@@ -1,0 +1,60 @@
+name: Validate Skills
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'skills/**'
+      - '.claude-plugin/marketplace.json'
+      - '.github/workflows/validate-skills.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'skills/**'
+      - '.claude-plugin/marketplace.json'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate every SKILL.md has required frontmatter
+        run: |
+          set -e
+          fail=0
+          while IFS= read -r -d '' f; do
+            if ! head -n 1 "$f" | grep -q '^---$'; then
+              echo "::error file=$f::missing YAML frontmatter"
+              fail=1
+              continue
+            fi
+            if ! awk '/^---$/{c++} c==1 && /^name:[[:space:]]*[^[:space:]]/{found=1} c==2{exit} END{exit !found}' "$f"; then
+              echo "::error file=$f::missing or empty name field"
+              fail=1
+            fi
+            if ! awk '/^---$/{c++} c==1 && /^description:[[:space:]]*[^[:space:]]/{found=1} c==2{exit} END{exit !found}' "$f"; then
+              echo "::error file=$f::missing or empty description field"
+              fail=1
+            fi
+          done < <(find skills -name SKILL.md -print0)
+          exit $fail
+
+      - name: Validate marketplace.json is valid JSON
+        run: python3 -c "import json; json.load(open('.claude-plugin/marketplace.json'))"
+
+      - name: Validate marketplace.json skill paths exist
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          m = json.load(open('.claude-plugin/marketplace.json'))
+          missing = []
+          for p in m.get('plugins', []):
+              for s in p.get('skills', []):
+                  path = os.path.normpath(s)
+                  if not os.path.isfile(os.path.join(path, 'SKILL.md')):
+                      missing.append(s)
+          if missing:
+              print('Missing SKILL.md for:', missing, file=sys.stderr)
+              sys.exit(1)
+          PY

@@ -1,0 +1,20 @@
+{
+  "name": "leek-agent-skills",
+  "owner": {
+    "name": "leek",
+    "email": "leeked@gmail.com"
+  },
+  "metadata": {
+    "description": "leek's personal collection of agent skills for Claude",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "leek-skills",
+      "description": "Personal skills collection",
+      "source": "./",
+      "strict": false,
+      "skills": []
+    }
+  ]
+}
