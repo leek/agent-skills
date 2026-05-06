@@ -43,6 +43,49 @@ Default CLI auto-paginates and may hang on huge result sets. For exploration:
 - `--no-paginate` for raw single page (then use `NextToken` if needed)
 - `--page-size 100` to tune API call size
 
+## Disable Pager in Scripts
+
+CLI v2 pipes long output through `less` by default. In a non-interactive shell (CI, agent runs, `bash -c`) this can hang. Always disable it:
+
+```bash
+export AWS_PAGER=""        # for the session
+aws --no-cli-pager s3 ls   # for one command
+```
+
+Set `AWS_PAGER=""` at the top of any script that calls `aws`.
+
+## Wait for Resource State
+
+Don't poll with `sleep` loops. The CLI has built-in waiters that poll for you:
+
+```bash
+aws ec2 wait instance-running    --instance-ids i-0abc...
+aws ec2 wait instance-terminated --instance-ids i-0abc...
+aws lambda wait function-updated --function-name F
+aws s3api wait bucket-exists     --bucket B
+aws cloudformation wait stack-create-complete --stack-name S
+```
+
+List available waiters per service: `aws <service> wait help`.
+
+Default poll interval and max attempts are service-specific (usually 15s × 40 attempts = 10 min).
+
+## Discovery & Skeleton Generation
+
+For unfamiliar commands, two power tools:
+
+```bash
+# interactive parameter completion — picks args from prompts
+aws lambda create-function --cli-auto-prompt
+
+# generate a JSON skeleton of all params, fill in, then submit
+aws lambda create-function --generate-cli-skeleton > req.json
+# edit req.json
+aws lambda create-function --cli-input-json file://req.json
+```
+
+Useful for any command with >5 params or nested shapes.
+
 ## Destructive Operations
 
 Stop and confirm with the user before any of:
@@ -78,6 +121,9 @@ Quick references kept short. Open the per-service file for details.
 - **IAM** — see [references/iam.md](./references/iam.md)
 - **Lambda** — see [references/lambda.md](./references/lambda.md)
 - **CloudWatch Logs** — see [references/logs.md](./references/logs.md)
+- **ECS / Fargate** — see [references/ecs.md](./references/ecs.md)
+- **DynamoDB** — see [references/dynamodb.md](./references/dynamodb.md)
+- **Secrets Manager / SSM Parameter Store** — see [references/secrets.md](./references/secrets.md)
 
 ## Errors
 
