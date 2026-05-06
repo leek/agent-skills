@@ -6,7 +6,15 @@ Skills follow the [Agent Skills](https://agentskills.io/) format.
 
 ## Available Skills
 
-_None yet — see [Creating a Skill](#creating-a-skill)._
+### aws-cli
+
+Run AWS CLI commands safely. Enforces identity verification, scoped queries with JMESPath, region/profile hygiene, and confirmation gates on destructive ops. Includes per-service references for S3, EC2, IAM, Lambda, and CloudWatch Logs.
+
+**Use when:**
+
+- Invoking `aws ...` for any service
+- "List S3 buckets", "describe EC2 instances", "tail Lambda logs", "what AWS account am I in"
+- Reviewing or proposing AWS infrastructure changes from the CLI
 
 ## Installation
 

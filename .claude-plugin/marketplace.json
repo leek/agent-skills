@@ -14,7 +14,9 @@
       "description": "Personal skills collection",
       "source": "./",
       "strict": false,
-      "skills": []
+      "skills": [
+        "./skills/aws-cli"
+      ]
     }
   ]
 }
