@@ -22,11 +22,19 @@ Run AWS CLI commands safely. Enforces identity verification, scoped queries with
 
 ### `npx skills` (any agent)
 
+Install the whole collection:
+
 ```bash
 npx skills add leek/agent-skills
 ```
 
-Installs the whole collection. Re-run to update.
+Install a single skill:
+
+```bash
+npx skills add https://github.com/leek/agent-skills --skill aws-cli
+```
+
+Re-run either command to update.
 
 ### Claude Code (plugin marketplace)
 
