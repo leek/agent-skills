@@ -4,6 +4,8 @@ Personal collection of agent skills for Claude Code, claude.ai, and the Claude A
 
 Skills follow the [Agent Skills](https://agentskills.io/) format.
 
+[![skills.sh](https://skills.sh/b/leek/agent-skills)](https://skills.sh/leek/agent-skills)
+
 ## Available Skills
 
 ### aws-cli
@@ -17,6 +19,14 @@ Run AWS CLI commands safely. Enforces identity verification, scoped queries with
 - Reviewing or proposing AWS infrastructure changes from the CLI
 
 ## Installation
+
+### `npx skills` (any agent)
+
+```bash
+npx skills add leek/agent-skills
+```
+
+Installs the whole collection. Re-run to update.
 
 ### Claude Code (plugin marketplace)
 
