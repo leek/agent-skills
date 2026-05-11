@@ -15,7 +15,8 @@
       "source": "./",
       "strict": false,
       "skills": [
-        "./skills/aws-cli"
+        "./skills/aws-cli",
+        "./skills/laravel-herd-worktrees"
       ]
     }
   ]
