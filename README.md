@@ -18,6 +18,16 @@ Run AWS CLI commands safely. Enforces identity verification, scoped queries with
 - "List S3 buckets", "describe EC2 instances", "tail Lambda logs", "what AWS account am I in"
 - Reviewing or proposing AWS infrastructure changes from the CLI
 
+### grill-me-claude
+
+Interview the user relentlessly about a plan or design until reaching shared understanding, resolving each branch of the decision tree. Every question is posed through the `AskUserQuestion` tool — click-to-answer, with a recommended option leading each prompt.
+
+**Use when:**
+
+- Stress-testing a plan or design before building
+- "Grill me on this", "poke holes in my approach", "interview me about this plan"
+- Resolving interdependent design decisions one branch at a time
+
 ### laravel-herd-worktrees
 
 Run multiple branches of a Laravel project in parallel via git worktrees, each served by Laravel Herd at its own `*.test` URL. Helper scripts handle worktree creation, `.env` rewrites (`APP_URL`, DB, cache/session/redis prefixes), per-worktree DB provisioning, dependency install, and clean teardown. Includes Herd CLI reference, isolation rationale, and DB strategy guide.

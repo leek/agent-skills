@@ -16,6 +16,7 @@
       "strict": false,
       "skills": [
         "./skills/aws-cli",
+        "./skills/grill-me-claude",
         "./skills/laravel-herd-worktrees"
       ]
     }
