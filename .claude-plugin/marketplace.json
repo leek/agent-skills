@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "leek's personal collection of agent skills for Claude",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
   "plugins": [
     {
@@ -16,6 +16,7 @@
       "strict": false,
       "skills": [
         "./skills/aws-cli",
+        "./skills/distill-sessions",
         "./skills/grill-me-claude",
         "./skills/laravel-herd-worktrees"
       ]

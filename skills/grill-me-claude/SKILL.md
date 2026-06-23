@@ -17,5 +17,8 @@ Pose every question with the `AskUserQuestion` tool instead of as plain prose, s
 - **`header` ≤ 12 chars.** A short tag for the decision, e.g. "Auth", "DB engine", "Caching".
 - **"Other" is automatic.** The user can always type a custom answer, so never add your own "Other"/"Something else" option. Don't force their intent into your list — if the real answer is likely off-list, keep the options honest and let them say so.
 - **`multiSelect` only when choices stack.** Set `multiSelect: true` when more than one option can legitimately be chosen together (e.g. "which of these should we support?"); otherwise leave it false.
+- **`preview`, if used, must be a non-null string.** A `null` preview makes the whole `AskUserQuestion` call fail validation. Either give every option a real preview snippet (a string) or omit the field entirely — never pass `null`.
+
+**Track what's already settled — never re-ask a resolved branch.** Keep a running list of the decisions the user has locked in (and the decisions their answers imply). Before posing a question, check it against that list; if the answer is already determined, skip it and move to the next open branch. Re-asking something the user already decided ("why are you asking me this again?") wastes their time and erodes trust.
 
 Keep going branch by branch until the plan is fully resolved.

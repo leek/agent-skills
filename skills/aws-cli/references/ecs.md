@@ -83,6 +83,30 @@ aws ecs execute-command --cluster prod --task <taskArn> \
   --container app --interactive --command "/bin/sh"
 ```
 
+### Gotchas (non-interactive shells, one-shot commands)
+
+- **Pick a *ready* task — not blindly `taskArns[0]`.** `enableExecuteCommand` on the *service* doesn't mean every task can exec; during a rolling deploy new tasks sit in `ACTIVATING`/`PENDING` with the exec agent still `PENDING`, and exec fails with *"execute command was not enabled … or the execute command agent isn't running."* Confirm both are `RUNNING` first:
+  ```bash
+  aws ecs describe-tasks --cluster prod --tasks "$TASK_ID" \
+    --query "tasks[0].{status:lastStatus,agent:containers[0].managedAgents[0].lastStatus}" --output json
+  # → {"status":"RUNNING","agent":"RUNNING"} — both must say RUNNING
+  ```
+- **`Cannot perform start session: EOF`** from a non-interactive shell (CI, an agent, a piped call): `--interactive` needs stdin held open. Redirect from `/dev/null` for a one-shot, or `sleep 25 |` to hold the session open. A *trailing* `Cannot perform start session: EOF` / `Exiting session …` line **after** the output is just normal teardown, not an error.
+- **No `bash` in slim images.** Wrap pipelines in `sh -c "..."`, not `bash -lc` (fails with `bash: executable file not found in $PATH`).
+- **SSM adds ~5–10s startup latency** before any output appears, and the call may get backgrounded — give it time before assuming it failed. Strip ANSI control noise from captured output with `sed -E 's/\x1b\[[0-9;]*m//g'`.
+
+### Run a multi-line script in the container (base64 → /tmp)
+
+Quoting a multi-line program through `execute-command` is hopeless, and many REPLs (e.g. PHP's psysh `tinker --execute`) reject `use` statements / multi-line input. Encode locally, decode in the container, run it, then `cat` a result file the script wrote:
+
+```bash
+B64=$(base64 -i /tmp/script.ext | tr -d '\n')
+aws ecs execute-command --cluster prod --task "$TASK_ID" --container app --interactive \
+  --command "sh -c \"echo $B64 | base64 -d > /tmp/x.ext && <interpreter> /tmp/x.ext </dev/null >/dev/null 2>&1; echo '=====OUTPUT====='; cat /tmp/out.txt\""
+```
+
+Have the script **write its result to `/tmp/out.txt`** (not stdout) and `cat` it *after* the interpreter exits: REPLs often swallow an included file's stdout, and `</dev/null` forces the interpreter to exit instead of hanging forever on the pty. The `=====OUTPUT=====` sentinel separates real output from session noise.
+
 ## Logs
 
 Container stdout goes to CloudWatch via the `awslogs` log driver. Tail:
