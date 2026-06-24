@@ -18,7 +18,7 @@ Run AWS CLI commands safely. Enforces identity verification, scoped queries with
 - "List S3 buckets", "describe EC2 instances", "tail Lambda logs", "what AWS account am I in"
 - Reviewing or proposing AWS infrastructure changes from the CLI
 
-### composer-dependency-audit-weekly
+### weekly-composer-dependency-audit
 
 Run a weekly Composer dependency audit for PHP projects. Checks outdated direct dependencies, runs `composer audit`, groups updates by risk, and produces a safe upgrade summary.
 
@@ -38,14 +38,14 @@ Interview the user relentlessly about a plan or design until reaching shared und
 - "Grill me on this", "poke holes in my approach", "interview me about this plan"
 - Resolving interdependent design decisions one branch at a time in Claude Code, Codex, or chat fallback
 
-### housekeeper-loop
+### housekeeper
 
 Run a conservative code-project housekeeping pass. Finds one proven low-risk cleanup at a time, makes the smallest coherent change, verifies behavior, and defers uncertain or approval-required candidates.
 
 **Use when:**
 
 - Cleaning dead code, stale files or comments, unused dependencies, duplicated logic, broken links, inconsistent names, or confusing structure
-- "Run the housekeeper loop", "do a safe repository cleanup", "find low-risk cleanup opportunities"
+- "Run housekeeper", "run the housekeeper loop", "do a safe repository cleanup", "find low-risk cleanup opportunities"
 - Improving project hygiene while protecting unrelated, uncommitted, generated, active, or uncertain work
 
 ### laravel-herd-worktrees
@@ -59,7 +59,7 @@ Run multiple branches of a Laravel project in parallel via git worktrees, each s
 - Wanting per-branch URLs like `myapp-feat.test` without manual config
 - Running the same Laravel project on multiple PHP versions simultaneously
 
-### npm-dependency-audit-weekly
+### weekly-npm-dependency-audit
 
 Run a weekly npm dependency audit for JavaScript and TypeScript projects. Checks outdated npm packages, runs `npm audit` when lockfile data is available, groups updates by risk, and produces a safe upgrade summary.
 
@@ -69,7 +69,7 @@ Run a weekly npm dependency audit for JavaScript and TypeScript projects. Checks
 - "Run npm audit", "check outdated npm packages", "review package.json upgrades"
 - Planning safe npm dependency upgrades without applying changes yet
 
-### overnight-docs-sweep
+### nightly-docs-sweep
 
 Run a documentation sweep for a codebase. Compares docs against the current implementation, updates stale material, verifies commands and examples, and leaves a reviewable change set or pull request.
 

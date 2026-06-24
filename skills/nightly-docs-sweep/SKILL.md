@@ -1,9 +1,9 @@
 ---
-name: overnight-docs-sweep
-description: Run a documentation sweep for a codebase. Use this when the user asks for an overnight docs sweep, documentation drift audit, README/setup/API docs refresh, docs sync after implementation changes, or a reviewable pull request that makes docs match the current code.
+name: nightly-docs-sweep
+description: Run a documentation sweep for a codebase. Use this when the user asks for a nightly docs sweep, overnight docs sweep, documentation drift audit, README/setup/API docs refresh, docs sync after implementation changes, or a reviewable pull request that makes docs match the current code.
 ---
 
-# Overnight Docs Sweep
+# Nightly Docs Sweep
 
 Use this skill to run the "The docs sweep" loop from Forward Future's Loop Library.
 

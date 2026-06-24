@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "leek's personal collection of agent skills for Claude",
-    "version": "0.3.0"
+    "version": "0.3.1"
   },
   "plugins": [
     {
@@ -16,13 +16,13 @@
       "strict": false,
       "skills": [
         "./skills/aws-cli",
-        "./skills/composer-dependency-audit-weekly",
+        "./skills/weekly-composer-dependency-audit",
         "./skills/distill-sessions",
         "./skills/grill-me-plus",
-        "./skills/housekeeper-loop",
+        "./skills/housekeeper",
         "./skills/laravel-herd-worktrees",
-        "./skills/npm-dependency-audit-weekly",
-        "./skills/overnight-docs-sweep"
+        "./skills/weekly-npm-dependency-audit",
+        "./skills/nightly-docs-sweep"
       ]
     }
   ]

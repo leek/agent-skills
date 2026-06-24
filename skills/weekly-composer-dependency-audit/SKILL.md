@@ -1,5 +1,5 @@
 ---
-name: composer-dependency-audit-weekly
+name: weekly-composer-dependency-audit
 description: Run a weekly Composer dependency audit for PHP projects. Use this when the user asks for a Composer dependency audit, PHP dependency review, composer outdated package summary, composer audit, Laravel package upgrade plan, or a safe PHP dependency upgrade summary.
 ---
 
