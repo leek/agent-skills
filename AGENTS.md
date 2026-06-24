@@ -13,11 +13,18 @@ This repo also doubles as a [Claude Code plugin marketplace](https://docs.claude
 ```
 .claude-plugin/marketplace.json   # Claude Code plugin manifest
 skills/<skill-name>/SKILL.md      # one folder per skill
-template/SKILL.md                 # starting point
+template/SKILL.md.example         # starting point; renamed so installers do not treat it as a real skill
 spec/                             # (optional) skill specs / docs
 ```
 
 ## Creating a New Skill
+
+Start from the example template:
+
+```bash
+mkdir -p skills/<skill-name>
+cp template/SKILL.md.example skills/<skill-name>/SKILL.md
+```
 
 ### 1. Naming
 

@@ -18,15 +18,35 @@ Run AWS CLI commands safely. Enforces identity verification, scoped queries with
 - "List S3 buckets", "describe EC2 instances", "tail Lambda logs", "what AWS account am I in"
 - Reviewing or proposing AWS infrastructure changes from the CLI
 
-### grill-me-claude
+### composer-dependency-audit-weekly
 
-Interview the user relentlessly about a plan or design until reaching shared understanding, resolving each branch of the decision tree. Every question is posed through the `AskUserQuestion` tool — click-to-answer, with a recommended option leading each prompt.
+Run a weekly Composer dependency audit for PHP projects. Checks outdated direct dependencies, runs `composer audit`, groups updates by risk, and produces a safe upgrade summary.
+
+**Use when:**
+
+- Auditing Composer or PHP dependencies
+- "Run composer audit", "check outdated Composer packages", "review Laravel package upgrades"
+- Planning safe PHP dependency upgrades without applying changes yet
+
+### grill-me-plus
+
+Interview the user relentlessly about a plan or design until reaching shared understanding, resolving each branch of the decision tree. Uses Claude Code's `AskUserQuestion` or Codex's `request_user_input` when available, with tool-specific schemas, recommended options, trade-offs, and fallbacks.
 
 **Use when:**
 
 - Stress-testing a plan or design before building
 - "Grill me on this", "poke holes in my approach", "interview me about this plan"
-- Resolving interdependent design decisions one branch at a time
+- Resolving interdependent design decisions one branch at a time in Claude Code, Codex, or chat fallback
+
+### housekeeper-loop
+
+Run a conservative code-project housekeeping pass. Finds one proven low-risk cleanup at a time, makes the smallest coherent change, verifies behavior, and defers uncertain or approval-required candidates.
+
+**Use when:**
+
+- Cleaning dead code, stale files or comments, unused dependencies, duplicated logic, broken links, inconsistent names, or confusing structure
+- "Run the housekeeper loop", "do a safe repository cleanup", "find low-risk cleanup opportunities"
+- Improving project hygiene while protecting unrelated, uncommitted, generated, active, or uncertain work
 
 ### laravel-herd-worktrees
 
@@ -38,6 +58,26 @@ Run multiple branches of a Laravel project in parallel via git worktrees, each s
 - Debugging cross-branch `.env`/cache/session/DB collisions
 - Wanting per-branch URLs like `myapp-feat.test` without manual config
 - Running the same Laravel project on multiple PHP versions simultaneously
+
+### npm-dependency-audit-weekly
+
+Run a weekly npm dependency audit for JavaScript and TypeScript projects. Checks outdated npm packages, runs `npm audit` when lockfile data is available, groups updates by risk, and produces a safe upgrade summary.
+
+**Use when:**
+
+- Auditing npm, JavaScript, or TypeScript dependencies
+- "Run npm audit", "check outdated npm packages", "review package.json upgrades"
+- Planning safe npm dependency upgrades without applying changes yet
+
+### overnight-docs-sweep
+
+Run a documentation sweep for a codebase. Compares docs against the current implementation, updates stale material, verifies commands and examples, and leaves a reviewable change set or pull request.
+
+**Use when:**
+
+- Auditing documentation drift after implementation changes
+- Refreshing READMEs, setup guides, API references, examples, architecture notes, or runbooks
+- "Run an overnight docs sweep", "make docs match the code", "open a docs cleanup PR"
 
 ## Installation
 
@@ -103,11 +143,11 @@ description: One sentence — what it does and when Claude should use it.
 Instructions here.
 ```
 
-See [`template/SKILL.md`](./template/SKILL.md) for a starting point and [`AGENTS.md`](./AGENTS.md) for full conventions.
+See [`template/SKILL.md.example`](./template/SKILL.md.example) for a starting point and [`AGENTS.md`](./AGENTS.md) for full conventions.
 
 ## Creating a Skill
 
-1. Copy `template/` to `skills/<skill-name>/`.
+1. Copy `template/SKILL.md.example` to `skills/<skill-name>/SKILL.md`.
 2. Fill in `SKILL.md` — keep it under 500 lines; offload reference material to sibling files.
 3. Add the skill to `.claude-plugin/marketplace.json` under the `leek-skills` plugin.
 4. Update the **Available Skills** section above.
