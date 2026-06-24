@@ -5,10 +5,6 @@ description: Run a weekly npm dependency audit for JavaScript or TypeScript proj
 
 # NPM Dependency Audit Weekly
 
-Use this skill to run the npm-specific version of the Dependency Audit Weekly loop from loops.elorm.xyz.
-
-Source loop: https://loops.elorm.xyz/loops/dependency-audit-weekly
-
 ## Goal
 
 Deliver a weekly npm dependency audit summary.

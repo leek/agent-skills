@@ -5,10 +5,6 @@ description: Run a conservative code-project housekeeping pass. Use this when th
 
 # Housekeeper
 
-Use this skill to run "The housekeeper loop" from Forward Future's Loop Library.
-
-Source loop: https://signals.forwardfuture.ai/loop-library/loops/housekeeper-loop/
-
 ## Goal
 
 Find and apply one proven, low-risk cleanup at a time while preserving existing behavior and protecting unrelated work.

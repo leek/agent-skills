@@ -5,10 +5,6 @@ description: Run a weekly Composer dependency audit for PHP projects. Use this w
 
 # Composer Dependency Audit Weekly
 
-Use this skill as the Composer/PHP clone of the npm Dependency Audit Weekly loop from loops.elorm.xyz.
-
-Source loop adapted from: https://loops.elorm.xyz/loops/dependency-audit-weekly
-
 ## Goal
 
 Deliver a weekly Composer dependency audit summary.

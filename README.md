@@ -18,6 +18,16 @@ Run AWS CLI commands safely. Enforces identity verification, scoped queries with
 - "List S3 buckets", "describe EC2 instances", "tail Lambda logs", "what AWS account am I in"
 - Reviewing or proposing AWS infrastructure changes from the CLI
 
+### architecture-satisfaction
+
+Run a bounded architectural refactor loop. Defines what satisfactory means, makes one reviewable architecture change at a time, live-tests affected behavior, runs an independent review, commits verified checkpoints, and records progress in `/tmp/refactor-{projectname}.md`.
+
+**Use when:**
+
+- Refactoring toward a stated architecture or untangling module boundaries
+- Fixing dependency direction, code organization, or long-running architectural drift
+- "Refactor until the architecture is right", "run the architecture satisfaction loop", "checkpoint this refactor as we go"
+
 ### weekly-composer-dependency-audit
 
 Run a weekly Composer dependency audit for PHP projects. Checks outdated direct dependencies, runs `composer audit`, groups updates by risk, and produces a safe upgrade summary.
@@ -47,6 +57,16 @@ Run a conservative code-project housekeeping pass. Finds one proven low-risk cle
 - Cleaning dead code, stale files or comments, unused dependencies, duplicated logic, broken links, inconsistent names, or confusing structure
 - "Run housekeeper", "run the housekeeper loop", "do a safe repository cleanup", "find low-risk cleanup opportunities"
 - Improving project hygiene while protecting unrelated, uncommitted, generated, active, or uncertain work
+
+### repository-cleanup
+
+Audit and clean Git repository state. Inventories branches, pull requests, commits, stashes, and worktrees; recovers valuable work; removes only proven stale state; and repeats until remaining repo state is intentional.
+
+**Use when:**
+
+- Cleaning stale local or remote branches, old pull requests, unmerged commits, forgotten stashes, or obsolete worktrees
+- "Run repository cleanup", "clean up old branches", "audit worktrees", "recover abandoned branch work"
+- Organizing Git state while protecting uncommitted changes, unpushed commits, dirty worktrees, and uncertain ownership
 
 ### laravel-herd-worktrees
 

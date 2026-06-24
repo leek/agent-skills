@@ -5,10 +5,6 @@ description: Run a documentation sweep for a codebase. Use this when the user as
 
 # Nightly Docs Sweep
 
-Use this skill to run the "The docs sweep" loop from Forward Future's Loop Library.
-
-Source loop: https://signals.forwardfuture.ai/loop-library/loops/overnight-docs-sweep/
-
 ## Goal
 
 Make repository documentation match the current implementation, then leave a reviewable change set or pull request.
