@@ -57,6 +57,8 @@ Do not print fake tool JSON to the user. Either call the available tool or ask n
 
 Use `AskUserQuestion` for every question when it is available.
 
+**These questions are always blocking. Do not time out and do not continue without a real user response.** Every `AskUserQuestion` call must wait for the user to actually answer. Never proceed on an assumed answer, a default, or your own best guess when the tool is still waiting. If the user has not responded, stay blocked — do not advance the grill, infer the answer, or move to the next decision until a genuine answer comes back.
+
 Use the tool to its full capability:
 
 - Ask 1 question per call by default.

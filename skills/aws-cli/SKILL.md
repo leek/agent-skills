@@ -9,13 +9,39 @@ Run AWS CLI commands safely and efficiently. Default to **read-only** operations
 
 ## Always Do First
 
-Before any AWS CLI command, confirm three things:
+Before any AWS CLI command, establish identity, region, and profile.
+
+**Fast path — resolve context from local config, no network call.** Region and a cached account ID both come from local files, so there's no need for an `sts` round-trip:
+
+```bash
+# env vars win (CI, direnv); else fall back to the active profile's ~/.aws/config
+ACCT="${AWS_EXPECTED_ACCOUNT_ID:-$(aws configure get expected_account_id 2>/dev/null)}"
+REGION="${AWS_REGION:-$(aws configure get region 2>/dev/null)}"
+echo "context: ${ACCT:-?} / ${REGION:-?}  (profile ${AWS_PROFILE:-default})"
+```
+
+If both resolve, **skip the upfront `aws sts get-caller-identity` round-trip** — treat them as the known account and region. Any auth problem (missing creds, expired SSO) surfaces on the first real command, so the check buys nothing for read-only work. State the assumed context in your summary ("Using cached context `123456789012` / `us-east-1`").
+
+`region` is a standard CLI key. `expected_account_id` is a **custom** key — the CLI ignores it, but `aws configure get` reads it. Stash it once, per profile, so it travels with the credentials it describes:
+
+```bash
+aws configure set expected_account_id 123456789012 --profile <name>
+```
+
+**Cold path — context didn't resolve.** Confirm three things first:
 
 1. **Identity** — `aws sts get-caller-identity` (account, principal)
 2. **Region** — explicit `--region <r>` or `AWS_REGION` env. Do not rely on default profile region for cross-account work.
 3. **Profile** — `AWS_PROFILE=<name>` if multiple. Show user which profile is active.
 
 If `aws sts get-caller-identity` fails: stop. Do not retry blindly. Diagnose: missing creds, expired SSO session, wrong profile. See [references/auth.md](./references/auth.md).
+
+**Verify before mutating.** The fast path trusts the *expected* account; it does not prove you're authenticated as it. Before any destructive op or work against a `prod` account, confirm the live identity matches the cache:
+
+```bash
+[ "$(aws sts get-caller-identity --query Account --output text)" = "$ACCT" ] \
+  && echo "identity OK" || echo "ACCOUNT MISMATCH — stop"
+```
 
 ## Output Filtering
 
