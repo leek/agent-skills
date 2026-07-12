@@ -167,4 +167,4 @@ Stop when:
 - Remaining branches depend on information outside the current context.
 - The user asks for a summary, PRD, implementation plan, or next-step artifact.
 
-End with a compact summary of settled decisions, unresolved risks, and the recommended next action.
+End with a compact summary of settled decisions, unresolved risks, and the recommended next action. When the plan is resolved and the user wants a durable artifact, suggest `to-spec-plus` (spec/PRD) or `to-tickets-plus` (implementation tickets); for efforts too big for one session, suggest charting a `wayfinder-plus` map.

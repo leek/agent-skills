@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "leek's personal collection of agent skills for Claude",
-    "version": "0.5.0"
+    "version": "0.6.0"
   },
   "plugins": [
     {
@@ -17,12 +17,18 @@
       "skills": [
         "./skills/aws-cli",
         "./skills/architecture-satisfaction",
+        "./skills/codebase-design-plus",
+        "./skills/domain-modeling-plus",
         "./skills/weekly-composer-dependency-audit",
         "./skills/distill-sessions",
         "./skills/grill-me-plus",
         "./skills/housekeeper",
+        "./skills/implement-plus",
         "./skills/repository-cleanup",
         "./skills/laravel-herd-worktrees",
+        "./skills/to-spec-plus",
+        "./skills/to-tickets-plus",
+        "./skills/wayfinder-plus",
         "./skills/weekly-npm-dependency-audit",
         "./skills/nightly-docs-sweep"
       ]

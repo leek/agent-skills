@@ -48,6 +48,66 @@ Interview the user relentlessly about a plan or design until reaching shared und
 - "Grill me on this", "poke holes in my approach", "interview me about this plan"
 - Resolving interdependent design decisions one branch at a time in Claude Code, Codex, or chat fallback
 
+### domain-modeling-plus
+
+Build and sharpen a project's domain model as you design — challenge terms against the `CONTEXT.md` glossary, resolve fuzzy language via `AskUserQuestion`, stress-test concepts with concrete scenarios, cross-reference terms against the Laravel codebase (models, enums, migrations, Filament labels), and record glossary entries and ADRs the moment decisions land.
+
+**Use when:**
+
+- Pinning down domain terminology or a ubiquitous language
+- Recording an architectural decision worth an ADR
+- Running alongside `grill-me-plus`, `wayfinder-plus`, or `to-spec-plus` sessions where terms get decided
+
+### codebase-design-plus
+
+Shared vocabulary for designing deep modules in a PHP/Laravel codebase — module, interface, seam, adapter, depth, leverage, locality — with a Laravel mapping (container bindings, framework fakes, actions over Eloquent), a deepening playbook by dependency category, and a design-it-twice parallel sub-agent pattern.
+
+**Use when:**
+
+- Designing or improving a class or module's interface
+- Deciding where a seam goes or whether a container binding is justified
+- Finding deepening opportunities or exploring alternative interfaces with parallel sub-agents
+
+### wayfinder-plus
+
+Plan work too big for one agent session as a shared map of investigation tickets on the project's issue tracker (GitHub, Linear, or local markdown), then resolve them one per session — grilling, research, prototype, or task tickets — until the route to the destination is clear. Adapted from [Matt Pocock's wayfinder](https://github.com/mattpocock/skills) with fast-path tracker resolution, `grill-me-plus` integration, and Laravel-flavored prototypes.
+
+**Use when:**
+
+- A loose idea is too large or foggy to spec in one sitting
+- "Chart a map", "run wayfinder", "work the map", "take the next frontier ticket"
+- Coordinating multi-session planning where humans and agents share one tracker
+
+### to-spec-plus
+
+Turn the current conversation into a spec (PRD) and publish it to the project's issue tracker — no interview, just synthesis of what was already discussed. Proposes Laravel test seams (HTTP, Livewire/Filament, command, job, action, model) and confirms them via `AskUserQuestion` before writing.
+
+**Use when:**
+
+- A grilling session is done and needs a durable artifact
+- "Write this up as a spec", "to spec", "turn this into a PRD"
+- Publishing a `ready-for-agent` spec issue for later implementation
+
+### to-tickets-plus
+
+Break a plan, spec, or conversation into tracer-bullet vertical-slice tickets with explicit blocking edges — Laravel slices cut migration → model → behavior → route → feature test. Approves granularity and edges via `AskUserQuestion`, sequences wide refactors as expand–contract, and publishes blockers-first to GitHub, Linear, or local markdown.
+
+**Use when:**
+
+- Slicing a spec into implementable, demoable tickets
+- "Break this into tickets", "to tickets", "create the issues for this plan"
+- Sequencing a wide refactor (column rename, shared type change) safely
+
+### implement-plus
+
+Implement one ticket or spec end to end in a Laravel codebase: claim it, TDD at pre-agreed seams with Pest/PHPUnit, run static analysis and Pint, review on two axes (standards + spec), verify the real flow, commit with explicit staging, and close the ticket. Includes a Laravel TDD reference (seam ladder, factories, fakes, anti-patterns).
+
+**Use when:**
+
+- Implementing a `ready-for-agent` ticket or an approved spec
+- "Implement this ticket", "work the next frontier ticket", "build this spec"
+- Working one vertical slice per session with a clean context between slices
+
 ### housekeeper
 
 Run a conservative code-project housekeeping pass. Finds one proven low-risk cleanup at a time, makes the smallest coherent change, verifies behavior, and defers uncertain or approval-required candidates.
