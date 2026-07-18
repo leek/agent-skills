@@ -7,14 +7,14 @@ description: Interview the user relentlessly about a plan or design until reachi
 
 Interview the user relentlessly about every aspect of a plan, design, product idea, implementation approach, or architectural choice until there is shared understanding.
 
-Walk the decision tree one branch at a time. Resolve dependencies between decisions in order. For each question, provide a recommended answer and concrete alternatives with trade-offs.
+Walk the decision tree one branch at a time. Resolve dependencies between decisions in order. The **frontier** is every open decision whose prerequisites are already settled — the questions that can be asked now without guessing at answers not yet given. For each question, provide a recommended answer and concrete alternatives with trade-offs.
 
-If a question can be answered by exploring the codebase, files, docs, or current implementation, inspect that context instead of asking.
+Finding facts is never the user's job. If a question can be answered by exploring the codebase, files, docs, or current implementation, inspect that context instead of asking. When a fact needs real research, dispatch a sub-agent to find it and keep interviewing — a running lookup is an unsettled prerequisite, so only the decisions downstream of it wait. The rest of the frontier stays askable now.
 
 ## Core Loop
 
 1. Identify the next unresolved decision that matters.
-2. Check whether existing context already answers it. If yes, record the decision and move on.
+2. Check whether existing context already answers it. If yes, record the decision and move on. If it needs a fact worth researching, dispatch a sub-agent, mark the branch deferred, and continue with the rest of the frontier while it runs.
 3. Ask one focused structured question through the current harness's question tool when available.
 4. Lead with the recommended option and explain the trade-off for every option.
 5. After the user answers, update the decision ledger and infer any downstream decisions that answer implies.
@@ -27,9 +27,9 @@ Maintain a running internal ledger:
 - `settled`: decisions the user explicitly chose.
 - `implied`: decisions that follow from earlier answers.
 - `open`: branches still worth asking about.
-- `deferred`: questions blocked by missing context, external constraints, or user choice.
+- `deferred`: questions blocked by missing context, a pending fact-finding sub-agent, external constraints, or user choice.
 
-Before asking anything, check the ledger. Never re-ask a resolved or implied branch.
+Before asking anything, check the ledger. Never re-ask a resolved or implied branch. When a fact-finding sub-agent reports back, move its downstream branches from `deferred` to `open`.
 
 ## Tool Selection
 
@@ -44,7 +44,7 @@ Do not print fake tool JSON to the user. Either call the available tool or ask n
 ## Shared Question Rules
 
 - Ask one decision at a time by default.
-- Batch only genuinely independent questions.
+- Batch only questions on the current frontier: every prerequisite settled, none depending on another answer in the same batch.
 - Put the recommended option first and suffix its label with ` (Recommended)`.
 - Use concise option labels, ideally 1-5 words.
 - Make every option real. No filler choices.
@@ -62,7 +62,7 @@ Use `AskUserQuestion` for every question when it is available.
 Use the tool to its full capability:
 
 - Ask 1 question per call by default.
-- Batch up to 4 questions only when the answers are independent.
+- Batch up to 4 frontier questions per call — the tool's cap. A question whose answer depends on another question in the batch belongs to a later call.
 - Provide 2-4 options per question.
 - Use `multiSelect: true` only when options can legitimately stack, such as feature support lists or acceptable constraints. Otherwise leave it false or omit it.
 - If the tool supports option `preview`, use it only for useful concrete snippets or examples. Never pass `null`; omit `preview` entirely when there is no meaningful preview.
