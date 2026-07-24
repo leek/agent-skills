@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "leek's personal collection of agent skills for Claude",
-    "version": "0.6.0"
+    "version": "0.8.0"
   },
   "plugins": [
     {
@@ -26,6 +26,8 @@
         "./skills/implement-plus",
         "./skills/repository-cleanup",
         "./skills/laravel-herd-worktrees",
+        "./skills/research-plus",
+        "./skills/to-questionnaire-plus",
         "./skills/to-spec-plus",
         "./skills/to-tickets-plus",
         "./skills/wayfinder-plus",

@@ -1,0 +1,20 @@
+---
+name: research-plus
+description: Investigate a question against high-trust primary sources and capture the findings as a cited Markdown file, run as a background subagent so the main session keeps working. Use when the user wants a topic researched, docs or package facts gathered, reading legwork delegated, or a wayfinder-plus research ticket resolved.
+---
+
+# Research Plus
+
+Spin up a **background subagent** to do the research, so the main session keeps working while it reads. In Claude Code that is the Agent tool run in the background — `Explore` for read-only source sweeps, `general-purpose` when the research needs web fetches or other tool calls. In harnesses without subagents, do the research inline and say so.
+
+The subagent's job:
+
+1. Investigate the question against **primary sources** — official docs, package source (`vendor/` for Composer, `node_modules/` for npm), specs, first-party APIs — never a secondary write-up of them. Follow every claim back to the source that owns it. In a Laravel project with Boost, prefer the `search-docs` MCP tool over web search for framework and package questions — it returns version-pinned ecosystem docs.
+2. Write the findings to a single Markdown file, citing each claim's source — a URL, a file path, or `package@version`.
+3. Save it where the repo already keeps such notes; match the existing convention. If there is none, put it somewhere sensible (`.scratch/research/<slug>.md` is a fine default) and say where.
+
+The final report back to the main session is the answer plus the file path — not a re-paste of the whole document.
+
+## Wayfinder integration
+
+When resolving a `wayfinder-plus` research ticket, commit the findings file to a throwaway `research/<ticket-slug>` branch and post the answer with a pointer to that branch as the ticket's resolution comment, then close the ticket. Research tickets are the one type a charting session may fire in parallel — one subagent per ticket, one branch each.

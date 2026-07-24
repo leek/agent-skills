@@ -1,11 +1,11 @@
 ---
 name: wayfinder-plus
-description: Plan work too big for one agent session as a shared map of investigation tickets on the project's issue tracker (GitHub, Linear, or local markdown), then resolve them one per session until the route to the destination is clear. Use when the user says "wayfinder", "chart a map", "work the map", or brings a loose idea too large or foggy to spec in one sitting.
+description: Plan work too big for one agent session as a shared map of decision tickets on the project's issue tracker (GitHub, Linear, or local markdown), then resolve them one per session until the route to the destination is clear. Use when the user says "wayfinder", "chart a map", "work the map", or brings a loose idea too large or foggy to spec in one sitting.
 ---
 
 # Wayfinder Plus
 
-A loose idea has arrived — too big for one agent session, and wrapped in fog: the way from here to the **destination** isn't visible yet. Wayfinding finds that way instead of charging at the destination. Chart the way as a **shared map** on the project's issue tracker, then work its tickets one at a time until the route is clear.
+A loose idea has arrived — too big for one agent session, and wrapped in fog: the way from here to the **destination** isn't visible yet. Wayfinding finds that way instead of charging at the destination. Chart the way as a **shared map** on the project's issue tracker, then work its **decision tickets** — questions whose resolution is a decision, not slices of a build to execute — one at a time until the route is clear.
 
 Naming the destination is the first act of charting — it shapes every ticket. It might be a spec to hand to `to-spec-plus`, a decision to lock before planning starts, or a change made in place (a data-model migration, an expand–contract schema change).
 
@@ -14,6 +14,8 @@ Pipeline position: `wayfinder-plus` (find the way) → `to-spec-plus` (write the
 ## Plan, don't do
 
 Each ticket resolves a **decision**; the map is done when nothing is left to decide before someone goes and does the thing. The pull to just do the work is usually the signal you've reached the edge of the map and it's time to hand off. An effort can override this in its **Notes** — carrying execution into the map itself — but absent that, produce decisions, not deliverables.
+
+When the map clears, **hand off — don't build**: `to-spec-plus` collapses the map's linked decisions into a buildable plan, then `to-tickets-plus` and `implement-plus` as usual. Looping the map straight into `implement-plus` skips that collapse and throws the linked detail away — skip to `implement-plus` only when the effort turned out genuinely small.
 
 ## Refer by name
 
@@ -80,7 +82,7 @@ The answer isn't part of the body — it's recorded on resolution. Assets create
 
 Every ticket is either **HITL** — human in the loop, worked *with* a human who speaks for themselves — or **AFK**, driven by the agent alone. A HITL ticket only resolves through that live exchange; the agent never stands in for the human's side (a grilling agent that answers its own questions has broken this).
 
-- **Research** (AFK): read documentation, package source, third-party APIs, or internal knowledge bases. Produces a markdown summary as a linked asset. Use when knowledge outside the working directory is required — e.g. "does Cashier support per-seat proration the way we need?"
+- **Research** (AFK): read documentation, package source, third-party APIs, or internal knowledge bases to surface a fact a decision waits on. Resolved by a `research-plus` **subagent** — findings land as a markdown summary linked from the ticket. Use when knowledge outside the working directory is required — e.g. "does Cashier support per-seat proration the way we need?"
 - **Prototype** (HITL): raise the fidelity of the discussion with a cheap, throwaway, concrete artifact to react to. Laravel flavors: a scratch Artisan command or Tinker script that pushes a state model through hard cases; a throwaway route/Blade view, Livewire component, or Filament page for "what should it look like". Clearly named as a prototype, committed to a throwaway branch off main, linked from the ticket. Fold only the validated decision back.
 - **Grilling** (HITL): run a `grill-me-plus` session — structured, click-to-answer questions, one decision at a time — with `domain-modeling-plus` alongside it, capturing terms and ADRs as decisions land. The default type.
 - **Task** (HITL or AFK): manual work that must happen before a *decision* can be made — signing up for a service so its API can be judged, provisioning access, moving data so its shape can be seen. The one type that *does* rather than decides, earning its place by unblocking a decision. The agent drives it alone where it can; otherwise it hands the human a precise checklist. The answer records what was done and any resulting facts (credentials location, URLs, row counts) later tickets depend on.
@@ -117,7 +119,7 @@ Decision points that arise outside a full grilling — confirming the destinatio
 
 ## Invocation
 
-Two modes. Either way, **never resolve more than one ticket per session.**
+Two modes. Either way, **never resolve more than one ticket per session** — with the exception of research tickets.
 
 ### Chart the map
 
@@ -127,7 +129,8 @@ User invokes with a loose idea.
 2. **Map the frontier.** Grill again, **breadth-first**: fan out across the whole space rather than deep on any thread, surfacing the open decisions and the first steps takeable now. **If this surfaces no fog** — the whole journey fits one session — you don't need a map. Stop and ask the user whether to go straight to `to-spec-plus` or `to-tickets-plus`.
 3. **Create the map** (label `wayfinder:map`): Destination and Notes filled in, Decisions so far empty, the fog sketched into Not yet specified.
 4. **Create the tickets you can specify now** as children of the map — then wire blocking edges in a **second pass** (issues need ids before they can reference each other). Everything you can't yet specify stays in the fog.
-5. Stop — charting is one session's work; do not also resolve tickets.
+5. **Fire the research subagents.** For each `research` ticket you just created, spin up a `research-plus` subagent to resolve it in parallel, capturing its findings on a throwaway `research/<name>` branch with a context pointer from the ticket.
+6. Stop — charting is one session's work; it hand-resolves nothing.
 
 ### Work through the map
 

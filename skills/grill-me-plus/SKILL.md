@@ -1,6 +1,6 @@
 ---
 name: grill-me-plus
-description: Interview the user relentlessly about a plan or design until reaching shared understanding, resolving each branch of the decision tree. Use Claude Code's AskUserQuestion or Codex's request_user_input when available so decisions are click-to-answer. Use when the user says "grill me", wants to stress-test a plan, compare design choices, or resolve ambiguous implementation decisions.
+description: Interview the user relentlessly about a plan, decision, or idea until reaching shared understanding, resolving each branch of the decision tree. Use Claude Code's AskUserQuestion or Codex's request_user_input when available so decisions are click-to-answer. Use when the user says "grill me", wants to stress-test their thinking, compare design choices, or resolve ambiguous implementation decisions.
 ---
 
 # Grill Me Plus
@@ -9,7 +9,7 @@ Interview the user relentlessly about every aspect of a plan, design, product id
 
 Walk the decision tree one branch at a time. Resolve dependencies between decisions in order. The **frontier** is every open decision whose prerequisites are already settled — the questions that can be asked now without guessing at answers not yet given. For each question, provide a recommended answer and concrete alternatives with trade-offs.
 
-Finding facts is never the user's job. If a question can be answered by exploring the codebase, files, docs, or current implementation, inspect that context instead of asking. When a fact needs real research, dispatch a sub-agent to find it and keep interviewing — a running lookup is an unsettled prerequisite, so only the decisions downstream of it wait. The rest of the frontier stays askable now.
+Finding facts is never the user's job. If a question can be answered by exploring the environment — codebase, files, docs, tools, or current implementation — inspect that context instead of asking. When a fact needs real research, dispatch a sub-agent to find it and keep interviewing — a running lookup is an unsettled prerequisite, so only the decisions downstream of it wait. The rest of the frontier stays askable now.
 
 ## Core Loop
 

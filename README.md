@@ -40,13 +40,23 @@ Run a weekly Composer dependency audit for PHP projects. Checks outdated direct 
 
 ### grill-me-plus
 
-Interview the user relentlessly about a plan or design until reaching shared understanding, resolving each branch of the decision tree. Uses Claude Code's `AskUserQuestion` or Codex's `request_user_input` when available, with tool-specific schemas, recommended options, trade-offs, and fallbacks.
+Interview the user relentlessly about a plan, decision, or idea until reaching shared understanding, resolving each branch of the decision tree. Uses Claude Code's `AskUserQuestion` or Codex's `request_user_input` when available, with tool-specific schemas, recommended options, trade-offs, and fallbacks.
 
 **Use when:**
 
-- Stress-testing a plan or design before building
+- Stress-testing a plan, decision, or idea before acting
 - "Grill me on this", "poke holes in my approach", "interview me about this plan"
 - Resolving interdependent design decisions one branch at a time in Claude Code, Codex, or chat fallback
+
+### to-questionnaire-plus
+
+Turn a decision the user can't fully answer into a Markdown questionnaire for someone else to fill in, async or over a meeting. Grills the send (who it goes to, what's needed back) via `AskUserQuestion`, then writes discovery questions aimed at the gap between what the recipient knows and what the user needs. Adapted from [Matt Pocock's to-questionnaire](https://github.com/mattpocock/skills).
+
+**Use when:**
+
+- A grilling branch is blocked on knowledge someone else holds
+- "To questionnaire", "draft questions for the vendor", "what should I ask compliance"
+- Pulling decisions or facts out of a stakeholder, vendor, or compliance contact
 
 ### domain-modeling-plus
 
@@ -70,13 +80,23 @@ Shared vocabulary for designing deep modules in a PHP/Laravel codebase — modul
 
 ### wayfinder-plus
 
-Plan work too big for one agent session as a shared map of investigation tickets on the project's issue tracker (GitHub, Linear, or local markdown), then resolve them one per session — grilling, research, prototype, or task tickets — until the route to the destination is clear. Adapted from [Matt Pocock's wayfinder](https://github.com/mattpocock/skills) with fast-path tracker resolution, `grill-me-plus` integration, and Laravel-flavored prototypes.
+Plan work too big for one agent session as a shared map of decision tickets on the project's issue tracker (GitHub, Linear, or local markdown), then resolve them one per session — grilling, research, prototype, or task tickets — until the route to the destination is clear. Adapted from [Matt Pocock's wayfinder](https://github.com/mattpocock/skills) with fast-path tracker resolution, `grill-me-plus` integration, parallel `research-plus` subagents, and Laravel-flavored prototypes.
 
 **Use when:**
 
 - A loose idea is too large or foggy to spec in one sitting
 - "Chart a map", "run wayfinder", "work the map", "take the next frontier ticket"
 - Coordinating multi-session planning where humans and agents share one tracker
+
+### research-plus
+
+Investigate a question against high-trust primary sources — official docs, package source, specs, first-party APIs — and capture the findings as a cited Markdown file. Runs as a background subagent so the main session keeps working; prefers Laravel Boost's `search-docs` for framework and package questions. Resolves `wayfinder-plus` research tickets on throwaway `research/<slug>` branches.
+
+**Use when:**
+
+- Delegating reading legwork to a background agent
+- "Research this", "check the docs for", "does package X support Y"
+- Burning down `wayfinder-plus` research tickets in parallel
 
 ### to-spec-plus
 
