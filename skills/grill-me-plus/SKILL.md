@@ -36,7 +36,7 @@ Before asking anything, check the ledger. Never re-ask a resolved or implied bra
 Use the best structured question tool exposed by the current agent harness:
 
 - **Claude Code:** use `AskUserQuestion`.
-- **Codex:** use `request_user_input` when it is listed in the available tools for the current turn.
+- **Codex:** use `request_user_input` when it is listed in the available tools for the current turn. Codex only exposes this tool in Plan mode.
 - **Other agents or missing structured tool:** ask directly in chat, one question at a time, preserving the same recommendation/options/trade-off structure.
 
 Do not print fake tool JSON to the user. Either call the available tool or ask naturally in chat.
@@ -98,7 +98,7 @@ Example shape:
 
 ## Codex: request_user_input
 
-Use `request_user_input` whenever it is listed in Codex's available tools for the current turn. If it is not available, ask in chat.
+Use `request_user_input` whenever it is listed in Codex's available tools for the current turn. Codex only exposes this tool in Plan mode. If it is not available, tell the user once — before the first question — that switching to Plan mode (Shift+Tab) enables the click-to-answer picker, then continue with the chat fallback rather than waiting for a mode switch.
 
 Codex has a stricter shape than Claude Code:
 
