@@ -91,6 +91,23 @@ What this spec deliberately excludes.
 Anything else future readers need.
 ```
 
-## After publishing
+## When you're done
 
-Point the user at `to-tickets-plus` to break the spec into tracer-bullet tickets, or `implement-plus` directly if the work fits one session.
+End the session by printing the block below — on a clean finish, a stop, or a dead end. On harnesses without slash commands, write the command as plain phrasing (`run to-tickets-plus on <ref>`) instead of `/to-tickets-plus <ref>`.
+
+```text
+---
+Pipeline: decide → **spec** → slice → build   (2 of 4)
+Done: <what exists now, with its reference>
+Next:
+  • <condition> → /<skill> <ref>
+```
+
+List only the conditions that actually apply, most likely first:
+
+- **Spec published, work spans several slices** → `/to-tickets-plus <spec ref>`
+- **Spec published, work fits one session** → `/implement-plus <spec ref>`
+- **A load-bearing decision is still open** → `/grill-me-plus` on that decision, naming it; re-run `/to-spec-plus` after
+- **Several decisions open, or the effort is bigger than one spec** → `/wayfinder-plus` to chart it first
+- **Blocked on knowledge someone else holds** → `/to-questionnaire-plus`; **on a fact worth reading for** → `/research-plus`
+- **Stopped before publishing** → say what the draft covers, where it lives, and which sections are unwritten

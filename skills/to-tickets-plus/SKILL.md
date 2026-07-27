@@ -98,3 +98,23 @@ In either form, avoid file paths and code snippets — they go stale fast. Excep
 ## After publishing
 
 Work the **frontier** — any ticket whose blockers are all done — one ticket at a time with `implement-plus`, clearing context between tickets. For a linear chain that means top to bottom.
+
+## When you're done
+
+End the session by printing the block below — on a clean finish, a stop, or a dead end. On harnesses without slash commands, write the command as plain phrasing (`run implement-plus on <ref>`) instead of `/implement-plus <ref>`.
+
+```text
+---
+Pipeline: decide → spec → **slice** → build   (3 of 4)
+Done: <how many tickets, how many on the frontier, with refs>
+Next:
+  • <condition> → /<skill> <ref>
+```
+
+List only the conditions that actually apply, most likely first:
+
+- **Tickets published with a frontier** → `/implement-plus <first frontier ticket>`, then one per session with cleared context
+- **Every ticket is blocked by something already open on the tracker** → `/implement-plus <that blocker>` first; name it
+- **A ticket turned out to be a decision, not a build** → `/grill-me-plus` on it (or `/wayfinder-plus` if there are several)
+- **Slicing exposed a gap the spec never settled** → `/grill-me-plus` on the gap, then re-run `/to-spec-plus`
+- **Stopped before publishing** → say which tickets exist, which are drafted only, and which blocking edges are unwired

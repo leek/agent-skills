@@ -52,3 +52,23 @@ _Why this matters: it decides whether we provision for burst traffic now or defe
 A closing catch-all: anything we didn't ask that we should know?
 
 </questionnaire-template>
+
+## When you're done
+
+End the session by printing the block below — on a clean finish, a stop, or a dead end. On harnesses without slash commands, write the command as plain phrasing (`run grill-me-plus on <ref>`) instead of `/grill-me-plus <ref>`.
+
+```text
+---
+Pipeline: **decide** → spec → slice → build   (questionnaire feeds decide)
+Done: <file path; who it's for; what it needs back>
+Next:
+  • <condition> → /<skill> <ref>
+```
+
+List only the conditions that actually apply, most likely first:
+
+- **Questionnaire written, answers not back yet** → nothing to run; send it, then `/grill-me-plus` on the blocked branch once answers land. Name the branch so the next session knows what was waiting.
+- **Answers already in hand** → `/grill-me-plus` on the blocked branch, feeding the answers in
+- **It unblocks a `wayfinder-plus` ticket** → `/wayfinder-plus <map>` once answered; note the ticket stays open until then
+- **Part of the gap is a documented fact, not a person's knowledge** → `/research-plus` on that part in parallel
+- **Stopped before finishing** → say what the draft covers and which of the user's needs have no question yet

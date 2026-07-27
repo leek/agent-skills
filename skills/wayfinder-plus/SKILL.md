@@ -143,3 +143,31 @@ User invokes with a map (URL, id, or path). A ticket is optional — without one
 5. Add newly surfaced tickets (create-then-wire); graduate any fog the answer made specifiable, clearing each graduated patch from Not yet specified. If the answer reveals a ticket sits beyond the destination, rule it out of scope rather than resolving it. If the decision invalidates other parts of the map, update or delete those tickets.
 
 The user may run unblocked tickets in parallel, so expect other sessions to be editing the tracker concurrently.
+
+## When you're done
+
+End the session by printing the block below — on a clean finish, a stop, or a dead end. Refer to the map and tickets **by name**, per **Refer by name** above. On harnesses without slash commands, write the command as plain phrasing (`run wayfinder-plus on <map>`) instead of `/wayfinder-plus <map>`.
+
+```text
+---
+Pipeline: **decide** → spec → slice → build   (1 of 4, multi-session map)
+Done: <map name; tickets open, resolved, and still in the fog>
+Next:
+  • <condition> → /<skill> <map or ticket name>
+```
+
+Query the tracker for the current frontier before writing the block — don't guess at what's open. List only the conditions that actually apply, most likely first:
+
+**After charting:**
+
+- **Map charted with a frontier** → `/clear`, then `/wayfinder-plus <map>` to resolve the first frontier ticket; name it
+- **Research subagents still running** → say which tickets they'll resolve and that their findings land on `research/<slug>` branches
+- **Charting surfaced no fog** → no map needed: `/to-spec-plus`, or `/to-tickets-plus` if the shape is already clear
+
+**After working a ticket:**
+
+- **Map still has open tickets** → `/clear`, then `/wayfinder-plus <map>` for the next frontier ticket; name it and say how many remain
+- **Map cleared** → `/to-spec-plus <map>` to collapse the decisions into a buildable spec — don't skip to `implement-plus`
+- **Map cleared and the effort turned out genuinely small** → `/to-tickets-plus <map>`
+- **Ticket blocked on someone else's knowledge** → `/to-questionnaire-plus`; **on a fact worth reading for** → `/research-plus`
+- **Stopped mid-ticket** → say which ticket is claimed, what's decided so far, and that it's still assigned

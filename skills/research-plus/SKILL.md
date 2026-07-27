@@ -18,3 +18,26 @@ The final report back to the main session is the answer plus the file path — n
 ## Wayfinder integration
 
 When resolving a `wayfinder-plus` research ticket, commit the findings file to a throwaway `research/<ticket-slug>` branch and post the answer with a pointer to that branch as the ticket's resolution comment, then close the ticket. Research tickets are the one type a charting session may fire in parallel — one subagent per ticket, one branch each.
+
+## When you're done
+
+A background subagent has no live session to print into, so the direction goes **in the findings file** — last section, and repeated in the ticket resolution comment when there is a ticket. Write it whether the research answered the question or not.
+
+```markdown
+## What this unblocks
+
+Pipeline: **decide** → spec → slice → build   (research feeds decide)
+
+<the answer in one or two lines, or what stayed unanswered and why>
+
+Next:
+- <condition> → /<skill> <ref>
+```
+
+On harnesses without slash commands, write the command as plain phrasing (`run grill-me-plus on <ref>`). List only the conditions that actually apply, most likely first:
+
+- **Answered, and a decision was waiting on it** → `/grill-me-plus` on that decision, naming it
+- **Answered a `wayfinder-plus` ticket** → `/wayfinder-plus <map>` for the next frontier ticket
+- **Answered, and it changes a published spec** → `/to-spec-plus` to revise, naming which section is now wrong
+- **Unanswerable from primary sources** → say so plainly; `/to-questionnaire-plus` if a person holds the answer
+- **Answered, but surfaced a new unknown** → `/research-plus` on the new question, stated as a question

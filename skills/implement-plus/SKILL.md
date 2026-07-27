@@ -64,3 +64,23 @@ Stage only files you touched, **by explicit path** — never `git add -A` or `gi
 On a tracker: post a resolution comment (what was built, where it deviated from the ticket and why, anything the next ticket should know), check off satisfied acceptance criteria, close the ticket. Never close or modify the parent spec/map issue. On local markdown tickets, set `status: closed` and append the resolution.
 
 Then stop. The next ticket gets a fresh session with a clean context.
+
+## When you're done
+
+End the session by printing the block below — on a clean finish, a stop, or a dead end. On harnesses without slash commands, write the command as plain phrasing (`run implement-plus on <ref>`) instead of `/implement-plus <ref>`.
+
+```text
+---
+Pipeline: decide → spec → slice → **build**   (4 of 4)
+Done: <what now works, the ticket ref, the commit>
+Next:
+  • <condition> → /<skill> <ref>
+```
+
+Check the tracker for the remaining frontier before writing the block — don't guess at what's left. List only the conditions that actually apply, most likely first:
+
+- **More frontier tickets on the parent spec** → `/clear`, then `/implement-plus <next frontier ticket>`; name it and how many remain
+- **Every ticket on the parent spec is closed** → nothing to run; say the spec is complete and name anything deferred out of scope
+- **Remaining tickets are all blocked** → `/implement-plus <the blocker>` first, or `/grill-me-plus` if the blocker is a decision
+- **The build exposed a decision nobody made** → `/grill-me-plus` on it, then re-run `/to-spec-plus` if the spec is now wrong
+- **Stopped mid-ticket** → say what passes, what's uncommitted, and the next red test to write

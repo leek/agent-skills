@@ -167,4 +167,25 @@ Stop when:
 - Remaining branches depend on information outside the current context.
 - The user asks for a summary, PRD, implementation plan, or next-step artifact.
 
-End with a compact summary of settled decisions, unresolved risks, and the recommended next action. When the plan is resolved and the user wants a durable artifact, suggest `to-spec-plus` (spec/PRD) or `to-tickets-plus` (implementation tickets); for efforts too big for one session, suggest charting a `wayfinder-plus` map.
+End with a compact summary of settled decisions and unresolved risks, then the block in **When you're done**.
+
+## When you're done
+
+End the session by printing the block below — whether the plan resolved, the user stopped the grill, or a branch dead-ended. On harnesses without slash commands, write the command as plain phrasing (`run to-spec-plus`) instead of `/to-spec-plus`.
+
+```text
+---
+Pipeline: **decide** → spec → slice → build   (1 of 4)
+Done: <n of m decisions settled; what's still open>
+Next:
+  • <condition> → /<skill> <ref>
+```
+
+List only the conditions that actually apply, most likely first:
+
+- **Plan resolved, spans several slices** → `/to-spec-plus` to record it
+- **Plan resolved, fits one session** → `/to-tickets-plus`, or `/implement-plus` if it's genuinely one ticket
+- **Resolved but too big for one spec, or still foggy** → `/wayfinder-plus` to chart it as a map
+- **A branch is blocked on knowledge someone else holds** → `/to-questionnaire-plus` on that branch
+- **A branch is blocked on a fact worth reading for** → `/research-plus` on that question
+- **Stopped early** → `/grill-me-plus` to resume; list the open branches by name so the next session starts on the frontier
