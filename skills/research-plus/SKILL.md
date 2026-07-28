@@ -17,7 +17,7 @@ The final report back to the main session is the answer plus the file path — n
 
 ## Wayfinder integration
 
-When resolving a `wayfinder-plus` research ticket, commit the findings file to a throwaway `research/<ticket-slug>` branch and post the answer with a pointer to that branch as the ticket's resolution comment, then close the ticket. Research tickets are the one type a charting session may fire in parallel — one subagent per ticket, one branch each.
+When resolving a `wayfinder-plus` research ticket, **claim it first**: before launching the subagent, the dispatching session assigns the ticket to the driving dev and sets it In Progress, so a concurrent session reading the frontier can't pick it up mid-flight. Then commit the findings file to a throwaway `research/<ticket-slug>` branch and post the answer with a pointer to that branch as the ticket's resolution comment, then close the ticket. Research tickets are the one type a charting session may fire in parallel — one subagent per ticket, one branch each.
 
 ## When you're done
 
