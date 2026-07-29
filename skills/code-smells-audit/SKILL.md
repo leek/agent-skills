@@ -11,8 +11,8 @@ matched against 56 distilled reference cards derived from Marcel Jerzyk's
 smell's actual definition before they reach the report.
 
 > **Status: under construction.** The card catalog is being built lens by
-> lens; the audit workflow lands once all 56 cards and the validation script
-> exist. Until then this skill is reference-only.
+> lens; the audit workflow lands once all 56 cards exist. Until then this
+> skill is reference-only.
 
 ## Reference material
 
@@ -27,3 +27,25 @@ smell's actual definition before they reach the report.
   103 raw names
 - [references/ATTRIBUTION.md](references/ATTRIBUTION.md) — upstream MIT
   notice and the requested academic citation
+
+## Validating the card set
+
+Run after any card edit, batch addition, or upstream re-sync:
+
+```bash
+bash scripts/validate-cards.sh            # strict: all 56 cards must exist (ship gate)
+bash scripts/validate-cards.sh --partial  # mid-build: missing cards reported as pending
+```
+
+Human-readable status goes to stderr; stdout carries a JSON result:
+
+```json
+{"pass": true, "mode": "partial", "cards_present": 4, "cards_pending": 52,
+ "checks": 352, "failures": [], "pending": ["afraid-to-fail", "..."]}
+```
+
+Exit 0 on pass, 1 on failure (each failure names the offending file and
+reason), 2 on usage errors. The script embeds the 56-slug catalog, the closed
+taxonomy vocabularies, and reads canonical refactoring names from
+[references/refactoring-names.md](references/refactoring-names.md) — it needs
+no network and no upstream clone.
