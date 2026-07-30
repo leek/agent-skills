@@ -48,13 +48,13 @@ Descriptions are quoted from the upstream catalog (see
 
 ## Unnecessary Complexity (7)
 
-- **Clever Code** — Code that works but makes you feel stupid for not understanding it. Reinvented built-ins, abused language quirks, logic compacted into one-liners that nobody else can maintain.
-- **Dead Code** — You read past it wondering if it's safe to delete. Unreachable branches, commented-out blocks, functions that last ran in 2019. They cost nothing at runtime but tax every developer who encounters them.
-- **Imperative Loops** — for(i=0; i<len; i++) — the ceremony of manually tracking indexes, accumulating results, and handling off-by-one errors, when a map, filter, or built-in says the same thing in one line.
-- **Lazy Element** — The meeting that could have been an email — except it's a class. One field, one method that just delegates to another, an abstraction that costs more in complexity than it ever returns in clarity.
-- **Obscured Intent** — You stare at the function for five minutes before realizing it calculates overtime pay. Between the single-letter variables, the magic numbers, and the missing whitespace, the intent is buried under layers of accidental obfuscation.
-- **Speculative Generality** — An abstract base class for a hierarchy that never grew. Three extra parameters for a feature you were sure someone would request. Abstractions built for a future that never arrived, cluttering the code with unused generality.
-- **Status Variable** — found = False. Then a loop. Then found = True somewhere inside. Then a check after. Mutable flags that complicate control flow when a direct return or a built-in would express the same logic in a single line.
+- **[Clever Code](smells/clever-code.md)** — Code that works but makes you feel stupid for not understanding it. Reinvented built-ins, abused language quirks, logic compacted into one-liners that nobody else can maintain.
+- **[Dead Code](smells/dead-code.md)** — You read past it wondering if it's safe to delete. Unreachable branches, commented-out blocks, functions that last ran in 2019. They cost nothing at runtime but tax every developer who encounters them.
+- **[Imperative Loops](smells/imperative-loops.md)** — for(i=0; i<len; i++) — the ceremony of manually tracking indexes, accumulating results, and handling off-by-one errors, when a map, filter, or built-in says the same thing in one line.
+- **[Lazy Element](smells/lazy-element.md)** — The meeting that could have been an email — except it's a class. One field, one method that just delegates to another, an abstraction that costs more in complexity than it ever returns in clarity.
+- **[Obscured Intent](smells/obscured-intent.md)** — You stare at the function for five minutes before realizing it calculates overtime pay. Between the single-letter variables, the magic numbers, and the missing whitespace, the intent is buried under layers of accidental obfuscation.
+- **[Speculative Generality](smells/speculative-generality.md)** — An abstract base class for a hierarchy that never grew. Three extra parameters for a feature you were sure someone would request. Abstractions built for a future that never arrived, cluttering the code with unused generality.
+- **[Status Variable](smells/status-variable.md)** — found = False. Then a loop. Then found = True somewhere inside. Then a check after. Mutable flags that complicate control flow when a direct return or a built-in would express the same logic in a single line.
 
 ## Conditional Logic (6)
 
@@ -67,10 +67,10 @@ Descriptions are quoted from the upstream catalog (see
 
 ## Interfaces (4)
 
-- **Base Class depends on Subclass** — When a parent class reaches down to reference its own children, the inheritance tree grows upside down. Change a leaf, redeploy the trunk.
-- **Inappropriate Static** — Impossible to override. Painful to mock. Silently coupling everything that calls them. Static methods are convenient right up until the behavior needs to vary: then they're a dead end.
-- **Incomplete Library Class** — A third-party library that does 95% of what you need. The missing 5% means building workarounds that duplicate effort, drift from the original, and never feel like first-class code.
-- **Refused Bequest** — A Tower that extends Minion but throws NotImplemented on move(). The inheritance contract promises full support; the subclass delivers a runtime exception and an apology.
+- **[Base Class depends on Subclass](smells/base-class-depends-on-subclass.md)** — When a parent class reaches down to reference its own children, the inheritance tree grows upside down. Change a leaf, redeploy the trunk.
+- **[Inappropriate Static](smells/inappropriate-static.md)** — Impossible to override. Painful to mock. Silently coupling everything that calls them. Static methods are convenient right up until the behavior needs to vary: then they're a dead end.
+- **[Incomplete Library Class](smells/incomplete-library-class.md)** — A third-party library that does 95% of what you need. The missing 5% means building workarounds that duplicate effort, drift from the original, and never feel like first-class code.
+- **[Refused Bequest](smells/refused-bequest.md)** — A Tower that extends Minion but throws NotImplemented on move(). The inheritance contract promises full support; the subclass delivers a runtime exception and an apology.
 
 ## Measured Smells (4)
 
