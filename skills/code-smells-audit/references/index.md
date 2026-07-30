@@ -9,17 +9,17 @@ Descriptions are quoted from the upstream catalog (see
 
 ## Responsibility (11)
 
-- **Afraid To Fail** — Every caller has to check whether things actually worked, because this code returns status codes instead of throwing exceptions. The defensive ifs cascade up the entire call chain.
-- **Combinatorial Explosion** — Dozens of methods that do almost the same thing, each differing by one small detail. Add a new feature and the count multiplies again. Good luck remembering which variant handles which edge case.
-- **Divergent Change** — A class that changes for database reasons on Monday, calculation reasons on Wednesday, and display reasons on Friday. Same file, different reasons, and the merge conflicts pile up every sprint.
-- **Dubious Abstraction** — A method that orchestrates a business workflow but also opens its own database connection, mixing strategy with plumbing until you can't tell what level of abstraction you're reading.
-- **Fate over Action** — A class that holds data but owns none of the behavior operating on it. External code reaches in, pulls values out, and makes decisions the object never learned to make for itself.
-- **Feature Envy** — A method that touches another class's fields more than its own. It was written in the wrong place and belongs closer to the data it can't stop reaching for.
-- **Insider Trading** — Two classes exchanging private implementation details they shouldn't have access to — the kind of under-the-table knowledge sharing that makes either one impossible to change without breaking the other.
-- **Parallel Inheritance Hierarchies** — Add a BasicUser, and you need a BasicFunctions. Add a PremiumUser, and here comes PremiumFunctions. Every subclass in one hierarchy demands a mirror in the other, and the cost of every new feature doubles.
-- **Required Setup or Teardown Code** — Close the socket when you're done. Check the environment variables before you start. Reset the state after every call. The object could handle all of this internally. Instead, it made it your problem.
-- **Shotgun Surgery** — One small feature change. A dozen files to edit. You submit the PR, then find two more files you missed.
-- **Side Effects** — set_gold(amount) sounds simple enough. Except it also triggers a dancing animation and resets the payday timer. Methods that do more than their name promises hide behavior callers never asked for and debuggers never suspect.
+- **[Afraid To Fail](smells/afraid-to-fail.md)** — Every caller has to check whether things actually worked, because this code returns status codes instead of throwing exceptions. The defensive ifs cascade up the entire call chain.
+- **[Combinatorial Explosion](smells/combinatorial-explosion.md)** — Dozens of methods that do almost the same thing, each differing by one small detail. Add a new feature and the count multiplies again. Good luck remembering which variant handles which edge case.
+- **[Divergent Change](smells/divergent-change.md)** — A class that changes for database reasons on Monday, calculation reasons on Wednesday, and display reasons on Friday. Same file, different reasons, and the merge conflicts pile up every sprint.
+- **[Dubious Abstraction](smells/dubious-abstraction.md)** — A method that orchestrates a business workflow but also opens its own database connection, mixing strategy with plumbing until you can't tell what level of abstraction you're reading.
+- **[Fate over Action](smells/fate-over-action.md)** — A class that holds data but owns none of the behavior operating on it. External code reaches in, pulls values out, and makes decisions the object never learned to make for itself.
+- **[Feature Envy](smells/feature-envy.md)** — A method that touches another class's fields more than its own. It was written in the wrong place and belongs closer to the data it can't stop reaching for.
+- **[Insider Trading](smells/insider-trading.md)** — Two classes exchanging private implementation details they shouldn't have access to — the kind of under-the-table knowledge sharing that makes either one impossible to change without breaking the other.
+- **[Parallel Inheritance Hierarchies](smells/parallel-inheritance-hierarchies.md)** — Add a BasicUser, and you need a BasicFunctions. Add a PremiumUser, and here comes PremiumFunctions. Every subclass in one hierarchy demands a mirror in the other, and the cost of every new feature doubles.
+- **[Required Setup or Teardown Code](smells/required-setup-or-teardown-code.md)** — Close the socket when you're done. Check the environment variables before you start. Reset the state after every call. The object could handle all of this internally. Instead, it made it your problem.
+- **[Shotgun Surgery](smells/shotgun-surgery.md)** — One small feature change. A dozen files to edit. You submit the PR, then find two more files you missed.
+- **[Side Effects](smells/side-effects.md)** — set_gold(amount) sounds simple enough. Except it also triggers a dancing animation and resets the payday timer. Methods that do more than their name promises hide behavior callers never asked for and debuggers never suspect.
 
 ## Names (11)
 
@@ -87,5 +87,5 @@ Descriptions are quoted from the upstream catalog (see
 
 ## Message Calls (2)
 
-- **Message Chain** — object.getA().getB().getC().getD() — the caller knows the entire relationship chain, and every intermediate link becomes a dependency that breaks when any relationship changes.
-- **Middle Man** — Half its methods just call the same method on another class. It exists, it delegates, and its author can't explain what it adds. Remove it, and nothing breaks.
+- **[Message Chain](smells/message-chain.md)** — object.getA().getB().getC().getD() — the caller knows the entire relationship chain, and every intermediate link becomes a dependency that breaks when any relationship changes.
+- **[Middle Man](smells/middle-man.md)** — Half its methods just call the same method on another class. It exists, it delegates, and its author can't explain what it adds. Remove it, and nothing breaks.
