@@ -37,14 +37,14 @@ Descriptions are quoted from the upstream catalog (see
 
 ## Data (8)
 
-- **Data Clump** — red, green, and blue passed separately to every function that needs a color. The same variables travel together everywhere, never packaged into the object they're quietly begging to become.
-- **Global Data** — Any code, anywhere, can read and write these variables. When something breaks, every function in the codebase is a suspect.
-- **Hidden Dependencies** — The class works perfectly in the developer's environment and crashes in production. You read the stack trace, search every constructor, and find nothing. The dependency was silently resolved from the environment.
-- **Indecent Exposure** — Everything's public. Nothing's hidden. Other modules couple to implementation details they were never meant to see, and now you can't change a private algorithm without breaking six callers who shouldn't have known it existed.
-- **Mutable Data** — Data that anything can modify at any time. The bug reproduces instantly in production and vanishes in your debugger — by the time you pause execution, something else already changed the value.
-- **Primitive Obsession** — A phone number stored as a string. A price stored as a float. Concepts that deserve their own types get crammed into primitives, losing validation, scattering logic, and pretending a bare string is something it's not.
-- **Temporary Field** — A field that's null eleven months of the year and suddenly matters during one specific calculation. The object carries it everywhere, for one brief moment of relevance.
-- **Tramp Data** — Data hitchhiking through a chain of methods that never use it. Each function accepts the parameter, ignores it, and passes it along — just so the one at the end of the line can finally read it.
+- **[Data Clump](smells/data-clump.md)** — red, green, and blue passed separately to every function that needs a color. The same variables travel together everywhere, never packaged into the object they're quietly begging to become.
+- **[Global Data](smells/global-data.md)** — Any code, anywhere, can read and write these variables. When something breaks, every function in the codebase is a suspect.
+- **[Hidden Dependencies](smells/hidden-dependencies.md)** — The class works perfectly in the developer's environment and crashes in production. You read the stack trace, search every constructor, and find nothing. The dependency was silently resolved from the environment.
+- **[Indecent Exposure](smells/indecent-exposure.md)** — Everything's public. Nothing's hidden. Other modules couple to implementation details they were never meant to see, and now you can't change a private algorithm without breaking six callers who shouldn't have known it existed.
+- **[Mutable Data](smells/mutable-data.md)** — Data that anything can modify at any time. The bug reproduces instantly in production and vanishes in your debugger — by the time you pause execution, something else already changed the value.
+- **[Primitive Obsession](smells/primitive-obsession.md)** — A phone number stored as a string. A price stored as a float. Concepts that deserve their own types get crammed into primitives, losing validation, scattering logic, and pretending a bare string is something it's not.
+- **[Temporary Field](smells/temporary-field.md)** — A field that's null eleven months of the year and suddenly matters during one specific calculation. The object carries it everywhere, for one brief moment of relevance.
+- **[Tramp Data](smells/tramp-data.md)** — Data hitchhiking through a chain of methods that never use it. Each function accepts the parameter, ignores it, and passes it along — just so the one at the end of the line can finally read it.
 
 ## Unnecessary Complexity (7)
 
@@ -58,12 +58,12 @@ Descriptions are quoted from the upstream catalog (see
 
 ## Conditional Logic (6)
 
-- **Callback Hell** — Nested callbacks indented so deep the closing brackets cascade like a staircase to nowhere. The actual logic hides somewhere around indent level five.
-- **Complicated Boolean Expression** — Reading it feels like solving a discrete math problem. The if-statement just checks whether a timer expired, but between the negations and conjunctions, you'd never guess that at a glance.
-- **Conditional Complexity** — The if/else chain that grows a new branch with every feature. First it's readable. Then it's manageable. Then it's a 200-line switch statement, and suddenly the polymorphism refactor everyone avoided is the only option left.
-- **Flag Argument** — A boolean parameter that forces the caller to write book(marcel, false) — and everyone who reads it to wonder: false what?
-- **Null Check** — Defensive null checks scattered everywhere like a nervous tic — each one a band-aid over a missing Null Object, and each a reminder that Tony Hoare called his invention a billion-dollar mistake.
-- **Special Case** — The if-statement that handles "one weird edge case" before the real logic begins. It was a hotfix once. It was never properly refactored. Now every future reader has to hold that branch in their head alongside everything else.
+- **[Callback Hell](smells/callback-hell.md)** — Nested callbacks indented so deep the closing brackets cascade like a staircase to nowhere. The actual logic hides somewhere around indent level five.
+- **[Complicated Boolean Expression](smells/complicated-boolean-expression.md)** — Reading it feels like solving a discrete math problem. The if-statement just checks whether a timer expired, but between the negations and conjunctions, you'd never guess that at a glance.
+- **[Conditional Complexity](smells/conditional-complexity.md)** — The if/else chain that grows a new branch with every feature. First it's readable. Then it's manageable. Then it's a 200-line switch statement, and suddenly the polymorphism refactor everyone avoided is the only option left.
+- **[Flag Argument](smells/flag-argument.md)** — A boolean parameter that forces the caller to write book(marcel, false) — and everyone who reads it to wonder: false what?
+- **[Null Check](smells/null-check.md)** — Defensive null checks scattered everywhere like a nervous tic — each one a band-aid over a missing Null Object, and each a reminder that Tony Hoare called his invention a billion-dollar mistake.
+- **[Special Case](smells/special-case.md)** — The if-statement that handles "one weird edge case" before the real logic begins. It was a hotfix once. It was never properly refactored. Now every future reader has to hold that branch in their head alongside everything else.
 
 ## Interfaces (4)
 
