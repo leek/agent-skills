@@ -17,6 +17,7 @@
       "skills": [
         "./skills/aws-cli",
         "./skills/architecture-satisfaction",
+        "./skills/code-smells-audit",
         "./skills/codebase-design-plus",
         "./skills/domain-modeling-plus",
         "./skills/weekly-composer-dependency-audit",

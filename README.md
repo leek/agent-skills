@@ -78,6 +78,16 @@ Shared vocabulary for designing deep modules in a PHP/Laravel codebase — modul
 - Deciding where a seam goes or whether a container binding is justified
 - Finding deepening opportunities or exploring alternative interfaces with parallel sub-agents
 
+### code-smells-audit
+
+Audit a codebase, path, glob, or branch diff for classic code smells using the 56-smell [Luzkan catalog](https://codesmells.org/), with detection heuristics tuned to PHP/Laravel and TS/React. Sweeps nine occurrence lenses, adversarially verifies every candidate against the smell's reference card, and emits a ranked markdown findings report with the catalog's suggested refactorings.
+
+**Use when:**
+
+- Auditing a repo, module, or PR diff for catalog code smells
+- "Audit for code smells", "smell check", "smell-check this diff / this controller / this component"
+- Asking which catalog smells a Laravel class or React component exhibits
+
 ### wayfinder-plus
 
 Plan work too big for one agent session as a shared map of decision tickets on the project's issue tracker (GitHub, Linear, or local markdown), then resolve them one per session — grilling, research, prototype, or task tickets — until the route to the destination is clear. Adapted from [Matt Pocock's wayfinder](https://github.com/mattpocock/skills) with fast-path tracker resolution, `grill-me-plus` integration, parallel `research-plus` subagents, and Laravel-flavored prototypes.
