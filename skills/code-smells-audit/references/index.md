@@ -23,17 +23,17 @@ Descriptions are quoted from the upstream catalog (see
 
 ## Names (11)
 
-- **"What" Comment** — Comments that narrate what the code does instead of why — a deodorant sprayed over smelly code, where extracting a well-named method would eliminate both the smell and the comment.
-- **Binary Operator in Name** — If a method has "and" or "or" in its name, it's confessing to doing two things, and that confession is an invitation to split it in half.
-- **Boolean Blindness** — Does filter(true) mean take or drop? When a function operates on raw booleans, it destroys the information about what those values represent. The type system knows; the reader doesn't.
-- **Complicated Regex Expression** — A regex pattern so dense it needs an online decomposer to parse. Named variables and a builder function would make the same expression self-documenting.
-- **Fallacious Comment** — A comment that was true once but now lies. The code changed, the comment didn't, and there's no linter that catches the drift.
-- **Fallacious Method Name** — getItems() returns a single item. isValid() returns a string. setValue() quietly returns a value too. Method names that betray every convention programmers have built over decades.
-- **Inconsistent Names** — The mental shortcuts that let developers navigate by pattern break when one class calls it store(), another says add(), and a third insists on put(). Same operation. Three names. Zero muscle memory.
-- **Inconsistent Style** — Mixed formatting, flipped parameter orders, and clashing conventions in the same codebase. The code works, but the inconsistency saps trust. If they couldn't agree on style, what else didn't they agree on?
-- **Magic Number** — A bare 86400 in the code — is that seconds in a day, a timeout, or a config limit? Unnamed numbers hide intent, and when the same literal appears in five places, changing one means hunting for the rest.
-- **Type Embedded in Name** — playerName, dateString, userList: the type is already in the annotation, and now it's in the name too. Redundant today, misleading tomorrow when the type changes but the name doesn't.
-- **Uncommunicative Name** — data, val, m1, temp, get_f(). The code compiles fine. Understanding it requires reverse-engineering every abbreviation the original author thought was self-evident.
+- **["What" Comment](smells/what-comment.md)** — Comments that narrate what the code does instead of why — a deodorant sprayed over smelly code, where extracting a well-named method would eliminate both the smell and the comment.
+- **[Binary Operator in Name](smells/binary-operator-in-name.md)** — If a method has "and" or "or" in its name, it's confessing to doing two things, and that confession is an invitation to split it in half.
+- **[Boolean Blindness](smells/boolean-blindness.md)** — Does filter(true) mean take or drop? When a function operates on raw booleans, it destroys the information about what those values represent. The type system knows; the reader doesn't.
+- **[Complicated Regex Expression](smells/complicated-regex-expression.md)** — A regex pattern so dense it needs an online decomposer to parse. Named variables and a builder function would make the same expression self-documenting.
+- **[Fallacious Comment](smells/fallacious-comment.md)** — A comment that was true once but now lies. The code changed, the comment didn't, and there's no linter that catches the drift.
+- **[Fallacious Method Name](smells/fallacious-method-name.md)** — getItems() returns a single item. isValid() returns a string. setValue() quietly returns a value too. Method names that betray every convention programmers have built over decades.
+- **[Inconsistent Names](smells/inconsistent-names.md)** — The mental shortcuts that let developers navigate by pattern break when one class calls it store(), another says add(), and a third insists on put(). Same operation. Three names. Zero muscle memory.
+- **[Inconsistent Style](smells/inconsistent-style.md)** — Mixed formatting, flipped parameter orders, and clashing conventions in the same codebase. The code works, but the inconsistency saps trust. If they couldn't agree on style, what else didn't they agree on?
+- **[Magic Number](smells/magic-number.md)** — A bare 86400 in the code — is that seconds in a day, a timeout, or a config limit? Unnamed numbers hide intent, and when the same literal appears in five places, changing one means hunting for the rest.
+- **[Type Embedded in Name](smells/type-embedded-in-name.md)** — playerName, dateString, userList: the type is already in the annotation, and now it's in the name too. Redundant today, misleading tomorrow when the type changes but the name doesn't.
+- **[Uncommunicative Name](smells/uncommunicative-name.md)** — data, val, m1, temp, get_f(). The code compiles fine. Understanding it requires reverse-engineering every abbreviation the original author thought was self-evident.
 
 ## Data (8)
 
@@ -81,9 +81,9 @@ Descriptions are quoted from the upstream catalog (see
 
 ## Duplication (3)
 
-- **Alternative Classes with Different Interfaces** — Two classes. Same job. Different spelling. One says hug_zombie(), the other says hug_snowman(), and neither realizes they're duplicating logic behind method names that could share a single interface.
-- **Duplicated Code** — The same logic in five places. Change one, miss another, and watch the behavior quietly diverge. According to Fowler, this is the single worst smell in a codebase.
-- **Oddball Solution** — Same problem, two solutions, different files. One uses an adapter, the other rolls its own socket logic, and you can't tell which approach is the correct one. Or if either is.
+- **[Alternative Classes with Different Interfaces](smells/alternative-classes-with-different-interfaces.md)** — Two classes. Same job. Different spelling. One says hug_zombie(), the other says hug_snowman(), and neither realizes they're duplicating logic behind method names that could share a single interface.
+- **[Duplicated Code](smells/duplicated-code.md)** — The same logic in five places. Change one, miss another, and watch the behavior quietly diverge. According to Fowler, this is the single worst smell in a codebase.
+- **[Oddball Solution](smells/oddball-solution.md)** — Same problem, two solutions, different files. One uses an adapter, the other rolls its own socket logic, and you can't tell which approach is the correct one. Or if either is.
 
 ## Message Calls (2)
 
