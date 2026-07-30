@@ -3,7 +3,6 @@
 All 56 smells of the catalog, grouped under the 9 occurrence lenses. Each
 detection pass sweeps one lens, armed with the one-line descriptions below,
 and loads a full card from `smells/<slug>.md` only for candidate matches.
-Linked entries have cards; unlinked entries are pending card batches.
 Descriptions are quoted from the upstream catalog (see
 [ATTRIBUTION.md](ATTRIBUTION.md)).
 
