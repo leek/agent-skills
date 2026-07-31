@@ -47,32 +47,24 @@ skills/<skill-name>/
 ```markdown
 ---
 name: <skill-name>
-description: One sentence — what it does and when Claude should use it. Include trigger phrases.
+description: <see invocation policy below>
+disable-model-invocation: true   # only on user-invoked flows
 ---
 
 # <Skill Title>
 
-Brief description of what the skill does.
-
-## How It Works
-
-1. Step one
-2. Step two
-
-## Usage
-
-\```bash
-bash scripts/<name>.sh [args]
-\```
-
-## Output
-
-Example output.
-
-## Troubleshooting
-
-Common issues + fixes.
+What the skill does and the rules that make it predictable. Ordered steps for
+processes (each ending on a checkable completion criterion); flat reference
+sections for material consulted on demand; anything only some runs need goes
+behind a pointer to a file in references/.
 ```
+
+**Invocation policy** — decide it per skill, deliberately:
+
+- **Model-invoked** (default): the agent may reach for it autonomously, and other skills can invoke it. The `description` pays for itself in every context window, so it earns rich trigger phrasing — but **one trigger per branch**; synonyms restating the same branch are duplication.
+- **User-invoked** (`disable-model-invocation: true`): for flows with side effects (publishing issues, committing, interviewing the user) or that only make sense when the human asks. The `description` becomes a human-facing one-liner — no trigger lists.
+
+The test: *could the model usefully reach for this on its own?* Reuse by other skills is a reason to keep it model-invoked; being a big deliberate workflow is a reason not to.
 
 ### 4. Register in the marketplace
 
@@ -90,13 +82,14 @@ Add a short section to `README.md` under **Available Skills**.
 
 ## Best Practices
 
-Skills load on-demand — only `name` + `description` load at startup. The full `SKILL.md` loads only when the agent decides the skill is relevant.
+Skills load on-demand — only `name` + `description` load at startup. The full `SKILL.md` loads only when the agent decides the skill is relevant. A skill exists to wrangle determinism out of a stochastic system: the same *process* every run. Everything below serves that. (The full authoring reference is the `writing-great-skills` skill.)
 
-- **Keep `SKILL.md` under 500 lines.** Offload detail to sibling files.
-- **Write specific descriptions.** Helps the agent match correctly.
-- **Progressive disclosure.** Reference supporting files; they load only when read.
+- **Short beats complete.** Most upstream skills this repo ports from are 10–130 lines. Prune sentence-by-sentence: when one part of a sentence is a no-op, delete the whole sentence. Length that restates what the model already holds (via leading words like *seam*, *frontier*, *red → green*) is sediment.
+- **One job per skill.** Same lifecycle, different entity → one skill. A skill doing an interview *and* tool plumbing *and* session routing is three skills.
+- **Single source of truth.** A protocol referenced by several skills lives in exactly one (e.g. the question shape in `grilling`, tracker operations in `setup`'s seeds) — others point at it, never restate it.
+- **Progressive disclosure.** Inline what every run needs; push what only some runs need behind a pointer to `references/`. File references work one level deep from `SKILL.md`.
 - **Prefer scripts over inline code.** Script execution does not consume context — only its stdout does.
-- **One level deep.** File references work one level deep from `SKILL.md`.
+- **No dead references.** Every skill a skill mentions must exist in this repo (or be a documented harness built-in). Check before committing.
 
 ## Script Requirements
 

@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "leek's personal collection of agent skills for Claude",
-    "version": "0.10.0"
+    "version": "0.11.0"
   },
   "plugins": [
     {
@@ -15,25 +15,39 @@
       "source": "./",
       "strict": false,
       "skills": [
-        "./skills/aws-cli",
         "./skills/architecture-satisfaction",
+        "./skills/aws-cli",
+        "./skills/code-review",
         "./skills/code-smells-audit",
-        "./skills/codebase-design-plus",
-        "./skills/domain-modeling-plus",
-        "./skills/weekly-composer-dependency-audit",
+        "./skills/codebase-design",
+        "./skills/diagnosing-bugs",
         "./skills/distill-sessions",
-        "./skills/grill-me-plus",
+        "./skills/domain-modeling",
+        "./skills/grill-me",
+        "./skills/grill-with-docs",
+        "./skills/grilling",
+        "./skills/handoff",
         "./skills/housekeeper",
-        "./skills/implement-plus",
-        "./skills/repository-cleanup",
+        "./skills/implement",
+        "./skills/improve-codebase-architecture",
         "./skills/laravel-herd-worktrees",
-        "./skills/research-plus",
-        "./skills/to-questionnaire-plus",
-        "./skills/to-spec-plus",
-        "./skills/to-tickets-plus",
-        "./skills/wayfinder-plus",
+        "./skills/nightly-docs-sweep",
+        "./skills/prototype",
+        "./skills/repository-cleanup",
+        "./skills/research",
+        "./skills/resolving-merge-conflicts",
+        "./skills/setup",
+        "./skills/tdd",
+        "./skills/teach",
+        "./skills/to-questionnaire",
+        "./skills/to-spec",
+        "./skills/to-tickets",
+        "./skills/triage",
+        "./skills/verify",
+        "./skills/wayfinder",
+        "./skills/weekly-composer-dependency-audit",
         "./skills/weekly-npm-dependency-audit",
-        "./skills/nightly-docs-sweep"
+        "./skills/writing-great-skills"
       ]
     }
   ]

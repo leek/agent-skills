@@ -121,7 +121,7 @@ verify: <n> · Findings: <n>
 
 After writing the file, summarize the top findings in the session and point at
 the artifact. Slicing findings into tickets is out of scope — hand the report
-to the user (or `/to-tickets-plus`) instead.
+to the user (or `/to-tickets`) instead.
 
 ## Reference material
 

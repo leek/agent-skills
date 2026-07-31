@@ -1,6 +1,7 @@
 ---
 name: distill-sessions
 description: Mine your recent AI-coding session logs (Claude Code + OpenAI Codex) for reusable patterns — corrections you gave, commands that errored or were retried, setup steps rediscovered across sessions, and content-worthy moments — then propose where each belongs (CLAUDE.md/AGENTS.md line, slash command/skill, hook, tool fix, config change, or content idea). Use when the user says "read my recent sessions", "distill my sessions", "what patterns are in my logs", "mine my history", or asks to turn their session history into rules/skills/content.
+disable-model-invocation: true
 ---
 
 # Distill Sessions

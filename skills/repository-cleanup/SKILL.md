@@ -1,6 +1,7 @@
 ---
 name: repository-cleanup
 description: Audit and clean Git repository state. Use this when the user asks for repository cleanup, stale branch cleanup, old pull request review, unmerged commit or stash recovery, git worktree cleanup, remote pruning, abandoned work recovery, or a repo-state hygiene pass across branches, PRs, commits, stashes, and worktrees.
+disable-model-invocation: true
 ---
 
 # Repository Cleanup

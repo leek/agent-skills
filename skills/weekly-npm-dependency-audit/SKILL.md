@@ -1,6 +1,7 @@
 ---
 name: weekly-npm-dependency-audit
 description: Run a weekly npm dependency audit for JavaScript or TypeScript projects. Use this when the user asks for an npm dependency audit, npm outdated package review, package.json upgrade plan, weekly dependency audit, npm security check, or a safe npm upgrade summary.
+disable-model-invocation: true
 ---
 
 # NPM Dependency Audit Weekly
