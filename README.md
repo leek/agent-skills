@@ -13,6 +13,7 @@ Skills marked **user** are user-invoked only (`/name`); the rest the agent can r
 | Skill | Invocation | What it does |
 |---|---|---|
 | `architecture-satisfaction` | user | Run a bounded architectural refactor loop. |
+| `autopilot` | user | Drive an existing wayfinder map, spec, or ticket set to completion through fresh top-level Claude Code or Codex sessions. |
 | `aws-cli` | model | Use when running AWS CLI commands (`aws ...`) for any service — S3, EC2, IAM, Lambda, CloudFormation, Logs, RDS, ECS, etc. |
 | `code-review` | model | Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes — Standards (does the diff follow this repo's documented conventions, including colocated CLAUDE.md rules?) and Spec (does it implement what the originating ticket/PRD asked?). |
 | `code-smells-audit` | model | Audit a codebase, path, glob, or branch diff for classic code smells using the 56-smell Luzkan catalog, with detection heuristics tuned to PHP/Laravel and TS/React — sweep nine occurrence lenses, adversarially verify every candidate against the smell's card definition, emit a ranked markdown findings report. |

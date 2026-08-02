@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["continue", "complete", "needs_input", "blocked", "failed"]
+    },
+    "completed_ref": {
+      "type": "string"
+    },
+    "next_ref": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "string"
+    },
+    "reason": {
+      "type": "string"
+    }
+  },
+  "required": ["status", "completed_ref", "next_ref", "summary", "reason"],
+  "additionalProperties": false
+}

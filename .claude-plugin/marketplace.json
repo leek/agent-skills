@@ -16,6 +16,7 @@
       "strict": false,
       "skills": [
         "./skills/architecture-satisfaction",
+        "./skills/autopilot",
         "./skills/aws-cli",
         "./skills/code-review",
         "./skills/code-smells-audit",
