@@ -14,7 +14,11 @@ Pipeline position: decide (`grill-with-docs`/`wayfinder`) → spec (`to-spec`) �
 
 ### 1. Load and claim the work
 
-Given a ticket reference, fetch its full body and comments, plus the parent spec if it links one. Resolve the tracker through `docs/agents/issue-tracker.md` (written by `/setup`) or an `## Issue tracker` section in `CLAUDE.md`/`AGENTS.md`; when neither exists, it's a local markdown ticket under `.scratch/`. On a shared tracker, **claim it first** — assign it to the driving dev — so concurrent sessions skip it. Confirm its blockers are all closed; if not, say so and stop rather than building on sand.
+Given a ticket reference, fetch its full body and comments, plus the parent spec if it links one. Resolve the tracker through `docs/agents/issue-tracker.md` (written by `/setup`) or an `## Issue tracker` section in `CLAUDE.md`/`AGENTS.md`; when neither exists, it's a local markdown ticket under `.scratch/`.
+
+**Claim before building — on every tracker, including local markdown.** On a shared tracker, assign the ticket to the driving dev. On a local markdown ticket, edit the file: set `**Status:** in-progress (claimed <date>, <who>)` before writing any code. "One session at a time" is an assumption, not a guarantee — a second session (human or agent) may be working the same list, and the claim marker is what makes it skip instead of collide. If the ticket is already claimed or in-progress, don't build it: say so and stop (treat a claim as stale only when its work is visibly committed or clearly abandoned).
+
+Confirm its blockers are all closed; if not, say so and stop rather than building on sand.
 
 Given only conversation context, restate the scope in two or three lines before starting.
 

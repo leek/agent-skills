@@ -125,7 +125,7 @@ In either form, avoid file paths and code snippets — they go stale fast. Excep
 
 ## After publishing
 
-Work the **frontier** — any ticket whose blockers are all done — with `implement`, one ticket per fresh session. On a real tracker (GitHub, Linear) several sessions can work unblocked tickets in parallel; local markdown is worked top to bottom, one session at a time, clearing context between tickets.
+Work the **frontier** — any ticket whose blockers are all done — with `implement`, one ticket per fresh session. On a real tracker (GitHub, Linear) several sessions can work unblocked tickets in parallel; local markdown is worked top to bottom, one session at a time, clearing context between tickets. Either way `implement` claims the ticket before building (assignment on a tracker, `**Status:** in-progress (claimed <date>, <who>)` in a local file), so an accidental second session skips a ticket already being worked instead of colliding with it.
 
 ## When you're done
 
