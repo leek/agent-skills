@@ -16,7 +16,7 @@ Run the research in a sub-agent so the main session can keep working on unrelate
 
 ### Wayfinder integration
 
-When resolving a `wayfinder` research ticket, **claim it first**: assign the ticket before launching the sub-agent, so a concurrent session reading the frontier can't pick it up mid-flight. Commit the findings file to a throwaway `research/<ticket-slug>` branch, post the answer with a pointer to that branch as the ticket's resolution comment, then close the ticket. Research tickets are the one type a charting session may run several of in parallel — one sub-agent per ticket, one branch each, all collected before the session ends.
+When resolving a `wayfinder` research ticket, follow the configured tracker's Wayfinding operations. **Claim it first** through the Claim operation so a concurrent session cannot pick it up mid-flight. Commit the findings file to a throwaway `research/<ticket-slug>` branch, then use the Resolve operation to record the answer and branch pointer and close the ticket. Research tickets are the one type a charting session may run several of in parallel — one sub-agent per ticket, one branch each, all collected before the session ends.
 
 ## The research brief
 

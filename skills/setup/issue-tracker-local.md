@@ -30,10 +30,21 @@ Used by `/wayfinder`. The **map** is a file with one **child** file per ticket, 
     02-<slug>.md
 ```
 
+Map file format:
+
+```markdown
+---
+title: <map title>
+---
+
+<the map body defined by `wayfinder`>
+```
+
 Ticket file format:
 
 ```markdown
 ---
+title: <ticket title>
 type: research | prototype | grilling | task
 status: open | closed
 claimed-by:            # empty = unclaimed
@@ -49,7 +60,7 @@ blocked-by: []         # ticket numbers, e.g. [01, 03]
 <appended on close>
 ```
 
-- **Create map / ticket**: write the file; number tickets from `01` in dependency order
+- **Create map / ticket**: write the file with its stable human-readable `title`; number tickets from `01` in dependency order
 - **Wire blocking**: `blocked-by:` frontmatter; a ticket is unblocked when every listed ticket is `status: closed`
 - **Claim**: set `claimed-by:` to the dev's name and save before any work
 - **Frontier**: open, unclaimed tickets whose blockers are all closed; first by number wins

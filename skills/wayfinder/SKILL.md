@@ -16,23 +16,23 @@ Pipeline position: `wayfinder` (find the way) → `to-spec` (write the spec) →
 
 Each ticket resolves a **decision**; the map is done when nothing is left to decide before someone goes and does the thing. The pull to just do the work is usually the signal you've reached the edge of the map and it's time to hand off. An effort can override this in its **Notes** — carrying execution into the map itself — but absent that, produce decisions, not deliverables.
 
-When the map clears, **hand off — don't build**: `to-spec` collapses the map's linked decisions into a buildable plan, then `to-tickets` and `implement` as usual. Looping the map straight into `implement` skips that collapse and throws the linked detail away — skip to `implement` only when the effort turned out genuinely small.
+When the map clears, **hand off — don't build**: use `to-spec` when the linked decisions need collapsing into a buildable plan, or go straight to `to-tickets` when the effort is genuinely small and already clear. `implement` starts from a build ticket, never directly from the map.
 
 ## Refer by name
 
-Every map and ticket is an issue, so it has a **name** — its title. In everything the human reads, refer to it by that name with the id/URL riding inside as a link — never a bare `#42` or `LIN-42`. A wall of ids is illegible; names read at a glance.
+Every map and ticket is an issue, so it has a **name** — its title. In everything the human reads, refer to it by that name with the path, id, or URL riding inside as a link — never a bare file path, `#42`, or `LIN-42`. A wall of identifiers is illegible; names read at a glance.
 
 ## The Map
 
-The map is a single issue labelled `wayfinder:map` — the canonical artifact. Its tickets are child issues of the map.
+The map is the configured tracker's canonical wayfinding artifact. Its tickets are children of the map.
 
 The map is an **index**, not a store. It lists decisions made and points at the tickets that hold their detail; a decision lives in exactly one place — its ticket — so the map never restates it, only gists it and links.
 
-How the map, children, blocking, and frontier queries are physically expressed is tracker-specific — see the **Wayfinding operations** section of `docs/agents/issue-tracker.md` (written by `/setup`; the `setup` skill's seed templates carry the operations for local markdown, GitHub, and Linear).
+Resolve the tracker once per session through `docs/agents/issue-tracker.md` (written by `/setup`) or an `## Issue tracker` section in `CLAUDE.md`/`AGENTS.md`. Its **Wayfinding operations** are the single source of truth for creating maps and children, recording types, wiring blockers, claiming, querying the frontier, resolving, and linking assets. When no tracker is configured, use the local-markdown operations under `.scratch/` from the `setup` skill's `issue-tracker-local.md` seed and suggest running `/setup` once to make the choice durable.
 
 ### The map body
 
-The whole map at low resolution, loaded once per session. Open tickets are **not** listed — they are open child issues, found by query.
+The whole map at low resolution, loaded once per session. Open tickets are **not** listed — find them through the tracker's Frontier operation.
 
 ```markdown
 ## Destination
@@ -71,13 +71,13 @@ Each ticket is a **child issue** of the map. Its body is the question, sized to 
 <the decision or investigation this ticket resolves>
 ```
 
-Each ticket carries a `wayfinder:<type>` label — one of `research`, `prototype`, `grilling`, `task`.
+Each ticket records one type — `research`, `prototype`, `grilling`, or `task` — through the configured tracker's wayfinding operations.
 
-A session **claims** a ticket by assigning it to the driving dev **first**, before any work, so concurrent sessions skip it. The assignee *is* the claim: an open, unassigned ticket is unclaimed.
+A session **claims** a ticket through the tracker's Claim operation **first**, before any work, so concurrent sessions skip it. A ticket with no claim is unclaimed.
 
-Blocking uses the tracker's **native** dependency relationship where one exists (Linear `blockedBy`, GitHub issue dependencies) so the human sees what's takeable in the tracker's own UI. Only a tracker without native blocking falls back to a `Blocked by:` body line. A ticket is **unblocked** when every ticket blocking it is closed; the **frontier** is the open, unblocked, unclaimed children — the edge of the known.
+Wire blocking through the tracker's Blocking operation. A ticket is **unblocked** when every ticket blocking it is closed; the **frontier** is the open, unblocked, unclaimed children — the edge of the known.
 
-The answer isn't part of the body — it's recorded on resolution. Assets created while resolving (research notes, prototype branches) are linked from the issue, not pasted in.
+Record the answer only through the tracker's Resolve operation, rather than duplicating it in the initial question. Link assets created while resolving through its Assets operation.
 
 ## Ticket types
 
@@ -105,10 +105,6 @@ The destination fixes the scope, so work beyond it is **out of scope** — not f
 
 When an existing ticket turns out to sit past the destination, **close it** and leave one line in Out of scope — the gist plus why, linking the closed ticket. It stays out of Decisions so far, which records only the route actually walked. Out-of-scope work never graduates; it returns only if the destination is redrawn, and then as a fresh effort.
 
-## Tracker resolution
-
-Resolve the tracker once per session: follow `docs/agents/issue-tracker.md` (written by `/setup`) or an `## Issue tracker` section in `CLAUDE.md`/`AGENTS.md`. When neither exists, default to **local markdown under `.scratch/`** (operations in the `setup` skill's `issue-tracker-local.md` seed) and suggest running `/setup` once to make the choice durable.
-
 ## Structured questions
 
 Decision points that arise outside a full grilling — confirming the destination phrasing, choosing between scope rulings, picking which frontier ticket to work — use the question shape from `grilling` (via `AskUserQuestion` where available, otherwise a plain question in chat): recommended option first, real trade-offs per option, wait for the answer. Don't reinvent the protocol here. When this skill invokes `grilling` or `domain-modeling`, the inner skill does **not** print an end-of-session block — only the outermost skill does.
@@ -122,10 +118,10 @@ Two modes. Either way, **never resolve more than one ticket per session** — wi
 User invokes with a loose idea.
 
 1. **Name the destination.** Run a `grilling` session (with `domain-modeling`) to pin down what this map is finding its way to. The destination fixes the scope, so it's settled first.
-2. **Map the frontier.** Grill again, **breadth-first**: fan out across the whole space rather than deep on any thread, surfacing the open decisions and the first steps takeable now. **If this surfaces no fog** — the whole journey fits one session — you don't need a map. Stop and ask the user whether to go straight to `to-spec` or `to-tickets`.
-3. **Create the map** (label `wayfinder:map`): Destination and Notes filled in, Decisions so far empty, the fog sketched into Not yet specified.
-4. **Create the tickets you can specify now** as children of the map — then wire blocking edges in a **second pass** (issues need ids before they can reference each other). Everything you can't yet specify stays in the fog.
-5. **Resolve the research tickets with sub-agents.** For each `research` ticket you just created, dispatch a `research` sub-agent — in parallel with each other, but **all completing inside this session** (a sub-agent is session-scoped; one still running when the session ends is killed, and its task ID becomes a dead handle). Findings land on a throwaway `research/<name>` branch with a context pointer from the ticket; refer to results **by findings file and branch, never by task ID**. If a read is too long to sit through, leave the ticket on the frontier for its own session instead.
+2. **Map the frontier.** Grill again, **breadth-first**: fan out across the whole space rather than deep on any thread, surfacing the open decisions and the first steps takeable now. **If this surfaces no unresolved decision tickets**, the destination is already clear enough to hand off and you don't need a map. An empty Not yet specified section alone is not enough — sharp open decisions still become tickets. Stop and ask the user whether to go straight to `to-spec` or `to-tickets`.
+3. **Create the map** through the tracker's Create map operation: Destination and Notes filled in, Decisions so far empty, the fog sketched into Not yet specified.
+4. **Create the tickets you can specify now** through the tracker's Create ticket operation — then wire blocking edges in a **second pass**. Everything you can't yet specify stays in the fog.
+5. **Resolve eligible research tickets.** Follow the `research` skill's Wayfinder integration to claim, dispatch, persist, and resolve them. If a research ticket cannot finish during this charting session, leave it open on the frontier for its own session.
 6. Stop — charting is one session's work; it hand-resolves nothing.
 
 ### Work through the map
@@ -133,10 +129,10 @@ User invokes with a loose idea.
 User invokes with a map (URL, id, or path). A ticket is optional — without one, you pick the next.
 
 1. Load the **map** — the low-res view, not every ticket body.
-2. Choose the ticket. If the user named one, use it; otherwise take the first frontier ticket. **Claim it** — assign before any work.
+2. Choose the ticket. If the user named one, use it; otherwise take the first frontier ticket. **Claim it** through the tracker's Claim operation before any work.
 3. Resolve it per its type — zoom as needed: fetch full bodies of related or closed tickets on demand; consult the skills the map's Notes name. If in doubt, grill.
-4. Record the resolution: post the answer as a **resolution comment**, **close** the issue, and **append a one-line pointer** to the map's Decisions so far.
-5. Add newly surfaced tickets (create-then-wire); graduate any fog the answer made specifiable, clearing each graduated patch from Not yet specified. If the answer reveals a ticket sits beyond the destination, rule it out of scope rather than resolving it. If the decision invalidates other parts of the map, update or delete those tickets.
+4. Record the answer through the tracker's Resolve operation, which closes the ticket and appends a one-line pointer to the map's Decisions so far.
+5. Add newly surfaced tickets (create-then-wire); graduate any fog the answer made specifiable, clearing each graduated patch from Not yet specified. If the answer reveals a ticket sits beyond the destination, rule it out of scope rather than resolving it. Update tickets that remain valid; close invalidated tickets as superseded with a short reason so their history remains intact.
 
 The user may run unblocked tickets in parallel, so expect other sessions to be editing the tracker concurrently.
 
@@ -157,12 +153,12 @@ Query the tracker for the current frontier before writing the block — don't gu
 **After charting:**
 
 - **Map charted with a frontier** → `/clear`, then `/wayfinder <map>` to resolve the first frontier ticket; name it (research tickets already resolved point at their `research/<slug>` branches)
-- **Charting surfaced no fog** → no map needed: `/to-spec`, or `/to-tickets` if the shape is already clear
+- **Charting found no unresolved decision tickets** → no map needed: `/to-spec`, or `/to-tickets` if the shape is already clear
 
 **After working a ticket:**
 
 - **Map still has open tickets** → `/clear`, then `/wayfinder <map>` for the next frontier ticket; name it and say how many remain
-- **Map cleared** → `/to-spec <map>` to collapse the decisions into a buildable spec — don't skip to `implement`
+- **Map cleared and its decisions need synthesis** → `/to-spec <map>` to collapse them into a buildable spec
 - **Map cleared and the effort turned out genuinely small** → `/to-tickets <map>`
 - **Ticket blocked on someone else's knowledge** → `/to-questionnaire`; **on a fact worth reading for** → `/research`
-- **Stopped mid-ticket** → say which ticket is claimed, what's decided so far, and that it's still assigned
+- **Stopped mid-ticket** → say which ticket is claimed, what's decided so far, and that the claim remains active

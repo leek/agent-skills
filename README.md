@@ -26,7 +26,7 @@ Skills marked **user** are user-invoked only (`/name`); the rest the agent can r
 | `grilling` | model | Interview the user one decision at a time until reaching shared understanding, resolving each branch of the decision tree with recommended options and trade-offs. |
 | `handoff` | user | Compact the current conversation into a handoff document for another agent to pick up. |
 | `housekeeper` | user | Run a conservative code-project housekeeping pass. |
-| `implement` | user | Implement one ticket or spec end to end in a Laravel codebase — claim it, TDD at pre-agreed seams, review, verify, commit, close the ticket. |
+| `implement` | user | Implement one Laravel work item end to end — scope and claim it when trackable, TDD at agreed seams, commit, review, verify, and resolve it. |
 | `improve-codebase-architecture` | user | Scan a codebase for deepening opportunities, present them as a visual HTML report, then grill through whichever one you pick. |
 | `laravel-herd-worktrees` | model | Use when working with Laravel projects served by Laravel Herd alongside git worktrees on macOS. |
 | `nightly-docs-sweep` | user | Run a documentation sweep for a codebase. |

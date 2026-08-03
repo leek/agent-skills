@@ -16,9 +16,9 @@ Pipeline position: `to-spec` (record) → **`to-tickets`** (slice) → `implemen
 
 Work from whatever is already in the conversation. If the user passes a reference (a spec path, an issue id or URL), fetch it and read its full body and comments.
 
-### 2. Explore the codebase
+### 2. Explore the codebase when applicable
 
-If you haven't already, explore to understand the current state. Ticket titles and descriptions use the project's domain vocabulary (`CONTEXT.md`/glossary if present) and respect ADRs in the area.
+When the work targets an existing codebase and you haven't already explored it, inspect the current state. Ticket titles and descriptions use the project's domain vocabulary (`CONTEXT.md`/glossary if present) and respect ADRs in the area. For greenfield or non-code work, continue from the gathered context.
 
 Look for opportunities to **prefactor** — restructure first so the feature lands cleanly. "Make the change easy, then make the easy change." Prefactors become the first tickets.
 
@@ -58,26 +58,24 @@ Iterate on the list until approved. Do not publish an unapproved breakdown.
 
 Publishing creates external artifacts — do it only after step 4's approval.
 
-Resolve the tracker through `docs/agents/issue-tracker.md` (written by `/setup`) or an `## Issue tracker` section in `CLAUDE.md`/`AGENTS.md`. When neither exists, default to **local markdown** and suggest running `/setup` once to make the choice durable.
+Resolve the tracker through `docs/agents/issue-tracker.md` (written by `/setup`) or an `## Issue tracker` section in `CLAUDE.md`/`AGENTS.md`. Follow that configuration for creation, parent links, blocking relations, and labels; it is the single source of truth for tracker mechanics. When neither exists, default to one local markdown file per ticket under `.scratch/<feature-slug>/issues/` and suggest running `/setup` once to make the choice durable.
 
-Publish in dependency order — **blockers first** — so each ticket's edges reference real identifiers, and publish idempotently: if a run fails mid-loop, re-read existing issues before creating more.
-
-- **Local markdown** (the default) — one file per ticket under `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01` in dependency order. Never a single combined file.
-- **Linear** — one issue per ticket via `save_issue`; `parentId` = the spec/parent issue if there is one; `blockedBy` = native blocking relations; apply the repo's AFK-ready label.
-- **GitHub** — one issue per ticket via `gh issue create`; native sub-issue/dependency APIs where available, `Blocked by: #a, #b` body lines where not (probe once, fall back without ceremony); apply the repo's AFK-ready label.
-
-The AFK-ready label is `ready-for-agent` unless `docs/agents/triage-labels.md` maps it differently; create it if it doesn't exist.
+Publish in dependency order — **blockers first** — so each ticket's edges reference real identifiers. Publish idempotently: if a run fails mid-loop, re-read existing issues before creating more.
 
 Do NOT close or modify any parent issue.
 
-## Ticket templates
+## Ticket template
 
-Tracker issue:
+The local template below is canonical. For a tracker issue, put the title and AFK-ready state in native fields and use the body from `## Parent` onward, replacing file references with issue identifiers.
 
 ```markdown
+# <NN> — <Ticket title>
+
+**Status:** ready-for-agent
+
 ## Parent
 
-Reference to the parent spec/issue (omit if none).
+Relative path to the spec (`../spec.md`), or omit if none.
 
 ## What to build
 
@@ -92,40 +90,16 @@ not a layer-by-layer implementation list.
 
 ## Blocked by
 
-- Reference to each blocking ticket, or "None — can start immediately".
-```
-
-Local file — the full self-contained template:
-
-```markdown
-# <NN> — <Ticket title>
-
-**Status:** ready-for-agent
-
-## Parent
-
-Relative path to the spec (`../spec.md`), or omit if none.
-
-## What to build
-
-Same as the tracker template.
-
-## Acceptance criteria
-
-- [ ] Same rules as the tracker template.
-
-## Blocked by
-
 - <NN>-<slug>.md per blocker, or "None — can start immediately".
 ```
 
-Files are numbered from `01` in dependency order — the number *is* the ordering guarantee.
+Files are numbered from `01` in topological order: every blocker has a lower number than the ticket it blocks. Numbers order dependencies; they do not serialize independent tickets.
 
 In either form, avoid file paths and code snippets — they go stale fast. Exception: a prototype-derived snippet that encodes a decision more precisely than prose (state machine, schema, enum shape); trim to the decision-rich parts.
 
 ## After publishing
 
-Work the **frontier** — any ticket whose blockers are all done — with `implement`, one ticket per fresh session. On a real tracker (GitHub, Linear) several sessions can work unblocked tickets in parallel; local markdown is worked top to bottom, one session at a time, clearing context between tickets. Either way `implement` claims the ticket before building (assignment on a tracker, `**Status:** in-progress (claimed <date>, <who>)` in a local file), so an accidental second session skips a ticket already being worked instead of colliding with it.
+Work the **frontier** — any ticket whose blockers are all done — with `implement`, one ticket per fresh session. Unblocked, unclaimed tickets can run in parallel on every tracker, including local markdown. `implement` claims each ticket before building (assignment on a tracker, `**Status:** in-progress (claimed <date>, <who>)` in a local file), so an accidental second session skips work already in progress instead of colliding with it.
 
 ## When you're done
 
@@ -141,7 +115,7 @@ Next:
 
 List only the conditions that actually apply, most likely first:
 
-- **Tickets published with a frontier** → `/implement <first frontier ticket>`, then one per session with cleared context
+- **Tickets published with a frontier** → `/implement <frontier ticket>` in one fresh session per ticket; parallelize only independent frontier tickets
 - **Every ticket is blocked by something already open on the tracker** → `/implement <that blocker>` first; name it
 - **A ticket turned out to be a decision, not a build** → `/grill-me` on it (or `/wayfinder` if there are several)
 - **Slicing exposed a gap the spec never settled** → `/grill-me` on the gap, then re-run `/to-spec`

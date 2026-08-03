@@ -1,71 +1,92 @@
 ---
 name: implement
-description: Implement one ticket or spec end to end in a Laravel codebase — claim it, TDD at pre-agreed seams, review, verify, commit, close the ticket.
+description: Implement one Laravel work item end to end — scope and claim it when trackable, TDD at agreed seams, commit, review, verify, and resolve it.
 disable-model-invocation: true
 ---
 
 # Implement
 
-Implement the work described by a ticket, a spec, or the conversation — one ticket per session, test-first, verified end to end.
+Implement exactly one work item per session, test-first and verified end to end. A work item is a ticket, a spec that fits one session, or an agreed conversation scope.
 
 Pipeline position: decide (`grill-with-docs`/`wayfinder`) → spec (`to-spec`) → slice (`to-tickets`) → **build (`implement`, review and verify inside)**.
 
+## Laravel guardrails
+
+- **Never** run `migrate:fresh`, `migrate:rollback`, or another destructive database operation without explicit approval. Put schema changes in new migrations; sequence live-table changes expand–contract.
+- Verify identifiers before using them — route names, config keys, enum values, icon names, and package APIs. A manifest entry alone does not prove registration or use.
+
 ## Process
 
-### 1. Load and claim the work
+### 1. Scope and claim the work
 
-Given a ticket reference, fetch its full body and comments, plus the parent spec if it links one. Resolve the tracker through `docs/agents/issue-tracker.md` (written by `/setup`) or an `## Issue tracker` section in `CLAUDE.md`/`AGENTS.md`; when neither exists, it's a local markdown ticket under `.scratch/`.
+Classify the input and make its acceptance criteria explicit:
 
-**Claim before building — on every tracker, including local markdown.** On a shared tracker, assign the ticket to the driving dev. On a local markdown ticket, edit the file: set `**Status:** in-progress (claimed <date>, <who>)` before writing any code. "One session at a time" is an assumption, not a guarantee — a second session (human or agent) may be working the same list, and the claim marker is what makes it skip instead of collide. If the ticket is already claimed or in-progress, don't build it: say so and stop (treat a claim as stale only when its work is visibly committed or clearly abandoned).
+- **Ticket** — fetch its full body and comments, plus its parent spec or map when linked. A Wayfinder child is eligible only when its type is `task`; stop on other ticket types because they are not implementation work. The ticket is the work item.
+- **Spec** — fetch its full body and comments. If it contains more than one independently deliverable slice or cannot fit one session, stop and tell the user to run `to-tickets`; otherwise the spec itself is the work item.
+- **Conversation** — restate the scope and behavior criteria in a few lines. It has no tracker claim or resolution.
 
-Confirm its blockers are all closed; if not, say so and stop rather than building on sand.
+For a trackable work item, resolve the tracker once through `docs/agents/issue-tracker.md` (written by `/setup`) or an `## Issue tracker` section in `CLAUDE.md`/`AGENTS.md`; default to the referenced local markdown artifact under `.scratch/` when neither exists. Confirm every blocker is closed through the configured tracker operation or the item's `Blocked by` data, and stop before claiming if any remain open. Then claim before building:
 
-Given only conversation context, restate the scope in two or three lines before starting.
+- On a shared tracker, use its configured claim operation or assign the work item to the driving dev.
+- On a local ticket from `to-tickets`, or a directly implemented local spec, change or add `**Status:** in-progress (claimed <date>, <who>)` near the top.
+- On a local Wayfinder child, use the configured Wayfinding **Claim** operation (`claimed-by`).
+
+If the item is already claimed or in progress, stop; treat the claim as stale only when its work is visibly committed or clearly abandoned.
+
+After claiming, or after scoping conversation-only work, record the output of `git rev-parse HEAD` as immutable `base_sha`. Use that exact SHA for review and for proving failures pre-existing.
+
+Finish this step only when the work fits one session, its acceptance criteria are explicit, every trackable item is claimed with blockers closed, and `base_sha` is recorded.
 
 ### 2. Confirm the seams
 
-Tests go at **pre-agreed seams** — the public boundaries where behavior is observed (the `tdd` skill holds the seam ladder). If the spec already agreed them, use those. If not, propose seams and confirm with the user (via `AskUserQuestion` where available, otherwise a plain question in chat) before writing any test.
+Use the ranking and selection rules in the `tdd` skill's **Seams — where tests go** section. Reuse seams already agreed in the spec; otherwise propose them and confirm with the user (via `AskUserQuestion` where available, otherwise a plain question in chat) before writing a test.
+
+Finish this step when every acceptance criterion has an agreed seam.
 
 ### 3. TDD loop
 
-Red → green, one slice at a time, per the `tdd` skill:
+Run the `tdd` skill at the agreed seams. Discover the repository's focused-test and static-analysis commands from its scripts and existing usage; run the focused test each cycle and static analysis regularly when configured.
 
-- Write one failing test at an agreed seam, watch it fail for the right reason, write only enough code to pass it, repeat.
-- Run the focused test each cycle: `php artisan test --filter=<TestName>` (or `vendor/bin/pest --filter`).
-- Run static analysis regularly if the repo has it configured — check `composer.json` scripts for PHPStan/Larastan (`composer analyse` or similar) before assuming the command exists.
-- Refactoring is not part of the loop — it belongs to the review step.
+Finish the loop only when every acceptance criterion is covered at an agreed seam, every focused test passes, and configured static analysis is green.
 
-### 4. Laravel guardrails
+### 4. Format and commit a reviewable checkpoint
 
-- **Never** run `migrate:fresh`, `migrate:rollback`, or any destructive DB operation without explicit approval. Schema changes go in new migrations; live-table changes follow expand–contract as the ticket sequence dictates.
-- Verify identifiers before using them — route names, config keys, enum values, icon names, package APIs. Presence in `composer.json` is not proof a package is registered or used.
-- Test data comes from model factories; add factory states rather than hand-building models in tests.
+Run the repository's configured formatter; when it uses Pint, run `vendor/bin/pint --dirty`. Check `git status --porcelain`, stage only work-item files by explicit path, and leave foreign changes unstaged. Commit to the current branch so review can inspect the real `base_sha...HEAD` range.
 
-### 5. Full suite, once
+Finish this step with every work-item change committed, every foreign change untouched, and the checkpoint commit SHA recorded.
 
-Run the full test suite once at the end (`php artisan test`). Fix failures you caused. Don't chase pre-existing failures — prove one is pre-existing (fails on the base commit too), then note it plainly and move on.
+### 5. Review
 
-Run Pint before committing: `vendor/bin/pint --dirty`.
+Run the `code-review` skill against `base_sha`. Resolve every actionable finding through the `tdd` loop, rerun affected focused checks and static analysis, format, stage explicit paths, and commit the fixes. Re-run `code-review` after each fix commit.
 
-### 6. Review
+Finish this step only when review reports no unresolved actionable findings and every work-item change is committed.
 
-Run `/code-review` against the ticket's base commit — it reviews the diff on two axes (**Standards**: repo conventions and smell baseline; **Spec**: faithful to the ticket, nothing missing, nothing smuggled in) via foreground sub-agents and reports them side by side. If the harness additionally ships its own correctness review, run that too — bug-hunting is a third axis the two-axis review doesn't cover.
+### 6. Run the final automated checks
 
-Fix what's real; skip stylistic nitpicks tooling already handles.
+Run the repository's full test suite as the final automated gate (`php artisan test` when the repo defines no wrapper). Fix failures caused by the work. Prove an unrelated failure pre-existing against `base_sha`, then note it plainly instead of expanding scope.
+
+Any code fix returns to steps 3–5 before this gate runs again. Finish this step when every caused check passes and every remaining failure has base-SHA evidence.
 
 ### 7. Verify end to end
 
-Run the `verify` skill: exercise the actual flow once — hit the route, run the command, dispatch the job, click through the Filament page. Report what you observed, not what should happen.
+Run the `verify` skill. A product failure returns to steps 3–6 before verification runs again. Successful verification is required to resolve a trackable work item.
 
-### 8. Commit
+If an external dependency prevents verification, keep the committed implementation, report the exact blocker, and leave the work item open. Mark nothing verified on inference alone.
 
-Stage only files you touched, **by explicit path** — never `git add -A` or `git add .`. Check `git status --porcelain` before committing; unstage anything foreign. Commit to the current branch.
+### 8. Close the loop
 
-### 9. Close the loop
+After successful verification, record what was built, any justified deviation, verification evidence, and the implementation commit SHA or SHAs; check off every satisfied acceptance criterion. Resolve the work item according to its branch:
 
-On a tracker: post a resolution comment (what was built, where it deviated from the ticket and why, anything the next ticket should know), check off satisfied acceptance criteria, close the ticket. Never close or modify the parent spec/map issue. On local markdown tickets, set `status: closed` and append the resolution.
+- **Shared tracker** — post the resolution and close the work item.
+- **Local ticket or directly implemented spec** — set `**Status:** closed` and append `## Resolution`.
+- **Local Wayfinder child** — use the configured Wayfinding **Resolve** operation.
+- **Conversation** — report the result without tracker mutation.
 
-Then stop. The next ticket gets a fresh session with a clean context.
+When a ticket has a parent spec or map, leave the parent open. When the spec itself was the one-session work item, close that spec. If a mutated local tracker artifact is tracked, stage only that artifact and commit the resolution separately; if it is ignored or untracked, leave it as tracker state. Resolution text cites the implementation commits, never its own closure commit.
+
+For trackable work, re-read the tracker artifact after mutation and verify its final state.
+
+Finish when the implementation commits and any separate resolution commit are recorded and the tracker's final state is verified, or the conversation-only result is reported. Then stop; any next work item gets a fresh session with a clean context.
 
 ## When you're done
 
@@ -74,15 +95,16 @@ End the session by printing the block below — on a clean finish, a stop, or a 
 ```text
 ---
 Pipeline: decide → spec → slice → **build**   (4 of 4)
-Done: <what now works, the ticket ref, the commit>
+Done: <what now works, the work-item ref if any, commit(s), verification state>
 Next:
   • <condition> → /<skill> <ref>
 ```
 
-Check the tracker for the remaining frontier before writing the block — don't guess at what's left. List only the conditions that actually apply, most likely first:
+For a trackable work item with a parent, check the tracker for the remaining frontier before writing the block — don't guess at what's left. List only the conditions that actually apply, most likely first:
 
 - **More frontier tickets on the parent spec** → `/clear`, then `/implement <next frontier ticket>`; name it and how many remain
 - **Every ticket on the parent spec is closed** → nothing to run; say the spec is complete and name anything deferred out of scope
 - **Remaining tickets are all blocked** → `/implement <the blocker>` first, or `/grill-me` if the blocker is a decision
 - **The build exposed a decision nobody made** → `/grill-me` on it, then re-run `/to-spec` if the spec is now wrong
-- **Stopped mid-ticket** → say what passes, what's uncommitted, and the next red test to write
+- **Verification is externally blocked** → keep the work item open and name the exact unblock condition
+- **Stopped mid-work** → say what passes, what is committed or uncommitted, the claim state, and the next red test to write

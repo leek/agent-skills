@@ -18,24 +18,17 @@ Pipeline position: `grill-with-docs`/`wayfinder` (decide) → **`to-spec`** (rec
 
 Understand the current state of the codebase if you haven't already. Use the project's domain vocabulary throughout the spec (read `CONTEXT.md` if one exists — `domain-modeling` maintains it) and respect any ADRs in the area being touched.
 
+Finish exploring only when you can name the domain terms and ADRs that constrain the spec, the closest existing implementation and tests to imitate (or confirm none exist), and the tracker destination step 3 will use.
+
 ### 2. Sketch the test seams
 
-A **seam** is the public boundary the feature will be tested at (`codebase-design` holds the full deep-module vocabulary). Prefer existing seams to new ones, and the highest seam possible — the fewer seams across the codebase, the better; the ideal number is one. While sketching seams, look for a **deepening opportunity** — functionality worth hiding behind a smaller, more stable interface — and record it under Implementation Decisions.
-
-The Laravel seam ladder ranks fallbacks, highest first — it is not a menu:
-
-1. **HTTP boundary** — a feature test hitting the route (`get()`/`post()` + `assertDatabaseHas`/response assertions). The default for anything with an endpoint.
-2. **Livewire / Filament component** — `Livewire::test()` or Filament's testing helpers, when the behavior lives in a component rather than a plain endpoint.
-3. **Console command** — `$this->artisan()` with exit code and side-effect assertions.
-4. **Queued job / listener** — dispatch or `handle()` directly, asserting side effects.
-5. **Action / service class** — direct test at the class's public API, for logic shared by several entry points.
-6. **Model** — only for non-trivial scopes, casts, or derived attributes.
+A **seam** is the public boundary the feature will be tested at (`codebase-design` holds the full deep-module vocabulary). Before proposing seams, consult and apply the Laravel ranking and selection rules in the `tdd` skill's **Seams — where tests go** section; it is the single source of truth. While sketching seams, look for a **deepening opportunity** — functionality worth hiding behind a smaller, more stable interface — and record it under Implementation Decisions.
 
 Then **confirm the seams with the user** before writing the spec — via `AskUserQuestion` where available, otherwise a plain question in chat; never skip the confirmation. Proposed seam set as the recommended option, one-step-higher and one-step-lower alternatives with their trade-offs (higher = fewer, more integrated tests; lower = faster, more coupled).
 
 ### 3. Write and publish the spec
 
-Write the spec using the template below. Show the draft, then publish it to the project's issue tracker with the repo's AFK-ready label (`ready-for-agent` unless `docs/agents/triage-labels.md` maps it differently; create the label if it doesn't exist). Creating an issue is an external action — publish only after the user has seen the draft.
+Write the spec using the template below. Show the complete draft and wait for the user to approve publication or request changes. After approval, publish it to the project's issue tracker with the repo's AFK-ready label (`ready-for-agent` unless `docs/agents/triage-labels.md` maps it differently; create the label if it doesn't exist).
 
 Resolve the tracker through `docs/agents/issue-tracker.md` (written by `/setup`) or an `## Issue tracker` section in `CLAUDE.md`/`AGENTS.md`. When neither exists, default to **local markdown** — `.scratch/<feature-slug>/spec.md` — and suggest running `/setup` once to make the choice durable.
 
