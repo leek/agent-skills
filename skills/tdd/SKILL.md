@@ -9,6 +9,10 @@ The red → green loop, tuned for Pest/PHPUnit in a Laravel codebase. Consult be
 
 Read `CONTEXT.md` if it exists so test names and interface vocabulary match the project's domain language, and respect ADRs in the area you're touching.
 
+Before writing or reviewing tests, read
+[`references/testing-best-practices.md`](references/testing-best-practices.md)
+and apply its value gate and rejection rules throughout the loop.
+
 ## Rules of the loop
 
 - **Red before green.** Write the failing test first, watch it fail for the right reason (a missing route 404s, not a typo'd import), then write only enough code to pass. No speculative features.
@@ -41,11 +45,3 @@ Highest first:
 - **Authorization is behavior**: for every "user can X" test, write the "user cannot X on someone else's record" test — record-level scoping is the most error-prone rule in a multi-tenant app.
 - **Fast loops with TIA (Pest v5)**: if the project is on Pest v5, use the [Tia engine](https://pestphp.com/docs/tia) so each red → green cycle replays only impacted tests instead of the whole suite — `./vendor/bin/pest --parallel --tia`, or enable it project-wide with `pest()->tia()->locally()` in `tests/Pest.php`. Requires PCOV or Xdebug. Local only — CI still runs the full suite.
 - **Fast loops without TIA (Pest v4, or no coverage driver)**: run the suite with [`--parallel`](https://pestphp.com/docs/optimizing-tests) (`--processes=N` to override the one-per-core default). Tests must be order-independent and not share database state — which the refresh-trait + factories rules above already guarantee.
-
-## Anti-patterns
-
-- **Implementation-coupled** — mocks internal collaborators, tests private/protected methods, or verifies through a side channel. The tell: the test breaks on refactor while behavior is unchanged.
-- **Tautological** — the assertion recomputes the expected value the way the code does (`expect(total($items))->toBe(collect($items)->sum(...))`), so it passes by construction. Expected values come from an independent source — a known-good literal, a worked example, the spec.
-- **Presentation assertions** — asserting on displayed copy, labels, headings, nav items, element order, or CSS classes. Those are change-detectors, not tests. Assert behavior, persisted data, validation, authorization, side effects.
-- **Framework tests** — asserting that Eloquent saves, that validation rules Laravel ships work, that a route resolves its controller. Test *your* branching, business rules, and edge cases only.
-- **Horizontal slicing** — all tests first, then all implementation. Work in vertical slices: one test → one implementation → repeat.
