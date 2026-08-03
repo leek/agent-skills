@@ -39,6 +39,8 @@ Highest first:
 - **Side effects via fakes**: `Queue::fake()`, `Mail::fake()`, `Notification::fake()`, `Event::fake()`, `Storage::fake()`, `Http::fake()` — then assert the effect (`Mail::assertQueued`), not the internal call path. Fake the boundary, never mock your own classes' internals.
 - **Time**: `$this->travel(...)` / `travelTo(...)` for anything date-dependent; never `sleep()`.
 - **Authorization is behavior**: for every "user can X" test, write the "user cannot X on someone else's record" test — record-level scoping is the most error-prone rule in a multi-tenant app.
+- **Fast loops with TIA (Pest v5)**: if the project is on Pest v5, use the [Tia engine](https://pestphp.com/docs/tia) so each red → green cycle replays only impacted tests instead of the whole suite — `./vendor/bin/pest --parallel --tia`, or enable it project-wide with `pest()->tia()->locally()` in `tests/Pest.php`. Requires PCOV or Xdebug. Local only — CI still runs the full suite.
+- **Fast loops without TIA (Pest v4, or no coverage driver)**: run the suite with [`--parallel`](https://pestphp.com/docs/optimizing-tests) (`--processes=N` to override the one-per-core default). Tests must be order-independent and not share database state — which the refresh-trait + factories rules above already guarantee.
 
 ## Anti-patterns
 

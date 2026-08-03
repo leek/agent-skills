@@ -63,9 +63,11 @@ Finish this step only when review reports no unresolved actionable findings and 
 
 ### 6. Run the final automated checks
 
-Run the repository's full test suite as the final automated gate (`php artisan test` when the repo defines no wrapper). Fix failures caused by the work. Prove an unrelated failure pre-existing against `base_sha`, then note it plainly instead of expanding scope.
+Ask the user first (via `AskUserQuestion` where available, otherwise a plain question in chat) whether to run the full test suite as the final automated gate. If they decline, skip the full run — the focused tests from step 3 stand as the automated evidence — and record the skip so step 8 reports it plainly.
 
-Any code fix returns to steps 3–5 before this gate runs again. Finish this step when every caused check passes and every remaining failure has base-SHA evidence.
+When approved, run the repository's full test suite (`php artisan test` when the repo defines no wrapper). Fix failures caused by the work. Prove an unrelated failure pre-existing against `base_sha`, then note it plainly instead of expanding scope.
+
+Any code fix returns to steps 3–5 before this gate runs again. Finish this step when the user declined the full run, or when every caused check passes and every remaining failure has base-SHA evidence.
 
 ### 7. Verify end to end
 
