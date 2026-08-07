@@ -96,6 +96,7 @@ The map is *deliberately* incomplete: don't chart what you can't yet see. Beyond
 
 **Fog or ticket?** The test is whether you can state the question precisely *now* — not whether you can answer it now.
 
+- **Neither** when `grilling`'s **Settle it yourself first** ladder already answers it — existing context, established practice, or the default bias toward reuse and configurability. Settle it, record it in the map's **Notes** as a standing convention for the effort, and don't spend a ticket on it.
 - **Ticket** when the question is already sharp — even if it's blocked.
 - **Not yet specified** when you can't phrase it that sharply. Don't pre-slice fog into ticket-sized pieces: one patch may graduate into several tickets, or none, once the frontier reaches it.
 
@@ -107,7 +108,7 @@ When an existing ticket turns out to sit past the destination, **close it** and 
 
 ## Structured questions
 
-Decision points that arise outside a full grilling — confirming the destination phrasing, choosing between scope rulings, picking which frontier ticket to work — use the question shape from `grilling` (via `AskUserQuestion` where available, otherwise a plain question in chat): recommended option first, real trade-offs per option, wait for the answer. Don't reinvent the protocol here. When this skill invokes `grilling` or `domain-modeling`, the inner skill does **not** print an end-of-session block — only the outermost skill does.
+Decision points that arise outside a full grilling — confirming the destination phrasing, choosing between scope rulings, picking which frontier ticket to work — use the question shape from `grilling` (via `AskUserQuestion` where available, otherwise a plain question in chat): recommended option first, real trade-offs per option, wait for the answer. Don't reinvent the protocol here — including its **Settle it yourself first** ladder and **What still earns a question** bar, which gate every question this skill asks and every ticket it charts. When this skill invokes `grilling` or `domain-modeling`, the inner skill does **not** print an end-of-session block — only the outermost skill does.
 
 ## Invocation
 
