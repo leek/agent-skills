@@ -1,6 +1,6 @@
 ---
 name: to-spec
-description: Turn the current conversation into a spec (PRD) and publish it to the project's issue tracker — no interview, just synthesis, with Laravel test seams confirmed before writing.
+description: Turn the current conversation into a spec (PRD) and publish it to the project's issue tracker — no interview, just synthesis, with Laravel test seams chosen from the tdd ranking rules rather than asked about.
 disable-model-invocation: true
 ---
 
@@ -24,7 +24,7 @@ Finish exploring only when you can name the domain terms and ADRs that constrain
 
 A **seam** is the public boundary the feature will be tested at (`codebase-design` holds the full deep-module vocabulary). Before proposing seams, consult and apply the Laravel ranking and selection rules in the `tdd` skill's **Seams — where tests go** section; it is the single source of truth. While sketching seams, look for a **deepening opportunity** — functionality worth hiding behind a smaller, more stable interface — and record it under Implementation Decisions.
 
-Then **confirm the seams with the user** before writing the spec — via `AskUserQuestion` where available, otherwise a plain question in chat; never skip the confirmation. Proposed seam set as the recommended option, one-step-higher and one-step-lower alternatives with their trade-offs (higher = fewer, more integrated tests; lower = faster, more coupled).
+**Decide the seams yourself — don't ask.** Seam placement is test structure, which `grilling`'s **What still earns a question** hands to you: the ranking rules settle it, so apply them and move on. Record the chosen set in the spec with a one-line why per seam; the user reviews them as part of the step 3 draft, which is the only gate this step needs. Ask only on a genuine fork — two placements the rules rank equally that would make materially different work — and then ask just that one.
 
 ### 3. Write and publish the spec
 
@@ -69,7 +69,7 @@ from a prototype, trim to the decision-rich parts.
 
 ## Testing Decisions
 
-- The agreed seams (from step 2) and which behaviors each covers
+- The chosen seams (from step 2) and which behaviors each covers
 - Prior art — similar tests already in the codebase to imitate
 - Ground rules: test behavior through public interfaces, never presentation
   (no assertions on copy, layout, or CSS); don't test framework behavior;

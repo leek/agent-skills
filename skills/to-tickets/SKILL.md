@@ -1,6 +1,6 @@
 ---
 name: to-tickets
-description: Break a plan, spec, or the current conversation into tracer-bullet vertical-slice tickets with explicit blocking edges, approve the breakdown with the user, and publish to the project's issue tracker.
+description: Break a plan, spec, or the current conversation into tracer-bullet vertical-slice tickets with explicit blocking edges, take one green light on the breakdown, and publish to the project's issue tracker.
 disable-model-invocation: true
 ---
 
@@ -41,22 +41,17 @@ Give each ticket its **blocking edges** — the tickets that must complete befor
 
 When even batches can't stay green alone, keep the sequence but share an integration branch, all blocking a final integrate-and-verify ticket — green is promised only there.
 
-### 4. Approve the breakdown
+### 4. Green-light publication
 
-Present the proposal as a numbered list — per ticket: **Title**, **Blocked by**, **What it delivers** (the end-to-end behavior it makes work).
+**Granularity, blocking edges, and slicing axis are yours to settle.** Step 3's rules decide them, so don't run a review round on each — `grilling`'s **What still earns a question** keeps mechanical judgment off the user's plate.
 
-Then put the review through structured questions (via `AskUserQuestion` where available, otherwise numbered questions in chat — never skip the approval) rather than an open-ended "thoughts?":
+Present the finished breakdown as a numbered list — per ticket: **Title**, **Blocked by**, **What it delivers** (the end-to-end behavior it makes work).
 
-- **Granularity** — right-sized (recommended, if you believe it) / too coarse, split more / too fine, merge some.
-- **Blocking edges** — correct / over-constrained (tickets could parallelize) / missing edges.
-- **Slicing axis** — correct / wrong shape, re-slice / one of these is a decision, not a build.
-- Follow-ups per adjustment the user picks, until they approve.
-
-Iterate on the list until approved. Do not publish an unapproved breakdown.
+Then ask **exactly one** question, because step 5 creates issues on a shared tracker and that isn't cheap to undo: publish as listed (recommended) / adjust first, say what. Make whatever the user names, reprint the list, and don't reopen the parts they left alone.
 
 ### 5. Publish
 
-Publishing creates external artifacts — do it only after step 4's approval.
+Publishing creates external artifacts — do it only after step 4's green light.
 
 Resolve the tracker through `docs/agents/issue-tracker.md` (written by `/setup`) or an `## Issue tracker` section in `CLAUDE.md`/`AGENTS.md`. Follow that configuration for creation, parent links, blocking relations, and labels; it is the single source of truth for tracker mechanics. When neither exists, default to one local markdown file per ticket under `.scratch/<feature-slug>/issues/` and suggest running `/setup` once to make the choice durable.
 

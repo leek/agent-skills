@@ -1,6 +1,6 @@
 ---
 name: implement
-description: Implement one Laravel work item end to end — scope and claim it when trackable, TDD at agreed seams, commit, review, verify, and resolve it.
+description: Implement one Laravel work item end to end — scope and claim it when trackable, TDD at chosen seams, commit, review, verify, and resolve it.
 disable-model-invocation: true
 ---
 
@@ -37,17 +37,17 @@ After claiming, or after scoping conversation-only work, record the output of `g
 
 Finish this step only when the work fits one session, its acceptance criteria are explicit, every trackable item is claimed with blockers closed, and `base_sha` is recorded.
 
-### 2. Confirm the seams
+### 2. Choose the seams
 
-Use the ranking and selection rules in the `tdd` skill's **Seams — where tests go** section. Reuse seams already agreed in the spec; otherwise propose them and confirm with the user (via `AskUserQuestion` where available, otherwise a plain question in chat) before writing a test.
+Use the ranking and selection rules in the `tdd` skill's **Seams — where tests go** section. Reuse seams already recorded in the spec; otherwise **choose them yourself and state the choice** — one line per seam, no approval round. Seam placement is test structure, which `grilling`'s **What still earns a question** hands to you, and the rules are the single source of truth. Ask only on a genuine fork the rules rank equally where the two placements would make materially different work.
 
-Finish this step when every acceptance criterion has an agreed seam.
+Finish this step when every acceptance criterion has a seam.
 
 ### 3. TDD loop
 
-Run the `tdd` skill at the agreed seams. Discover the repository's focused-test and static-analysis commands from its scripts and existing usage; run the focused test each cycle and static analysis regularly when configured.
+Run the `tdd` skill at the chosen seams. Discover the repository's focused-test and static-analysis commands from its scripts and existing usage; run the focused test each cycle and static analysis regularly when configured.
 
-Finish the loop only when every acceptance criterion is covered at an agreed seam, every focused test passes, and configured static analysis is green.
+Finish the loop only when every acceptance criterion is covered at a chosen seam, every focused test passes, and configured static analysis is green.
 
 ### 4. Format and commit a reviewable checkpoint
 
