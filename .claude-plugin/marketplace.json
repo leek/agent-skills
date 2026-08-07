@@ -21,6 +21,7 @@
         "./skills/code-review",
         "./skills/code-smells-audit",
         "./skills/codebase-design",
+        "./skills/commit",
         "./skills/diagnosing-bugs",
         "./skills/distill-sessions",
         "./skills/domain-modeling",
