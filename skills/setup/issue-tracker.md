@@ -91,6 +91,6 @@ blocked-by: []         # ticket numbers, e.g. [01, 03]
 - **Claim**: set `claimed-by:` to the dev's name and save before any work
 - **Frontier**: open, unclaimed tickets whose blockers are all closed; first by number wins
 - **Resolve**: append `## Resolution`, set `status: closed`, add the one-line pointer to `map.md`'s Decisions so far
-- **Hand off**: `to-spec` writes the feature to `specs/<NN>-<feature-slug>/spec.md` and appends one line to `map.md`'s Handed off
-- **Status**: read every `specs/*/issues/*.md` and count stories by `Status:`; the map itself never stores build state
+- **Hand off**: `to-spec` writes the feature to `specs/<NN>-<feature-slug>/spec.md`, then ticks that feature's line in `map.md`'s Features and adds the link. `wayfinder` adds the unticked line earlier, when the feature's shape is decided
+- **Status**: for each unticked line in Features, report not started; for each ticked line, read its `specs/<NN>-*/issues/*.md` and count stories by `Status:`. The map itself never stores build state
 - **Assets**: relative links to files in the repo or scratch folder

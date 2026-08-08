@@ -36,7 +36,7 @@ A spec is a markdown file under `.scratch/` — there is no external tracker. Re
 
 **Where it goes depends on whether an epic sent you.** Cover exactly one feature either way — if the draft grew to cover two, publish the first and say the second needs its own session.
 
-- **Invoked with a map** — publish inside the epic, as its next feature: `.scratch/<epic-slug>/specs/<NN>-<feature-slug>/spec.md`, numbered from `01` in handoff order. Then append one line to the map's **Handed off** section through the tracker's Hand off operation, and leave the map open — an epic closes only after its last feature.
+- **Invoked with a map** — publish inside the epic: `.scratch/<epic-slug>/specs/<NN>-<feature-slug>/spec.md`, numbered to match the feature's position in the map's **Features** list. Then tick that feature's line and add the link, through the tracker's Hand off operation. If the map never listed this feature, add the line first — an unlisted feature means the epic's build plan was incomplete. Leave the map open; it closes only when every listed feature is ticked.
 - **Invoked without a map** — publish standalone at `.scratch/<feature-slug>/spec.md`.
 
 ## Spec template
@@ -108,7 +108,7 @@ List only the conditions that actually apply, most likely first:
 
 - **Feature published, work spans several stories** → `/to-tickets <spec ref>`
 - **Feature published, work fits one session** → `/implement <spec ref>`
-- **Published under an epic that still has open decisions** → `/wayfinder <map>` for its next frontier ticket; say how many remain
+- **Published under an epic whose Features list still has unticked lines** → name them and how many; `/wayfinder <map>` first if any still has an open decision, otherwise `/to-spec <map>` on the next one
 - **A load-bearing decision is still open** → `/grill-me` on that decision, naming it; re-run `/to-spec` after
 - **Several decisions open, or the work is bigger than one feature** → `/wayfinder` to chart it as an epic first
 - **Blocked on knowledge someone else holds** → `/to-questionnaire`; **on a fact worth reading for** → `/research`

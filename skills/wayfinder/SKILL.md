@@ -20,7 +20,9 @@ Each ticket resolves a **decision**; the map is done when nothing is left to dec
 
 **The test on every ticket: can it be answered, or must it be built?** Work you would build is not a ticket. It is a feature, and it belongs in a spec. Never number build work onto the map — the map holds no build state, so a map that lists build work will tell you it is unfinished long after the work ships.
 
-**Hand off — don't build.** When decisions clear enough to describe one buildable feature, run `to-spec` on that part and record it under **Handed off**; go straight to `to-tickets` only when the whole effort turned out small and already clear. The map stays open across handoffs and closes after the last one. `implement` starts from a story, never from the map.
+**Hand off — don't build.** The moment a feature's shape is decided, add it to **Features** as an unticked line — that is the epic's build plan, and it is a decision like any other. When its decisions are all closed, run `to-spec` on it, which ticks the line and links the spec; go straight to `to-tickets` only when the whole effort turned out small and already clear. The map stays open until every listed feature is ticked. `implement` starts from a story, never from the map.
+
+Listing a feature is not the same as pre-cutting the fog. Apply the same test as for a ticket: list it only when you can name what it builds **now**. Anything vaguer stays in **Not yet specified**.
 
 ## Refer by name
 
@@ -56,12 +58,15 @@ effort — e.g. "all schema changes expand–contract", "Filament v3 conventions
 
 - [<closed ticket title>](link) — <one-line gist of the answer>
 
-## Handed off
+## Features
 
-<!-- one line per feature this epic produced; records that the feature exists,
-     never how much of it is built -->
+<!-- the build plan, in order. A feature is listed the moment its shape is
+     decided — before any spec exists. `to-spec` ticks it and adds the link.
+     Records which features exist and in what order, never how much of any
+     one is built; status reads that from the stories. -->
 
-- [<feature name>](link) — <one-line gist of what it builds>
+- [ ] <feature name> — <one-line gist of what it builds>
+- [x] [<feature name>](link) — <one-line gist of what it builds>
 
 ## Not yet specified
 
@@ -109,7 +114,7 @@ The map is *deliberately* incomplete: don't chart what you can't yet see. Beyond
 **Fog or ticket?** First ask whether it is a decision at all, then whether you can state it precisely *now* — not whether you can answer it now.
 
 - **Neither** when `grilling`'s **Settle it yourself first** ladder already answers it — existing context, established practice, or the default bias toward reuse and configurability. Settle it, record it in the map's **Notes** as a standing convention for the effort, and don't spend a ticket on it.
-- **A feature, not a ticket** when the answer would be a thing built rather than a thing decided. Hold it in **Not yet specified** until its decisions clear, then hand it to `to-spec`. It never becomes a map ticket, however sharp it gets.
+- **A feature, not a ticket** when the answer would be a thing built rather than a thing decided. Once you can name what it builds, list it unticked under **Features**; while it is vaguer than that, hold it in **Not yet specified**. It never becomes a map ticket, however sharp it gets.
 - **Ticket** when the question is already sharp — even if it's blocked.
 - **Not yet specified** when you can't phrase it that sharply. Don't cut fog into ticket-sized pieces up front: one patch may graduate into several tickets, or none, once the frontier reaches it.
 
@@ -147,7 +152,7 @@ User invokes with a map (URL, id, or path). A ticket is optional — without one
 3. Resolve it per its type — zoom as needed: fetch full bodies of related or closed tickets on demand; consult the skills the map's Notes name. If in doubt, grill.
 4. Record the answer through the tracker's Resolve operation, which closes the ticket and appends a one-line pointer to the map's Decisions so far.
 5. Add newly surfaced tickets (create-then-wire); graduate any fog the answer made specifiable, clearing each graduated patch from Not yet specified. If the answer reveals a ticket sits beyond the destination, rule it out of scope rather than resolving it. Update tickets that remain valid; close invalidated tickets as superseded with a short reason so their history remains intact.
-6. **Hand off any feature the answer completed.** A feature is ready when every decision it waits on is closed — it does not wait for the rest of the map. Say so and stop; `to-spec` runs in its own session and appends the Handed off line itself.
+6. **Update Features.** Add an unticked line for any feature the answer just gave a nameable shape. A feature is ready to spec when every decision it waits on is closed — it does not wait for the rest of the map. Name the ready ones and stop; `to-spec` runs in its own session and ticks the line itself.
 
 The user may run unblocked tickets in parallel, so expect other sessions to be editing the tracker concurrently.
 
@@ -156,10 +161,10 @@ The user may run unblocked tickets in parallel, so expect other sessions to be e
 User invokes with a map and asks what is left. This mode reads; it writes nothing.
 
 1. Load the map and query the tracker for the frontier.
-2. Run the tracker's Status operation on every feature under **Handed off** and count its stories by state.
-3. Report, by name: open decision tickets, patches still in the fog, and per feature its story counts. Say plainly when the map holds no decisions and every feature is built — that is a finished epic.
+2. Walk **Features** in order. An unticked line has no spec yet — report it as not started. For a ticked line, run the tracker's Status operation and count its stories by state.
+3. Report, by name: open decision tickets, patches still in the fog, every unticked feature, and per ticked feature its story counts. Call the epic finished only when no decision is open, no fog remains, and every listed feature is ticked **and** has no open story.
 
-The map never stores build state, so this count is always read fresh from the stories.
+Never report progress from the map's own text. Unticked features and story counts both come from the filesystem, so an epic cannot look finished while work it named remains unbuilt.
 
 ## When you're done
 
@@ -168,7 +173,7 @@ End the session by printing the block below — on a clean finish, a stop, or a 
 ```text
 ---
 Pipeline: **epic** → feature → story → build   (one epic, many features)
-Done: <map name; decision tickets open, resolved, and still in the fog; features handed off>
+Done: <map name; decision tickets open, resolved, and still in the fog; features listed, of which how many specced>
 Next:
   • <condition> → /<skill> <map or ticket name>
 ```
@@ -185,6 +190,7 @@ Query the tracker for the current frontier before writing the block — don't gu
 - **A feature's decisions are all closed** → `/to-spec <map>` on that feature, naming it; the map stays open for the rest
 - **Map still has open tickets** → `/clear`, then `/wayfinder <map>` for the next frontier ticket; name it and say how many remain
 - **Map cleared and the effort turned out genuinely small** → `/to-tickets <map>`
-- **Every decision closed and every feature handed off** → the epic is done; `/wayfinder <map> status` reports what is left to build
+- **Every decision closed, but Features still has unticked lines** → `/to-spec <map>` on the first one; name it and say how many remain unticked
+- **Every decision closed and every feature ticked** → charting is done; `/wayfinder <map> status` reports what is left to build
 - **Ticket blocked on someone else's knowledge** → `/to-questionnaire`; **on a fact worth reading for** → `/research`
 - **Stopped mid-ticket** → say which ticket is claimed, what's decided so far, and that the claim remains active
