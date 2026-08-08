@@ -37,6 +37,11 @@ persist_state() {
     --arg status "$RUN_STATUS" \
     --arg phase "$RUN_PHASE" \
     --arg provider "$PROVIDER" \
+    --arg model "$WORKER_MODEL" \
+    --arg model_source "$WORKER_MODEL_SOURCE" \
+    --arg reported_model "$REPORTED_MODEL" \
+    --arg effort "$WORKER_EFFORT" \
+    --arg effort_source "$WORKER_EFFORT_SOURCE" \
     --arg runner_pid "$RUNNER_PID_STATE" \
     --arg worker_pid "$WORKER_PID_STATE" \
     --arg runner_process_started "$RUNNER_PROCESS_STARTED" \
@@ -59,7 +64,7 @@ persist_state() {
     --arg next_ref "$NEXT_REF_STATE" \
     --arg result_file "$RESULT_FILE_STATE" \
     '{
-      version: 2,
+      version: 3,
       run_id: $run_id,
       root_ref: $root_ref,
       repo_root: $repo_root,
@@ -67,6 +72,11 @@ persist_state() {
       status: $status,
       phase: $phase,
       provider: $provider,
+      model: $model,
+      model_source: $model_source,
+      reported_model: (if $reported_model == "" then null else $reported_model end),
+      effort: $effort,
+      effort_source: $effort_source,
       runner_pid: (if $runner_pid == "" then null else ($runner_pid | tonumber) end),
       worker_pid: (if $worker_pid == "" then null else ($worker_pid | tonumber) end),
       runner_process_started: (if $runner_process_started == "" then null else $runner_process_started end),
@@ -137,7 +147,7 @@ record_failure_state() {
 validate_state() {
   local state_file="$1"
   jq -e --arg root "$ROOT_REF" --arg repo "$REPO_ROOT" '
-    (.version == 1 or .version == 2) and
+    (.version == 1 or .version == 2 or .version == 3) and
     .root_ref == $root and
     .repo_root == $repo and
     (.run_id | type == "string" and length > 0)

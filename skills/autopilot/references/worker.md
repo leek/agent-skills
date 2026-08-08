@@ -23,11 +23,31 @@ Build the current dependency graph. Treat an open, unclaimed item as frontier wo
 
 Choose deterministically from the frontier: use the lowest local ticket number, or the tracker's published child order. Claims win over ordering—skip work claimed by another active session. Requery immediately before claiming.
 
-Use `autopilot:<run-id>` as this session's claim identity, written into the work item's claim marker before changing code. An existing claim bearing the same run ID is owned interrupted work: inspect the file's history and the current Git diff, then resume that item rather than selecting another. A claim with a different or absent run ID belongs to another session unless the authoritative workflow's abandonment rule is visibly satisfied. If an owned claim cannot be resumed without guessing which changes belong to it, return `needs_input` with the exact claim and worktree state; never clear or overwrite it automatically.
+Use `autopilot:<run-id>` as this session's claim identity, written into the work item's claim marker before changing code — see **Keep the tracker current** for the exact markers. An existing claim bearing the same run ID is owned interrupted work: inspect the file's history and the current Git diff, then resume that item rather than selecting another. A claim with a different or absent run ID belongs to another session unless the authoritative workflow's abandonment rule is visibly satisfied. If an owned claim cannot be resumed without guessing which changes belong to it, return `needs_input` with the exact claim and worktree state; never clear or overwrite it automatically.
 
 For a wayfinder map, run only an AFK research or task ticket. Return `needs_input` for grilling, prototype, or any task requiring a human. When the map has no open tickets but still has fog, return `needs_input`. When it is cleared, return `needs_input` with the exact `to-spec` handoff unless an approved linked spec already exists.
 
 For build work, read `implement` completely and follow its full lifecycle for the selected ticket or one-session spec: claim, test at chosen seams, review through its subagents, verify end to end, explicitly stage, commit, and close. Complete no second unit in this process.
+
+## Keep the tracker current
+
+The tracker is the loop's only memory: the next process recomputes the frontier from these files alone. Write the status transition into the work item at both ends of the unit, in the shape its tracker uses.
+
+Mark it in progress **before** changing any code or dispatching any subagent:
+
+- Build ticket from `to-tickets`, or a directly implemented spec — replace the `**Status:**` line with `**Status:** in-progress (claimed <YYYY-MM-DD>, autopilot:<run-id>)`.
+- `wayfinder` decision ticket — set `claimed-by: autopilot:<run-id>` in the frontmatter and leave `status: open`.
+
+Mark it done as the last step of the unit, after verification and the durable commit:
+
+- Build ticket or directly implemented spec — set `**Status:** closed` and append `## Resolution` per `implement`.
+- `wayfinder` decision ticket — set `status: closed` and append `## Resolution` per the tracker's Resolve operation.
+
+Rules that hold in every branch:
+
+- Re-read the file after writing it and confirm the marker on disk matches what you are about to return. Autopilot reads the same file and fails the run when a `continue` or `complete` result names a unit that is not closed.
+- Leave parents alone: a ticket never closes its spec, and a spec never closes its map.
+- On `needs_input`, `blocked`, or `failed`, leave the in-progress marker and the `autopilot:<run-id>` claim in place — that marker is how a later process recognizes its own resumable work. Never mark an unfinished unit closed, and never leave a finished unit in progress.
 
 ## Report progress
 

@@ -16,6 +16,17 @@ TMUX_START_TIMEOUT_SECONDS=30
 MODE="run"
 USE_TMUX="false"
 LOG_FILE_OVERRIDE=""
+REQUESTED_MODEL="${AUTOPILOT_MODEL:-}"
+REQUESTED_EFFORT="${AUTOPILOT_EFFORT:-}"
+MODEL_FLAG_PROVIDED="false"
+EFFORT_FLAG_PROVIDED="false"
+WORKER_MODEL=""
+WORKER_MODEL_SOURCE=""
+WORKER_EFFORT=""
+WORKER_EFFORT_SOURCE=""
+REPORTED_MODEL=""
+MODEL_CAPTURE_FILE=""
+COMPLETED_REF_STATUS=""
 
 COMPLETED_REFS=""
 TEMP_DIR=""
@@ -61,6 +72,11 @@ PROVIDER_BIN_ENV_NAME=""
 PROVIDER_EVENT_FORMATTER=""
 PROVIDER_EXECUTOR=""
 PROVIDER_RESULT_EXTRACTOR=""
+PROVIDER_CONFIG_READER=""
+PROVIDER_CONFIG_SOURCE=""
+PROVIDER_MODEL_KEY=""
+PROVIDER_EFFORT_KEY=""
+PROVIDER_EFFORT_LEVELS=""
 
 REPO_ROOT=""
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
@@ -108,6 +124,11 @@ require_module "$module_path"
 # shellcheck source-path=SCRIPTDIR
 # shellcheck source=lib/provider.sh
 source "$module_path"
+module_path="$SCRIPT_DIR/lib/tickets.sh"
+require_module "$module_path"
+# shellcheck source-path=SCRIPTDIR
+# shellcheck source=lib/tickets.sh
+source "$module_path"
 module_path="$SCRIPT_DIR/lib/tmux.sh"
 require_module "$module_path"
 # shellcheck source-path=SCRIPTDIR
@@ -130,8 +151,12 @@ Usage:
   autopilot.sh --history --root <ref> [--repo <path>]
 
 Run options:
-  --repo <path>          Target Git repository (default: current directory)
+  --repo <path>         Target Git repository (default: current directory)
   --max-iterations <n>  Fresh-process limit (default: 50)
+  --model <name>        Model for every worker session (default: provider config)
+  --effort <level>      Reasoning effort for every worker session
+                        claude: low|medium|high|xhigh|max
+                        codex:  none|minimal|low|medium|high|xhigh|max
   --log-file <path>     Mirror the durable human-readable log to this path
   --tmux                Start the run in a detached tmux session
   -h, --help            Show this help
@@ -139,6 +164,8 @@ Run options:
 Autopilot writes raw provider events and a human-readable log under the target
 repository's Git directory. Heartbeats default to every five minutes. Set
 AUTOPILOT_HEARTBEAT_SECONDS to a positive number of seconds to change them.
+AUTOPILOT_MODEL and AUTOPILOT_EFFORT are the environment equivalents of --model
+and --effort. Every run reports the model and effort its worker sessions use.
 EOF
 }
 
@@ -173,6 +200,18 @@ while [[ $# -gt 0 ]]; do
     --max-iterations)
       [[ $# -ge 2 ]] || runner_failure "--max-iterations requires a value"
       MAX_ITERATIONS="$2"
+      shift 2
+      ;;
+    --model)
+      [[ $# -ge 2 ]] || runner_failure "--model requires a value"
+      REQUESTED_MODEL="$2"
+      MODEL_FLAG_PROVIDED="true"
+      shift 2
+      ;;
+    --effort)
+      [[ $# -ge 2 ]] || runner_failure "--effort requires a value"
+      REQUESTED_EFFORT="$2"
+      EFFORT_FLAG_PROVIDED="true"
       shift 2
       ;;
     --log-file)
@@ -214,6 +253,8 @@ if [[ "$MODE" == "run" ]]; then
 else
   [[ "$USE_TMUX" == "false" ]] || runner_failure "--tmux is only valid when starting a run"
   [[ -z "$LOG_FILE_OVERRIDE" ]] || runner_failure "--log-file is only valid when starting a run"
+  [[ "$MODEL_FLAG_PROVIDED" == "false" ]] || runner_failure "--model is only valid when starting a run"
+  [[ "$EFFORT_FLAG_PROVIDED" == "false" ]] || runner_failure "--effort is only valid when starting a run"
 fi
 command -v jq >/dev/null 2>&1 || runner_failure "jq is required"
 command -v git >/dev/null 2>&1 || runner_failure "git is required"
@@ -254,6 +295,7 @@ jq -e . "$SCHEMA_PATH" >/dev/null 2>&1 || runner_failure "result schema is inval
 resolve_workflow_skills
 configure_provider
 PROVIDER_BIN_PATH="$(command -v "$PROVIDER_BIN" 2>/dev/null)" || runner_failure "$PROVIDER executable not found: $PROVIDER_BIN"
+resolve_worker_tuning
 
 if [[ "$USE_TMUX" == "true" && "${AUTOPILOT_TMUX_CHILD:-}" != "1" ]]; then
   launch_tmux

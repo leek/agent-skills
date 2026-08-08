@@ -97,8 +97,11 @@ initialize_run() {
     LOG_MIRROR_FILE="$existing_log_mirror"
   fi
 
-  ACTIVITY_FILE="$existing_activity"
-  [[ -n "$ACTIVITY_FILE" ]] || ACTIVITY_FILE="$RUN_DIR/activity"
+  if [[ "$new_run" == "false" && -n "$existing_activity" ]]; then
+    ACTIVITY_FILE="$existing_activity"
+  else
+    ACTIVITY_FILE="$RUN_DIR/activity"
+  fi
   touch "$LOG_FILE" "$ACTIVITY_FILE" || runner_failure "could not initialize run log: $LOG_FILE"
   [[ -z "$LOG_MIRROR_FILE" ]] || touch "$LOG_MIRROR_FILE" || runner_failure "could not initialize log mirror: $LOG_MIRROR_FILE"
 
@@ -114,6 +117,7 @@ initialize_run() {
   persist_state || runner_failure "could not persist runner state: $STATE_FILE"
 
   announce_activity "run $RUN_ID started ($PROVIDER)"
+  announce "worker session $(worker_tuning_summary)"
   announce "log $LOG_FILE"
   [[ -z "$LOG_MIRROR_FILE" ]] || announce "log mirror $LOG_MIRROR_FILE"
   print_observer_commands announce "$TMUX_SESSION"
@@ -147,6 +151,14 @@ validate_result() {
   ' "$result_file" >/dev/null 2>&1
 }
 
+capture_reported_model() {
+  local captured
+  [[ -n "$MODEL_CAPTURE_FILE" && -s "$MODEL_CAPTURE_FILE" ]] || return 1
+  captured="$(sed -n '1p' "$MODEL_CAPTURE_FILE")"
+  [[ -n "$captured" && "$captured" != "$REPORTED_MODEL" ]] || return 1
+  REPORTED_MODEL="$captured"
+}
+
 monitor_worker() {
   local worker_pid="$1" exit_file="$2" started_epoch="$3"
   local next_heartbeat now last_event age elapsed message
@@ -154,12 +166,15 @@ monitor_worker() {
 
   while [[ ! -f "$exit_file" ]] && kill -0 "$worker_pid" 2>/dev/null; do
     sleep "$POLL_SECONDS"
+    if capture_reported_model; then
+      persist_state || true
+    fi
     now="$(now_epoch)"
     if [[ "$now" -ge "$next_heartbeat" ]]; then
       last_event="$(file_mtime "$ACTIVITY_FILE")"
       age=$((now - last_event))
       elapsed=$((now - started_epoch))
-      message="worker alive (iteration $ITERATION/$MAX_ITERATIONS, elapsed $(format_duration "$elapsed"), last event $(format_duration "$age") ago)"
+      message="worker alive (iteration $ITERATION/$MAX_ITERATIONS, model ${REPORTED_MODEL:-$WORKER_MODEL}, effort $WORKER_EFFORT, elapsed $(format_duration "$elapsed"), last event $(format_duration "$age") ago)"
       if [[ "$age" -ge "$QUIET_SECONDS" ]]; then
         message="$message; quiet threshold reached"
       fi
@@ -175,6 +190,9 @@ run_worker() {
   local error_pipe="$TEMP_DIR/errors-$ITERATION.pipe"
   local exit_file="$TEMP_DIR/exit-$ITERATION"
   local event_reader_pid error_reader_pid worker_pid worker_pgid runner_pgid started_epoch worker_exit
+
+  MODEL_CAPTURE_FILE="$TEMP_DIR/model-$ITERATION"
+  : >"$MODEL_CAPTURE_FILE"
 
   mkfifo "$event_pipe" "$error_pipe"
   process_event_stream "$event_file" <"$event_pipe" &
@@ -223,6 +241,7 @@ run_worker() {
   WORKER_PROCESS_GROUP=""
   WORKER_STARTED_AT=""
   RUN_PHASE="reconciling"
+  capture_reported_model || true
   persist_state || worker_failure "could not update worker state"
 
   "$PROVIDER_RESULT_EXTRACTOR" "$event_file" "$result_file"
@@ -236,14 +255,18 @@ run_autopilot_loop() {
 
   ITERATION=1
   while [[ "$ITERATION" -le "$MAX_ITERATIONS" ]]; do
-    announce_activity "iteration $ITERATION/$MAX_ITERATIONS ($PROVIDER)"
+    announce_activity "iteration $ITERATION/$MAX_ITERATIONS ($PROVIDER, $(worker_tuning_summary))"
     persist_state || runner_failure "could not persist iteration state"
     local prompt result_file attempt_id event_file result_status completed_ref next_ref terminal_exit
+    local tickets_before tickets_after
     prompt="$(build_prompt)"
     result_file="$TEMP_DIR/result-$ITERATION.json"
     attempt_id="$(date -u '+%Y%m%dT%H%M%SZ')-$$-$ITERATION"
     event_file="$RUN_DIR/$attempt_id.$PROVIDER.events.jsonl"
     touch "$event_file"
+    tickets_before="$TEMP_DIR/tickets-$ITERATION.before"
+    tickets_after="$TEMP_DIR/tickets-$ITERATION.after"
+    snapshot_work_items "$tickets_before"
 
     if ! run_worker "$prompt" "$result_file" "$event_file"; then
       worker_failure "$PROVIDER worker process failed in iteration $ITERATION"
@@ -263,6 +286,14 @@ run_autopilot_loop() {
 
     announce_activity "$SUMMARY"
     [[ -z "$next_ref" ]] || announce_activity "next $next_ref"
+
+    snapshot_work_items "$tickets_after"
+    announce_work_item_changes "$tickets_before" "$tickets_after"
+    if [[ "$result_status" == "continue" || "$result_status" == "complete" ]]; then
+      verify_completed_ref_closed "$completed_ref" ||
+        worker_failure "worker reported $result_status but $completed_ref is not closed (${COMPLETED_REF_STATUS:-no status marker}) in iteration $ITERATION"
+      warn_open_claims "$tickets_after" "$completed_ref"
+    fi
 
     terminal_exit=""
     case "$result_status" in

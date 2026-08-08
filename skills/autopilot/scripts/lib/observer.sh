@@ -37,6 +37,7 @@ print_status() {
 
   local runner_pid worker_pid runner_process_started worker_process_started runner_alive worker_alive
   local tmux_session tmux_alive activity_file last_event_epoch last_event_at current_status current_iteration current_max log_file
+  local current_model current_model_source current_reported_model current_effort current_effort_source model_display
   read_state_fields "$STATE_FILE" '[
     ((.runner_pid // "") | tostring),
     ((.worker_pid // "") | tostring),
@@ -46,7 +47,12 @@ print_status() {
     (.activity_file // ""),
     (.status // "interrupted"),
     ((.iteration // 0) | tostring),
-    ((.max_iterations // 0) | tostring)
+    ((.max_iterations // 0) | tostring),
+    (.model // ""),
+    (.model_source // ""),
+    (.reported_model // ""),
+    (.effort // ""),
+    (.effort_source // "")
   ]'
   runner_pid="${STATE_FIELDS[0]:-}"
   worker_pid="${STATE_FIELDS[1]:-}"
@@ -57,6 +63,11 @@ print_status() {
   current_status="${STATE_FIELDS[6]:-interrupted}"
   current_iteration="${STATE_FIELDS[7]:-0}"
   current_max="${STATE_FIELDS[8]:-0}"
+  current_model="${STATE_FIELDS[9]:-}"
+  current_model_source="${STATE_FIELDS[10]:-}"
+  current_reported_model="${STATE_FIELDS[11]:-}"
+  current_effort="${STATE_FIELDS[12]:-}"
+  current_effort_source="${STATE_FIELDS[13]:-}"
 
   if pid_is_alive "$runner_pid" "$runner_process_started"; then runner_alive=true; else runner_alive=false; fi
   if pid_is_alive "$worker_pid" "$worker_process_started"; then worker_alive=true; else worker_alive=false; fi
@@ -72,6 +83,14 @@ print_status() {
     "$current_status" "$current_iteration" "$current_max" \
     "$([[ "$runner_alive" == true ]] && printf alive || printf stopped)" \
     "$([[ "$worker_alive" == true ]] && printf alive || printf stopped)" >&2
+  if [[ -n "$current_model" || -n "$current_reported_model" || -n "$current_effort" ]]; then
+    if [[ -n "$current_reported_model" ]]; then
+      model_display="$current_reported_model (reported)"
+    else
+      model_display="${current_model:-unknown} (${current_model_source:-unknown})"
+    fi
+    emit_stderr "worker session model $model_display, effort ${current_effort:-unknown} (${current_effort_source:-unknown})"
+  fi
   emit_stderr "log $log_file"
 
   jq -c \

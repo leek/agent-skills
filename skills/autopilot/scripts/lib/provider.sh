@@ -11,6 +11,11 @@ configure_provider() {
       PROVIDER_EVENT_FORMATTER="format_claude_event"
       PROVIDER_EXECUTOR="run_claude_provider"
       PROVIDER_RESULT_EXTRACTOR="extract_claude_result"
+      PROVIDER_CONFIG_READER="claude_configured_value"
+      PROVIDER_CONFIG_SOURCE="settings"
+      PROVIDER_MODEL_KEY="model"
+      PROVIDER_EFFORT_KEY="effortLevel"
+      PROVIDER_EFFORT_LEVELS="low|medium|high|xhigh|max"
       ;;
     codex)
       PROVIDER_BIN="${AUTOPILOT_CODEX_BIN:-codex}"
@@ -18,11 +23,109 @@ configure_provider() {
       PROVIDER_EVENT_FORMATTER="format_codex_event"
       PROVIDER_EXECUTOR="run_codex_provider"
       PROVIDER_RESULT_EXTRACTOR="extract_codex_result"
+      PROVIDER_CONFIG_READER="codex_configured_value"
+      PROVIDER_CONFIG_SOURCE="config"
+      PROVIDER_MODEL_KEY="model"
+      PROVIDER_EFFORT_KEY="model_reasoning_effort"
+      PROVIDER_EFFORT_LEVELS="none|minimal|low|medium|high|xhigh|max"
       ;;
     *)
       runner_failure "--provider must be claude or codex"
       ;;
   esac
+}
+
+json_settings_value() {
+  local file="$1" key="$2" value
+  [[ -f "$file" ]] || return 1
+  value="$(jq -r --arg key "$key" '(.[$key] // empty) | if type == "string" then . else empty end' "$file" 2>/dev/null)" || return 1
+  [[ -n "$value" ]] || return 1
+  printf '%s' "$value"
+}
+
+claude_configured_value() {
+  local key="$1" file value config_dir files=()
+  config_dir="${CLAUDE_CONFIG_DIR:-${HOME:-}/.claude}"
+  files+=("/Library/Application Support/ClaudeCode/managed-settings.json")
+  files+=("/etc/claude-code/managed-settings.json")
+  files+=("$REPO_ROOT/.claude/settings.local.json")
+  files+=("$REPO_ROOT/.claude/settings.json")
+  files+=("$config_dir/settings.json")
+
+  for file in "${files[@]}"; do
+    if value="$(json_settings_value "$file" "$key")"; then
+      printf '%s' "$value"
+      return 0
+    fi
+  done
+  return 1
+}
+
+codex_configured_value() {
+  local key="$1" file value
+  file="${CODEX_HOME:-${HOME:-}/.codex}/config.toml"
+  [[ -f "$file" ]] || return 1
+  value="$(awk -v key="$key" '
+    /^[[:space:]]*\[/ { exit }
+    /=/ {
+      name = $0
+      sub(/=.*$/, "", name)
+      gsub(/[[:space:]]/, "", name)
+      if (name != key) { next }
+      sub(/^[^=]*=/, "", $0)
+      sub(/[[:space:]]*#.*$/, "", $0)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", $0)
+      print $0
+      exit
+    }
+  ' "$file" | tr -d "\"'")" || return 1
+  [[ -n "$value" ]] || return 1
+  printf '%s' "$value"
+}
+
+validate_worker_tuning() {
+  if [[ -n "$REQUESTED_MODEL" ]]; then
+    [[ "$REQUESTED_MODEL" != -* && "$REQUESTED_MODEL" =~ ^[^[:space:]]+$ ]] ||
+      runner_failure "--model must be a provider model name: $REQUESTED_MODEL"
+  fi
+  [[ -n "$REQUESTED_EFFORT" ]] || return 0
+  [[ "$REQUESTED_EFFORT" =~ ^($PROVIDER_EFFORT_LEVELS)$ ]] ||
+    runner_failure "--effort for $PROVIDER must be one of ${PROVIDER_EFFORT_LEVELS//|/, }"
+  if [[ "$PROVIDER" == "claude" ]] && ! "$PROVIDER_BIN" --help 2>/dev/null | grep -q -- '--effort'; then
+    runner_failure "this claude executable does not support --effort: $PROVIDER_BIN_PATH"
+  fi
+}
+
+resolve_worker_tuning() {
+  local configured=""
+  validate_worker_tuning
+
+  if [[ -n "$REQUESTED_MODEL" ]]; then
+    WORKER_MODEL="$REQUESTED_MODEL"
+    WORKER_MODEL_SOURCE="requested"
+  elif configured="$("$PROVIDER_CONFIG_READER" "$PROVIDER_MODEL_KEY")"; then
+    WORKER_MODEL="$configured"
+    WORKER_MODEL_SOURCE="$PROVIDER_CONFIG_SOURCE"
+  else
+    WORKER_MODEL="unknown"
+    WORKER_MODEL_SOURCE="provider default"
+  fi
+
+  if [[ -n "$REQUESTED_EFFORT" ]]; then
+    WORKER_EFFORT="$REQUESTED_EFFORT"
+    WORKER_EFFORT_SOURCE="requested"
+  elif configured="$("$PROVIDER_CONFIG_READER" "$PROVIDER_EFFORT_KEY")"; then
+    WORKER_EFFORT="$configured"
+    WORKER_EFFORT_SOURCE="$PROVIDER_CONFIG_SOURCE"
+  else
+    WORKER_EFFORT="unknown"
+    WORKER_EFFORT_SOURCE="provider default"
+  fi
+}
+
+worker_tuning_summary() {
+  printf 'model %s (%s), effort %s (%s)' \
+    "$WORKER_MODEL" "$WORKER_MODEL_SOURCE" "$WORKER_EFFORT" "$WORKER_EFFORT_SOURCE"
 }
 
 format_claude_event() {
@@ -35,6 +138,12 @@ format_claude_event() {
       elif .type == "tool_use" then
         ["tool", ("tool " + (.name // "unknown") + " started")] | @tsv
       else empty end
+    elif .type == "system" and (.subtype // "") == "init" then
+      if (.parent_tool_use_id // "") == "" then
+        ["model", (.model // "unknown")] | @tsv
+      else
+        ["event", ("subagent model " + (.model // "unknown"))] | @tsv
+      end
     elif .type == "system" and ((.subtype // "") | startswith("hook_")) then
       ["event", ("hook " + (.subtype // "event"))] | @tsv
     elif .type == "result" then
@@ -75,6 +184,13 @@ process_event_stream() {
       message="$(sanitize_message "$message")"
       if [[ "$kind" == "milestone" ]]; then
         announce_activity "worker: $message"
+      elif [[ "$kind" == "model" ]]; then
+        [[ -z "$MODEL_CAPTURE_FILE" ]] || printf '%s\n' "$message" >"$MODEL_CAPTURE_FILE"
+        if [[ "$message" == "$WORKER_MODEL" ]]; then
+          record_activity "worker session model $message"
+        else
+          announce_activity "worker session model $message (reported)"
+        fi
       else
         record_activity "$message"
       fi
@@ -93,25 +209,34 @@ process_error_stream() {
 run_claude_provider() {
   local prompt="$1" result_file="$2" event_pipe="$3" error_pipe="$4"
   : "$result_file"
-  (cd "$REPO_ROOT" && "$PROVIDER_BIN" -p "$prompt" \
-    --dangerously-skip-permissions \
-    --no-session-persistence \
-    --output-format stream-json \
-    --verbose \
-    --include-hook-events \
-    --forward-subagent-text \
-    --json-schema "$SCHEMA_JSON" >"$event_pipe" 2>"$error_pipe")
+  local args=(
+    -p "$prompt"
+    --dangerously-skip-permissions
+    --no-session-persistence
+    --output-format stream-json
+    --verbose
+    --include-hook-events
+    --forward-subagent-text
+    --json-schema "$SCHEMA_JSON"
+  )
+  [[ -z "$REQUESTED_MODEL" ]] || args+=(--model "$REQUESTED_MODEL")
+  [[ -z "$REQUESTED_EFFORT" ]] || args+=(--effort "$REQUESTED_EFFORT")
+  (cd "$REPO_ROOT" && "$PROVIDER_BIN" "${args[@]}" >"$event_pipe" 2>"$error_pipe")
 }
 
 run_codex_provider() {
   local prompt="$1" result_file="$2" event_pipe="$3" error_pipe="$4"
-  "$PROVIDER_BIN" exec --ephemeral \
-    --dangerously-bypass-approvals-and-sandbox \
-    --cd "$REPO_ROOT" \
-    --json \
-    --output-schema "$SCHEMA_PATH" \
-    --output-last-message "$result_file" \
-    "$prompt" >"$event_pipe" 2>"$error_pipe"
+  local args=(
+    exec --ephemeral
+    --dangerously-bypass-approvals-and-sandbox
+    --cd "$REPO_ROOT"
+    --json
+    --output-schema "$SCHEMA_PATH"
+    --output-last-message "$result_file"
+  )
+  [[ -z "$REQUESTED_MODEL" ]] || args+=(--model "$REQUESTED_MODEL")
+  [[ -z "$REQUESTED_EFFORT" ]] || args+=(-c "model_reasoning_effort=$REQUESTED_EFFORT")
+  "$PROVIDER_BIN" "${args[@]}" "$prompt" >"$event_pipe" 2>"$error_pipe"
 }
 
 extract_claude_result() {

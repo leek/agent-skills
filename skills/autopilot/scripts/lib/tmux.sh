@@ -65,6 +65,8 @@ launch_tmux() {
     --repo "$REPO_ROOT"
     --max-iterations "$MAX_ITERATIONS"
   )
+  [[ -z "$REQUESTED_MODEL" ]] || command_args+=(--model "$REQUESTED_MODEL")
+  [[ -z "$REQUESTED_EFFORT" ]] || command_args+=(--effort "$REQUESTED_EFFORT")
   [[ -z "$LOG_FILE_OVERRIDE" ]] || command_args+=(--log-file "$LOG_FILE_OVERRIDE")
 
   local tmux_command
@@ -110,6 +112,7 @@ launch_tmux() {
   tmux has-session -t "$session_name" 2>/dev/null && tmux_alive="true"
 
   emit_stderr "$launch_status $run_id in tmux session $session_name"
+  emit_stderr "worker session $(worker_tuning_summary)"
   emit_stderr "log $log_file"
   [[ -z "$log_mirror_file" ]] || emit_stderr "log mirror $log_mirror_file"
   print_observer_commands emit_stderr "$session_name" "$tmux_alive"
@@ -117,7 +120,11 @@ launch_tmux() {
     --arg status "$launch_status" \
     --arg run_id "$run_id" \
     --arg tmux_session "$session_name" \
+    --arg model "$WORKER_MODEL" \
+    --arg model_source "$WORKER_MODEL_SOURCE" \
+    --arg effort "$WORKER_EFFORT" \
+    --arg effort_source "$WORKER_EFFORT_SOURCE" \
     --arg log_file "$log_file" \
     --arg log_mirror_file "$log_mirror_file" \
-    '{status:$status,run_id:$run_id,tmux_session:$tmux_session,log_file:$log_file,log_mirror_file:(if $log_mirror_file == "" then null else $log_mirror_file end)}'
+    '{status:$status,run_id:$run_id,tmux_session:$tmux_session,model:$model,model_source:$model_source,effort:$effort,effort_source:$effort_source,log_file:$log_file,log_mirror_file:(if $log_mirror_file == "" then null else $log_mirror_file end)}'
 }
