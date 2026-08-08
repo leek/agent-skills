@@ -6,9 +6,9 @@ disable-model-invocation: true
 
 # Implement
 
-Implement exactly one work item per session, test-first and verified end to end. A work item is a ticket, a spec that fits one session, or an agreed conversation scope.
+Implement exactly one work item per session, test-first and verified end to end. A work item is a **story**, a feature small enough for one session, or an agreed conversation scope.
 
-Pipeline position: decide (`grill-with-docs`/`wayfinder`) → spec (`to-spec`) → slice (`to-tickets`) → **build (`implement`, review and verify inside)**.
+Pipeline position: `wayfinder` charts the **epic** → `to-spec` writes each **feature** → `to-tickets` cuts its **stories** → **`implement` builds one story per session (review and verify inside)**.
 
 ## Laravel guardrails
 
@@ -21,14 +21,14 @@ Pipeline position: decide (`grill-with-docs`/`wayfinder`) → spec (`to-spec`) �
 
 Classify the input and make its acceptance criteria explicit:
 
-- **Ticket** — fetch its full body and comments, plus its parent spec or map when linked. A Wayfinder child is eligible only when its type is `task`; stop on other ticket types because they are not implementation work. The ticket is the work item.
-- **Spec** — fetch its full body and comments. If it contains more than one independently deliverable slice or cannot fit one session, stop and tell the user to run `to-tickets`; otherwise the spec itself is the work item.
+- **Story** — fetch its full body and comments, plus its parent feature spec and that feature's epic when linked. A `wayfinder` decision ticket is eligible only when its type is `task`; stop on the other types because they decide rather than build. The story is the work item.
+- **Feature spec** — fetch its full body and comments. If it holds more than one independently deliverable story or cannot fit one session, stop and tell the user to run `to-tickets`; otherwise the spec itself is the work item.
 - **Conversation** — restate the scope and behavior criteria in a few lines. It has no tracker claim or resolution.
 
 For a trackable work item, resolve the tracker once through `docs/agents/issue-tracker.md` (written by `/setup`) or an `## Issue tracker` section in `CLAUDE.md`/`AGENTS.md`; default to the referenced local markdown artifact under `.scratch/` when neither exists. Confirm every blocker is closed through the configured tracker operation or the item's `Blocked by` data, and stop before claiming if any remain open. Then claim before building:
 
 - On a shared tracker, use its configured claim operation or assign the work item to the driving dev.
-- On a local ticket from `to-tickets`, or a directly implemented local spec, change or add `**Status:** in-progress (claimed <date>, <who>)` near the top.
+- On a local story from `to-tickets`, or a directly implemented local feature spec, change or add `**Status:** in-progress (claimed <date>, <who>)` near the top.
 - On a local Wayfinder child, use the configured Wayfinding **Claim** operation (`claimed-by`).
 
 If the item is already claimed or in progress, stop; treat the claim as stale only when its work is visibly committed or clearly abandoned.
@@ -80,11 +80,11 @@ If an external dependency prevents verification, keep the committed implementati
 After successful verification, record what was built, any justified deviation, verification evidence, and the implementation commit SHA or SHAs; check off every satisfied acceptance criterion. Resolve the work item according to its branch:
 
 - **Shared tracker** — post the resolution and close the work item.
-- **Local ticket or directly implemented spec** — set `**Status:** closed` and append `## Resolution`.
+- **Local story or directly implemented feature spec** — set `**Status:** closed` and append `## Resolution`.
 - **Local Wayfinder child** — use the configured Wayfinding **Resolve** operation.
 - **Conversation** — report the result without tracker mutation.
 
-When a ticket has a parent spec or map, leave the parent open. When the spec itself was the one-session work item, close that spec. If a mutated local tracker artifact is tracked, stage only that artifact and commit the resolution separately; if it is ignored or untracked, leave it as tracker state. Resolution text cites the implementation commits, never its own closure commit.
+Leave every parent open — a story never closes its feature, and a feature never closes its epic. When the feature spec itself was the one-session work item, close that spec and still leave its epic open. If a mutated local tracker artifact is tracked, stage only that artifact and commit the resolution separately; if it is ignored or untracked, leave it as tracker state. Resolution text cites the implementation commits, never its own closure commit.
 
 For trackable work, re-read the tracker artifact after mutation and verify its final state.
 
@@ -96,7 +96,7 @@ End the session by printing the block below — on a clean finish, a stop, or a 
 
 ```text
 ---
-Pipeline: decide → spec → slice → **build**   (4 of 4)
+Pipeline: epic → feature → story → **build**   (one story per session)
 Done: <what now works, the work-item ref if any, commit(s), verification state>
 Next:
   • <condition> → /<skill> <ref>
@@ -104,9 +104,10 @@ Next:
 
 For a trackable work item with a parent, check the tracker for the remaining frontier before writing the block — don't guess at what's left. List only the conditions that actually apply, most likely first:
 
-- **More frontier tickets on the parent spec** → `/clear`, then `/implement <next frontier ticket>`; name it and how many remain
-- **Every ticket on the parent spec is closed** → nothing to run; say the spec is complete and name anything deferred out of scope
-- **Remaining tickets are all blocked** → `/implement <the blocker>` first, or `/grill-me` if the blocker is a decision
+- **More frontier stories in the parent feature** → `/clear`, then `/implement <next frontier story>`; name it and how many remain
+- **Every story in the feature is closed, and it belongs to an epic** → `/wayfinder <map> status` for what is left across the epic
+- **Every story in the feature is closed, with no epic** → nothing to run; say the feature is complete and name anything deferred out of scope
+- **Remaining stories are all blocked** → `/implement <the blocker>` first, or `/grill-me` if the blocker is a decision
 - **The build exposed a decision nobody made** → `/grill-me` on it, then re-run `/to-spec` if the spec is now wrong
 - **Verification is externally blocked** → keep the work item open and name the exact unblock condition
 - **Stopped mid-work** → say what passes, what is committed or uncommitted, the claim state, and the next red test to write

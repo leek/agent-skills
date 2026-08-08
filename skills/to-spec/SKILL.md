@@ -1,6 +1,6 @@
 ---
 name: to-spec
-description: Turn the current conversation into a spec (PRD) and publish it to the project's issue tracker — no interview, just synthesis, with Laravel test seams chosen from the tdd ranking rules rather than asked about.
+description: Turn the current conversation into a spec (PRD) for one feature and publish it to the project's issue tracker — no interview, just synthesis, with Laravel test seams chosen from the tdd ranking rules rather than asked about.
 disable-model-invocation: true
 ---
 
@@ -10,7 +10,9 @@ Take the current conversation context and codebase understanding and produce a s
 
 If a load-bearing decision is genuinely unresolved — one the spec cannot be written without — don't guess and don't launch a full interview. Ask just that decision (via `AskUserQuestion` where available, otherwise a plain question in chat — recommended option first, trade-offs per option), or suggest a `grill-me` round if several are open.
 
-Pipeline position: `grill-with-docs`/`wayfinder` (decide) → **`to-spec`** (record) → `to-tickets` (slice) → `implement` (build).
+A spec is one **feature**: the unit between an epic and its stories. An epic (a `wayfinder` map) hands off one feature or many, each in its own session; small work has no epic and starts here.
+
+Pipeline position: `wayfinder` charts the **epic** → **`to-spec`** writes each **feature** → `to-tickets` cuts its **stories** → `implement` builds one story per session.
 
 ## Process
 
@@ -30,7 +32,12 @@ A **seam** is the public boundary the feature will be tested at (`codebase-desig
 
 Write the spec using the template below. Show the complete draft and wait for the user to approve publication or request changes. After approval, publish it to the project's issue tracker with the repo's AFK-ready label (`ready-for-agent` unless `docs/agents/triage-labels.md` maps it differently; create the label if it doesn't exist).
 
-Resolve the tracker through `docs/agents/issue-tracker.md` (written by `/setup`) or an `## Issue tracker` section in `CLAUDE.md`/`AGENTS.md`. When neither exists, default to **local markdown** — `.scratch/<feature-slug>/spec.md` — and suggest running `/setup` once to make the choice durable.
+Resolve the tracker through `docs/agents/issue-tracker.md` (written by `/setup`) or an `## Issue tracker` section in `CLAUDE.md`/`AGENTS.md`. When neither exists, default to **local markdown** and suggest running `/setup` once to make the choice durable.
+
+**Where it goes depends on whether an epic sent you.** Cover exactly one feature either way — if the draft grew to cover two, publish the first and say the second needs its own session.
+
+- **Invoked with a map** — publish inside the epic, as its next feature: `.scratch/<epic-slug>/specs/<NN>-<feature-slug>/spec.md`, numbered from `01` in handoff order. Then append one line to the map's **Handed off** section through the tracker's Hand off operation, and leave the map open — an epic closes only after its last feature.
+- **Invoked without a map** — publish standalone at `.scratch/<feature-slug>/spec.md`.
 
 ## Spec template
 
@@ -91,17 +98,18 @@ End the session by printing the block below — on a clean finish, a stop, or a 
 
 ```text
 ---
-Pipeline: decide → **spec** → slice → build   (2 of 4)
-Done: <what exists now, with its reference>
+Pipeline: epic → **feature** → story → build   (one feature, many stories)
+Done: <what exists now, with its reference; the epic it belongs to, if any>
 Next:
   • <condition> → /<skill> <ref>
 ```
 
 List only the conditions that actually apply, most likely first:
 
-- **Spec published, work spans several slices** → `/to-tickets <spec ref>`
-- **Spec published, work fits one session** → `/implement <spec ref>`
+- **Feature published, work spans several stories** → `/to-tickets <spec ref>`
+- **Feature published, work fits one session** → `/implement <spec ref>`
+- **Published under an epic that still has open decisions** → `/wayfinder <map>` for its next frontier ticket; say how many remain
 - **A load-bearing decision is still open** → `/grill-me` on that decision, naming it; re-run `/to-spec` after
-- **Several decisions open, or the effort is bigger than one spec** → `/wayfinder` to chart it first
+- **Several decisions open, or the work is bigger than one feature** → `/wayfinder` to chart it as an epic first
 - **Blocked on knowledge someone else holds** → `/to-questionnaire`; **on a fact worth reading for** → `/research`
 - **Stopped before publishing** → say what the draft covers, where it lives, and which sections are unwritten

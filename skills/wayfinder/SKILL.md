@@ -1,22 +1,26 @@
 ---
 name: wayfinder
-description: Plan work too big for one agent session as a shared map of decision tickets on the project's issue tracker, then resolve them one per session until the route to the destination is clear.
+description: Plan an epic too big for one agent session as a shared map of decision tickets on the project's issue tracker, resolve them one per session, and hand each feature to to-spec as its decisions clear.
 disable-model-invocation: true
 ---
 
 # Wayfinder
 
-A loose idea has arrived — too big for one agent session, and wrapped in fog: the way from here to the **destination** isn't visible yet. Wayfinding finds that way instead of charging at the destination. Chart the way as a **shared map** on the project's issue tracker, then work its **decision tickets** — questions whose resolution is a decision, not slices of a build to execute — one at a time until the route is clear.
+A loose idea has arrived — too big for one agent session, and wrapped in fog: the way from here to the **destination** isn't visible yet. Wayfinding finds that way instead of charging at the destination. Chart the way as a **shared map** on the project's issue tracker, then work its **decision tickets** — questions whose resolution is a decision, never work to build — one at a time until the route is clear.
 
-Naming the destination is the first act of charting — it shapes every ticket. It might be a spec to hand to `to-spec`, a decision to lock before planning starts, or a change made in place (a data-model migration, an expand–contract schema change).
+The map is the **epic**, the largest unit in the pipeline. As its decisions clear it hands off **features** to `to-spec` — one feature, or many over several sessions.
 
-Pipeline position: `wayfinder` (find the way) → `to-spec` (write the spec) → `to-tickets` (slice it) → `implement` (build one slice per session).
+Naming the destination is the first act of charting — it shapes every ticket. It might be one feature to hand to `to-spec`, a set of them, a decision to lock before planning starts, or a change made in place (a data-model migration, an expand–contract schema change).
+
+Pipeline position: **`wayfinder`** charts the **epic** → `to-spec` writes each **feature** → `to-tickets` cuts its **stories** → `implement` builds one story per session.
 
 ## Plan, don't do
 
 Each ticket resolves a **decision**; the map is done when nothing is left to decide before someone goes and does the thing. The pull to just do the work is usually the signal you've reached the edge of the map and it's time to hand off. An effort can override this in its **Notes** — carrying execution into the map itself — but absent that, produce decisions, not deliverables.
 
-When the map clears, **hand off — don't build**: use `to-spec` when the linked decisions need collapsing into a buildable plan, or go straight to `to-tickets` when the effort is genuinely small and already clear. `implement` starts from a build ticket, never directly from the map.
+**The test on every ticket: can it be answered, or must it be built?** Work you would build is not a ticket. It is a feature, and it belongs in a spec. Never number build work onto the map — the map holds no build state, so a map that lists build work will tell you it is unfinished long after the work ships.
+
+**Hand off — don't build.** When decisions clear enough to describe one buildable feature, run `to-spec` on that part and record it under **Handed off**; go straight to `to-tickets` only when the whole effort turned out small and already clear. The map stays open across handoffs and closes after the last one. `implement` starts from a story, never from the map.
 
 ## Refer by name
 
@@ -26,9 +30,9 @@ Every map and ticket is an issue, so it has a **name** — its title. In everyth
 
 The map is the configured tracker's canonical wayfinding artifact. Its tickets are children of the map.
 
-The map is an **index**, not a store. It lists decisions made and points at the tickets that hold their detail; a decision lives in exactly one place — its ticket — so the map never restates it, only gists it and links.
+The map is an **index**, not a store. It lists decisions made and points at the tickets that hold their detail; a decision lives in exactly one place — its ticket — so the map never restates it, only gists it and links. The same holds for the features it hands off: the map links each one and the spec holds it. Build state lives with the stories and is never copied here.
 
-Resolve the tracker once per session through `docs/agents/issue-tracker.md` (written by `/setup`) or an `## Issue tracker` section in `CLAUDE.md`/`AGENTS.md`. Its **Wayfinding operations** are the single source of truth for creating maps and children, recording types, wiring blockers, claiming, querying the frontier, resolving, and linking assets. When no tracker is configured, use the local-markdown operations under `.scratch/` from the `setup` skill's `issue-tracker-local.md` seed and suggest running `/setup` once to make the choice durable.
+Resolve the tracker once per session through `docs/agents/issue-tracker.md` (written by `/setup`) or an `## Issue tracker` section in `CLAUDE.md`/`AGENTS.md`. Its **Wayfinding operations** are the single source of truth for creating maps and children, recording types, wiring blockers, claiming, querying the frontier, resolving, handing off features, reading status, and linking assets. When no tracker is configured, use the local-markdown operations under `.scratch/` from the `setup` skill's `issue-tracker-local.md` seed and suggest running `/setup` once to make the choice durable.
 
 ### The map body
 
@@ -37,9 +41,9 @@ The whole map at low resolution, loaded once per session. Open tickets are **not
 ```markdown
 ## Destination
 
-<what reaching the end of this map looks like — the spec, decision, or change
-this effort is finding its way to. One or two lines; every session orients to
-it before choosing a ticket.>
+<what reaching the end of this epic looks like — the features, decision, or
+change this effort is finding its way to. One or two lines; every session
+orients to it before choosing a ticket.>
 
 ## Notes
 
@@ -52,9 +56,17 @@ effort — e.g. "all schema changes expand–contract", "Filament v3 conventions
 
 - [<closed ticket title>](link) — <one-line gist of the answer>
 
+## Handed off
+
+<!-- one line per feature this epic produced; records that the feature exists,
+     never how much of it is built -->
+
+- [<feature name>](link) — <one-line gist of what it builds>
+
 ## Not yet specified
 
-<!-- in-scope fog you can't ticket yet; graduates as the frontier advances -->
+<!-- in-scope fog: decisions you can't ticket yet, and features whose decisions
+     haven't cleared; graduates as the frontier advances -->
 
 ## Out of scope
 
@@ -94,11 +106,12 @@ The map is *deliberately* incomplete: don't chart what you can't yet see. Beyond
 
 **Not yet specified** on the map holds that dim view: the suspected question, the area to revisit. Everything there is in scope, just not sharp enough to ticket. It excludes what's already decided, what's already a live ticket, and what's out of scope.
 
-**Fog or ticket?** The test is whether you can state the question precisely *now* — not whether you can answer it now.
+**Fog or ticket?** First ask whether it is a decision at all, then whether you can state it precisely *now* — not whether you can answer it now.
 
 - **Neither** when `grilling`'s **Settle it yourself first** ladder already answers it — existing context, established practice, or the default bias toward reuse and configurability. Settle it, record it in the map's **Notes** as a standing convention for the effort, and don't spend a ticket on it.
+- **A feature, not a ticket** when the answer would be a thing built rather than a thing decided. Hold it in **Not yet specified** until its decisions clear, then hand it to `to-spec`. It never becomes a map ticket, however sharp it gets.
 - **Ticket** when the question is already sharp — even if it's blocked.
-- **Not yet specified** when you can't phrase it that sharply. Don't pre-slice fog into ticket-sized pieces: one patch may graduate into several tickets, or none, once the frontier reaches it.
+- **Not yet specified** when you can't phrase it that sharply. Don't cut fog into ticket-sized pieces up front: one patch may graduate into several tickets, or none, once the frontier reaches it.
 
 ## Out of scope
 
@@ -112,7 +125,7 @@ Decision points that arise outside a full grilling — confirming the destinatio
 
 ## Invocation
 
-Two modes. Either way, **never resolve more than one ticket per session** — with the exception of research tickets.
+Three modes. In the first two, **never resolve more than one ticket per session** — with the exception of research tickets.
 
 ### Chart the map
 
@@ -134,8 +147,19 @@ User invokes with a map (URL, id, or path). A ticket is optional — without one
 3. Resolve it per its type — zoom as needed: fetch full bodies of related or closed tickets on demand; consult the skills the map's Notes name. If in doubt, grill.
 4. Record the answer through the tracker's Resolve operation, which closes the ticket and appends a one-line pointer to the map's Decisions so far.
 5. Add newly surfaced tickets (create-then-wire); graduate any fog the answer made specifiable, clearing each graduated patch from Not yet specified. If the answer reveals a ticket sits beyond the destination, rule it out of scope rather than resolving it. Update tickets that remain valid; close invalidated tickets as superseded with a short reason so their history remains intact.
+6. **Hand off any feature the answer completed.** A feature is ready when every decision it waits on is closed — it does not wait for the rest of the map. Say so and stop; `to-spec` runs in its own session and appends the Handed off line itself.
 
 The user may run unblocked tickets in parallel, so expect other sessions to be editing the tracker concurrently.
+
+### Report status
+
+User invokes with a map and asks what is left. This mode reads; it writes nothing.
+
+1. Load the map and query the tracker for the frontier.
+2. Run the tracker's Status operation on every feature under **Handed off** and count its stories by state.
+3. Report, by name: open decision tickets, patches still in the fog, and per feature its story counts. Say plainly when the map holds no decisions and every feature is built — that is a finished epic.
+
+The map never stores build state, so this count is always read fresh from the stories.
 
 ## When you're done
 
@@ -143,8 +167,8 @@ End the session by printing the block below — on a clean finish, a stop, or a 
 
 ```text
 ---
-Pipeline: **decide** → spec → slice → build   (1 of 4, multi-session map)
-Done: <map name; tickets open, resolved, and still in the fog>
+Pipeline: **epic** → feature → story → build   (one epic, many features)
+Done: <map name; decision tickets open, resolved, and still in the fog; features handed off>
 Next:
   • <condition> → /<skill> <map or ticket name>
 ```
@@ -158,8 +182,9 @@ Query the tracker for the current frontier before writing the block — don't gu
 
 **After working a ticket:**
 
+- **A feature's decisions are all closed** → `/to-spec <map>` on that feature, naming it; the map stays open for the rest
 - **Map still has open tickets** → `/clear`, then `/wayfinder <map>` for the next frontier ticket; name it and say how many remain
-- **Map cleared and its decisions need synthesis** → `/to-spec <map>` to collapse them into a buildable spec
 - **Map cleared and the effort turned out genuinely small** → `/to-tickets <map>`
+- **Every decision closed and every feature handed off** → the epic is done; `/wayfinder <map> status` reports what is left to build
 - **Ticket blocked on someone else's knowledge** → `/to-questionnaire`; **on a fact worth reading for** → `/research`
 - **Stopped mid-ticket** → say which ticket is claimed, what's decided so far, and that the claim remains active

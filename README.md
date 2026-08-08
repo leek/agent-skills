@@ -8,12 +8,23 @@ Skills follow the [Agent Skills](https://agentskills.io/) format.
 
 ## Available Skills
 
-Skills marked **user** are user-invoked only (`/name`); the rest the agent can reach for on its own. The engineering pipeline is `grill-with-docs` → `to-spec` → `to-tickets` → `implement` (review + verify inside), with `wayfinder` and `triage` as on-ramps. Many are adapted from [Matt Pocock's skills](https://github.com/mattpocock/skills), tuned for Laravel/PHP repos and markdown-first issue tracking.
+Skills marked **user** are user-invoked only (`/name`); the rest the agent can reach for on its own. Many are adapted from [Matt Pocock's skills](https://github.com/mattpocock/skills), tuned for Laravel/PHP repos and markdown-first issue tracking.
+
+The engineering pipeline nests three artifact levels, named for their agile equivalents — **epic → feature → story → build**:
+
+| Level | Artifact | Skill | Holds |
+|---|---|---|---|
+| **epic** | a map of decision tickets | `wayfinder` | many features |
+| **feature** | a spec (PRD) | `to-spec` | many stories |
+| **story** | one vertical slice | `to-tickets` | one session of build work |
+| build | working code | `implement` (review + verify inside) | — |
+
+Small work skips the epic and starts at `grill-with-docs` or `to-spec`; `wayfinder` and `triage` are the on-ramps for everything larger.
 
 | Skill | Invocation | What it does |
 |---|---|---|
 | `architecture-satisfaction` | user | Run a bounded architectural refactor loop. |
-| `autopilot` | user | Drive an existing wayfinder map, spec, or ticket set to completion through fresh top-level Claude Code or Codex sessions. |
+| `autopilot` | user | Drive an existing epic, feature, or set of stories to completion through fresh top-level Claude Code or Codex sessions. |
 | `aws-cli` | model | Use when running AWS CLI commands (`aws ...`) for any service — S3, EC2, IAM, Lambda, CloudFormation, Logs, RDS, ECS, etc. |
 | `code-review` | model | Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes — Standards (does the diff follow this repo's documented conventions, including colocated CLAUDE.md rules?) and Spec (does it implement what the originating ticket/PRD asked?). |
 | `code-smells-audit` | model | Audit a codebase, path, glob, or branch diff for classic code smells using the 56-smell Luzkan catalog, with detection heuristics tuned to PHP/Laravel and TS/React — sweep nine occurrence lenses, adversarially verify every candidate against the smell's card definition, emit a ranked markdown findings report. |
@@ -39,11 +50,11 @@ Skills marked **user** are user-invoked only (`/name`); the rest the agent can r
 | `tdd` | model | The red → green loop tuned for Pest/PHPUnit in a Laravel codebase — seams, what a good test is, and the anti-patterns to refuse. |
 | `teach` | user | Teach the user a new skill or concept, within this workspace. |
 | `to-questionnaire` | user | Turn a decision the user can't fully answer into a Markdown questionnaire for someone else to fill in, async or over a meeting. |
-| `to-spec` | user | Turn the current conversation into a spec (PRD) and publish it to the project's issue tracker — no interview, just synthesis, with Laravel test seams confirmed before writing. |
-| `to-tickets` | user | Break a plan, spec, or the current conversation into tracer-bullet vertical-slice tickets with explicit blocking edges, approve the breakdown with the user, and publish to the project's issue tracker. |
+| `to-spec` | user | Turn the current conversation into a spec (PRD) for one feature and publish it to the project's issue tracker — no interview, just synthesis, with Laravel test seams chosen from the tdd ranking rules rather than asked about. |
+| `to-tickets` | user | Break one feature into tracer-bullet vertical-slice stories with explicit blocking edges, take one green light on the breakdown, and publish to the project's issue tracker. |
 | `triage` | user | Move issues and external PRs through a state machine of triage roles — categorise, verify, grill if needed, and write agent-ready briefs. |
 | `verify` | model | Exercise a change end to end in the running application — hit the route, run the command, click through the page — and report what actually happened. |
-| `wayfinder` | user | Plan work too big for one agent session as a shared map of decision tickets on the project's issue tracker, then resolve them one per session until the route to the destination is clear. |
+| `wayfinder` | user | Plan an epic too big for one agent session as a shared map of decision tickets on the project's issue tracker, resolve them one per session, and hand each feature to to-spec as its decisions clear. |
 | `weekly-composer-dependency-audit` | user | Run a weekly Composer dependency audit for PHP projects. |
 | `weekly-npm-dependency-audit` | user | Run a weekly npm dependency audit for JavaScript or TypeScript projects. |
 | `writing-great-skills` | user | Reference for writing and editing skills well — the vocabulary and principles that make a skill predictable. |

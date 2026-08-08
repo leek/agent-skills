@@ -101,12 +101,12 @@ Invoked from `implement`, hand the findings back to its loop — it decides what
 
 ```text
 ---
-Pipeline: decide → spec → slice → **build**   (review feeds build)
+Pipeline: epic → feature → story → **build**   (review runs inside build)
 Done: <n Standards findings, m Spec findings; the worst per axis>
 Next:
   • <condition> → /<skill> <ref>
 ```
 
-- **Real findings to fix** → fix them, or `/implement <ticket>` if they belong to an open ticket
+- **Real findings to fix** → fix them, or `/implement <story>` if they belong to an open story
 - **Spec axis skipped (no spec)** → `/to-spec` if this work deserved one
 - **Clean on both axes** → nothing to run; say so
