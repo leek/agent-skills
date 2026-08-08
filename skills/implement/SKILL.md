@@ -6,9 +6,9 @@ disable-model-invocation: true
 
 # Implement
 
-Implement exactly one work item per session, test-first and verified end to end. A work item is a **story**, a feature small enough for one session, or an agreed conversation scope.
+Implement exactly one work item per session, test-first and verified end to end. A work item is a **ticket**, a spec small enough for one session, or an agreed conversation scope.
 
-Pipeline position: `wayfinder` charts the **epic** → `to-spec` writes each **feature** → `to-tickets` cuts its **stories** → **`implement` builds one story per session (review and verify inside)**.
+Pipeline position: `wayfinder` (decide) → `to-spec` (write the spec) → `to-tickets` (break it into tickets) → **`implement` (build one ticket per session, review and verify inside)**.
 
 ## Laravel guardrails
 
@@ -21,13 +21,13 @@ Pipeline position: `wayfinder` charts the **epic** → `to-spec` writes each **f
 
 Classify the input and make its acceptance criteria explicit:
 
-- **Story** — fetch its full body and comments, plus its parent feature spec and that feature's epic when linked. A `wayfinder` decision ticket is eligible only when its type is `task`; stop on the other types because they decide rather than build. The story is the work item.
-- **Feature spec** — fetch its full body and comments. If it holds more than one independently deliverable story or cannot fit one session, stop and tell the user to run `to-tickets`; otherwise the spec itself is the work item.
+- **Ticket** — fetch its full body and comments, plus its parent spec and that spec's map when linked. A `wayfinder` decision ticket is eligible only when its type is `task`; stop on the other types because they decide rather than build. The ticket is the work item.
+- **Spec** — fetch its full body and comments. If it holds more than one independently deliverable ticket or cannot fit one session, stop and tell the user to run `to-tickets`; otherwise the spec itself is the work item.
 - **Conversation** — restate the scope and behavior criteria in a few lines. It has no tracker claim or resolution.
 
 Work items are markdown files under `.scratch/` — there is no external tracker. Read the layout once through `docs/agents/issue-tracker.md` (written by `/setup`), falling back to the `setup` skill's `issue-tracker.md` seed when the repo has none. Confirm every blocker is closed through the item's `Blocked by` data, and stop before claiming if any remain open. Then claim before building:
 
-- On a story from `to-tickets`, or a directly implemented feature spec, change or add `**Status:** in-progress (claimed <date>, <who>)` near the top.
+- On a ticket from `to-tickets`, or a directly implemented spec, change or add `**Status:** in-progress (claimed <date>, <who>)` near the top.
 - On a `wayfinder` decision ticket, use the Wayfinding **Claim** operation (`claimed-by`).
 
 If the item is already claimed or in progress, stop; treat the claim as stale only when its work is visibly committed or clearly abandoned.
@@ -78,11 +78,11 @@ If an external dependency prevents verification, keep the committed implementati
 
 After successful verification, record what was built, any justified deviation, verification evidence, and the implementation commit SHA or SHAs; check off every satisfied acceptance criterion. Resolve the work item according to its branch:
 
-- **Story, or a directly implemented feature spec** — set `**Status:** closed` and append `## Resolution`.
+- **Ticket, or a directly implemented spec** — set `**Status:** closed` and append `## Resolution`.
 - **`wayfinder` decision ticket** — use the Wayfinding **Resolve** operation.
 - **Conversation** — report the result without touching any file under `.scratch/`.
 
-Leave every parent open — a story never closes its feature, and a feature never closes its epic. When the feature spec itself was the one-session work item, close that spec and still leave its epic open. If the mutated markdown file is tracked by Git, stage only that file and commit the resolution separately; if `.scratch/` is ignored, leave it as working state. Resolution text cites the implementation commits, never its own closure commit.
+Leave every parent open — a ticket never closes its spec, and a spec never closes its map. When the spec itself was the one-session work item, close that spec and still leave its map open. If the mutated markdown file is tracked by Git, stage only that file and commit the resolution separately; if `.scratch/` is ignored, leave it as working state. Resolution text cites the implementation commits, never its own closure commit.
 
 For trackable work, re-read the markdown file after writing it and verify its final state.
 
@@ -94,7 +94,7 @@ End the session by printing the block below — on a clean finish, a stop, or a 
 
 ```text
 ---
-Pipeline: epic → feature → story → **build**   (one story per session)
+Pipeline: decide → spec → tickets → **build**   (4 of 4)
 Done: <what now works, the work-item ref if any, commit(s), verification state>
 Next:
   • <condition> → /<skill> <ref>
@@ -102,10 +102,9 @@ Next:
 
 For a trackable work item with a parent, check the tracker for the remaining frontier before writing the block — don't guess at what's left. List only the conditions that actually apply, most likely first:
 
-- **More frontier stories in the parent feature** → `/clear`, then `/implement <next frontier story>`; name it and how many remain
-- **Every story in the feature is closed, and it belongs to an epic** → `/wayfinder <map> status` for what is left across the epic
-- **Every story in the feature is closed, with no epic** → nothing to run; say the feature is complete and name anything deferred out of scope
-- **Remaining stories are all blocked** → `/implement <the blocker>` first, or `/grill-me` if the blocker is a decision
+- **More frontier tickets on the parent spec** → `/clear`, then `/implement <next frontier ticket>`; name it and how many remain
+- **Every ticket on the spec is closed** → nothing to run; say the spec is complete and name anything deferred out of scope
+- **Remaining tickets are all blocked** → `/implement <the blocker>` first, or `/grill-me` if the blocker is a decision
 - **The build exposed a decision nobody made** → `/grill-me` on it, then re-run `/to-spec` if the spec is now wrong
 - **Verification is externally blocked** → keep the work item open and name the exact unblock condition
 - **Stopped mid-work** → say what passes, what is committed or uncommitted, the claim state, and the next red test to write

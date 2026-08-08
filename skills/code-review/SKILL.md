@@ -28,7 +28,7 @@ Before going further, confirm the fixed point resolves (`git rev-parse <fixed-po
 
 Look for the originating spec, in this order:
 
-1. Story or ticket references in the commit messages or branch name — read the matching markdown file under `.scratch/` (or wherever `docs/agents/issue-tracker.md`, written by `/setup`, says this repo keeps them).
+1. Ticket references in the commit messages or branch name — read the matching markdown file under `.scratch/` (or wherever `docs/agents/issue-tracker.md`, written by `/setup`, says this repo keeps them).
 2. A path the user passed as an argument.
 3. A PRD/spec file under `docs/`, `specs/`, or `.scratch/` matching the branch name or feature.
 4. If nothing is found, ask the user where the spec is. If they say there isn't one, the **Spec** sub-agent skips and reports "no spec available".
@@ -101,12 +101,12 @@ Invoked from `implement`, hand the findings back to its loop — it decides what
 
 ```text
 ---
-Pipeline: epic → feature → story → **build**   (review runs inside build)
+Pipeline: decide → spec → tickets → **build**   (review runs inside build)
 Done: <n Standards findings, m Spec findings; the worst per axis>
 Next:
   • <condition> → /<skill> <ref>
 ```
 
-- **Real findings to fix** → fix them, or `/implement <story>` if they belong to an open story
+- **Real findings to fix** → fix them, or `/implement <ticket>` if they belong to an open ticket
 - **Spec axis skipped (no spec)** → `/to-spec` if this work deserved one
 - **Clean on both axes** → nothing to run; say so

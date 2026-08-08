@@ -1,47 +1,27 @@
 # Issue tracker: Markdown files
 
-Every epic, feature, and story for this repo lives as a markdown file in `.scratch/` — there is no external tracker (gitignore `.scratch/` or commit it, following the repo's existing convention; ask once if there is none).
-
-## Levels
-
-The pipeline has three artifact levels, named for their agile equivalents:
-
-| Agile name | Artifact | Made by | Holds |
-|---|---|---|---|
-| **epic** | `map.md` and its decision tickets | `wayfinder` | many features |
-| **feature** | `spec.md` | `to-spec` | many stories |
-| **story** | one file under `issues/` | `to-tickets` | one session of build work |
-
-Small work starts at the feature level and never has an epic. An epic holds **decisions**, never build work.
+Every map, spec, and ticket for this repo lives as a markdown file in `.scratch/` — there is no external tracker (gitignore `.scratch/` or commit it, following the repo's existing convention; ask once if there is none).
 
 ## Conventions
 
-A feature with no epic:
+**One effort, one directory, one of each artifact.**
 
 ```
-.scratch/<feature-slug>/
-  spec.md
-  issues/
+.scratch/<slug>/
+  map.md            # /wayfinder — decisions only; omit for small work
+  decisions/        # /wayfinder — one file per decision ticket
+    01-<slug>.md
+  spec.md           # /to-spec — exactly one, written once
+  issues/           # /to-tickets — one file per build ticket
     01-<slug>.md
 ```
 
-An epic and the features it hands off:
+The pipeline runs straight through it: `/wayfinder` writes `map.md` and `decisions/`, `/to-spec` writes `spec.md` once and closes the map, `/to-tickets` writes `issues/`, `/implement` works one file in `issues/` per session.
 
-```
-.scratch/<epic-slug>/
-  map.md
-  decisions/                # the epic's decision tickets
-    01-<slug>.md
-  specs/
-    01-<feature-slug>/
-      spec.md
-      issues/               # that feature's stories
-        01-<slug>.md
-```
-
-- `issues/` is always a sibling of the `spec.md` it belongs to, at either level
-- Stories are one file per story, numbered from `01` in dependency order — never a single combined tickets file
-- Triage state is a `Status:` line near the top of each story file (see `triage-labels.md` for the role strings)
+- Small, already-clear work skips `map.md` and `decisions/` and starts at `spec.md`
+- `decisions/` holds questions; `issues/` holds build work. Nothing in `decisions/` is ever built, and nothing in `issues/` is ever a question
+- Build tickets are one file each, numbered from `01` in dependency order — never a single combined tickets file
+- Triage state is a `Status:` line near the top of each file (see `triage-labels.md` for the role strings)
 - Comments and conversation history append under a `## Comments` heading
 
 ## When a skill says "publish to the issue tracker"
@@ -54,7 +34,7 @@ Read the file at the referenced path. The user will normally pass the path or th
 
 ## Wayfinding operations
 
-Used by `/wayfinder`. The **map** is the epic's index; its decision tickets are one file each under `decisions/`.
+Used by `/wayfinder`. The **map** is the index; its decision tickets are one file each under `decisions/`.
 
 Map file format:
 
@@ -91,6 +71,5 @@ blocked-by: []         # ticket numbers, e.g. [01, 03]
 - **Claim**: set `claimed-by:` to the dev's name and save before any work
 - **Frontier**: open, unclaimed tickets whose blockers are all closed; first by number wins
 - **Resolve**: append `## Resolution`, set `status: closed`, add the one-line pointer to `map.md`'s Decisions so far
-- **Hand off**: `to-spec` writes the feature to `specs/<NN>-<feature-slug>/spec.md`, then ticks that feature's line in `map.md`'s Features and adds the link. `wayfinder` adds the unticked line earlier, when the feature's shape is decided
-- **Status**: for each unticked line in Features, report not started; for each ticked line, read its `specs/<NN>-*/issues/*.md` and count stories by `Status:`. The map itself never stores build state
+- **Hand off**: once every ticket is closed, `to-spec` writes `spec.md` in the same directory and appends `**Status:** closed` to `map.md`. It runs once per map
 - **Assets**: relative links to files in the repo or scratch folder

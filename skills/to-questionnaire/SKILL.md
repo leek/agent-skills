@@ -62,7 +62,7 @@ End the session by printing the block below — on a clean finish, a stop, or a 
 
 ```text
 ---
-Pipeline: epic → feature → story → build   (a questionnaire unblocks a decision)
+Pipeline: **decide** → spec → tickets → build   (a questionnaire unblocks a decision)
 Done: <file path; who it's for; what it needs back>
 Next:
   • <condition> → /<skill> <ref>

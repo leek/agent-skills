@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 Scaffold the per-repo configuration that the engineering skills assume:
 
-- **Issue tracker** — where the epics, features, and stories live as markdown files
+- **Issue tracker** — where maps, specs, and tickets live as markdown files
 - **Triage labels** — the strings used for the five canonical triage roles
 - **Domain docs** — where `CONTEXT.md` and ADRs live, and the consumer rules for reading them
 
@@ -30,7 +30,7 @@ Read whatever exists; don't assume:
 
 Summarise what's present and missing, then take the sections in order — one section, one answer. Lead each with the recommended answer so the user can accept it in a word. Use `AskUserQuestion` where available; otherwise ask in chat and wait.
 
-**Section A — Issue tracker.** Markdown files under `.scratch/` are the only tracker these skills use — it needs no auth and keeps every epic, feature, and story greppable next to the code. There is no choice to make here, so ask nothing: write `docs/agents/issue-tracker.md` from this skill's `issue-tracker.md` seed. Ask one question only if the repo already keeps this work somewhere other than `.scratch/`, and then only to confirm that path.
+**Section A — Issue tracker.** Markdown files under `.scratch/` are the only tracker these skills use — it needs no auth and keeps every map, spec, and ticket greppable next to the code. There is no choice to make here, so ask nothing: write `docs/agents/issue-tracker.md` from this skill's `issue-tracker.md` seed. Ask one question only if the repo already keeps this work somewhere other than `.scratch/`, and then only to confirm that path.
 
 **Section B — Triage label vocabulary.** Skip entirely if the `triage` skill isn't installed. If it is, ask exactly one question: keep the default labels? (recommended: **yes**). Defaults: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. Collect overrides only on "no".
 
@@ -62,7 +62,7 @@ Omit the `### Triage labels` sub-block (and its file) when Section B didn't run.
 
 Seed templates in this folder:
 
-- [issue-tracker.md](./issue-tracker.md) — the markdown layout for epics, features, and stories
+- [issue-tracker.md](./issue-tracker.md) — the markdown layout for maps, specs, and tickets
 - [triage-labels.md](./triage-labels.md) — label mapping (only if `triage` is installed)
 - [domain.md](./domain.md) — domain doc consumer rules + layout
 

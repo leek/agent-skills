@@ -15,7 +15,7 @@ Execute one unit from an existing engineering pipeline, then return the required
 - A child ticket inherits the parent map or spec as the loop scope.
 - A spec with no child tickets may be implemented directly only when it fits one fresh session and already records agreed test seams. Otherwise return `needs_input` with the exact `to-tickets` action.
 
-Work items are markdown files under `.scratch/` — there is no external tracker. Inspect the feature spec and every sibling story under its `issues/` directory, plus the epic's `decisions/` directory when the feature sits under one. Read current status, claims, and blocking edges from those files rather than trusting stale conversation text.
+Work items are markdown files under `.scratch/` — there is no external tracker. Inspect the spec and every sibling ticket under its `issues/` directory, plus the map's `decisions/` directory when the effort has one. Read current status, claims, and blocking edges from those files rather than trusting stale conversation text.
 
 ## Choose one unit
 

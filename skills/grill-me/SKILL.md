@@ -14,7 +14,7 @@ End the session by printing the block below — whether the plan resolved, the u
 
 ```text
 ---
-Pipeline: epic → feature → story → build   (grilling settles decisions at every level)
+Pipeline: **decide** → spec → tickets → build   (1 of 4)
 Done: <n of m decisions settled; what's still open>
 Next:
   • <condition> → /<skill> <ref>
@@ -22,9 +22,9 @@ Next:
 
 List only the conditions that actually apply, most likely first:
 
-- **Plan resolved, spans several stories** → `/to-spec` to record it as one feature
-- **Plan resolved, fits one session** → `/to-tickets`, or `/implement` if it's genuinely one story
-- **Resolved but bigger than one feature, or still foggy** → `/wayfinder` to chart it as an epic
+- **Plan resolved, spans several tickets** → `/to-spec` to record it
+- **Plan resolved, fits one session** → `/to-tickets`, or `/implement` if it's genuinely one ticket
+- **Resolved but too big for one spec, or still foggy** → `/wayfinder` to chart it as a map
 - **A branch is blocked on knowledge someone else holds** → `/to-questionnaire` on that branch
 - **A branch is blocked on a fact worth reading for** → `/research` on that question
 - **Stopped early** → `/grill-me` to resume; list the open branches by name so the next session starts on the frontier
