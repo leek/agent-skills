@@ -36,7 +36,7 @@ A spec is a markdown file under `.scratch/` — there is no external tracker. Re
 
 Publish to `.scratch/<slug>/spec.md`. **Invoked with a map, reuse that map's directory** and append `**Status:** closed` to `map.md` — the map's job is done, and this skill does not run on it again.
 
-The spec covers the whole effort. If it feels too big for one spec, say so and recommend narrowing the effort rather than writing a second spec beside the first.
+The spec covers the whole effort. Its short **Build Contract** is the canonical home for invariants, ordering, and shared seams every implementation ticket needs; detailed decisions below it hold ticket-specific context without repeating that contract. If the effort feels too big for one spec, say so and recommend narrowing it rather than writing a second spec beside the first.
 
 ## Spec template
 
@@ -49,6 +49,13 @@ The problem the user is facing, from the user's perspective.
 
 The solution to the problem, from the user's perspective.
 
+## Build Contract
+
+- The cross-ticket invariants every implementation must preserve
+- Delivery or expand–contract ordering that constrains more than one ticket
+- Shared public seams later tickets can rely on
+- Links to named sections below that workers should load only when their ticket reaches them
+
 ## User Stories
 
 A LONG, numbered list covering all aspects of the feature:
@@ -57,7 +64,7 @@ A LONG, numbered list covering all aspects of the feature:
 
 ## Implementation Decisions
 
-The decisions that were made, e.g.:
+The detailed decisions that were made. Keep Build Contract material in that section only; link to it instead of repeating it here. Examples:
 
 - Schema changes (expand–contract sequencing for live tables)
 - Eloquent models and relationships to add or modify

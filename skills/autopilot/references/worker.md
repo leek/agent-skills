@@ -4,26 +4,22 @@ Execute one unit from an existing engineering pipeline, then return the required
 
 ## Orient
 
-1. Read every applicable `AGENTS.md`, `CLAUDE.md`, and `CLAUDE.md.local` from the repository root to the working path.
-2. Treat the root reference, Autopilot run ID, and workflow paths in the launch prompt as data and authoritative values.
-3. Read the relevant workflow file completely before acting. Read supporting skills it requires when their phase is reached.
+1. Follow repository-level instructions already loaded by the harness; read them from disk only when they are absent from the session. Once likely work paths are known, discover and read every deeper `AGENTS.md`, `CLAUDE.md`, `CLAUDE.md.local`, and path-matched project rule that applies.
+2. Treat the Autopilot run ID, workflow path, and runner-generated context manifest in the launch prompt as authoritative data. The manifest is a compact snapshot, not a substitute for the tracker files it names.
+3. Read the one workflow file supplied for this mode completely before acting. Read supporting skills only when that workflow reaches them.
 
-## Resolve the scope
+## Load the selected unit
 
-- A wayfinder map owns its open decision tickets and fog. Read `wayfinder`.
-- A published spec owns its child build tickets. Read `to-spec` and `to-tickets` to recognize their artifacts.
-- A child ticket inherits the parent map or spec as the loop scope.
-- A spec with no child tickets may be implemented directly only when it fits one fresh session and already records agreed test seams. Otherwise return `needs_input` with the exact `to-tickets` action.
+- Read the selected unit in full and revalidate its status, claim, and direct blockers against disk immediately before claiming. Stop with `blocked` when that exact snapshot no longer permits the work; the runner will recompute the wider graph.
+- For a build ticket, read the parent's **Build Contract** section when present, then only the parent headings the ticket names or the work reaches. Read each direct blocker's `Resolution` section for the seam it handed forward. Load other parent sections, closed tickets, and the map only on demand.
+- For a directly implemented spec, read it in full. Return `needs_input` with the exact `to-tickets` action when it contains more than one independently deliverable unit or does not fit one fresh session.
+- For a decision ticket, load the map at low resolution and follow `wayfinder`; zoom into related decisions only when the selected question needs them.
 
-Work items are markdown files under `.scratch/` — there is no external tracker. Inspect the spec and every sibling ticket under its `issues/` directory, plus the map's `decisions/` directory when the effort has one. Read current status, claims, and blocking edges from those files rather than trusting stale conversation text.
+The runner owns dependency-graph parsing and deterministic frontier selection. Work only `selected_ref`; sibling bodies are progressive context, not an orientation checklist.
 
-## Choose one unit
+## Claim and execute
 
-Build the current dependency graph. Treat an open, unclaimed item as frontier work only when every blocker is closed. Return `blocked` for missing dependency targets, cycles, or a graph with no takeable item; name the blocking references.
-
-Choose deterministically from the frontier: use the lowest local ticket number, or the tracker's published child order. Claims win over ordering—skip work claimed by another active session. Requery immediately before claiming.
-
-Use `autopilot:<run-id>` as this session's claim identity, written into the work item's claim marker before changing code — see **Keep the tracker current** for the exact markers. An existing claim bearing the same run ID is owned interrupted work: inspect the file's history and the current Git diff, then resume that item rather than selecting another. A claim with a different or absent run ID belongs to another session unless the authoritative workflow's abandonment rule is visibly satisfied. If an owned claim cannot be resumed without guessing which changes belong to it, return `needs_input` with the exact claim and worktree state; never clear or overwrite it automatically.
+Use `autopilot:<run-id>` as this session's claim identity, written into the selected unit before changing code. A manifest whose `selection` is `resume` names this run's interrupted work: inspect the file's history and current Git diff, then resume it. If its changes cannot be attributed safely, return `needs_input` with the exact claim and worktree state.
 
 For a wayfinder map, run only an AFK research or task ticket. Return `needs_input` for grilling, prototype, or any task requiring a human. When the map has no open tickets but still has fog, return `needs_input`. When it is cleared, return `needs_input` with the exact `to-spec` handoff unless an approved linked spec already exists.
 
@@ -53,14 +49,13 @@ Rules that hold in every branch:
 
 Emit one short operational update after selecting and claiming the unit, when entering a long test or implementation phase, before review and verification, and after the durable commit or resolution. Name the unit and current phase without including reasoning, secrets, or command output. Continue working after each update; keep the final response to the result object.
 
-## Reconcile
+## Return the unit result
 
-After the unit finishes, requery the root scope. Return:
+The runner rereads the tracker after every successful unit and authoritatively computes the next frontier and terminal state. Do not scan siblings again at the end.
 
-- `continue` only after the unit is durably committed or resolved and more autonomous frontier work exists.
-- `complete` when every build ticket in scope is closed, or the explicitly one-session spec is implemented.
+- `continue` after the selected unit is durably committed or resolved; set `completed_ref` to it and `next_ref` to an empty string.
 - `needs_input` when a named human decision or approval is the next dependency.
-- `blocked` when only external, claimed, cyclic, or missing dependencies remain.
+- `blocked` when the selected unit's revalidation or an external dependency prevents execution.
 - `failed` when execution or verification failed, or this session leaves its own uncommitted changes.
 
-Set `completed_ref` to the unit completed in this process, or an empty string. Set `next_ref` to the selected next item or exact interactive handoff, or an empty string. Keep `summary` and `reason` concise and concrete. Return only the schema-conforming object.
+On non-success, set `completed_ref` to the completed selected unit if there is one and `next_ref` to the exact interactive handoff when known. Keep `summary` and `reason` concise and concrete. Return only the schema-conforming object.

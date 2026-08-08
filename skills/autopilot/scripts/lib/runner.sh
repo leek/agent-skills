@@ -124,18 +124,85 @@ initialize_run() {
 }
 
 build_prompt() {
+  local context_json="$1" workflow_line=""
+  case "$TRACKER_MODE" in
+    decision) workflow_line="Decision workflow: $WAYFINDER_PATH" ;;
+    build|direct-spec) workflow_line="Build workflow: $IMPLEMENT_PATH" ;;
+    *) runner_failure "unsupported tracker mode: $TRACKER_MODE" ;;
+  esac
+
   printf '%s\n' \
     "You are one fresh top-level worker in an external Autopilot loop." \
     "Read and follow this worker contract completely: $WORKER_PATH" \
     "Target repository: $REPO_ROOT" \
-    "Root reference as a JSON string: $ROOT_JSON" \
     "Autopilot run ID: $RUN_ID" \
-    "Workflow files:" \
-    "- wayfinder: $WAYFINDER_PATH" \
-    "- to-spec: $TO_SPEC_PATH" \
-    "- to-tickets: $TO_TICKETS_PATH" \
-    "- implement: $IMPLEMENT_PATH" \
-    "Perform exactly one unit, reconcile current tracker state, and return only the required structured result."
+    "$workflow_line" \
+    "The runner selected the exact unit from current tracker and Git state." \
+    "Iteration context manifest (JSON): $context_json" \
+    "Perform exactly that unit. On success return it as completed_ref with an empty next_ref; the runner computes the next frontier. Return only the required structured result."
+}
+
+tracker_terminal_result() {
+  local result_file="$1" status summary next_ref
+  status="$TRACKER_OUTCOME"
+  next_ref="$TRACKER_NEXT_REF"
+  case "$status" in
+    complete) summary="Autopilot scope is complete." ;;
+    needs_input) summary="Autopilot reached a human gate." ;;
+    blocked) summary="Autopilot has no autonomous frontier." ;;
+    *) runner_failure "cannot terminate from tracker outcome: $status" ;;
+  esac
+  jq -cn \
+    --arg status "$status" \
+    --arg next_ref "$next_ref" \
+    --arg summary "$summary" \
+    --arg reason "$TRACKER_REASON" \
+    '{status:$status,completed_ref:"",next_ref:$next_ref,summary:$summary,reason:$reason}' >"$result_file"
+}
+
+reconcile_successful_result() {
+  local result_file="$1" status next_ref reason
+  tracker_refresh
+  case "$TRACKER_OUTCOME" in
+    selected)
+      status="continue"
+      next_ref="$TRACKER_SELECTED_REF"
+      reason="Runner selected $next_ref from the current tracker frontier."
+      ;;
+    complete)
+      status="complete"
+      next_ref=""
+      reason="$TRACKER_REASON"
+      ;;
+    needs_input)
+      status="needs_input"
+      next_ref="$TRACKER_NEXT_REF"
+      reason="$TRACKER_REASON"
+      ;;
+    blocked)
+      status="blocked"
+      next_ref=""
+      reason="$TRACKER_REASON"
+      ;;
+    *) runner_failure "unsupported tracker outcome after worker success: $TRACKER_OUTCOME" ;;
+  esac
+  jq \
+    --arg status "$status" \
+    --arg next_ref "$next_ref" \
+    --arg reason "$reason" \
+    '.status = $status | .next_ref = $next_ref | .reason = $reason' \
+    "$result_file" >"$result_file.reconciled"
+  mv -- "$result_file.reconciled" "$result_file"
+}
+
+terminal_exit_for_status() {
+  case "$1" in
+    complete) printf '0' ;;
+    needs_input) printf '2' ;;
+    blocked) printf '3' ;;
+    failed) printf '4' ;;
+    *) return 1 ;;
+  esac
 }
 
 validate_result() {
@@ -251,15 +318,13 @@ run_worker() {
 run_autopilot_loop() {
   TEMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/autopilot.XXXXXX")" || runner_failure "could not create a temporary directory"
   SCHEMA_JSON="$(jq -c . "$SCHEMA_PATH")"
-  ROOT_JSON="$(jq -Rn --arg value "$ROOT_REF" '$value')"
 
   ITERATION=1
   while [[ "$ITERATION" -le "$MAX_ITERATIONS" ]]; do
     announce_activity "iteration $ITERATION/$MAX_ITERATIONS ($PROVIDER, $(worker_tuning_summary))"
     persist_state || runner_failure "could not persist iteration state"
     local prompt result_file attempt_id event_file result_status completed_ref next_ref terminal_exit
-    local tickets_before tickets_after
-    prompt="$(build_prompt)"
+    local tickets_before tickets_after selected_file
     result_file="$TEMP_DIR/result-$ITERATION.json"
     attempt_id="$(date -u '+%Y%m%dT%H%M%SZ')-$$-$ITERATION"
     event_file="$RUN_DIR/$attempt_id.$PROVIDER.events.jsonl"
@@ -268,10 +333,47 @@ run_autopilot_loop() {
     tickets_after="$TEMP_DIR/tickets-$ITERATION.after"
     snapshot_work_items "$tickets_before"
 
+    tracker_refresh
+    if [[ "$TRACKER_OUTCOME" != "selected" ]]; then
+      tracker_terminal_result "$result_file"
+      result_status="$(jq -r '.status' "$result_file")"
+      SUMMARY="$(jq -r '.summary' "$result_file")"
+      REASON="$(jq -r '.reason' "$result_file")"
+      NEXT_REF_STATE="$(jq -r '.next_ref' "$result_file")"
+      RESULT_FILE_STATE="$RUN_DIR/last-result.json"
+      cp -- "$result_file" "$RESULT_FILE_STATE" || runner_failure "could not persist tracker result"
+      terminal_exit="$(terminal_exit_for_status "$result_status")"
+      transition_to_terminal "$result_status"
+      persist_state || runner_failure "could not persist terminal tracker state"
+      announce_activity "$SUMMARY"
+      [[ -z "$NEXT_REF_STATE" ]] || announce_activity "next $NEXT_REF_STATE"
+      jq -c . "$result_file"
+      return "$terminal_exit"
+    fi
+
+    selected_file="$TRACKER_SELECTED_FILE"
+    announce_activity "selected $TRACKER_SELECTED_REF ($TRACKER_SELECTION, $TRACKER_MODE)"
+    prompt="$(build_prompt "$TRACKER_CONTEXT_JSON")"
+
     if ! run_worker "$prompt" "$result_file" "$event_file"; then
       worker_failure "$PROVIDER worker process failed in iteration $ITERATION"
     fi
     validate_result "$result_file" || worker_failure "$PROVIDER worker returned an invalid result in iteration $ITERATION"
+
+    result_status="$(jq -r '.status' "$result_file")"
+    completed_ref="$(jq -r '.completed_ref' "$result_file")"
+
+    snapshot_work_items "$tickets_after"
+    announce_work_item_changes "$tickets_before" "$tickets_after"
+    if [[ "$result_status" == "continue" || "$result_status" == "complete" ]]; then
+      [[ -n "$completed_ref" ]] || worker_failure "$result_status result omitted completed_ref in iteration $ITERATION"
+      verify_completed_ref_selected "$completed_ref" "$selected_file" ||
+        worker_failure "worker completed $completed_ref instead of selected unit $(repo_relative_ref "$selected_file") in iteration $ITERATION"
+      verify_completed_ref_closed "$completed_ref" ||
+        worker_failure "worker reported $result_status but $completed_ref is not closed (${COMPLETED_REF_STATUS:-no status marker}) in iteration $ITERATION"
+      warn_open_claims "$tickets_after" "$completed_ref"
+      reconcile_successful_result "$result_file"
+    fi
 
     result_status="$(jq -r '.status' "$result_file")"
     completed_ref="$(jq -r '.completed_ref' "$result_file")"
@@ -287,28 +389,16 @@ run_autopilot_loop() {
     announce_activity "$SUMMARY"
     [[ -z "$next_ref" ]] || announce_activity "next $next_ref"
 
-    snapshot_work_items "$tickets_after"
-    announce_work_item_changes "$tickets_before" "$tickets_after"
-    if [[ "$result_status" == "continue" || "$result_status" == "complete" ]]; then
-      verify_completed_ref_closed "$completed_ref" ||
-        worker_failure "worker reported $result_status but $completed_ref is not closed (${COMPLETED_REF_STATUS:-no status marker}) in iteration $ITERATION"
-      warn_open_claims "$tickets_after" "$completed_ref"
-    fi
-
     terminal_exit=""
     case "$result_status" in
       continue)
-        [[ -n "$completed_ref" ]] || worker_failure "continue result omitted completed_ref in iteration $ITERATION"
         if printf '%s\n' "$COMPLETED_REFS" | grep -Fxq -- "$completed_ref"; then
           worker_failure "no progress: completed_ref repeated ($completed_ref)"
         fi
         COMPLETED_REFS="${COMPLETED_REFS}${completed_ref}
 "
         ;;
-      complete) terminal_exit=0 ;;
-      needs_input) terminal_exit=2 ;;
-      blocked) terminal_exit=3 ;;
-      failed) terminal_exit=4 ;;
+      complete|needs_input|blocked|failed) terminal_exit="$(terminal_exit_for_status "$result_status")" ;;
     esac
 
     if [[ -n "$terminal_exit" ]]; then

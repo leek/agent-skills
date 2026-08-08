@@ -29,6 +29,7 @@ Cut the spec into **tracer bullet** tickets:
 - Each ticket cuts a narrow but COMPLETE path through every layer it needs — for a typical Laravel feature: migration → model/factory → behavior (controller / FormRequest / action / job / Livewire / Filament) → route → feature test. Vertical, never a horizontal slice of one layer ("all migrations", "all the tests").
 - A completed ticket is demoable or verifiable on its own — a route you can hit, a command you can run, a test you can watch pass.
 - Each ticket is sized to fit one fresh agent session.
+- Each ticket points to the parent's **Build Contract** and only the additional spec headings it needs. Those heading links route progressive context; they do not restate the spec.
 - Prefactoring tickets come first.
 
 Give each ticket its **blocking edges** — the tickets that must complete before it can start. A ticket with no blockers can start immediately.
@@ -71,6 +72,11 @@ This template is canonical.
 ## Parent
 
 Relative path to the spec (`../spec.md`), or omit if none.
+
+## Parent context
+
+- [Build Contract](../spec.md#build-contract)
+- [<only another spec heading this ticket needs>](../spec.md#<heading-anchor>)
 
 ## What to build
 

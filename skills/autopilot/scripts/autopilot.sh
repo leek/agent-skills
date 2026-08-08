@@ -90,7 +90,6 @@ TO_SPEC_PATH=""
 TO_TICKETS_PATH=""
 IMPLEMENT_PATH=""
 SCHEMA_JSON=""
-ROOT_JSON=""
 
 require_module() {
   if [[ ! -f "$1" ]]; then

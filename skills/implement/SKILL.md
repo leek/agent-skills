@@ -21,11 +21,11 @@ Pipeline position: `wayfinder` (decide) → `to-spec` (write the spec) → `to-t
 
 Classify the input and make its acceptance criteria explicit:
 
-- **Ticket** — fetch its full body and comments, plus its parent spec and that spec's map when linked. A `wayfinder` decision ticket is eligible only when its type is `task`; stop on the other types because they decide rather than build. The ticket is the work item.
+- **Ticket** — fetch its full body and comments. From its parent spec, load the **Build Contract** section first when present, then the headings the ticket names or the implementation reaches. Read direct blockers' `Resolution` sections for handed-forward seams; load other closed tickets and the map only on demand. A `wayfinder` decision ticket is eligible only when its type is `task`; stop on the other types because they decide rather than build. The ticket is the work item.
 - **Spec** — fetch its full body and comments. If it holds more than one independently deliverable ticket or cannot fit one session, stop and tell the user to run `to-tickets`; otherwise the spec itself is the work item.
 - **Conversation** — restate the scope and behavior criteria in a few lines. It has no tracker claim or resolution.
 
-Work items are markdown files under `.scratch/` — there is no external tracker. Read the layout once through `docs/agents/issue-tracker.md` (written by `/setup`), falling back to the `setup` skill's `issue-tracker.md` seed when the repo has none. Confirm every blocker is closed through the item's `Blocked by` data, and stop before claiming if any remain open. Then claim before building:
+Work items are markdown files under `.scratch/` — there is no external tracker. When launch context already identifies the tracker mode, selected unit, status, and blockers, revalidate those exact files rather than rereading the tracker layout. Otherwise read the layout once through `docs/agents/issue-tracker.md` (written by `/setup`), falling back to the `setup` skill's `issue-tracker.md` seed when the repo has none. Confirm every direct blocker is closed through the item's `Blocked by` data, and stop before claiming if any remain open. Then claim before building:
 
 - On a ticket from `to-tickets`, or a directly implemented spec, change or add `**Status:** in-progress (claimed <date>, <who>)` near the top.
 - On a `wayfinder` decision ticket, use the Wayfinding **Claim** operation (`claimed-by`).
@@ -76,7 +76,7 @@ If an external dependency prevents verification, keep the committed implementati
 
 ### 8. Close the loop
 
-After successful verification, record what was built, any justified deviation, verification evidence, and the implementation commit SHA or SHAs; check off every satisfied acceptance criterion. Resolve the work item according to its branch:
+After successful verification, record what was built, any justified deviation, verification evidence, the implementation commit SHA or SHAs, and any public seam a direct successor should reuse; check off every satisfied acceptance criterion. This `Resolution` is the successor handoff, so keep the seam and evidence concrete without retelling the parent spec. Resolve the work item according to its branch:
 
 - **Ticket, or a directly implemented spec** — set `**Status:** closed` and append `## Resolution`.
 - **`wayfinder` decision ticket** — use the Wayfinding **Resolve** operation.
