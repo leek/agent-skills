@@ -8,7 +8,7 @@ Skills follow the [Agent Skills](https://agentskills.io/) format.
 
 ## Available Skills
 
-Skills marked **user** are user-invoked only (`/name`); the rest the agent can reach for on its own. Many are adapted from [Matt Pocock's skills](https://github.com/mattpocock/skills), tuned for Laravel/PHP repos and markdown-first issue tracking.
+Skills marked **user** are user-invoked only (`/name`); the rest the agent can reach for on its own. Many are adapted from [Matt Pocock's skills](https://github.com/mattpocock/skills), tuned for Laravel/PHP repos. Every epic, feature, and story is a markdown file under `.scratch/` — there is no external issue tracker.
 
 The engineering pipeline nests three artifact levels, named for their agile equivalents — **epic → feature → story → build**:
 
@@ -46,15 +46,15 @@ Small work skips the epic and starts at `grill-with-docs` or `to-spec`; `wayfind
 | `repository-cleanup` | user | Audit and clean Git repository state. |
 | `research` | model | Investigate a question against high-trust primary sources and capture the findings as a cited Markdown file. |
 | `resolving-merge-conflicts` | model | "Use when you need to resolve an in-progress git merge/rebase conflict." |
-| `setup` | user | Configure this repo for the engineering skills — issue tracker, triage label vocabulary, and domain doc layout. |
+| `setup` | user | Configure this repo for the engineering skills — the markdown issue tracker layout, triage label vocabulary, and domain doc layout. |
 | `tdd` | model | The red → green loop tuned for Pest/PHPUnit in a Laravel codebase — seams, what a good test is, and the anti-patterns to refuse. |
 | `teach` | user | Teach the user a new skill or concept, within this workspace. |
 | `to-questionnaire` | user | Turn a decision the user can't fully answer into a Markdown questionnaire for someone else to fill in, async or over a meeting. |
-| `to-spec` | user | Turn the current conversation into a spec (PRD) for one feature and publish it to the project's issue tracker — no interview, just synthesis, with Laravel test seams chosen from the tdd ranking rules rather than asked about. |
-| `to-tickets` | user | Break one feature into tracer-bullet vertical-slice stories with explicit blocking edges, take one green light on the breakdown, and publish to the project's issue tracker. |
+| `to-spec` | user | Turn the current conversation into a spec (PRD) for one feature and save it as markdown under .scratch/ — no interview, just synthesis, with Laravel test seams chosen from the tdd ranking rules rather than asked about. |
+| `to-tickets` | user | Break one feature into tracer-bullet vertical-slice stories with explicit blocking edges, take one green light on the breakdown, and save one markdown file per story beside the spec. |
 | `triage` | user | Move issues and external PRs through a state machine of triage roles — categorise, verify, grill if needed, and write agent-ready briefs. |
 | `verify` | model | Exercise a change end to end in the running application — hit the route, run the command, click through the page — and report what actually happened. |
-| `wayfinder` | user | Plan an epic too big for one agent session as a shared map of decision tickets on the project's issue tracker, resolve them one per session, and hand each feature to to-spec as its decisions clear. |
+| `wayfinder` | user | Plan an epic too big for one agent session as a shared map of decision tickets in markdown under .scratch/, resolve them one per session, and hand each feature to to-spec as its decisions clear. |
 | `weekly-composer-dependency-audit` | user | Run a weekly Composer dependency audit for PHP projects. |
 | `weekly-npm-dependency-audit` | user | Run a weekly npm dependency audit for JavaScript or TypeScript projects. |
 | `writing-great-skills` | user | Reference for writing and editing skills well — the vocabulary and principles that make a skill predictable. |

@@ -1,6 +1,6 @@
 ---
 name: to-tickets
-description: Break one feature into tracer-bullet vertical-slice stories with explicit blocking edges, take one green light on the breakdown, and publish to the project's issue tracker.
+description: Break one feature into tracer-bullet vertical-slice stories with explicit blocking edges, take one green light on the breakdown, and save one markdown file per story beside the spec.
 disable-model-invocation: true
 ---
 
@@ -47,13 +47,13 @@ When even batches can't stay green alone, keep the sequence but share an integra
 
 Present the finished breakdown as a numbered list — per story: **Title**, **Blocked by**, **What it delivers** (the end-to-end behavior it makes work).
 
-Then ask **exactly one** question, because step 5 creates issues on a shared tracker and that isn't cheap to undo: publish as listed (recommended) / adjust first, say what. Make whatever the user names, reprint the list, and don't reopen the parts they left alone.
+Then ask **exactly one** question, because step 5 writes a file per story and renumbering them afterwards isn't cheap: publish as listed (recommended) / adjust first, say what. Make whatever the user names, reprint the list, and don't reopen the parts they left alone.
 
 ### 5. Publish
 
 Publishing creates external artifacts — do it only after step 4's green light.
 
-Resolve the tracker through `docs/agents/issue-tracker.md` (written by `/setup`) or an `## Issue tracker` section in `CLAUDE.md`/`AGENTS.md`. Follow that configuration for creation, parent links, blocking relations, and labels; it is the single source of truth for tracker mechanics. When neither exists, default to one local markdown file per story in an `issues/` directory **beside the feature's `spec.md`**, and suggest running `/setup` once to make the choice durable. That rule holds whether the feature stands alone or sits under an epic — the stories always live next to the spec they belong to.
+Write one markdown file per story into an `issues/` directory **beside the feature's `spec.md`** — there is no external tracker. That rule holds whether the feature stands alone or sits under an epic: the stories always live next to the spec they belong to. Read the layout from `docs/agents/issue-tracker.md` (written by `/setup`) when the repo has one; suggest running `/setup` once to make the paths durable.
 
 Publish in dependency order — **blockers first** — so each story's edges reference real identifiers. Publish idempotently: if a run fails mid-loop, re-read existing issues before creating more.
 
@@ -94,7 +94,7 @@ In either form, avoid file paths and code snippets — they go stale fast. Excep
 
 ## After publishing
 
-Work the **frontier** — any story whose blockers are all done — with `implement`, one story per fresh session. Unblocked, unclaimed stories can run in parallel on every tracker, including local markdown. `implement` claims each story before building (assignment on a tracker, `**Status:** in-progress (claimed <date>, <who>)` in a local file), so an accidental second session skips work already in progress instead of colliding with it.
+Work the **frontier** — any story whose blockers are all done — with `implement`, one story per fresh session. Unblocked, unclaimed stories can run in parallel. `implement` claims each story before building, by writing `**Status:** in-progress (claimed <date>, <who>)` into its file, so an accidental second session skips work already in progress instead of colliding with it.
 
 ## When you're done
 

@@ -1,6 +1,6 @@
 ---
 name: wayfinder
-description: Plan an epic too big for one agent session as a shared map of decision tickets on the project's issue tracker, resolve them one per session, and hand each feature to to-spec as its decisions clear.
+description: Plan an epic too big for one agent session as a shared map of decision tickets in markdown under .scratch/, resolve them one per session, and hand each feature to to-spec as its decisions clear.
 disable-model-invocation: true
 ---
 
@@ -32,7 +32,7 @@ The map is the configured tracker's canonical wayfinding artifact. Its tickets a
 
 The map is an **index**, not a store. It lists decisions made and points at the tickets that hold their detail; a decision lives in exactly one place — its ticket — so the map never restates it, only gists it and links. The same holds for the features it hands off: the map links each one and the spec holds it. Build state lives with the stories and is never copied here.
 
-Resolve the tracker once per session through `docs/agents/issue-tracker.md` (written by `/setup`) or an `## Issue tracker` section in `CLAUDE.md`/`AGENTS.md`. Its **Wayfinding operations** are the single source of truth for creating maps and children, recording types, wiring blockers, claiming, querying the frontier, resolving, handing off features, reading status, and linking assets. When no tracker is configured, use the local-markdown operations under `.scratch/` from the `setup` skill's `issue-tracker-local.md` seed and suggest running `/setup` once to make the choice durable.
+Maps, tickets, and specs are markdown files under `.scratch/` — there is no external tracker. Read the layout once per session from `docs/agents/issue-tracker.md` (written by `/setup`), falling back to the `setup` skill's `issue-tracker.md` seed when the repo has none; suggest running `/setup` once to make the paths durable. Its **Wayfinding operations** are the single source of truth for creating maps and children, recording types, wiring blockers, claiming, querying the frontier, resolving, handing off features, reading status, and linking assets.
 
 ### The map body
 

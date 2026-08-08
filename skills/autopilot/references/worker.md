@@ -15,7 +15,7 @@ Execute one unit from an existing engineering pipeline, then return the required
 - A child ticket inherits the parent map or spec as the loop scope.
 - A spec with no child tickets may be implemented directly only when it fits one fresh session and already records agreed test seams. Otherwise return `needs_input` with the exact `to-tickets` action.
 
-Resolve the issue tracker through the project's documented tracker operations. For local markdown, inspect the spec and every sibling ticket under its `issues/` directory. For a hosted tracker, query current child, status, assignee, and dependency relationships rather than trusting stale conversation text.
+Work items are markdown files under `.scratch/` — there is no external tracker. Inspect the feature spec and every sibling story under its `issues/` directory, plus the epic's `decisions/` directory when the feature sits under one. Read current status, claims, and blocking edges from those files rather than trusting stale conversation text.
 
 ## Choose one unit
 
@@ -23,7 +23,7 @@ Build the current dependency graph. Treat an open, unclaimed item as frontier wo
 
 Choose deterministically from the frontier: use the lowest local ticket number, or the tracker's published child order. Claims win over ordering—skip work claimed by another active session. Requery immediately before claiming.
 
-Use `autopilot:<run-id>` as this session's claim identity. Put that exact identity in a local markdown claim marker. On a hosted tracker, assign through the normal workflow and immediately add an `Autopilot run: <run-id>` claim comment before changing code. An existing claim bearing the same run ID is owned interrupted work: inspect its tracker history and the current Git diff, then resume that ticket rather than selecting another. A claim with a different or absent run ID belongs to another session unless the authoritative workflow's abandonment rule is visibly satisfied. If an owned claim cannot be resumed without guessing which changes belong to it, return `needs_input` with the exact claim and worktree state; never clear or overwrite it automatically.
+Use `autopilot:<run-id>` as this session's claim identity, written into the work item's claim marker before changing code. An existing claim bearing the same run ID is owned interrupted work: inspect the file's history and the current Git diff, then resume that item rather than selecting another. A claim with a different or absent run ID belongs to another session unless the authoritative workflow's abandonment rule is visibly satisfied. If an owned claim cannot be resumed without guessing which changes belong to it, return `needs_input` with the exact claim and worktree state; never clear or overwrite it automatically.
 
 For a wayfinder map, run only an AFK research or task ticket. Return `needs_input` for grilling, prototype, or any task requiring a human. When the map has no open tickets but still has fog, return `needs_input`. When it is cleared, return `needs_input` with the exact `to-spec` handoff unless an approved linked spec already exists.
 

@@ -28,7 +28,7 @@ Before going further, confirm the fixed point resolves (`git rev-parse <fixed-po
 
 Look for the originating spec, in this order:
 
-1. Ticket references in the commit messages or branch name — fetch via the project's issue tracker (`docs/agents/issue-tracker.md`, written by `/setup`, or an `## Issue tracker` section in `CLAUDE.md`/`AGENTS.md`; local markdown under `.scratch/` is the default when neither exists).
+1. Story or ticket references in the commit messages or branch name — read the matching markdown file under `.scratch/` (or wherever `docs/agents/issue-tracker.md`, written by `/setup`, says this repo keeps them).
 2. A path the user passed as an argument.
 3. A PRD/spec file under `docs/`, `specs/`, or `.scratch/` matching the branch name or feature.
 4. If nothing is found, ask the user where the spec is. If they say there isn't one, the **Spec** sub-agent skips and reports "no spec available".

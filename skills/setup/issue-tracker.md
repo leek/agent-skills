@@ -1,6 +1,6 @@
-# Issue tracker: Local Markdown
+# Issue tracker: Markdown files
 
-Issues and specs (you may know a spec as a PRD) for this repo live as markdown files in `.scratch/` (gitignore it or commit it — follow the repo's existing convention; ask once if there is none).
+Every epic, feature, and story for this repo lives as a markdown file in `.scratch/` — there is no external tracker (gitignore `.scratch/` or commit it, following the repo's existing convention; ask once if there is none).
 
 ## Levels
 

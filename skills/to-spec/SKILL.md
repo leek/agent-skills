@@ -1,6 +1,6 @@
 ---
 name: to-spec
-description: Turn the current conversation into a spec (PRD) for one feature and publish it to the project's issue tracker — no interview, just synthesis, with Laravel test seams chosen from the tdd ranking rules rather than asked about.
+description: Turn the current conversation into a spec (PRD) for one feature and save it as markdown under .scratch/ — no interview, just synthesis, with Laravel test seams chosen from the tdd ranking rules rather than asked about.
 disable-model-invocation: true
 ---
 
@@ -32,7 +32,7 @@ A **seam** is the public boundary the feature will be tested at (`codebase-desig
 
 Write the spec using the template below. Show the complete draft and wait for the user to approve publication or request changes. After approval, publish it to the project's issue tracker with the repo's AFK-ready label (`ready-for-agent` unless `docs/agents/triage-labels.md` maps it differently; create the label if it doesn't exist).
 
-Resolve the tracker through `docs/agents/issue-tracker.md` (written by `/setup`) or an `## Issue tracker` section in `CLAUDE.md`/`AGENTS.md`. When neither exists, default to **local markdown** and suggest running `/setup` once to make the choice durable.
+A spec is a markdown file under `.scratch/` — there is no external tracker. Read the layout from `docs/agents/issue-tracker.md` (written by `/setup`), falling back to the paths below when the repo has none; suggest running `/setup` once to make them durable.
 
 **Where it goes depends on whether an epic sent you.** Cover exactly one feature either way — if the draft grew to cover two, publish the first and say the second needs its own session.
 

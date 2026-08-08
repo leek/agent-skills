@@ -25,11 +25,10 @@ Classify the input and make its acceptance criteria explicit:
 - **Feature spec** — fetch its full body and comments. If it holds more than one independently deliverable story or cannot fit one session, stop and tell the user to run `to-tickets`; otherwise the spec itself is the work item.
 - **Conversation** — restate the scope and behavior criteria in a few lines. It has no tracker claim or resolution.
 
-For a trackable work item, resolve the tracker once through `docs/agents/issue-tracker.md` (written by `/setup`) or an `## Issue tracker` section in `CLAUDE.md`/`AGENTS.md`; default to the referenced local markdown artifact under `.scratch/` when neither exists. Confirm every blocker is closed through the configured tracker operation or the item's `Blocked by` data, and stop before claiming if any remain open. Then claim before building:
+Work items are markdown files under `.scratch/` — there is no external tracker. Read the layout once through `docs/agents/issue-tracker.md` (written by `/setup`), falling back to the `setup` skill's `issue-tracker.md` seed when the repo has none. Confirm every blocker is closed through the item's `Blocked by` data, and stop before claiming if any remain open. Then claim before building:
 
-- On a shared tracker, use its configured claim operation or assign the work item to the driving dev.
-- On a local story from `to-tickets`, or a directly implemented local feature spec, change or add `**Status:** in-progress (claimed <date>, <who>)` near the top.
-- On a local Wayfinder child, use the configured Wayfinding **Claim** operation (`claimed-by`).
+- On a story from `to-tickets`, or a directly implemented feature spec, change or add `**Status:** in-progress (claimed <date>, <who>)` near the top.
+- On a `wayfinder` decision ticket, use the Wayfinding **Claim** operation (`claimed-by`).
 
 If the item is already claimed or in progress, stop; treat the claim as stale only when its work is visibly committed or clearly abandoned.
 
@@ -79,14 +78,13 @@ If an external dependency prevents verification, keep the committed implementati
 
 After successful verification, record what was built, any justified deviation, verification evidence, and the implementation commit SHA or SHAs; check off every satisfied acceptance criterion. Resolve the work item according to its branch:
 
-- **Shared tracker** — post the resolution and close the work item.
-- **Local story or directly implemented feature spec** — set `**Status:** closed` and append `## Resolution`.
-- **Local Wayfinder child** — use the configured Wayfinding **Resolve** operation.
-- **Conversation** — report the result without tracker mutation.
+- **Story, or a directly implemented feature spec** — set `**Status:** closed` and append `## Resolution`.
+- **`wayfinder` decision ticket** — use the Wayfinding **Resolve** operation.
+- **Conversation** — report the result without touching any file under `.scratch/`.
 
-Leave every parent open — a story never closes its feature, and a feature never closes its epic. When the feature spec itself was the one-session work item, close that spec and still leave its epic open. If a mutated local tracker artifact is tracked, stage only that artifact and commit the resolution separately; if it is ignored or untracked, leave it as tracker state. Resolution text cites the implementation commits, never its own closure commit.
+Leave every parent open — a story never closes its feature, and a feature never closes its epic. When the feature spec itself was the one-session work item, close that spec and still leave its epic open. If the mutated markdown file is tracked by Git, stage only that file and commit the resolution separately; if `.scratch/` is ignored, leave it as working state. Resolution text cites the implementation commits, never its own closure commit.
 
-For trackable work, re-read the tracker artifact after mutation and verify its final state.
+For trackable work, re-read the markdown file after writing it and verify its final state.
 
 Finish when the implementation commits and any separate resolution commit are recorded and the tracker's final state is verified, or the conversation-only result is reported. Then stop; any next work item gets a fresh session with a clean context.
 
