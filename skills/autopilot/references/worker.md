@@ -29,6 +29,10 @@ For a wayfinder map, run only an AFK research or task ticket. Return `needs_inpu
 
 For build work, read `implement` completely and follow its full lifecycle for the selected ticket or one-session spec: claim, test at chosen seams, review through its subagents, verify end to end, explicitly stage, commit, and close. Complete no second unit in this process.
 
+## Report progress
+
+Emit one short operational update after selecting and claiming the unit, when entering a long test or implementation phase, before review and verification, and after the durable commit or resolution. Name the unit and current phase without including reasoning, secrets, or command output. Continue working after each update; keep the final response to the result object.
+
 ## Reconcile
 
 After the unit finishes, requery the root scope. Return:

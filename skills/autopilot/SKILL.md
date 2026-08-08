@@ -18,17 +18,29 @@ Run approved pipeline work until it is complete or reaches a genuine human gate.
 bash <autopilot-skill-dir>/scripts/autopilot.sh --provider <claude|codex> --root <ref>
 ```
 
-Pass `--repo <path>` when the target is not the current repository and `--max-iterations <n>` to replace the default limit of 50.
+Pass `--repo <path>` when the target is not the current repository, `--max-iterations <n>` to replace the default limit of 50, and `--log-file <path>` to mirror the per-run log to another path.
 
-Run the script as a background task and poll its output: one iteration is a full build lifecycle and routinely outlasts a foreground shell-command timeout. Report progress from stderr as it arrives.
+Run the script as a background task and poll its output: one iteration is a full build lifecycle and routinely outlasts a foreground shell-command timeout. Immediately report the run ID, log path, and printed observer commands. Then report worker milestones and five-minute heartbeats from stderr as they arrive; leave routine tool events in the log.
 
-The script prints progress to stderr and one result object to stdout. Completion is an exit code of `0` with `status: complete`.
+Foreground run mode prints progress to stderr and one terminal result object to stdout; completion is exit code `0` with `status: complete`. Observer modes keep their operational messages on stderr: `--status` prints one state object, `--history` prints an array of retained states, `--tmux` prints one launch object, and `--follow` streams the human-readable run log to stdout.
+
+Use the printed commands to inspect a run independently:
+
+```bash
+bash <autopilot-skill-dir>/scripts/autopilot.sh --status --root <ref> [--repo <path>]
+bash <autopilot-skill-dir>/scripts/autopilot.sh --follow --root <ref> [--repo <path>]
+bash <autopilot-skill-dir>/scripts/autopilot.sh --history --root <ref> [--repo <path>]
+```
+
+`--follow` exits when the run does; `--history` returns every retained run for the root. For a detached terminal-owned run, add `--tmux`. Its stdout is a launch object rather than the eventual worker result. Report the printed `status`, `follow`, and `tmux attach` commands; continue monitoring through `--status` until the run reaches a terminal state. Read the exact terminal result from the `result_file` in status.
 
 ## Fresh-process contract
 
 Each iteration launches a new top-level CLI process with normal user and project configuration but with permission prompts and sandboxing bypassed (`--dangerously-skip-permissions` / `--dangerously-bypass-approvals-and-sandbox`) — headless workers cannot answer prompts, so only start the loop on work the user has already approved for autonomous execution. It performs exactly one decision ticket or build ticket, finishes all nested review and verification agents, records durable tracker and Git state, and exits. The next process rereads the root artifact and recomputes the dependency frontier.
 
-The runner keeps a durable run ID under the target repository's Git directory. Claims made by that run include the ID, so a later invocation of the same command can recognize and resume its own interrupted ticket without taking over another session's work. A per-root lock prevents concurrent runner processes from sharing that identity. Successful completion removes the runner state; failures and human gates retain it for recovery.
+The runner keeps durable state, a human-readable log, and raw provider events under the target repository's Git directory. Claims made by that run include the ID, so a later invocation of the same command can recognize and resume its own interrupted ticket without taking over another session's work. A per-root lock prevents concurrent runner processes from sharing that identity. Terminal state remains inspectable; rerunning a completed root starts a new run, while failures and human gates resume the existing run.
+
+A heartbeat proves that the worker process is alive. It defaults to five minutes; set `AUTOPILOT_HEARTBEAT_SECONDS` to a positive number of seconds when a different cadence is needed. `quiet threshold reached` means it has emitted no provider event for two heartbeat intervals; treat that as a prompt to inspect the log or attach, not proof that the worker is hung. The runner never kills quiet work automatically.
 
 Use the installed workflow skills as the single source of truth. The script locates their `SKILL.md` files and passes their absolute paths to the worker. If the pipeline skills are absent, install this repository's complete skill collection before retrying.
 
@@ -38,4 +50,4 @@ Headless workers cannot conduct a live interview or approve a new spec or ticket
 
 If an interrupted owned claim cannot be safely resumed from the current tracker and worktree state, stop with `needs_input` and identify the claim and unresolved changes. Never clear or take over a differently owned claim automatically.
 
-Exit codes are `0` complete, `2` needs input, `3` blocked, `4` worker failure, and `5` runner/configuration failure.
+Exit codes are `0` complete, `2` needs input, `3` blocked, `4` worker failure, `5` runner/configuration failure, `129` hangup, `130` interrupted, and `143` terminated.
