@@ -42,7 +42,7 @@ check "marketplace omits old weekly names" \
 
 # 5. Pipeline end-block SSOT
 check "pipeline-end-block reference exists" \
-  test -f skills/writing-great-skills/references/pipeline-end-block.md
+  test -f skills/wayfinder/references/pipeline-end-block.md
 check "pipeline skills point at end-block" \
   bash -c 'n=$(rg -l "pipeline-end-block.md" skills --glob "**/SKILL.md" | wc -l | tr -d " "); test "$n" -ge 6'
 

@@ -101,7 +101,7 @@ Reporting them separately stops one axis from masking the other.
 
 ## When you're done
 
-Invoked from `implement`, hand the findings back to its loop — it decides what's real and fixes before committing; print no block. Invoked standalone, print the end-of-session block using the frame in [`writing-great-skills/references/pipeline-end-block.md`](../writing-great-skills/references/pipeline-end-block.md):
+Invoked from `implement`, hand the findings back to its loop — it decides what's real and fixes before committing; print no block. Invoked standalone, print the end-of-session block using the frame in [`wayfinder/references/pipeline-end-block.md`](../wayfinder/references/pipeline-end-block.md):
 
 ```text
 ---

@@ -68,7 +68,7 @@ The user may run unblocked tickets in parallel, so expect other sessions to be e
 
 ## When you're done
 
-Print the end-of-session block using the frame in [`writing-great-skills/references/pipeline-end-block.md`](../writing-great-skills/references/pipeline-end-block.md). Refer to the map and tickets **by name**, per **Refer by name** above. Query the markdown tracker for the current frontier before writing the block — don't guess at what's open.
+Print the end-of-session block using the frame in [`references/pipeline-end-block.md`](references/pipeline-end-block.md). Refer to the map and tickets **by name**, per **Refer by name** above. Query the markdown tracker for the current frontier before writing the block — don't guess at what's open.
 
 ```text
 ---

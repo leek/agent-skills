@@ -1,6 +1,6 @@
 # Pipeline end-of-session block
 
-**Single source of truth** for the banner format printed by pipeline skills (`grill-me`, `wayfinder`, `to-spec`, `to-tickets`, `implement`, and standalone `code-review` / `to-questionnaire`). Stage skills keep their own **Done** placeholders and **Next** condition lists; they only restyle the frame here.
+**Single source of truth** for the banner format printed by pipeline skills (`grill-me`, `wayfinder`, `to-spec`, `to-tickets`, `implement`, and standalone `code-review` / `to-questionnaire`). Owned by `wayfinder` as the pipeline base. Stage skills keep their own **Done** placeholders and **Next** condition lists; they only restyle the frame here.
 
 ## When to print
 

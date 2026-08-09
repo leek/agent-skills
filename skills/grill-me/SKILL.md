@@ -10,7 +10,7 @@ Run a `grilling` session on whatever the user brought.
 
 ## When you're done
 
-Print the end-of-session block using the frame in [`writing-great-skills/references/pipeline-end-block.md`](../writing-great-skills/references/pipeline-end-block.md) — whether the plan resolved, the user stopped the grill, or a branch dead-ended.
+Print the end-of-session block using the frame in [`wayfinder/references/pipeline-end-block.md`](../wayfinder/references/pipeline-end-block.md) — whether the plan resolved, the user stopped the grill, or a branch dead-ended.
 
 ```text
 ---

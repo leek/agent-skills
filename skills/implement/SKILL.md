@@ -90,7 +90,7 @@ Finish when the implementation commits and any separate resolution commit are re
 
 ## When you're done
 
-Print the end-of-session block using the frame in [`writing-great-skills/references/pipeline-end-block.md`](../writing-great-skills/references/pipeline-end-block.md). For a trackable work item with a parent, check the markdown tracker for the remaining frontier before writing the block — don't guess at what's left.
+Print the end-of-session block using the frame in [`wayfinder/references/pipeline-end-block.md`](../wayfinder/references/pipeline-end-block.md). For a trackable work item with a parent, check the markdown tracker for the remaining frontier before writing the block — don't guess at what's left.
 
 ```text
 ---

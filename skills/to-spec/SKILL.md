@@ -100,7 +100,7 @@ Anything else future readers need.
 
 ## When you're done
 
-Print the end-of-session block using the frame in [`writing-great-skills/references/pipeline-end-block.md`](../writing-great-skills/references/pipeline-end-block.md).
+Print the end-of-session block using the frame in [`wayfinder/references/pipeline-end-block.md`](../wayfinder/references/pipeline-end-block.md).
 
 ```text
 ---
