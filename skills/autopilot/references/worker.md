@@ -47,15 +47,15 @@ Rules that hold in every branch:
 
 ## Report progress
 
-Emit one short operational update after selecting and claiming the unit, when entering a long test or implementation phase, before review and verification, and after the durable commit or resolution. Name the unit and current phase without including reasoning, secrets, or command output. Continue working after each update; keep the final response to the result object.
+Emit one short operational update after selecting and claiming the unit, when entering a long test or implementation phase, before review and verification, and after the durable commit or resolution. Name the unit and current phase without including reasoning, secrets, or command output. These updates are plain-text messages, never the result object — invoke the structured result tool exactly once, as the final action of the session. Continue working after each update.
 
 ## Return the unit result
 
-The runner rereads the tracker after every successful unit and authoritatively computes the next frontier and terminal state. Do not scan siblings again at the end.
+The runner rereads the tracker after every successful unit and authoritatively computes the next frontier and terminal state. Do not scan siblings again at the end. The result object always carries all five fields — `status`, `completed_ref`, `next_ref`, `summary`, and `reason` — on every path; the schema rejects any object missing one, which fails the whole session even after the unit is already committed.
 
 - `continue` after the selected unit is durably committed or resolved; set `completed_ref` to it and `next_ref` to an empty string.
 - `needs_input` when a named human decision or approval is the next dependency.
 - `blocked` when the selected unit's revalidation or an external dependency prevents execution.
 - `failed` when execution or verification failed, or this session leaves its own uncommitted changes.
 
-On non-success, set `completed_ref` to the completed selected unit if there is one and `next_ref` to the exact interactive handoff when known. Keep `summary` and `reason` concise and concrete. Return only the schema-conforming object.
+On a successful `continue`, still set `reason` to a brief completion note — the runner overwrites it from the tracker, but the field must be present. On non-success, set `completed_ref` to the completed selected unit if there is one, `next_ref` to the exact interactive handoff when known, and `reason` to the concrete cause. Keep `summary` and `reason` concise. Return only the schema-conforming object, with all five fields present.
