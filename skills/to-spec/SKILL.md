@@ -30,11 +30,11 @@ A **seam** is the public boundary the feature will be tested at (`codebase-desig
 
 ### 3. Write and publish the spec
 
-Write the spec using the template below. Show the complete draft and wait for the user to approve publication or request changes. After approval, publish it to the project's issue tracker with the repo's AFK-ready label (`ready-for-agent` unless `docs/agents/triage-labels.md` maps it differently; create the label if it doesn't exist).
+Write the spec using the template below. Show the complete draft and wait for the user to approve publication or request changes.
 
 A spec is a markdown file under `.scratch/` — there is no external tracker. Read the layout from `docs/agents/issue-tracker.md` (written by `/setup`), falling back to the path below when the repo has none; suggest running `/setup` once to make it durable.
 
-Publish to `.scratch/<slug>/spec.md`. **Invoked with a map, reuse that map's directory** and append `**Status:** closed` to `map.md` — the map's job is done, and this skill does not run on it again.
+After approval, publish to `.scratch/<slug>/spec.md` with `**Status:** ready-for-agent` near the top (or the AFK-ready role string from `docs/agents/triage-labels.md` when that mapping exists). **Invoked with a map, reuse that map's directory** and append `**Status:** closed` to `map.md` — the map's job is done, and this skill does not run on it again.
 
 The spec covers the whole effort. Its short **Build Contract** is the canonical home for invariants, ordering, and shared seams every implementation ticket needs; detailed decisions below it hold ticket-specific context without repeating that contract. If the effort feels too big for one spec, say so and recommend narrowing it rather than writing a second spec beside the first.
 
@@ -100,7 +100,7 @@ Anything else future readers need.
 
 ## When you're done
 
-End the session by printing the block below — on a clean finish, a stop, or a dead end. On harnesses without slash commands, write the command as plain phrasing (`run to-tickets on <ref>`) instead of `/to-tickets <ref>`.
+Print the end-of-session block using the frame in [`writing-great-skills/references/pipeline-end-block.md`](../writing-great-skills/references/pipeline-end-block.md).
 
 ```text
 ---
@@ -110,7 +110,7 @@ Next:
   • <condition> → /<skill> <ref>
 ```
 
-List only the conditions that actually apply, most likely first:
+Stage-specific **Next** conditions (only those that apply, most likely first):
 
 - **Spec published, work spans several tickets** → `/to-tickets <spec ref>`
 - **Spec published, work fits one session** → `/implement <spec ref>`

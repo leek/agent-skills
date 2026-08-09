@@ -24,13 +24,13 @@ The pipeline runs straight through it: `/wayfinder` writes `map.md` and `decisio
 - Triage state is a `Status:` line near the top of each file (see `triage-labels.md` for the role strings)
 - Comments and conversation history append under a `## Comments` heading
 
-## When a skill says "publish to the issue tracker"
+## When a skill says "publish" a map, spec, or ticket
 
 Create a new file at the level's path above, creating directories as needed.
 
 ## When a skill says "fetch the relevant ticket"
 
-Read the file at the referenced path. The user will normally pass the path or the issue number directly.
+Read the file at the referenced path. The user will normally pass the path or the ticket title/number directly.
 
 ## Wayfinding operations
 

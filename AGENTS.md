@@ -1,12 +1,12 @@
 # AGENTS.md
 
-Guidance for AI coding agents (Claude Code, Cursor, Copilot, etc.) working in this repository.
+Guidance for AI coding agents (Claude Code, Cursor, Copilot, Grok, etc.) working in this repository.
 
 ## Repository Overview
 
-Personal collection of agent skills. Skills are packaged instructions, scripts, and references that extend agent capabilities.
+Personal collection of agent skills. Skills are packaged instructions, scripts, and references that extend agent capabilities across coding agents.
 
-This repo also doubles as a [Claude Code plugin marketplace](https://docs.claude.com/en/docs/claude-code/plugins) via `.claude-plugin/marketplace.json`.
+This repo also doubles as a [Claude Code plugin marketplace](https://docs.claude.com/en/docs/claude-code/plugins) via `.claude-plugin/marketplace.json` for Claude Code installs; the skill folders themselves are harness-agnostic.
 
 ## Layout
 
@@ -14,7 +14,6 @@ This repo also doubles as a [Claude Code plugin marketplace](https://docs.claude
 .claude-plugin/marketplace.json   # Claude Code plugin manifest
 skills/<skill-name>/SKILL.md      # one folder per skill
 template/SKILL.md.example         # starting point; renamed so installers do not treat it as a real skill
-spec/                             # (optional) skill specs / docs
 ```
 
 ## Creating a New Skill
@@ -40,7 +39,10 @@ skills/<skill-name>/
   scripts/            # optional — bash scripts (preferred)
     <name>.sh
   references/         # optional — supporting docs read on demand
+  *.md                # optional — skill-root companions (formats, seeds, short branch docs)
 ```
+
+**Companion files.** Prefer `references/` for material only some runs need. Skill-root `.md` companions (one level deep from `SKILL.md`) are allowed for formats, setup seeds, and short branch docs that every related path may open — e.g. `setup/issue-tracker.md`, `teach/MISSION-FORMAT.md`, `prototype/LOGIC.md`. Do not nest companions more than one level below `SKILL.md`.
 
 ### 3. `SKILL.md` format
 
@@ -56,7 +58,7 @@ disable-model-invocation: true   # only on user-invoked flows
 What the skill does and the rules that make it predictable. Ordered steps for
 processes (each ending on a checkable completion criterion); flat reference
 sections for material consulted on demand; anything only some runs need goes
-behind a pointer to a file in references/.
+behind a pointer to a companion file or references/.
 ```
 
 **Invocation policy** — decide it per skill, deliberately:
@@ -87,7 +89,7 @@ Skills load on-demand — only `name` + `description` load at startup. The full 
 - **Short beats complete.** Most upstream skills this repo ports from are 10–130 lines. Prune sentence-by-sentence: when one part of a sentence is a no-op, delete the whole sentence. Length that restates what the model already holds (via leading words like *seam*, *frontier*, *red → green*) is sediment.
 - **One job per skill.** Same lifecycle, different entity → one skill. A skill doing an interview *and* tool plumbing *and* session routing is three skills.
 - **Single source of truth.** A protocol referenced by several skills lives in exactly one (e.g. the question shape in `grilling`, tracker operations in `setup`'s seeds) — others point at it, never restate it.
-- **Progressive disclosure.** Inline what every run needs; push what only some runs need behind a pointer to `references/`. File references work one level deep from `SKILL.md`.
+- **Progressive disclosure.** Inline what every run needs; push what only some runs need behind a pointer to `references/` or a skill-root companion. File references work one level deep from `SKILL.md`.
 - **Prefer scripts over inline code.** Script execution does not consume context — only its stdout does.
 - **No dead references.** Every skill a skill mentions must exist in this repo (or be a documented harness built-in). Check before committing.
 
@@ -101,5 +103,5 @@ Skills load on-demand — only `name` + `description` load at startup. The full 
 
 ## Distribution Notes
 
-- Each skill folder is self-contained — users can copy a single `skills/<skill-name>/` into `~/.claude/skills/`.
+- Each skill folder is self-contained — users can copy a single `skills/<skill-name>/` into their agent's skills directory (e.g. `~/.claude/skills/`, or the equivalent for their harness).
 - Network access for skills running in claude.ai must be allowlisted at `claude.ai/settings/capabilities`.

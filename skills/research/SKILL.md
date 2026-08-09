@@ -29,7 +29,7 @@ The sub-agent's job:
 
 ## When you're done
 
-The dispatching session routes the result. List only the conditions that apply, most likely first:
+The dispatching session routes the result (no pipeline banner — research is supporting work). List only the conditions that apply, most likely first:
 
 - **Answered, and a decision was waiting on it** → `/grill-me` on that decision, naming it
 - **Answered a `wayfinder` ticket** → `/wayfinder <map>` for the next frontier ticket

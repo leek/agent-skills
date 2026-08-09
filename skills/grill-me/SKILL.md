@@ -10,7 +10,7 @@ Run a `grilling` session on whatever the user brought.
 
 ## When you're done
 
-End the session by printing the block below — whether the plan resolved, the user stopped the grill, or a branch dead-ended.
+Print the end-of-session block using the frame in [`writing-great-skills/references/pipeline-end-block.md`](../writing-great-skills/references/pipeline-end-block.md) — whether the plan resolved, the user stopped the grill, or a branch dead-ended.
 
 ```text
 ---
@@ -20,7 +20,7 @@ Next:
   • <condition> → /<skill> <ref>
 ```
 
-List only the conditions that actually apply, most likely first:
+Stage-specific **Next** conditions (only those that apply, most likely first):
 
 - **Plan resolved, spans several tickets** → `/to-spec` to record it
 - **Plan resolved, fits one session** → `/to-tickets`, or `/implement` if it's genuinely one ticket

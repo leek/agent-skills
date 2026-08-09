@@ -90,7 +90,7 @@ Finish when the implementation commits and any separate resolution commit are re
 
 ## When you're done
 
-End the session by printing the block below — on a clean finish, a stop, or a dead end. On harnesses without slash commands, write the command as plain phrasing (`run implement on <ref>`) instead of `/implement <ref>`.
+Print the end-of-session block using the frame in [`writing-great-skills/references/pipeline-end-block.md`](../writing-great-skills/references/pipeline-end-block.md). For a trackable work item with a parent, check the markdown tracker for the remaining frontier before writing the block — don't guess at what's left.
 
 ```text
 ---
@@ -100,7 +100,7 @@ Next:
   • <condition> → /<skill> <ref>
 ```
 
-For a trackable work item with a parent, check the tracker for the remaining frontier before writing the block — don't guess at what's left. List only the conditions that actually apply, most likely first:
+Stage-specific **Next** conditions (only those that apply, most likely first):
 
 - **More frontier tickets on the parent spec** → `/clear`, then `/implement <next frontier ticket>`; name it and how many remain
 - **Every ticket on the spec is closed** → nothing to run; say the spec is complete and name anything deferred out of scope

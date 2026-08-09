@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes — Standards (does the diff follow this repo's documented conventions, including colocated CLAUDE.md rules?) and Spec (does it implement what the originating ticket/PRD asked?). Runs both reviews as foreground sub-agents and reports them side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to "review since X".
+description: Two-axis review of the diff since a fixed point — Standards (repo conventions) and Spec (ticket/PRD fidelity). Use when the user wants to review a branch, PR, WIP changes, or asks to "review since X".
 ---
 
 # Code Review
@@ -10,9 +10,9 @@ Two-axis review of the diff between `HEAD` and a fixed point the user supplies:
 - **Standards** — does the code conform to how this repo writes code?
 - **Spec** — does the code faithfully implement the originating ticket / PRD / spec?
 
-Both axes run as **parallel sub-agents** so they don't pollute each other's context, then this skill aggregates their findings. Run them **in the foreground and wait for both results** (in Claude Code, `run_in_background: false`) — a background review agent's task handle dies with the session, and the aggregation below needs both reports in hand.
+Both axes run **separately** so they don't pollute each other's context, then this skill aggregates their findings. Prefer **parallel sub-agents** when the harness supports them; otherwise run both reviews **inline in sequence** in this session. Either path must finish both axes before aggregating — never leave a review handle running past session end.
 
-This is not a bug hunt. If the harness ships its own correctness review (Claude Code's built-in `/code-review`), that answers a third, different question — *does it break?* — and complements this skill rather than replacing it.
+This is not a bug hunt. If the harness ships its own correctness review, that answers a third, different question — *does it break?* — and complements this skill rather than replacing it.
 
 ## Process
 
@@ -22,7 +22,7 @@ Whatever the user said is the fixed point — a commit SHA, branch name, tag, `m
 
 Capture the diff command once: `git diff <fixed-point>...HEAD` (three-dot, so the comparison is against the merge-base). Also note the list of commits via `git log <fixed-point>..HEAD --oneline`.
 
-Before going further, confirm the fixed point resolves (`git rev-parse <fixed-point>`) and the diff is non-empty. A bad ref or empty diff should fail here — not inside two parallel sub-agents.
+Before going further, confirm the fixed point resolves (`git rev-parse <fixed-point>`) and the diff is non-empty. A bad ref or empty diff should fail here — not inside two parallel reviews.
 
 ### 2. Identify the spec source
 
@@ -31,16 +31,18 @@ Look for the originating spec, in this order:
 1. Ticket references in the commit messages or branch name — read the matching markdown file under `.scratch/` (or wherever `docs/agents/issue-tracker.md`, written by `/setup`, says this repo keeps them).
 2. A path the user passed as an argument.
 3. A PRD/spec file under `docs/`, `specs/`, or `.scratch/` matching the branch name or feature.
-4. If nothing is found, ask the user where the spec is. If they say there isn't one, the **Spec** sub-agent skips and reports "no spec available".
+4. If nothing is found, ask the user where the spec is. If they say there isn't one, the **Spec** axis skips and reports "no spec available".
 
 ### 3. Identify the standards sources
 
-Anything in the repo that documents how code should be written. In a Laravel repo that is, in priority order:
+Anything in the repo that documents how code should be written, in priority order:
 
-1. **Colocated `CLAUDE.md` files** — the root one plus every `CLAUDE.md` in a directory the diff touches (`app/CLAUDE.md`, `tests/Feature/CLAUDE.md`, …). Colocated rules are binding and override generic guidance.
-2. `AGENTS.md`, `CONTRIBUTING.md`, `CODING_STANDARDS.md`, or standards docs under `docs/`.
+1. **`AGENTS.md`** at the repo root (and any standards docs under `docs/` it points at).
+2. **`CONTRIBUTING.md`**, **`CODING_STANDARDS.md`**, or other project standards under `docs/`.
+3. **Harness-specific or colocated rule files** — root and directory-scoped `CLAUDE.md`, `.cursor/rules`, or equivalents in directories the diff touches. Colocated rules are binding for their tree and override generic guidance for that path.
+4. When both `AGENTS.md` and a harness-specific root file exist, prefer `AGENTS.md` for cross-harness conventions; apply harness-specific files as additional constraints for that environment.
 
-**Skip anything tooling already enforces.** Pint owns formatting, Larastan owns types and dead code, Rector owns mechanical upgrades — a finding those tools would catch or fix is noise, not a review finding.
+**Skip anything tooling already enforces.** Formatters, type checkers, and mechanical upgrade tools own their domains — a finding those tools would catch or fix is noise, not a review finding. In a Laravel repo that typically means Pint, Larastan, and Rector.
 
 On top of whatever the repo documents, the Standards axis always carries the **smell baseline** below — a fixed set of Fowler code smells (_Refactoring_, ch.3) that applies even when a repo documents nothing. Two rules bind it:
 
@@ -62,23 +64,25 @@ Each smell reads *what it is* → *how to fix*; match it against the diff:
 - **Middle Man** — a class or function that mostly just delegates onward. → cut it, call the real target direct.
 - **Refused Bequest** — a subclass or implementer that ignores or overrides most of what it inherits. → drop the inheritance, use composition.
 
-### 4. Spawn both sub-agents in parallel — foreground
+### 4. Run both axes — sub-agents or inline
 
-Send a single message with two `Agent` tool calls, both foreground (`run_in_background: false`). Use the `general-purpose` subagent for both. Wait for both results before writing anything.
+**If the harness can spawn parallel sub-agents** (e.g. Claude Code Agent tool, Grok `spawn_subagent`, or equivalent): launch two foreground sub-agents in parallel, wait for both results before writing anything. Do not background them — a background handle can die with the session.
 
-**Standards sub-agent prompt** — include:
+**If sub-agents are unavailable:** run both reviews inline in this session, Standards first then Spec (or skip Spec when no source was found). Same briefs, same output shape — only the execution host changes.
+
+**Standards brief** — include:
 
 - The full diff command and commit list.
-- The list of standards-source files you found in step 3, **plus the smell baseline from step 3 pasted in full** — the sub-agent has no other access to it.
-- The brief: "Report — per file/hunk where relevant — (a) every place the diff violates a documented standard: cite the standard (file + the rule); and (b) any baseline smell you spot: name it and quote the hunk. Distinguish hard violations from judgement calls — documented-standard breaches can be hard, but baseline smells are always judgement calls, and a documented repo standard overrides the baseline. Skip anything Pint, Larastan, or Rector enforces. Under 400 words."
+- The list of standards-source files you found in step 3, **plus the smell baseline from step 3 pasted in full** — a sub-agent has no other access to it.
+- The brief: "Report — per file/hunk where relevant — (a) every place the diff violates a documented standard: cite the standard (file + the rule); and (b) any baseline smell you spot: name it and quote the hunk. Distinguish hard violations from judgement calls — documented-standard breaches can be hard, but baseline smells are always judgement calls, and a documented repo standard overrides the baseline. Skip anything formatters, type checkers, or mechanical upgrade tools enforce. Under 400 words."
 
-**Spec sub-agent prompt** — include:
+**Spec brief** — include:
 
 - The diff command and commit list.
 - The path or fetched contents of the spec.
 - The brief: "Report: (a) requirements the spec asked for that are missing or partial; (b) behaviour in the diff that wasn't asked for (scope creep); (c) requirements that look implemented but where the implementation looks wrong. Quote the spec line for each finding. Under 400 words."
 
-If the spec is missing, skip the Spec sub-agent and note this in the final report.
+If the spec is missing, skip the Spec axis and note this in the final report.
 
 ### 5. Aggregate
 
@@ -97,7 +101,7 @@ Reporting them separately stops one axis from masking the other.
 
 ## When you're done
 
-Invoked from `implement`, hand the findings back to its loop — it decides what's real and fixes before committing; print no block. Invoked standalone, end with:
+Invoked from `implement`, hand the findings back to its loop — it decides what's real and fixes before committing; print no block. Invoked standalone, print the end-of-session block using the frame in [`writing-great-skills/references/pipeline-end-block.md`](../writing-great-skills/references/pipeline-end-block.md):
 
 ```text
 ---
@@ -106,6 +110,8 @@ Done: <n Standards findings, m Spec findings; the worst per axis>
 Next:
   • <condition> → /<skill> <ref>
 ```
+
+Stage-specific **Next** conditions (only those that apply):
 
 - **Real findings to fix** → fix them, or `/implement <ticket>` if they belong to an open ticket
 - **Spec axis skipped (no spec)** → `/to-spec` if this work deserved one

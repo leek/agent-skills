@@ -1,6 +1,6 @@
 ---
 name: aws-cli
-description: Use when running AWS CLI commands (`aws ...`) for any service — S3, EC2, IAM, Lambda, CloudFormation, Logs, RDS, ECS, etc. Triggers on phrases like "list s3 buckets", "describe ec2 instances", "check IAM role", "deploy lambda", "tail cloudwatch logs", "what AWS account am I in", or any direct invocation of the `aws` CLI. Enforces auth/identity verification, scoped queries, safe destructive ops, and JMESPath output filtering.
+description: Run AWS CLI commands safely — identity and region first, prefer read-only, confirm before mutating. Use when the user runs or asks for `aws` CLI work across S3, EC2, IAM, Lambda, Logs, ECS, or related services.
 ---
 
 # AWS CLI

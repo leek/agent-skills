@@ -58,7 +58,7 @@ A closing catch-all: anything we didn't ask that we should know?
 
 ## When you're done
 
-End the session by printing the block below — on a clean finish, a stop, or a dead end. On harnesses without slash commands, write the command as plain phrasing (`run grill-me on <ref>`) instead of `/grill-me <ref>`.
+Print the end-of-session block using the frame in [`writing-great-skills/references/pipeline-end-block.md`](../writing-great-skills/references/pipeline-end-block.md).
 
 ```text
 ---
@@ -68,7 +68,7 @@ Next:
   • <condition> → /<skill> <ref>
 ```
 
-List only the conditions that actually apply, most likely first:
+Stage-specific **Next** conditions (only those that apply, most likely first):
 
 - **Questionnaire written, answers not back yet** → nothing to run; send it, then `/grill-me` on the blocked branch once answers land. Name the branch so the next session knows what was waiting.
 - **Answers already in hand** → `/grill-me` on the blocked branch, feeding the answers in

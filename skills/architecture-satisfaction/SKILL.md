@@ -1,6 +1,6 @@
 ---
 name: architecture-satisfaction
-description: Run a bounded architectural refactor loop. Use this when the user asks to improve architecture, refactor toward a stated design, untangle module boundaries, fix dependency direction, reshape code organization, or iterate until the architecture is satisfactory while live-testing, reviewing, checkpointing, and recording progress.
+description: Run a bounded architectural refactor loop toward a stated design.
 disable-model-invocation: true
 ---
 

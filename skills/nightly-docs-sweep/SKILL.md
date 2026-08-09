@@ -1,6 +1,6 @@
 ---
 name: nightly-docs-sweep
-description: Run a documentation sweep for a codebase. Use this when the user asks for a nightly docs sweep, overnight docs sweep, documentation drift audit, README/setup/API docs refresh, docs sync after implementation changes, or a reviewable pull request that makes docs match the current code.
+description: Run a documentation sweep so repo docs match the current implementation.
 disable-model-invocation: true
 ---
 

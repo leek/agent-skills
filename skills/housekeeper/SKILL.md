@@ -1,6 +1,6 @@
 ---
 name: housekeeper
-description: Run a conservative code-project housekeeping pass. Use this when the user asks for repository housekeeping, dead code cleanup, unused dependency review, stale file cleanup, duplicate code cleanup, broken link cleanup, naming cleanup, or a safe low-risk project hygiene sweep.
+description: Run a conservative code-project housekeeping pass — one proven low-risk cleanup at a time.
 disable-model-invocation: true
 ---
 

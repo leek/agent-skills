@@ -1,6 +1,6 @@
 ---
 name: laravel-herd-worktrees
-description: Use when working with Laravel projects served by Laravel Herd alongside git worktrees on macOS. Triggers on "laravel herd worktree", "new worktree for laravel", "herd parked sites worktree", "multiple branches herd", "composer install per worktree", ".test url for branch", "isolate php version per worktree", or any task that creates, lists, or removes a git worktree inside a Herd-served Laravel project. Covers site routing, per-worktree `.env`/database/cache isolation, and fast dependency install strategy.
+description: Create, list, or remove git worktrees for Laravel projects served by Laravel Herd on macOS. Use when the user needs a branch worktree, .test URL, or per-worktree PHP/composer isolation.
 ---
 
 # Laravel Herd + Git Worktrees

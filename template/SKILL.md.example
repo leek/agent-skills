@@ -1,6 +1,6 @@
 ---
 name: template-skill
-description: Replace with description of what the skill does and when Claude should use it. Include trigger phrases.
+description: Replace with a one-line summary of what the skill does. For model-invoked skills, add distinct trigger branches; for user-invoked skills, keep a human one-liner with no trigger list.
 ---
 
 # Insert instructions below

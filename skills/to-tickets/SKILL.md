@@ -104,7 +104,7 @@ Work the **frontier** — any ticket whose blockers are all done — with `imple
 
 ## When you're done
 
-End the session by printing the block below — on a clean finish, a stop, or a dead end. On harnesses without slash commands, write the command as plain phrasing (`run implement on <ref>`) instead of `/implement <ref>`.
+Print the end-of-session block using the frame in [`writing-great-skills/references/pipeline-end-block.md`](../writing-great-skills/references/pipeline-end-block.md).
 
 ```text
 ---
@@ -114,7 +114,7 @@ Next:
   • <condition> → /<skill> <ref>
 ```
 
-List only the conditions that actually apply, most likely first:
+Stage-specific **Next** conditions (only those that apply, most likely first):
 
 - **Tickets published with a frontier** → `/implement <frontier ticket>` in one fresh session per ticket; parallelize only independent frontier tickets
 - **Every ticket is blocked by another that is still open** → `/implement <that blocker>` first; name it
