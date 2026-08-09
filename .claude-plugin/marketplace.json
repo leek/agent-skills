@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "leek's personal collection of agent skills for Claude",
-    "version": "0.22.0"
+    "version": "0.22.1"
   },
   "plugins": [
     {
