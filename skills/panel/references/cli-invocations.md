@@ -5,19 +5,24 @@ misbehaves, when you want a hard read-only guarantee, or when the panel roster c
 `SKILL.md` holds the canonical command for each CLI; this file explains the flags and
 the alternatives — it does not restate the canonical command.
 
-Two rules hold for every CLI:
+Three rules hold for every CLI:
 
 - **No `--model`.** Each CLI must run as its own latest/default model.
+- **Pass the task as `"$TASK"`, never inline.** Build the task with a quoted heredoc and
+  pass `"$TASK"`, so the shell never expands a backtick, `$`, or quote inside the prompt.
+  Redirect `< /dev/null` so the CLI does not block waiting on stdin.
 - **Headless needs auto-approval.** A headless run cannot answer a permission prompt, so
-  each command carries that CLI's bypass flag. The read-only variants below trade that
-  bypass for a sandbox the CLI cannot escape.
+  each command carries that CLI's bypass flag. The read-only options below vary in
+  quality; the working-tree check in `SKILL.md` step 3 — not a flag — is what enforces
+  review-only.
 
 ## claude
 
 - Headless: `-p` / `--print` runs one prompt and exits.
 - Auto-approve: `--dangerously-skip-permissions`.
-- Read-only variant: `claude -p "<task>" --permission-mode plan` — plan mode reads freely
-  but does not edit. Prefer this in review shape when a stray write would be unacceptable.
+- Read-only variant: keep `--dangerously-skip-permissions` (so it stays non-interactive)
+  and drop the edit tools: `--disallowedTools Edit Write NotebookEdit`. Those three are
+  the real tool names — `MultiEdit` is not one and triggers a warning.
 - Structured output: `--output-format json` (default is text, which the subagent distills).
 
 ## codex
@@ -34,9 +39,12 @@ Two rules hold for every CLI:
 ## agy
 
 - Headless: `-p` / `--print` runs one prompt and exits (`--print-timeout` defaults to 5m).
+- Flag order: put flags before the positional prompt — `agy -p --dangerously-skip-permissions "$TASK"`.
+  A flag placed after the prompt can be read as part of the prompt.
 - Auto-approve: `--dangerously-skip-permissions`.
-- Read-only variant: `agy -p "<task>" --mode plan` — plan mode does not modify files.
-  Add `--sandbox` for terminal restrictions on top.
+- Read-only: agy has no clean review read-only flag. Do **not** use `--mode plan` for a
+  review — plan mode hijacks the run into "planning mode" and ignores the task. Keep
+  auto-approve and rely on the working-tree check in `SKILL.md` step 3.
 - Structured output: `--output-format json` and `--json-schema <schema>`.
 
 ## grok

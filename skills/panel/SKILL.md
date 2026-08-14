@@ -26,7 +26,8 @@ Two task shapes:
 - **Review** when the user asks to review a branch, PR, WIP, or "review since X".
   Pin the fixed point the way `code-review` does: the diff is
   `git diff <fixed-point>...HEAD` (three-dot, against the merge-base), default
-  `main` when the user names none. Confirm the ref resolves
+  `main` when the user names none. For uncommitted work in progress, drop the `...HEAD`
+  so the diff also covers staged and unsaved changes. Confirm the ref resolves
   (`git rev-parse <fixed-point>`) and the diff is non-empty **before** fanning out —
   a bad ref should fail here, not inside four subagents.
 - **Prompt** otherwise — the user's text is the task, passed word for word.
@@ -45,9 +46,20 @@ consensus to form — say which are missing and stop.
 Spawn one subagent per present CLI, all in a single message so they run at once.
 Give each subagent the **same** task string and this brief:
 
-- Run your CLI **once**, headless, from the repo root, using the exact command for
-  your CLI in the table below. Substitute the task string for `<task>`. Add nothing —
-  no `--model`, no extra flags.
+- **Pass the task safely — never inline it.** A prompt with a backtick, `$`, or quote
+  gets run by the shell if you paste it into the command. Put the task in a variable
+  with a quoted heredoc, then pass `"$TASK"`:
+
+  ```bash
+  TASK=$(cat <<'PANEL_EOF'
+  …the one task string…
+  PANEL_EOF
+  )
+  ```
+
+  The quoted `'PANEL_EOF'` delimiter and the quotes around `"$TASK"` stop every
+  expansion. Then run your CLI **once**, headless, from the repo root, using its row
+  below. Add no `--model`; keep the row's flags as written.
 - Agent CLIs take minutes. Wait for it to finish; allow a generous timeout.
 - Distill the output into a short, normalized result. For each point the CLI makes,
   capture three things: a one-line **claim**, a **location** (`file:line`, or
@@ -55,54 +67,76 @@ Give each subagent the **same** task string and this brief:
 - Return `{ cli, status, points[] }`. `status` is `responded`, or `errored` with a
   one-line cause. Return the object only — no narration.
 
-Headless commands (each subagent uses its own row verbatim):
+Headless commands (`< /dev/null` stops the CLI blocking on stdin):
 
 | CLI | Command |
 |---|---|
-| `claude` | `claude -p "<task>" --dangerously-skip-permissions` |
-| `codex` | `codex exec --dangerously-bypass-approvals-and-sandbox --cd "$PWD" "<task>"` |
-| `agy` | `agy -p "<task>" --dangerously-skip-permissions` |
-| `grok` | `grok -p "<task>" --always-approve` |
+| `claude` | `claude -p "$TASK" --dangerously-skip-permissions < /dev/null` |
+| `codex` | `codex exec --dangerously-bypass-approvals-and-sandbox --cd "$PWD" "$TASK" < /dev/null` |
+| `agy` | `agy -p --dangerously-skip-permissions "$TASK" < /dev/null` |
+| `grok` | `grok -p "$TASK" --always-approve < /dev/null` |
 
-In **review** shape, the task string is this brief (fill in the pinned scope):
+In **review** shape, the task string is this brief. Name the pinned diff from step 1 in
+plain words, with **no backticks**, so nothing is left for a shell to expand:
 
-> Review the change `git diff <fixed-point>...HEAD` in this repository. Read the diff
-> and any files you need. Report concrete findings only — for each, a one-line claim,
-> the `file:line`, and a one-line reason. Review only; **do not modify any file.** Be concise.
+> Review the change from git diff FIXED-POINT in this repository. Read the diff and any
+> files you need. Report concrete findings only — for each, a one-line claim, the
+> file:line, and a one-line reason. Review only; do not modify any file. Be concise.
 
-Per-CLI notes — structured-output flags, sandbox/read-only options, absent-vs-errored,
-auth — live in [`references/cli-invocations.md`](references/cli-invocations.md). Read it
-only when a CLI misbehaves or the panel roster changes.
+**Keep review read-only.** Run on a clean working tree. After every subagent returns,
+run `git status --porcelain`; if a CLI changed a tracked file or added one, revert it
+(`git checkout -- <path>`, delete new files) and name that CLI in the report. This tree
+check — not a per-CLI flag — is what enforces review-only.
+
+Per-CLI notes — read-only options and their traps, structured-output flags,
+absent-vs-errored, auth — live in
+[`references/cli-invocations.md`](references/cli-invocations.md). Read it only when a CLI
+misbehaves or the panel roster changes.
 
 ### 4. Cluster into consensus
 
-Collect the four results. Match points that make the same claim, even when worded
-differently or aimed at the same area. Grade each cluster by how many **responding**
-CLIs raised it:
+First check the panel had a quorum: at least two CLIs must have **responded**, not just
+been present. With fewer, there is no consensus — report the single result plainly and
+say the panel was short.
 
-- **Unanimous** — every responding CLI.
-- **Majority** — more than half.
-- **Lone** — one CLI.
+Collect the results. Match points that make the same claim, even when worded differently
+or aimed at the same area. Grade each cluster by the share of the responders (`N`) that
+raised it, and state `N` so a grade is never read as more agreement than it holds:
+
+- **Unanimous** — all `N`.
+- **Majority** — more than half, but not all.
+- **Split** — exactly half (a tie; only when `N` is even).
+- **Lone** — fewer than half.
 - **Conflict** — CLIs directly disagree on the same point.
 
 Clustering is a judgement call. When two points are plausibly the same, join them; a
-borderline join that turns a Lone into a Majority is the whole value of the panel.
+borderline join that lifts a point to a higher grade is the whole value of the panel.
 
 ### 5. Report the consensus
 
-Print the clusters, most-agreed first, under `## Unanimous`, `## Majority`, `## Lone`,
-`## Conflict` (skip any that are empty). One line per point: the claim, its location,
-and the CLIs that raised it in brackets — e.g. `[claude, codex, grok]`. For a Conflict,
-state both sides and who holds each.
+Print the clusters, most-agreed first, under `## Unanimous`, `## Majority`, `## Split`,
+`## Lone`, `## Conflict` (skip any that are empty). One line per point: the **claim**,
+its **location**, the CLIs that raised it in brackets — e.g. `[claude, codex, grok]` —
+and its one-line **reason**. For a Conflict, state both sides and who holds each.
 
-End with one summary line: how many points at each grade, and any CLI that was absent
-or errored. Then, when the task was a review, name the natural next move — fix the
-Unanimous and Majority findings first; Lone and Conflict are judgement calls to weigh,
-not a to-do list.
+Then a one-line summary: how many points at each grade, the responder count `N`, and any
+CLI that was absent or errored.
+
+Close with a **Recommended next steps** block, ordered by confidence:
+
+1. **Fix now** — list every Unanimous and Majority point as a checklist. These are the
+   panel's confident calls.
+2. **Weigh** — list the Split, Lone, and Conflict points. Decide each on its merits; do
+   not batch-apply them.
+3. **Offer the shortcut** — ask whether to apply the Fix-now set as one commit, naming
+   the count, e.g. "Reply *fix all* to apply the 3 confident fixes."
 
 ## Safety
 
 Headless mode auto-approves every tool, so each CLI *could* write files even though the
-brief says review only. Run the panel on a clean working tree so any stray change shows
-in `git status`. For a hard read-only guarantee, use each CLI's sandbox option — see the
+brief says review only. Two guards, in order: run the panel on a clean working tree, and
+in review shape revert any stray write with the `git status` check in step 3. Per-CLI
+read-only flags exist but behave inconsistently — `codex --sandbox read-only` works,
+`agy --mode plan` hijacks the task into planning, and `grok`'s profile name is
+machine-specific — so the tree check, not a flag, is what enforces read-only. See the
 references file.
