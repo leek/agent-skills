@@ -24,7 +24,7 @@ Only include these when they add genuine value. Most ADRs won't need them.
 
 ## Numbering
 
-Scan `docs/adr/` for the highest existing number and increment by one.
+Scan `docs/adr/` for the highest existing number and increment by one. If sessions may run in parallel, re-scan right after writing; if your number now collides with another new ADR, rename yours to the next free number — the title-slug in the filename keeps the collision recoverable.
 
 ## When to offer an ADR
 

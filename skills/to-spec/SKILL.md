@@ -10,7 +10,7 @@ Take the current conversation context and codebase understanding and produce a s
 
 If a load-bearing decision is genuinely unresolved — one the spec cannot be written without — don't guess and don't launch a full interview. Ask just that decision (via `AskUserQuestion` where available, otherwise a plain question in chat — recommended option first, trade-offs per option), or suggest a `grill-me` round if several are open.
 
-**Run once per effort.** One spec, written in one session, covering everything the effort builds. If it came from a `wayfinder` map, writing the spec closes that map.
+**Written once per effort, revised in place after.** One spec covering everything the effort builds, written in a single session. If it came from a `wayfinder` map, that first write closes the map and does not run on it again. Later, if downstream work exposes a wrong or missing decision, re-run to **edit this spec in place** — never write a second spec beside it, and never reopen or re-close the map.
 
 Pipeline position: `grill-with-docs`/`wayfinder` (decide) → **`to-spec`** (write the spec) → `to-tickets` (break it into tickets) → `implement` (build one ticket per session).
 
@@ -19,6 +19,8 @@ Pipeline position: `grill-with-docs`/`wayfinder` (decide) → **`to-spec`** (wri
 ### 1. Explore the repo
 
 Understand the current state of the codebase if you haven't already. Use the project's domain vocabulary throughout the spec (read `CONTEXT.md` if one exists — `domain-modeling` maintains it) and respect any ADRs in the area being touched.
+
+**Invoked with a `wayfinder` map, read the map and every closed decision ticket's `## Resolution` first** — those resolutions are the authoritative decisions the spec must encode. Don't synthesize from conversation memory alone; a fresh session may not hold what earlier ticket sessions decided.
 
 Finish exploring only when you can name the domain terms and ADRs that constrain the spec, the closest existing implementation and tests to imitate (or confirm none exist), and the tracker destination step 3 will use.
 
@@ -34,7 +36,7 @@ Write the spec using the template below. Show the complete draft and wait for th
 
 A spec is a markdown file under `.scratch/` — there is no external tracker. Read the layout from `docs/agents/issue-tracker.md` (written by `/setup`), falling back to the path below when the repo has none; suggest running `/setup` once to make it durable.
 
-After approval, publish to `.scratch/<slug>/spec.md` with `**Status:** ready-for-agent` near the top (or the AFK-ready role string from `docs/agents/triage-labels.md` when that mapping exists). **Invoked with a map, reuse that map's directory** and append `**Status:** closed` to `map.md` — the map's job is done, and this skill does not run on it again.
+After approval, publish to `.scratch/<slug>/spec.md` with `status: ready-for-agent` in its YAML frontmatter (or the AFK-ready role string from `docs/agents/triage-labels.md` when that mapping differs). **Invoked with a map, reuse that map's directory** and set `map.md`'s frontmatter to `status: closed` — the map's job is done. A later in-place revision leaves the map closed.
 
 The spec covers the whole effort. Its short **Build Contract** is the canonical home for invariants, ordering, and shared seams every implementation ticket needs; detailed decisions below it hold ticket-specific context without repeating that contract. If the effort feels too big for one spec, say so and recommend narrowing it rather than writing a second spec beside the first.
 

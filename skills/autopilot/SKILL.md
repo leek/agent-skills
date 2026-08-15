@@ -62,7 +62,7 @@ Use the installed workflow skills as the single source of truth. The script loca
 
 ## Ticket status
 
-Every unit is marked in progress before work starts and closed after it is verified and committed, so the markdown tracker under `.scratch/` always reflects reality. The worker writes the transition in the shape its tracker uses — `**Status:** in-progress (claimed <date>, autopilot:<run-id>)` then `**Status:** closed` plus `## Resolution` for a build ticket or directly implemented spec; `claimed-by:` then `status: closed` for a `wayfinder` decision ticket.
+Every unit is marked in progress before work starts and closed after it is verified and committed, so the markdown tracker under `.scratch/` always reflects reality. The worker writes the transition into the file's YAML frontmatter — `status: in-progress` plus `claimed-by: autopilot:<run-id>`, then `status: closed` plus `## Resolution` — for build tickets, directly implemented specs, and `wayfinder` decision tickets alike.
 
 The runner does not take that on trust. It snapshots every work item beside the root before each iteration, announces each status change afterwards (`ticket .scratch/x/issues/01-y.md: ready-for-agent -> closed`), and fails the run when a successful result names a different unit or one whose file is not closed. It then rereads the tracker itself and replaces the worker's `status` and `next_ref` with the authoritative next frontier, completion, human gate, or blocked state. A unit this run claimed and left open is announced as an open claim.
 

@@ -7,7 +7,7 @@ description: Build and sharpen a project's domain model — challenge terms agai
 
 Actively build and sharpen the project's domain model as you design. This is the *active* discipline — challenging terms, inventing edge-case scenarios, and writing the glossary and decisions down the moment they crystallise. Merely *reading* `CONTEXT.md` for vocabulary is not this skill — that's a one-line habit any skill can do. This skill is for when you're changing the model, not just consuming it.
 
-Runs alongside `grilling` sessions (`grill-with-docs` is the front door that pairs the two), `wayfinder` grilling tickets, and `to-spec` synthesis — anywhere terms get decided. When running inside another skill, don't print an end-of-session block — only the outermost skill does.
+Runs alongside `grilling` sessions (`grill-with-docs` is the front door that pairs the two), `wayfinder` grilling tickets, and `to-spec` synthesis — anywhere terms get decided. It's supporting work, not a pipeline stage: it never prints the pipeline end-of-session block, whether nested or run directly — the invoking skill (or the user's next step) owns routing.
 
 ## File structure
 
@@ -66,11 +66,11 @@ When the user states how something works, check whether the code agrees. In a La
 - Filament resource/page labels and navigation names
 - Route names, job names, event names
 
-If you find a contradiction, surface it: "Your code cancels entire Orders (`Order::cancel()`), but you just said partial cancellation is possible — which is right?" When a term is resolved *against* the code's current naming, the rename is real work — note it as a decision (and a ticket, if a tracker is in play), never silently absorb it.
+If you find a contradiction, surface it: "Your code cancels entire Orders (`Order::cancel()`), but you just said partial cancellation is possible — which is right?" When a term is resolved *against* the code's current naming, the rename is real **build** work — record the *decision* here, and leave the rename itself for the spec (or an `issues/` ticket once one exists), never as a `wayfinder` decision-map ticket, which holds only things decided, not things built. Never silently absorb it.
 
 ### Update CONTEXT.md inline
 
-When a term is resolved, update `CONTEXT.md` right there. Don't batch these up — capture them as they happen. Use the format in [references/context-format.md](references/context-format.md).
+When a term is resolved, update `CONTEXT.md` right there. Don't batch these up — capture them as they happen. Use the format in [references/context-format.md](references/context-format.md). If sessions may run in parallel, re-read `CONTEXT.md` immediately before writing and add only your entry, so a concurrent edit isn't clobbered.
 
 `CONTEXT.md` must stay totally devoid of implementation details. It is a glossary — not a spec, a scratch pad, or a home for implementation decisions.
 

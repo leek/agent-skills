@@ -16,7 +16,7 @@ The recipient has none of the user's context, so `grilling`'s **Frame the proble
 
 2. **What do you need back?** Ask, in one exchange, the specific decisions or facts the user can't resolve alone and needs from this person. Done when you have a concrete list of what the user must walk away able to do or decide.
 
-3. **Write the questionnaire.** Draft questions aimed at the gap from steps 1–2, following the Document structure below. Write it to `to-questionnaire-<slug>.md` in the current directory (slug from the topic) and report the path. Done when the file exists and every item the user named in step 2 is covered by a question.
+3. **Write the questionnaire.** Draft questions aimed at the gap from steps 1–2, following the Document structure below. Write it under the effort's `.scratch/` directory as `questionnaire-<slug>.md` (slug from the topic), alongside the map or spec it serves — never loose in the repo root. When it unblocks a `wayfinder` ticket, link it from that ticket through the tracker's Assets operation. Report the path. Done when the file exists, is linked from any ticket it serves, and every item the user named in step 2 is covered by a question.
 
 ## Document structure
 
@@ -72,6 +72,6 @@ Stage-specific **Next** conditions (only those that apply, most likely first):
 
 - **Questionnaire written, answers not back yet** → nothing to run; send it, then `/grill-me` on the blocked branch once answers land. Name the branch so the next session knows what was waiting.
 - **Answers already in hand** → `/grill-me` on the blocked branch, feeding the answers in
-- **It unblocks a `wayfinder` ticket** → `/wayfinder <map>` once answered; note the ticket stays open until then
+- **It unblocks a `wayfinder` ticket** → Release that ticket (clear its claim) and leave a `## Comments` note saying it waits on this questionnaire, so it stays visible on the frontier rather than stranded under a dead claim; `/wayfinder <map>` to re-claim and resolve it once the answers land
 - **Part of the gap is a documented fact, not a person's knowledge** → `/research` on that part in parallel
 - **Stopped before finishing** → say what the draft covers and which of the user's needs have no question yet

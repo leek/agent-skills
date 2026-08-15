@@ -31,18 +31,18 @@ The tracker is the loop's only memory: the next process recomputes the frontier 
 
 Mark it in progress **before** changing any code or dispatching any subagent:
 
-- Build ticket from `to-tickets`, or a directly implemented spec — replace the `**Status:**` line with `**Status:** in-progress (claimed <YYYY-MM-DD>, autopilot:<run-id>)`.
+- Build ticket from `to-tickets`, or a directly implemented spec — set the frontmatter `status: in-progress` and `claimed-by: autopilot:<run-id>`.
 - `wayfinder` decision ticket — set `claimed-by: autopilot:<run-id>` in the frontmatter and leave `status: open`.
 
 Mark it done as the last step of the unit, after verification and the durable commit:
 
-- Build ticket or directly implemented spec — set `**Status:** closed` and append `## Resolution` per `implement`.
+- Build ticket or directly implemented spec — set the frontmatter `status: closed` and append `## Resolution` per `implement`.
 - `wayfinder` decision ticket — set `status: closed` and append `## Resolution` per the tracker's Resolve operation.
 
 Rules that hold in every branch:
 
 - Re-read the file after writing it and confirm the marker on disk matches what you are about to return. Autopilot reads the same file and fails the run when a `continue` or `complete` result names a unit that is not closed.
-- Leave parents alone: a ticket never closes its spec, and a spec never closes its map.
+- Leave parents alone: a ticket never closes its spec, and the worker never touches the map (it was closed at the spec/tickets handoff).
 - On `needs_input`, `blocked`, or `failed`, leave the in-progress marker and the `autopilot:<run-id>` claim in place — that marker is how a later process recognizes its own resumable work. Never mark an unfinished unit closed, and never leave a finished unit in progress.
 
 ## Report progress

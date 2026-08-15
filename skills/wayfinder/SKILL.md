@@ -10,17 +10,17 @@ A loose idea has arrived — too big for one agent session, and wrapped in fog: 
 
 One map produces **one spec**. When its decisions are clear, `to-spec` runs once and the map is finished. If the work is too big for a single spec, that is a sign the destination is drawn too wide — narrow it, and chart the rest as its own map later.
 
-Naming the destination is the first act of charting — it shapes every ticket. It might be the spec to hand to `to-spec`, a decision to lock before planning starts, or a change made in place (a data-model migration, an expand–contract schema change).
+Naming the destination is the first act of charting — it shapes every ticket. It might be the spec to hand to `to-spec`, a decision to lock before planning starts, or the decisions behind a change made in place (a data-model migration, an expand–contract schema change) — which still builds through the normal spec → tickets → build handoff.
 
 Pipeline position: **`wayfinder`** (decide) → `to-spec` (write the spec) → `to-tickets` (break it into tickets) → `implement` (build one ticket per session).
 
 ## Plan, don't do
 
-Each ticket resolves a **decision**; the map is done when nothing is left to decide before someone goes and does the thing. The pull to just do the work is usually the signal you've reached the edge of the map and it's time to hand off. An effort can override this in its **Notes** — carrying execution into the map itself — but absent that, produce decisions, not deliverables.
+Each ticket resolves a **decision**; the map is done when nothing is left to decide before someone goes and does the thing. The pull to just do the work is usually the signal you've reached the edge of the map and it's time to hand off. The one sanctioned *do* on a map is a **task** ticket — manual work that unblocks a decision (see ticket types); it resolves like any other ticket and leaves no build state behind. Absent that, produce decisions, not deliverables.
 
 **The test on every ticket: can it be answered, or must it be built?** Work you would build is not a ticket — it belongs in the spec. Never number build work onto the map. The map holds no build state, so a map carrying build work will keep telling you it is unfinished long after the work ships.
 
-**Hand off — don't build.** When the decisions are clear, run `to-spec` once on the map. That closes the map. `implement` starts from a ticket `to-tickets` wrote, never from the map.
+**Hand off — don't build.** When the decisions are clear, run `to-spec` once on the map. That closes the map. `implement` builds the spec's work from a ticket `to-tickets` wrote, never from the map — the lone exception being a `task` ticket, which is unblocking work rather than the spec's build.
 
 ## Refer by name
 
@@ -49,19 +49,19 @@ User invokes with a loose idea.
 1. **Name the destination.** Run a `grilling` session (with `domain-modeling`) to pin down what this map is finding its way to. The destination fixes the scope, so it's settled first.
 2. **Map the frontier.** Grill again, **breadth-first**: fan out across the whole space rather than deep on any thread, surfacing the open decisions and the first steps takeable now. **If this surfaces no unresolved decision tickets**, the destination is already clear enough to hand off and you don't need a map. An empty Not yet specified section alone is not enough — sharp open decisions still become tickets. Stop and ask the user whether to go straight to `to-spec` or `to-tickets`.
 3. **Create the map** through the tracker's Create map operation: Destination and Notes filled in, Decisions so far empty, the fog sketched into Not yet specified.
-4. **Create the tickets you can specify now** through the tracker's Create ticket operation — then wire blocking edges in a **second pass**. Everything you can't yet specify stays in the fog.
+4. **Create the tickets you can specify now** through the tracker's Create ticket operation, setting each ticket's `blocked-by` as you create it and wiring any remaining cross-edges in a **second pass** — so no ticket sits on the frontier before its blockers are wired. Everything you can't yet specify stays in the fog.
 5. **Resolve eligible research tickets.** Follow the `research` skill's Wayfinder integration to claim, dispatch, persist, and resolve them. If a research ticket cannot finish during this charting session, leave it open on the frontier for its own session.
-6. Stop — charting is one session's work; it hand-resolves nothing.
+6. Stop — charting is one session's work; beyond the research tickets step 5 resolves, it hand-resolves nothing.
 
 ### Work through the map
 
-User invokes with a map (URL, id, or path). A ticket is optional — without one, you pick the next.
+User invokes with a map (its path or title). A ticket is optional — without one, you pick the next.
 
 1. Load the **map** — the low-res view, not every ticket body.
 2. Choose the ticket. If the user named one, use it; otherwise take the first frontier ticket. **Claim it** through the tracker's Claim operation before any work.
 3. Resolve it per its type — zoom as needed: fetch full bodies of related or closed tickets on demand; consult the skills the map's Notes name. If in doubt, grill.
-4. Record the answer through the tracker's Resolve operation, which closes the ticket and appends a one-line pointer to the map's Decisions so far.
-5. Add newly surfaced tickets (create-then-wire); graduate any fog the answer made specifiable, clearing each graduated patch from Not yet specified. If the answer reveals a ticket sits beyond the destination, rule it out of scope rather than resolving it. Update tickets that remain valid; close invalidated tickets as superseded with a short reason so their history remains intact.
+4. Record the answer through the tracker's Resolve operation, which closes the ticket. The map's Decisions so far is derived from the closed, resolved tickets — don't hand-append it.
+5. Add newly surfaced tickets (create-then-wire); graduate any fog the answer made specifiable, clearing each graduated patch from Not yet specified. If the answer reveals a ticket sits beyond the destination, use the tracker's Close operation to rule it out of scope (not Resolve, so it stays out of Decisions so far). Update tickets that remain valid; Close invalidated tickets as superseded with a short reason so their history remains intact.
 6. **Say whether the map is clear.** It is clear when no ticket is open and nothing remains in Not yet specified. Say so plainly, because that is the signal to run `to-spec` — once.
 
 The user may run unblocked tickets in parallel, so expect other sessions to be editing the tracker concurrently.
@@ -82,13 +82,13 @@ Stage-specific **Next** conditions (only those that apply, most likely first):
 
 **After charting:**
 
-- **Map charted with a frontier** → `/clear`, then `/wayfinder <map>` to resolve the first frontier ticket; name it (research tickets already resolved point at their `research/<slug>` branches)
+- **Map charted with a frontier** → `/clear`, then `/wayfinder <map>` to resolve the first frontier ticket; name it (research tickets already resolved point at their findings files)
 - **Charting found no unresolved decision tickets** → no map needed: `/to-spec`, or `/to-tickets` if the shape is already clear
 
 **After working a ticket:**
 
-- **Map still has open tickets** → `/clear`, then `/wayfinder <map>` for the next frontier ticket; name it and say how many remain
+- **Map still has open tickets** → `/clear`, then `/wayfinder <map>` for the next frontier ticket (or **resume your own claimed ticket first** if you stopped mid-ticket — see below); name it and say how many remain
 - **Map is clear** → `/to-spec <map>`, run once; that writes the spec and closes the map
 - **Map is clear and the effort turned out genuinely small** → `/to-tickets <map>`, skipping the spec
 - **Ticket blocked on someone else's knowledge** → `/to-questionnaire`; **on a fact worth reading for** → `/research`
-- **Stopped mid-ticket** → say which ticket is claimed, what's decided so far, and that the claim remains active
+- **Stopped mid-ticket** → say which ticket is claimed, what's decided so far, and that the claim remains active; resume that ticket next session before taking a fresh one, or Release it to hand it back to the frontier

@@ -22,6 +22,8 @@ Whatever the user said is the fixed point — a commit SHA, branch name, tag, `m
 
 Capture the diff command once: `git diff <fixed-point>...HEAD` (three-dot, so the comparison is against the merge-base). Also note the list of commits via `git log <fixed-point>..HEAD --oneline`.
 
+When the caller passes a **path scope** (as `implement` does, so parallel sessions sharing one branch don't pollute the range), append it to both: `git diff <fixed-point>...HEAD -- <paths>` and `git log <fixed-point>..HEAD --oneline -- <paths>`.
+
 Before going further, confirm the fixed point resolves (`git rev-parse <fixed-point>`) and the diff is non-empty. A bad ref or empty diff should fail here — not inside two parallel reviews.
 
 ### 2. Identify the spec source

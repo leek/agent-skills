@@ -9,7 +9,7 @@ The map is *deliberately* incomplete: don't chart what you can't yet see. Beyond
 **Fog or ticket?** First ask whether it is a decision at all, then whether you can state it precisely *now* — not whether you can answer it now.
 
 - **Neither** when `grilling`'s **Settle it yourself first** ladder already answers it — existing context, established practice, or the default bias toward reuse and configurability. Settle it, record it in the map's **Notes** as a standing convention for the effort, and don't spend a ticket on it.
-- **Spec material, not a ticket** when the answer would be a thing built rather than a thing decided. Leave it for `to-spec` — note it in **Not yet specified** if you would otherwise forget it. It never becomes a map ticket, however sharp it gets.
+- **Spec material, not a ticket** when the answer would be a thing built rather than a thing decided. Leave it for `to-spec`. If you'd otherwise forget it, jot it under the map's **Notes** as a for-the-spec reminder — never in **Not yet specified**, which holds only undecided questions and gates whether the map is clear (park build material there and the map can never read as clear). It never becomes a map ticket, however sharp it gets.
 - **Ticket** when the question is already sharp — even if it's blocked.
 - **Not yet specified** when you can't phrase it that sharply. Don't cut fog into ticket-sized pieces up front: one patch may graduate into several tickets, or none, once the frontier reaches it.
 

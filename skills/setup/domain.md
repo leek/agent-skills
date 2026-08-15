@@ -29,11 +29,11 @@ Multi-context repo (presence of `CONTEXT-MAP.md` at the root):
 /
 ├── CONTEXT-MAP.md
 ├── docs/adr/                          ← system-wide decisions
-└── app/
-    ├── ordering/
+└── app/Domain/                        ← or modules/, app-modules/ — follow the repo
+    ├── Ordering/
     │   ├── CONTEXT.md
     │   └── docs/adr/                  ← context-specific decisions
-    └── billing/
+    └── Billing/
         ├── CONTEXT.md
         └── docs/adr/
 ```

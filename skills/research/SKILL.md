@@ -9,14 +9,14 @@ Run the research in a sub-agent so the main session can keep working on unrelate
 
 ## Dispatching a research run
 
-- In Claude Code, use the Agent tool — `Explore` for read-only source sweeps, `general-purpose` when the research needs web fetches or other tool calls. Hand the sub-agent the question plus **The research brief** below.
+- In Claude Code, use the Agent tool — `Explore` for read-only source sweeps (it can't write, so it returns the findings as text and the dispatcher saves the file), `general-purpose` when the research needs web fetches, other tool calls, or must write the findings file itself. Hand the sub-agent the question plus **The research brief** below.
 - Collect the result before the session ends or suggests `/clear` — never leave one running.
-- In everything durable (tickets, resolution comments, hand-off text), reference the findings **by file path and branch, never by task ID** — a task ID written down is a dead handle the next session will poll and fail on.
+- In everything durable (tickets, resolution comments, hand-off text), reference the findings **by file path, never by task ID** — a task ID written down is a dead handle the next session will poll and fail on.
 - Relay the answer plus the file path to the user — not a re-paste of the whole document.
 
 ### Wayfinder integration
 
-When resolving a `wayfinder` research ticket, follow the configured tracker's Wayfinding operations. **Claim it first** through the Claim operation so a concurrent session cannot pick it up mid-flight. Commit the findings file to a throwaway `research/<ticket-slug>` branch, then use the Resolve operation to record the answer and branch pointer and close the ticket. Research tickets are the one type a charting session may run several of in parallel — one sub-agent per ticket, one branch each, all collected before the session ends.
+When resolving a `wayfinder` research ticket, follow the configured tracker's Wayfinding operations. **Claim it first** through the Claim operation so a concurrent session cannot pick it up mid-flight. Write the findings file (no branch — see the tracker's Working in parallel rules), link it through the Assets operation, then use the Resolve operation to record the answer and the file pointer and close the ticket. Research tickets are the one type a charting session may run several of in parallel — one sub-agent per ticket, all collected before the session ends.
 
 ## The research brief
 

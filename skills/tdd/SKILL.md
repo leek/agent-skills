@@ -25,7 +25,7 @@ Tests verify behavior through public interfaces, not implementation details. Cod
 
 ## Seams — where tests go
 
-A **seam** is the public boundary you test at (`codebase-design` holds the full deep-module vocabulary). Test only at seams agreed with the user; the highest seam that can observe the behavior, and as few seams as possible.
+A **seam** is the public boundary you test at (`codebase-design` holds the full deep-module vocabulary). Test at the chosen seams — the caller (`to-spec` or `implement`) picks them from the ranking below and states the choice rather than asking; test at the highest seam that can observe the behavior, and as few seams as possible. Ask only on a genuine fork the rules rank equally.
 
 Highest first:
 

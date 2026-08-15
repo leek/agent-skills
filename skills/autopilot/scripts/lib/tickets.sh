@@ -68,8 +68,8 @@ resolve_work_item() {
   canonical_existing_file "$ref"
 }
 
-# Reads both tracker shapes: YAML frontmatter (wayfinder decision tickets) and a
-# bold "**Status:**" line (to-tickets build tickets, specs, maps).
+# Reads status/claim from YAML frontmatter (all pipeline files now use it),
+# falling back to a legacy bold "**Status:**" line for older files.
 read_work_item_state() {
   local file="$1" status="" claim=""
   WORK_ITEM_STATUS=""
@@ -288,13 +288,16 @@ read_work_item_blockers() {
   RESOLVED_BLOCKERS=()
   BLOCKER_ERROR=""
 
-  if [[ "$mode" == "decision" ]]; then
-    raw="$(awk '
-      NR == 1 && $0 !~ /^---[[:space:]]*$/ { exit }
-      NR > 1 && /^---[[:space:]]*$/ { exit }
-      /^blocked-by:[[:space:]]*/ { sub(/^blocked-by:[[:space:]]*/, ""); print; exit }
-    ' "$file" 2>/dev/null)" || true
-    raw="$(printf '%s' "$raw" | tr -d '[]')"
+  # Every ticket now carries blockers in `blocked-by` frontmatter (decision and
+  # build alike). Read that first; fall back to a legacy "## Blocked by" body
+  # section only when the frontmatter list is absent or empty.
+  raw="$(awk '
+    NR == 1 && $0 !~ /^---[[:space:]]*$/ { exit }
+    NR > 1 && /^---[[:space:]]*$/ { exit }
+    /^blocked-by:[[:space:]]*/ { sub(/^blocked-by:[[:space:]]*/, ""); print; exit }
+  ' "$file" 2>/dev/null)" || true
+  raw="$(printf '%s' "$raw" | tr -d '[]')"
+  if [[ -n "$(printf '%s' "$raw" | tr -d '[:space:]')" ]]; then
     while IFS= read -r token; do
       token="$(printf '%s' "$token" | sed -E 's/^[[:space:]]+//;s/[[:space:]]+$//')"
       [[ -n "$token" ]] && tokens+=("$token")

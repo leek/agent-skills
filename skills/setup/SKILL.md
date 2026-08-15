@@ -9,7 +9,7 @@ disable-model-invocation: true
 Scaffold the per-repo configuration that the engineering skills assume:
 
 - **Markdown tracker** — where maps, specs, and tickets live as files under `.scratch/`
-- **Triage status** — the `**Status:**` strings used for the five canonical triage roles
+- **Triage status** — the `status:` frontmatter strings used for the five canonical triage roles
 - **Domain docs** — where `CONTEXT.md` and ADRs live, and the consumer rules for reading them
 
 This is a prompt-driven skill, not a deterministic script. Explore, present what you found, confirm with the user, then write.
