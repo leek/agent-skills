@@ -60,7 +60,16 @@ Give each subagent the **same** task string and this brief:
   The quoted `'PANEL_EOF'` delimiter and the quotes around `"$TASK"` stop every
   expansion. Then run your CLI **once**, headless, from the repo root, using its row
   below. Add no `--model`; keep the row's flags as written.
-- Agent CLIs take minutes. Wait for it to finish; allow a generous timeout.
+- **Run every CLI detached — never let one time out.** These agent CLIs take many
+  minutes, and a slow model (codex at high reasoning is the usual culprit) will run past
+  the Bash tool's 10-minute foreground ceiling and get killed mid-orientation, before it
+  ever reports. Do **not** run the command in the foreground with a big timeout — 10 min
+  is the hard max and it will be killed. Instead redirect the command's output to a
+  scratch file and launch it with the Bash tool's `run_in_background: true` — append
+  ` > "$SCRATCH/panel-<cli>.out" 2>&1` to the row's command (keep the `< /dev/null`).
+  Your turn pauses and you are re-invoked automatically when the CLI exits; then read the
+  scratch file and distill it. Background runs have no timeout — this is what guarantees
+  nothing is cut off.
 - Distill the output into a short, normalized result. For each point the CLI makes,
   capture three things: a one-line **claim**, a **location** (`file:line`, or
   `general`), and a one-line **reason**. Drop the CLI's logs, thinking, and prose.
