@@ -39,8 +39,12 @@ Three rules hold for every CLI:
 ## agy
 
 - Headless: `-p` / `--print` runs one prompt and exits (`--print-timeout` defaults to 5m).
-- Flag order: put flags before the positional prompt — `agy -p --dangerously-skip-permissions "$TASK"`.
-  A flag placed after the prompt can be read as part of the prompt.
+- Flag order: `-p` / `--print` consumes the NEXT token as its prompt value, so put every
+  other flag **before** `-p` and give the task as `-p`'s value last —
+  `agy --dangerously-skip-permissions -p "$TASK"`. Putting `-p` first (`agy -p
+  --dangerously-skip-permissions "$TASK"`) makes it swallow `--dangerously-skip-permissions`
+  as the prompt: the flag is silently dropped (permissions never skipped) and the real
+  `$TASK` is discarded as an ignored trailing positional, so no review runs.
 - Auto-approve: `--dangerously-skip-permissions`.
 - Read-only: agy has no clean review read-only flag. Do **not** use `--mode plan` for a
   review — plan mode hijacks the run into "planning mode" and ignores the task. Keep
