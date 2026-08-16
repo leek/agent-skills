@@ -47,6 +47,7 @@ The engineering pipeline is one straight line — **decide → spec → tickets 
 | `prototype` | model | Build a throwaway prototype to answer a design question. |
 | `repository-cleanup` | user | Audit and clean Git repository state. |
 | `research` | model | Investigate a question against high-trust primary sources and capture the findings as a cited Markdown file. |
+| `resolve-review-comments` | model | Triage, fix or rebut, then reply-and-resolve every review comment on a PR (including AI-review bot findings). |
 | `resolving-merge-conflicts` | model | "Use when you need to resolve an in-progress git merge/rebase conflict." |
 | `setup` | user | Configure this repo for the engineering skills — the markdown issue tracker layout, triage label vocabulary, and domain doc layout. |
 | `tdd` | model | The red → green loop tuned for Pest/PHPUnit in a Laravel codebase — seams, what a good test is, and the anti-patterns to refuse. |

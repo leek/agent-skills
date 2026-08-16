@@ -38,6 +38,7 @@
         "./skills/prototype",
         "./skills/repository-cleanup",
         "./skills/research",
+        "./skills/resolve-review-comments",
         "./skills/resolving-merge-conflicts",
         "./skills/setup",
         "./skills/tdd",
