@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run one fresh top-level Claude Code or Codex process per pipeline unit.
+# Run one fresh top-level Claude Code, Codex, or Grok process per pipeline unit.
 # Human-readable progress goes to stderr; terminal results and status use JSON on stdout.
 
 set -euo pipefail
@@ -144,7 +144,7 @@ unset -f require_module
 usage() {
   cat >&2 <<'EOF'
 Usage:
-  autopilot.sh --provider <claude|codex> --root <ref> [options]
+  autopilot.sh --provider <claude|codex|grok> --root <ref> [options]
   autopilot.sh --status --root <ref> [--repo <path>]
   autopilot.sh --follow --root <ref> [--repo <path>]
   autopilot.sh --history --root <ref> [--repo <path>]
@@ -155,7 +155,7 @@ Run options:
   --model <name>        Model for every worker session (default: provider config)
   --effort <level>      Reasoning effort for every worker session
                         claude: low|medium|high|xhigh|max
-                        codex:  none|minimal|low|medium|high|xhigh|max
+                        codex/grok: none|minimal|low|medium|high|xhigh|max
   --log-file <path>     Mirror the durable human-readable log to this path
   --tmux                Start the run in a detached tmux session
   -h, --help            Show this help

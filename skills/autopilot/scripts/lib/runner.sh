@@ -8,14 +8,17 @@ find_skill() {
   local candidate=""
   local user_home="${HOME:-}"
   local codex_home="${CODEX_HOME:-}"
-  local roots=("$REPO_ROOT/.agents/skills" "$REPO_ROOT/.claude/skills" "$REPO_ROOT/.codex/skills")
+  local grok_home="${GROK_HOME:-}"
+  local roots=("$REPO_ROOT/.agents/skills" "$REPO_ROOT/.claude/skills" "$REPO_ROOT/.codex/skills" "$REPO_ROOT/.grok/skills")
 
   roots+=("$(cd "$SKILL_DIR/.." && pwd -P)")
   if [[ -n "$user_home" ]]; then
     roots+=("$user_home/.agents/skills" "$user_home/.claude/skills")
     [[ -n "$codex_home" ]] || codex_home="$user_home/.codex"
+    [[ -n "$grok_home" ]] || grok_home="$user_home/.grok"
   fi
   [[ -z "$codex_home" ]] || roots+=("$codex_home/skills")
+  [[ -z "$grok_home" ]] || roots+=("$grok_home/skills")
 
   for candidate in "${roots[@]}"; do
     if [[ -f "$candidate/$name/SKILL.md" ]]; then

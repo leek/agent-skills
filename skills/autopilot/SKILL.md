@@ -1,6 +1,6 @@
 ---
 name: autopilot
-description: Drive an existing wayfinder map, spec, or set of tickets to completion through fresh top-level Claude Code or Codex sessions.
+description: Drive an existing wayfinder map, spec, or set of tickets to completion through fresh top-level Claude Code, Codex, or Grok sessions.
 disable-model-invocation: true
 ---
 
@@ -11,11 +11,11 @@ Run approved pipeline work until it is complete or reaches a genuine human gate.
 ## Start the loop
 
 1. Require a reference to a `wayfinder` map, a spec, or a ticket. Run from the target Git repository.
-2. Select the current harness as the provider: `claude` in Claude Code, `codex` in Codex. When running directly from a terminal, require the user to choose.
+2. Select the current harness as the provider: `claude` in Claude Code, `codex` in Codex, `grok` in Grok. When running directly from a terminal, require the user to choose.
 3. Resolve this skill's installed directory, then run the bundled script by absolute path while keeping the target repository as the working directory:
 
 ```bash
-bash <autopilot-skill-dir>/scripts/autopilot.sh --provider <claude|codex> --root <ref>
+bash <autopilot-skill-dir>/scripts/autopilot.sh --provider <claude|codex|grok> --root <ref>
 ```
 
 Pass `--repo <path>` when the target is not the current repository, `--max-iterations <n>` to replace the default limit of 50, and `--log-file <path>` to mirror the per-run log to another path.
@@ -41,16 +41,16 @@ Every worker session is one sub-session of the run, and every run reports which 
 Set them explicitly to pin every sub-session:
 
 ```bash
-bash <autopilot-skill-dir>/scripts/autopilot.sh --provider <claude|codex> --root <ref> --model <name> --effort <level>
+bash <autopilot-skill-dir>/scripts/autopilot.sh --provider <claude|codex|grok> --root <ref> --model <name> --effort <level>
 ```
 
-`AUTOPILOT_MODEL` and `AUTOPILOT_EFFORT` are the environment equivalents. Valid effort levels are `low|medium|high|xhigh|max` for `claude` and `none|minimal|low|medium|high|xhigh|max` for `codex`; the runner rejects anything else before starting a worker.
+`AUTOPILOT_MODEL` and `AUTOPILOT_EFFORT` are the environment equivalents. Valid effort levels are `low|medium|high|xhigh|max` for `claude` and `none|minimal|low|medium|high|xhigh|max` for `codex` and `grok`; the runner rejects anything else before starting a worker.
 
-The `source` names where each value came from: `requested` for a flag or environment variable, `settings` for the resolved Claude Code settings chain (`model` and `effortLevel`, honoring `CLAUDE_CONFIG_DIR`), `config` for `$CODEX_HOME/config.toml` (`model` and `model_reasoning_effort`), and `provider default` when neither is set and the provider chooses. Claude workers also report the model the session actually resolved; that authoritative value is announced when it differs from the requested one — an alias like `opus` resolving to a dated model ID — and is kept in state as `reported_model`.
+The `source` names where each value came from: `requested` for a flag or environment variable, `settings` for the resolved Claude Code settings chain (`model` and `effortLevel`, honoring `CLAUDE_CONFIG_DIR`), `config` for `$CODEX_HOME/config.toml` (`model` and `model_reasoning_effort`) or `$GROK_HOME/config.toml` (`[models].default` and `[models].default_reasoning_effort`), and `provider default` when neither is set and the provider chooses. Claude and Grok workers also report the model the session actually resolved; that authoritative value is announced when it differs from the requested one — an alias like `opus` resolving to a dated model ID — and is kept in state as `reported_model`.
 
 ## Fresh-process contract
 
-Each iteration launches a new top-level CLI process with normal user and project configuration but with permission prompts and sandboxing bypassed (`--dangerously-skip-permissions` / `--dangerously-bypass-approvals-and-sandbox`) — headless workers cannot answer prompts, so only start the loop on work the user has already approved for autonomous execution. It performs exactly one decision ticket or one build ticket, finishes all nested review and verification agents, records durable tracker and Git state, and exits.
+Each iteration launches a new top-level CLI process with normal user and project configuration but with permission prompts and sandboxing bypassed (`--dangerously-skip-permissions` / `--dangerously-bypass-approvals-and-sandbox` / `--always-approve`) — headless workers cannot answer prompts, so only start the loop on work the user has already approved for autonomous execution. It performs exactly one decision ticket or one build ticket, finishes all nested review and verification agents, records durable tracker and Git state, and exits.
 
 Before launching it, the runner parses current statuses, claims, and blocking edges, chooses the deterministic frontier unit, and passes a compact JSON manifest: mode, exact selected unit, parent, direct blocker states, whole frontier, and launch `HEAD`. The worker revalidates that unit and its direct blockers, then progressively loads the parent's Build Contract, ticket-named sections, blocker resolutions, path-local instructions, and seam files. Closed sibling bodies and the full parent are on-demand context rather than a fresh-process orientation tax.
 

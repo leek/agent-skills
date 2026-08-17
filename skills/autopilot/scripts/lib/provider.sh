@@ -1,5 +1,5 @@
 #!/bin/bash
-# Claude Code and Codex adapters behind one runner interface.
+# Claude Code, Codex, and Grok adapters behind one runner interface.
 
 set -e
 
@@ -29,8 +29,20 @@ configure_provider() {
       PROVIDER_EFFORT_KEY="model_reasoning_effort"
       PROVIDER_EFFORT_LEVELS="none|minimal|low|medium|high|xhigh|max"
       ;;
+    grok)
+      PROVIDER_BIN="${AUTOPILOT_GROK_BIN:-grok}"
+      PROVIDER_BIN_ENV_NAME="AUTOPILOT_GROK_BIN"
+      PROVIDER_EVENT_FORMATTER="format_claude_event"
+      PROVIDER_EXECUTOR="run_grok_provider"
+      PROVIDER_RESULT_EXTRACTOR="extract_claude_result"
+      PROVIDER_CONFIG_READER="grok_configured_value"
+      PROVIDER_CONFIG_SOURCE="config"
+      PROVIDER_MODEL_KEY="default"
+      PROVIDER_EFFORT_KEY="default_reasoning_effort"
+      PROVIDER_EFFORT_LEVELS="none|minimal|low|medium|high|xhigh|max"
+      ;;
     *)
-      runner_failure "--provider must be claude or codex"
+      runner_failure "--provider must be claude, codex, or grok"
       ;;
   esac
 }
@@ -68,6 +80,29 @@ codex_configured_value() {
   value="$(awk -v key="$key" '
     /^[[:space:]]*\[/ { exit }
     /=/ {
+      name = $0
+      sub(/=.*$/, "", name)
+      gsub(/[[:space:]]/, "", name)
+      if (name != key) { next }
+      sub(/^[^=]*=/, "", $0)
+      sub(/[[:space:]]*#.*$/, "", $0)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", $0)
+      print $0
+      exit
+    }
+  ' "$file" | tr -d "\"'")" || return 1
+  [[ -n "$value" ]] || return 1
+  printf '%s' "$value"
+}
+
+grok_configured_value() {
+  local key="$1" file value
+  file="${GROK_HOME:-${HOME:-}/.grok}/config.toml"
+  [[ -f "$file" ]] || return 1
+  value="$(awk -v key="$key" '
+    /^[[:space:]]*\[models\][[:space:]]*$/ { in_models=1; next }
+    /^[[:space:]]*\[/ { in_models=0; next }
+    in_models && /=/ {
       name = $0
       sub(/=.*$/, "", name)
       gsub(/[[:space:]]/, "", name)
@@ -237,6 +272,24 @@ run_codex_provider() {
   [[ -z "$REQUESTED_MODEL" ]] || args+=(--model "$REQUESTED_MODEL")
   [[ -z "$REQUESTED_EFFORT" ]] || args+=(-c "model_reasoning_effort=$REQUESTED_EFFORT")
   "$PROVIDER_BIN" "${args[@]}" "$prompt" >"$event_pipe" 2>"$error_pipe"
+}
+
+run_grok_provider() {
+  local prompt="$1" result_file="$2" event_pipe="$3" error_pipe="$4"
+  : "$result_file"
+  local args=(
+    --verbatim
+    --always-approve
+    --output-format streaming-messages-json
+    --json-schema "$SCHEMA_JSON"
+    --cwd "$REPO_ROOT"
+    --no-memory
+    --no-plan
+  )
+  [[ -z "$REQUESTED_MODEL" ]] || args+=(--model "$REQUESTED_MODEL")
+  [[ -z "$REQUESTED_EFFORT" ]] || args+=(--effort "$REQUESTED_EFFORT")
+  args+=(-p "$prompt")
+  "$PROVIDER_BIN" "${args[@]}" >"$event_pipe" 2>"$error_pipe"
 }
 
 extract_claude_result() {
