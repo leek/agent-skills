@@ -12,14 +12,15 @@ Every map, spec, and ticket for this repo lives as a markdown file in `.scratch/
   decisions/        # /wayfinder — one file per decision ticket
     01-<slug>.md
   spec.md           # /to-spec — exactly one, written once
-  issues/           # /to-tickets — one file per build ticket
+  tickets/          # /to-tickets — one file per build ticket
     01-<slug>.md
 ```
 
-The pipeline runs straight through it: `/wayfinder` writes `map.md` and `decisions/`, `/to-spec` writes `spec.md` once and closes the map, `/to-tickets` writes `issues/`, `/implement` works one file in `issues/` per session.
+The pipeline runs straight through it: `/wayfinder` writes `map.md` and `decisions/`, `/to-spec` writes `spec.md` once and closes the map, `/to-tickets` writes `tickets/`, `/implement` works one file in `tickets/` per session.
 
 - Small, already-clear work skips `map.md` and `decisions/` and starts at `spec.md`
-- `decisions/` holds questions; `issues/` holds build work. Nothing in `decisions/` is ever built, and nothing in `issues/` is ever a question
+- `decisions/` holds questions; `tickets/` holds build work. Nothing in `decisions/` is ever built, and nothing in `tickets/` is ever a question
+- There is no `issues/` folder
 - Build tickets are one file each, numbered from `01`; where a dependency is known give the blocker the lower number. Numbers only tie-break the frontier — `blocked-by` is what actually gates work
 - **Every tracker file carries YAML frontmatter** with at least `title` and `status`; tickets also carry `claimed-by` and `blocked-by`. Status is that frontmatter field — never a `**Status:**` line in the body
 - Comments and conversation history append under a `## Comments` heading
@@ -32,7 +33,7 @@ The pipeline runs straight through it: `/wayfinder` writes `map.md` and `decisio
 | --- | --- |
 | Map (`map.md`) | `open` → `closed` (closed by `/to-spec`, or by a spec-less `/to-tickets`) |
 | Decision ticket (`decisions/`) | `open` → `closed` |
-| Spec (`spec.md`), build ticket (`issues/`) | a triage role from `triage-labels.md` (`ready-for-agent` at publish), then `in-progress` (claimed) → `closed` (resolved) |
+| Spec (`spec.md`), build ticket (`tickets/`) | a triage role from `triage-labels.md` (`ready-for-agent` at publish), then `in-progress` (claimed) → `closed` (resolved) |
 
 `in-progress` and `closed` are the build lifecycle, not triage roles; they are always legal on a spec or build ticket even though `triage-labels.md` lists only the triage roles.
 
@@ -48,7 +49,7 @@ Read the file at the referenced path. The user will normally pass the path or th
 
 Unblocked, unclaimed tickets may be worked by concurrent sessions in the **same checkout**. No skill creates a branch or a worktree; isolation comes from three rules:
 
-- **One file per unit.** Each ticket, issue, and spec is its own file, so sessions on different units never write the same file.
+- **One file per unit.** Each ticket and spec is its own file, so sessions on different units never write the same file.
 - **Claim is compare-after-write.** To claim, set `claimed-by` to a value unique to *this session* — your name plus a short session-unique suffix, never the bare name (two of your own sessions would share it). Save, then re-read the file: if `claimed-by` is not your value, another session won the race — pick a different ticket. This is advisory, not a lock; a rare double-claim wastes at most one session and is caught at Resolve, when the second finder sees the ticket already closed.
 - **Shared files are derived or explicit-path.** The map's "Decisions so far" is *derived* from the closed tickets, never hand-appended (see Resolve). Code work stages only its own files by explicit path and reviews only those paths, so concurrent commits on the one branch neither capture nor review each other's changes.
 

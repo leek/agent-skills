@@ -41,7 +41,8 @@ canonical_existing_file() {
   printf '%s/%s' "$parent" "$(basename "$file")"
 }
 
-# The effort directory holds the map, spec, decisions/, and issues/ for one effort.
+# The effort directory holds the map, spec, decisions/, and tickets/ for one effort.
+# Older efforts may still use issues/ as the build folder.
 effort_dir_for_ref() {
   local ref="$1" dir parent
   [[ -e "$ref" ]] || return 1
@@ -52,7 +53,7 @@ effort_dir_for_ref() {
   fi
   while [[ "$dir" != "/" && "$dir" != "$REPO_ROOT" ]]; do
     parent="$(basename "$dir")"
-    [[ "$parent" == "issues" || "$parent" == "decisions" ]] || break
+    [[ "$parent" == "tickets" || "$parent" == "issues" || "$parent" == "decisions" ]] || break
     dir="$(dirname "$dir")"
   done
   printf '%s' "$dir"
@@ -133,10 +134,22 @@ work_item_is_human_gate() {
 }
 
 path_tracker_mode() {
-  local path="$1"
+  local path="$1" dir parent
   case "$path" in
     */decisions|*/decisions/*) printf 'decision' ;;
     */issues|*/issues/*) printf 'build' ;;
+    */tickets|*/tickets/*)
+      dir="$path"
+      [[ -d "$dir" ]] || dir="$(dirname "$path")"
+      parent="$(dirname "$dir")"
+      if [[ -d "$parent/decisions" ]]; then
+        printf 'build'
+      elif [[ -d "$parent/issues" ]]; then
+        printf 'decision'
+      else
+        printf 'build'
+      fi
+      ;;
     *) return 1 ;;
   esac
 }
@@ -198,9 +211,17 @@ resolve_tracker_scope() {
       TRACKER_MODE="$mode"
       TRACKER_WORK_DIR="$root"
       set_default_tracker_parent
+    elif [[ -d "$root/tickets" && -d "$root/decisions" ]]; then
+      TRACKER_MODE="build"
+      TRACKER_WORK_DIR="$root/tickets"
+      [[ -f "$root/spec.md" ]] && TRACKER_PARENT_FILE="$root/spec.md"
     elif [[ -d "$root/issues" ]]; then
       TRACKER_MODE="build"
       TRACKER_WORK_DIR="$root/issues"
+      [[ -f "$root/spec.md" ]] && TRACKER_PARENT_FILE="$root/spec.md"
+    elif [[ -d "$root/tickets" ]]; then
+      TRACKER_MODE="build"
+      TRACKER_WORK_DIR="$root/tickets"
       [[ -f "$root/spec.md" ]] && TRACKER_PARENT_FILE="$root/spec.md"
     elif [[ -d "$root/decisions" ]]; then
       TRACKER_MODE="decision"
@@ -208,7 +229,7 @@ resolve_tracker_scope() {
       [[ -f "$root/map.md" ]] && TRACKER_PARENT_FILE="$root/map.md"
     else
       TRACKER_OUTCOME="blocked"
-      TRACKER_REASON="root directory contains no issues/ or decisions/ tracker: $(repo_relative_ref "$root")"
+      TRACKER_REASON="root directory contains no tickets/ or decisions/ tracker: $(repo_relative_ref "$root")"
       return 1
     fi
     return 0
@@ -222,7 +243,11 @@ resolve_tracker_scope() {
   elif [[ "$basename_value" == "map.md" ]]; then
     TRACKER_MODE="decision"
     TRACKER_PARENT_FILE="$root"
-    TRACKER_WORK_DIR="$(dirname "$root")/decisions"
+    if [[ -d "$(dirname "$root")/decisions" ]]; then
+      TRACKER_WORK_DIR="$(dirname "$root")/decisions"
+    else
+      TRACKER_WORK_DIR="$(dirname "$root")/tickets"
+    fi
   elif [[ "$basename_value" == spec*.md ]]; then
     TRACKER_MODE="build"
     TRACKER_PARENT_FILE="$root"
@@ -232,10 +257,16 @@ resolve_tracker_scope() {
     fi
     if TRACKER_WORK_DIR="$(read_linked_tracker_dir "$root" build)"; then
       :
+    elif [[ -n "$spec_suffix" && -d "$(dirname "$root")/tickets/$spec_suffix" ]]; then
+      TRACKER_WORK_DIR="$(dirname "$root")/tickets/$spec_suffix"
     elif [[ -n "$spec_suffix" && -d "$(dirname "$root")/issues/$spec_suffix" ]]; then
       TRACKER_WORK_DIR="$(dirname "$root")/issues/$spec_suffix"
+    elif [[ -d "$(dirname "$root")/tickets" && ( -d "$(dirname "$root")/decisions" || ! -d "$(dirname "$root")/issues" ) ]]; then
+      TRACKER_WORK_DIR="$(dirname "$root")/tickets"
     elif [[ -d "$(dirname "$root")/issues" ]]; then
       TRACKER_WORK_DIR="$(dirname "$root")/issues"
+    elif [[ -d "$(dirname "$root")/tickets" ]]; then
+      TRACKER_WORK_DIR="$(dirname "$root")/tickets"
     else
       TRACKER_MODE="direct-spec"
       TRACKER_WORK_DIR="$(dirname "$root")"

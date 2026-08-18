@@ -66,7 +66,7 @@ When the user states how something works, check whether the code agrees. In a La
 - Filament resource/page labels and navigation names
 - Route names, job names, event names
 
-If you find a contradiction, surface it: "Your code cancels entire Orders (`Order::cancel()`), but you just said partial cancellation is possible — which is right?" When a term is resolved *against* the code's current naming, the rename is real **build** work — record the *decision* here, and leave the rename itself for the spec (or an `issues/` ticket once one exists), never as a `wayfinder` decision-map ticket, which holds only things decided, not things built. Never silently absorb it.
+If you find a contradiction, surface it: "Your code cancels entire Orders (`Order::cancel()`), but you just said partial cancellation is possible — which is right?" When a term is resolved *against* the code's current naming, the rename is real **build** work — record the *decision* here, and leave the rename itself for the spec (or a `tickets/` ticket once one exists), never as a `wayfinder` decision-map ticket, which holds only things decided, not things built. Never silently absorb it.
 
 ### Update CONTEXT.md inline
 

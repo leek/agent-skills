@@ -17,10 +17,10 @@ The engineering pipeline is one straight line — **decide → spec → tickets 
   map.md        # /wayfinder  — the decisions (skip it for small, clear work)
   decisions/    # /wayfinder  — one file per decision ticket
   spec.md       # /to-spec    — exactly one, written once
-  issues/       # /to-tickets — one file per build ticket
+  tickets/      # /to-tickets — one file per build ticket
 ```
 
-`/implement` then builds one file from `issues/` per fresh session. `triage` is the other on-ramp. There is no external issue tracker — every artifact is a markdown file.
+`/implement` then builds one file from `tickets/` per fresh session. `triage` is the other on-ramp. There is no external issue tracker — every artifact is a markdown file.
 
 | Skill | Invocation | What it does |
 |---|---|---|

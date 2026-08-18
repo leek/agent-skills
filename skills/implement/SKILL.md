@@ -82,7 +82,7 @@ After successful verification, record what was built, any justified deviation, v
 - **`wayfinder` decision ticket** — use the Wayfinding **Resolve** operation.
 - **Conversation** — report the result without touching any file under `.scratch/`.
 
-Leave every parent open — a ticket never closes its spec, and `implement` never touches the map (the map was already closed by `to-spec`, or by a spec-less `to-tickets`, when the spec or tickets were written). A spec is **complete** when every ticket in its `issues/` is closed — a derived state you report, not a status you write onto the spec. When the spec itself was the one-session work item, close that spec directly. Keep the resolution write out of code commits: if `.scratch/` is tracked, commit it separately; never fold it into an implementation commit. Resolution text cites the implementation commits, never its own closure commit.
+Leave every parent open — a ticket never closes its spec, and `implement` never touches the map (the map was already closed by `to-spec`, or by a spec-less `to-tickets`, when the spec or tickets were written). A spec is **complete** when every ticket in its `tickets/` is closed — a derived state you report, not a status you write onto the spec. When the spec itself was the one-session work item, close that spec directly. Keep the resolution write out of code commits: if `.scratch/` is tracked, commit it separately; never fold it into an implementation commit. Resolution text cites the implementation commits, never its own closure commit.
 
 For trackable work, re-read the markdown file after writing it and verify its final state.
 
