@@ -54,7 +54,7 @@ Then ask **exactly one** question, because step 5 writes a file per ticket and r
 
 Publishing creates external artifacts — do it only after step 4's green light.
 
-Write one markdown file per ticket into `.scratch/<slug>/tickets/` — the `tickets/` directory **beside the spec** — there is no external tracker. Read the layout from `docs/agents/issue-tracker.md` (written by `/setup`) when the repo has one; suggest running `/setup` once to make the paths durable. Set each ticket's `status` to `ready-for-agent`, or the AFK-ready role string from `docs/agents/triage-labels.md` when that mapping differs.
+Write one markdown file per ticket into `.scratch/<slug>/tickets/` — the `tickets/` directory **beside the spec** — there is no external tracker. Read the layout from `.agents/issue-tracker.md` (written by `/setup`) when the repo has one (`docs/agents/issue-tracker.md` is the legacy path); suggest running `/setup` once to make the paths durable. Set each ticket's `status` to `ready-for-agent`, or the AFK-ready role string from `.agents/triage-labels.md` when that mapping differs.
 
 Publish in dependency order — **blockers first** — so each ticket's edges reference real identifiers. Publish idempotently: before writing, read what `tickets/` already holds — if this spec was already broken down, don't mint a second set; a re-run only fills gaps a failed mid-loop run left behind.
 

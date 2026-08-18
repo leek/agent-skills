@@ -30,7 +30,7 @@ Every map and ticket has a **name** — its title. In everything the human reads
 
 The map is the canonical wayfinding artifact under `.scratch/`. Its tickets are children of the map. The map is an **index**, not a store: it lists decisions made and points at the tickets that hold their detail; a decision lives in exactly one place — its ticket. Build work never appears here; that is the spec's job.
 
-Maps, tickets, and specs are markdown files under `.scratch/`. Read the layout once per session from `docs/agents/issue-tracker.md` (written by `/setup`), falling back to the `setup` skill's `issue-tracker.md` seed when the repo has none; suggest running `/setup` once to make the paths durable. Its **Wayfinding operations** are the single source of truth for creating maps and children, recording types, wiring blockers, claiming, querying the frontier, resolving, and linking assets.
+Maps, tickets, and specs are markdown files under `.scratch/`. Read the layout once per session from `.agents/issue-tracker.md` (written by `/setup`). If it's missing, try `docs/agents/issue-tracker.md` (legacy), then the `setup` skill's seed; suggest running `/setup` once to make the paths durable. Its **Wayfinding operations** are the single source of truth for creating maps and children, recording types, wiring blockers, claiming, querying the frontier, resolving, and linking assets.
 
 Map body template, ticket body, claim/block/resolve mechanics: [references/map-and-tickets.md](references/map-and-tickets.md). Ticket types (research / prototype / grilling / task): [references/ticket-types.md](references/ticket-types.md). Fog of war and out-of-scope rules: [references/fog-and-scope.md](references/fog-and-scope.md). Load each when charting or resolving.
 

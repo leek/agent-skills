@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Triage
 
-Move request files under `.scratch/` through a small state machine of triage roles. There is no external issue tracker — every artifact is a markdown file. Read the layout from `docs/agents/issue-tracker.md` (written by `/setup`) when the repo has one.
+Move request files under `.scratch/` through a small state machine of triage roles. There is no external issue tracker — every artifact is a markdown file. Read the layout from `.agents/issue-tracker.md` (written by `/setup`) when the repo has one (`docs/agents/issue-tracker.md` is the legacy path).
 
 External pull requests can still be a request surface: **a PR is input that produces a markdown triage file** under `.scratch/` (same roles, same states, same machine, with a few deltas marked "for a PR" below). Notes, briefs, and state live in that file — never on the PR host as the system of record.
 
@@ -40,7 +40,7 @@ For a PR-originated file, the same states read against the attached code: `ready
 
 Every triaged file should carry exactly one category and one status. If statuses conflict, flag it and ask the maintainer before doing anything else.
 
-Canonical role names may be remapped in `docs/agents/triage-labels.md` (written by `/setup`); when that file is missing, use the names above as the `**Status:**` values themselves.
+Canonical role names may be remapped in `.agents/triage-labels.md` (written by `/setup`); when that file is missing, use the names above as the `**Status:**` values themselves.
 
 State transitions: a file with no `**Status:**` normally goes to `needs-triage` first; from there it moves to `needs-info`, `ready-for-agent`, `ready-for-human`, or `wontfix`. `needs-info` returns to `needs-triage` once the reporter replies. The maintainer can override at any time — flag transitions that look unusual and ask before proceeding.
 
@@ -56,7 +56,7 @@ The maintainer invokes triage and describes what they want in natural language. 
 
 ## Show what needs attention
 
-Scan `.scratch/` (and the layout from `docs/agents/issue-tracker.md` when present) and present three buckets, oldest first:
+Scan `.scratch/` (and the layout from `.agents/issue-tracker.md` when present) and present three buckets, oldest first:
 
 1. **No status** — never triaged (`**Status:**` missing).
 2. **`needs-triage`** — evaluation in progress.

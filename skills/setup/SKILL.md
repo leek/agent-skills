@@ -22,7 +22,8 @@ Read whatever exists; don't assume:
 
 - `AGENTS.md` / `CLAUDE.md` at the repo root — does an `## Agent skills` section already exist?
 - `CONTEXT.md` at the repo root, `docs/adr/`
-- `docs/agents/` — does this skill's prior output already exist?
+- `.agents/` — does this skill's prior output already exist (`domain.md`, `issue-tracker.md`, `triage-labels.md`)? These sit next to `.agents/skills/`; they are not skills.
+- `docs/agents/` — leftover from an older setup. If those files exist and `.agents/` does not, move them.
 - `.scratch/` — is the convention already in use, and at which levels?
 - Is the `triage` skill installed? This decides whether Section B runs at all.
 
@@ -30,7 +31,7 @@ Read whatever exists; don't assume:
 
 Summarise what's present and missing, then take the sections in order — one section, one answer. Lead each with the recommended answer so the user can accept it in a word. Use `AskUserQuestion` where available; otherwise ask in chat and wait.
 
-**Section A — Issue tracker.** Markdown files under `.scratch/` are the only tracker these skills use — it needs no auth and keeps every map, spec, and ticket greppable next to the code. There is no choice to make here, so ask nothing: write `docs/agents/issue-tracker.md` from this skill's `issue-tracker.md` seed. Ask one question only if the repo already keeps this work somewhere other than `.scratch/`, and then only to confirm that path.
+**Section A — Issue tracker.** Markdown files under `.scratch/` are the only tracker these skills use — it needs no auth and keeps every map, spec, and ticket greppable next to the code. There is no choice to make here, so ask nothing: write `.agents/issue-tracker.md` from this skill's `issue-tracker.md` seed. Ask one question only if the repo already keeps this work somewhere other than `.scratch/`, and then only to confirm that path.
 
 **Section B — Triage status vocabulary.** Skip entirely if the `triage` skill isn't installed. If it is, ask exactly one question: keep the default status strings? (recommended: **yes**). Defaults: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. Collect overrides only on "no".
 
@@ -38,7 +39,7 @@ Summarise what's present and missing, then take the sections in order — one se
 
 ### 3. Confirm and write
 
-Show a draft of the `## Agent skills` block and each `docs/agents/*.md` file; let the user edit before writing.
+Show a draft of the `## Agent skills` block and each `.agents/*.md` file; let the user edit before writing. If `docs/agents/` still holds a prior copy, move those files into `.agents/` instead of writing a second set.
 
 Edit `CLAUDE.md` if it exists, else `AGENTS.md`; if neither exists, ask which to create. If an `## Agent skills` block already exists, update it in place — never append a duplicate.
 
@@ -47,15 +48,15 @@ Edit `CLAUDE.md` if it exists, else `AGENTS.md`; if neither exists, ask which to
 
 ### Issue tracker
 
-[one-line summary]. See `docs/agents/issue-tracker.md`.
+[one-line summary]. See `.agents/issue-tracker.md`.
 
 ### Triage status
 
-[one-line summary]. See `docs/agents/triage-labels.md`.
+[one-line summary]. See `.agents/triage-labels.md`.
 
 ### Domain docs
 
-[one-line summary — "single-context" or "multi-context"]. See `docs/agents/domain.md`.
+[one-line summary — "single-context" or "multi-context"]. See `.agents/domain.md`.
 ```
 
 Omit the `### Triage status` sub-block (and its file) when Section B didn't run.
@@ -68,4 +69,4 @@ Seed templates in this folder:
 
 ### 4. Done
 
-Tell the user setup is complete and which skills now read these files (`wayfinder`, `to-spec`, `to-tickets`, `implement`, `code-review`, `triage`). They can edit `docs/agents/*.md` directly later — re-running this skill is only needed to restart.
+Tell the user setup is complete and which skills now read these files (`wayfinder`, `to-spec`, `to-tickets`, `implement`, `code-review`, `triage`). They can edit `.agents/*.md` directly later — re-running this skill is only needed to restart.

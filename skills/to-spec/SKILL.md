@@ -34,9 +34,9 @@ A **seam** is the public boundary the feature will be tested at (`codebase-desig
 
 Write the spec using the template below. Show the complete draft and wait for the user to approve publication or request changes.
 
-A spec is a markdown file under `.scratch/` — there is no external tracker. Read the layout from `docs/agents/issue-tracker.md` (written by `/setup`), falling back to the path below when the repo has none; suggest running `/setup` once to make it durable.
+A spec is a markdown file under `.scratch/` — there is no external tracker. Read the layout from `.agents/issue-tracker.md` (written by `/setup`). If it's missing, try `docs/agents/issue-tracker.md` (legacy), then the path below; suggest running `/setup` once to make it durable.
 
-After approval, publish to `.scratch/<slug>/spec.md` with `status: ready-for-agent` in its YAML frontmatter (or the AFK-ready role string from `docs/agents/triage-labels.md` when that mapping differs). **Invoked with a map, reuse that map's directory** and set `map.md`'s frontmatter to `status: closed` — the map's job is done. A later in-place revision leaves the map closed.
+After approval, publish to `.scratch/<slug>/spec.md` with `status: ready-for-agent` in its YAML frontmatter (or the AFK-ready role string from `.agents/triage-labels.md` when that mapping differs). **Invoked with a map, reuse that map's directory** and set `map.md`'s frontmatter to `status: closed` — the map's job is done. A later in-place revision leaves the map closed.
 
 The spec covers the whole effort. Its short **Build Contract** is the canonical home for invariants, ordering, and shared seams every implementation ticket needs; detailed decisions below it hold ticket-specific context without repeating that contract. If the effort feels too big for one spec, say so and recommend narrowing it rather than writing a second spec beside the first.
 
