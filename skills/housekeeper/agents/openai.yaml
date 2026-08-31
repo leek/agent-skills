@@ -1,0 +1,5 @@
+interface:
+  display_name: "Housekeeper"
+  short_description: "Run a conservative code-project housekeeping pass: one proven low-risk cleanup at a time"
+policy:
+  allow_implicit_invocation: false

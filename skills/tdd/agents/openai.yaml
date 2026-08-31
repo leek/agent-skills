@@ -1,0 +1,5 @@
+interface:
+  display_name: "TDD"
+  short_description: "The red → green loop tuned for Pest/PHPUnit in a Laravel codebase: seams, what a good test is, and the anti-patterns to refuse"
+policy:
+  allow_implicit_invocation: true

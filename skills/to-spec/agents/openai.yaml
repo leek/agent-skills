@@ -1,0 +1,5 @@
+interface:
+  display_name: "To Spec"
+  short_description: "Turn the current conversation into a spec (PRD) and save it as markdown under .scratch/: no interview, just synthesis, with Laravel test seams chosen from..."
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,5 @@
+interface:
+  display_name: "Which Skill"
+  short_description: "Not sure which skill to reach for? Name the situation and get routed to one"
+policy:
+  allow_implicit_invocation: false

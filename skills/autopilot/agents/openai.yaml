@@ -1,0 +1,5 @@
+interface:
+  display_name: "Autopilot"
+  short_description: "Drive an existing wayfinder map, spec, or set of tickets to completion through fresh top-level Claude Code, Codex, or Grok sessions"
+policy:
+  allow_implicit_invocation: false

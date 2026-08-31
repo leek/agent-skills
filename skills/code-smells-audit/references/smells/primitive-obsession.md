@@ -2,13 +2,13 @@
 
 `Between · Bloaters · Data`
 
-A concept from the domain — money, a phone number, a postcode, an order
-status — is represented by a bare `string`, `int`, or `float` because no one
+A concept from the domain, money, a phone number, a postcode, an order
+status: is represented by a bare `string`, `int`, or `float` because no one
 ever created the type it deserved. The primitive is only pretending: nothing
 about `string` says which strings are valid, so every place that receives one
 has to re-derive the rules, and the rules drift apart as they spread. Fowler
 observes that programmers are oddly reluctant to introduce fundamental types
-of their own, and Mäntylä's canonical example — money as a primitive — shows
+of their own, and Mäntylä's canonical example (money as a primitive) shows
 what it costs: rounding, currency, and formatting logic end up scattered
 across the callers instead of living in one object that owns them. Because
 primitives are cheap to pass, they travel further than a real type would,
@@ -21,12 +21,12 @@ validation is not a value object, it is a rename.
 
 ### Agnostic
 
-- The same validation — a regex, a range check, a length limit — is written
+- The same validation (a regex, a range check, a length limit) is written
   at more than one boundary because the type cannot carry it.
 - Units or currency live in the variable name (`amountInCents`, `delayMs`,
   `weightKg`) rather than in a type, so conversions happen by convention (see
   [Type Embedded in Name](type-embedded-in-name.md)).
-- A closed set of states is compared as raw string or integer literals —
+- A closed set of states is compared as raw string or integer literals, 
   a type code where an enum or polymorphism belongs.
 - Parsing and formatting helpers named after the concept
   (`formatPhoneNumber`, `parseSku`) sit in a utility module far from the data
@@ -38,7 +38,7 @@ validation is not a value object, it is a rename.
 
 ### PHP / Laravel
 
-- Status and type columns compared as strings — `$order->status === 'paid'` —
+- Status and type columns compared as strings, `$order->status === 'paid'`, 
   where a backed enum cast (`protected function casts(): array { return
   ['status' => OrderStatus::class]; }`) would make the set closed and
   exhaustive in `match`.
@@ -47,7 +47,7 @@ validation is not a value object, it is a rename.
   object behind a custom cast implementing `CastsAttributes`.
 - The same `regex:`, `email`, or `size:` rules copied across several
   FormRequests: the shared rule is the type that was never written.
-- Associative arrays standing in for objects — `['lat' => $x, 'lng' => $y]`
+- Associative arrays standing in for objects, `['lat' => $x, 'lng' => $y]`
   passed between services with an `array{lat: float, lng: float}` docblock
   doing the type's job.
 - Identifiers passed as bare `int` or `string` through the container and into
@@ -73,7 +73,7 @@ validation is not a value object, it is a rename.
 
 Translated from the upstream Python example.
 
-Smelly — two dates that are only strings, so nothing rejects
+Smelly: two dates that are only strings, so nothing rejects
 `'2021-13-45'` and every consumer parses for itself:
 
 ```php
@@ -81,7 +81,7 @@ $birthdayDate = '1998-03-04';
 $nameDayDate = '2021-03-20';
 ```
 
-Solution — a type that owns its own validity and rendering:
+Solution: a type that owns its own validity and rendering:
 
 ```php
 final readonly class CalendarDate implements Stringable
@@ -139,5 +139,5 @@ None recorded upstream.
 ---
 
 *Derivative work adapted from "Primitive Obsession" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

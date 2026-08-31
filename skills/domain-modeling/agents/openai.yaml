@@ -1,0 +1,5 @@
+interface:
+  display_name: "Domain Modeling"
+  short_description: "Build and sharpen a project's domain model: challenge terms against the glossary, resolve fuzzy language, stress-test concepts with concrete scenarios, and..."
+policy:
+  allow_implicit_invocation: true

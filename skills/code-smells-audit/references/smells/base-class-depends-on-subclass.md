@@ -4,8 +4,8 @@
 
 Inheritance is supposed to point one way: children know their parent, the
 parent knows nothing about who extends it. When the base class reaches back
-down — naming its own subclasses, branching on `instanceof`, listing the
-concrete types it expects — the tree grows upside down and the components stop
+down: naming its own subclasses, branching on `instanceof`, listing the
+concrete types it expects: the tree grows upside down and the components stop
 being independently deployable. Every new child means editing the trunk, and a
 change to one leaf can break every sibling that shares the branch, which is
 [Shotgun Surgery](shotgun-surgery.md) waiting to happen. It also quietly
@@ -41,7 +41,7 @@ in.
   concrete class: `if ($this instanceof PayrollReport)`, or a `match
   (static::class)` picking a filename, queue, or recipient list.
 - Single-table inheritance where the base model overrides `newFromBuilder()` or
-  a static `make()` to `match` the `type` column onto its own child classes —
+  a static `make()` to `match` the `type` column onto its own child classes, 
   move that decision into a dedicated factory, or into Laravel's morph map
   (`Relation::enforceMorphMap()`), which is configuration held outside the
   hierarchy rather than knowledge inside the parent.
@@ -51,7 +51,7 @@ in.
   or middleware "only for" one named subclass.
 - Namespaces that show the direction of the dependency at a glance:
   `App\Reports\Report` referencing `App\Reports\Sales\SalesReport`.
-- The base is `abstract` yet has no `abstract` methods — the variation is
+- The base is `abstract` yet has no `abstract` methods; the variation is
   handled by branching instead of by dispatch.
 
 ### TS / React
@@ -71,9 +71,9 @@ in.
 
 ## Example
 
-Authored for this card — upstream has no code example for this smell.
+Authored for this card: upstream has no code example for this smell.
 
-Smelly — the abstract parent knows the name of every report that extends it:
+Smelly: the abstract parent knows the name of every report that extends it:
 
 ```php
 abstract class Report
@@ -106,7 +106,7 @@ final class SalesReport extends Report
 }
 ```
 
-Solution — the varying pieces become abstract methods, so the parent declares
+Solution; the varying pieces become abstract methods, so the parent declares
 what it needs and each child answers for itself:
 
 ```php
@@ -144,7 +144,7 @@ Adding a fourth report now touches one new file and nothing else.
 ## Refactorings
 
 None recorded upstream. Invert the dependency by hand: move every mention of a
-concrete subclass out of the parent — push the varying behaviour down as an
+concrete subclass out of the parent, push the varying behaviour down as an
 abstract method for polymorphic dispatch, and where the parent was choosing
 *which* child to build, hand that job to a factory or a registry configured
 from outside the hierarchy, so the arrows only ever point upward.
@@ -165,5 +165,5 @@ Base Classes Depending on Their Derivatives
 ---
 
 *Derivative work adapted from "Base Class depends on Subclass" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

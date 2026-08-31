@@ -1,0 +1,5 @@
+interface:
+  display_name: "Grill Me"
+  short_description: "Run a grilling session: the user wants their plan, decision, or idea stress-tested one question at a time"
+policy:
+  allow_implicit_invocation: false

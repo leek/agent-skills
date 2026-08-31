@@ -5,14 +5,14 @@ pull-request number.
 
 ## Read the three comment surfaces
 
-Review comments live in three different places — pull all three:
+Review comments live in three different places, pull all three:
 
 ```bash
 # 1. Reviews (top-level bodies + state; identifies which bot reviewed which commit)
 gh api repos/OWNER/REPO/pulls/PR/reviews \
   --jq '.[] | {id, user: .user.login, state, commit: .commit_id[:10], body: (.body[:200])}'
 
-# 2. Inline review comments (the threads you resolve) — the reviewed commit is commit_id
+# 2. Inline review comments (the threads you resolve): the reviewed commit is commit_id
 gh api repos/OWNER/REPO/pulls/PR/comments \
   --jq '.[] | "=== #\(.id) | \(.user.login) | \(.path):\(.line // .original_line) | commit \(.commit_id[:10]) ===\n\(.body)\n"'
 
@@ -75,7 +75,7 @@ reply_and_resolve() {  # comment_id  thread_id  body
 }
 
 FIXED_X='Fixed in <sha>. <behaviour now>. Test: <name>.'
-NOT_BUG_Y='Reviewed — not a defect. <evidence: spec line / role leaf / existing test>.'
+NOT_BUG_Y='Reviewed, not a defect. <evidence: spec line / role leaf / existing test>.'
 
 reply_and_resolve 3790734403 PRRT_kwDO…0W "$FIXED_X"
 reply_and_resolve 3790734406 PRRT_kwDO…0Y "$NOT_BUG_Y"
@@ -94,6 +94,6 @@ gh api graphql -f query='query { repository(owner:"OWNER", name:"REPO"){
 
 - A reply from a bot's own account is not needed; your reply + resolve is the record.
 - If a resolve mutation returns nothing, you likely lack write access or the thread id is
-  stale — re-query `reviewThreads`.
+  stale, re-query `reviewThreads`.
 - Outdated comments (the code moved) still resolve the same way; resolving marks the
   conversation done regardless of the diff position.

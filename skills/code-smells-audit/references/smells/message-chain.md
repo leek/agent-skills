@@ -4,13 +4,13 @@
 
 A caller that needs something from a distant object walks there hop by hop:
 `a.getB().getC().getD()`. Every link in the chain is a dependency the caller
-never asked for and now carries — it knows not just its neighbour but the
+never asked for and now carries, it knows not just its neighbour but the
 shape of the whole relationship graph, so a change to any intermediate
 structure breaks code several classes away from the edit. Splitting the walk
 across temporary variables hides the sequence without removing an ounce of the
 coupling. The habit behind it is asking objects for their internals and doing
 the work outside them, instead of telling the object that already holds the
-data to answer the question — the arrangement the Law of Demeter and Tell,
+data to answer the question, the arrangement the Law of Demeter and Tell,
 Don't Ask both argue for. The counterweight matters as much as the smell:
 hiding every hop behind a forwarding method converts this into
 [Middle Man](middle-man.md), so what you want is a balance between the two,
@@ -22,7 +22,7 @@ not zero hops.
 
 - Three or more dots, arrows, or accessor calls between the caller and the
   value it actually wants.
-- The chain's intermediate types appear nowhere else in the calling class —
+- The chain's intermediate types appear nowhere else in the calling class, 
   they are transit, not collaborators.
 - A rename or restructure two objects away breaks compilation or tests in
   modules that never mention the changed class.
@@ -36,8 +36,8 @@ not zero hops.
 
 ### PHP / Laravel
 
-- Blade templates walking relations — `$order->customer->address->country->name`
-  — which couples the view to the schema and lazy-loads a query per hop.
+- Blade templates walking relations, `$order->customer->address->country->name`
+: which couples the view to the schema and lazy-loads a query per hop.
 - Controllers and jobs reaching through
   `auth()->user()->team->subscription->plan->limits` instead of asking the
   team for its limit.
@@ -53,7 +53,7 @@ not zero hops.
 
 - JSX reading `props.user.profile.settings.theme.color`, so the leaf component
   is coupled to the top-level API shape.
-- Optional chaining used as structural armour — `a?.b?.c?.d ?? fallback` —
+- Optional chaining used as structural armour, `a?.b?.c?.d ?? fallback`, 
   where each `?.` marks a relationship the component is guessing at.
 - Components indexing deep into store state
   (`state.entities.orders.byId[id].customer.address.city`) rather than
@@ -67,7 +67,7 @@ not zero hops.
 
 Translated from the upstream Python example.
 
-Smelly — `Minion` reaches through `Location` into `Field`, so it depends on
+Smelly: `Minion` reaches through `Location` into `Field`, so it depends on
 both:
 
 ```php
@@ -98,7 +98,7 @@ final class Field
 }
 ```
 
-Solution — each object answers the question for the one above it, so `Minion`
+Solution: each object answers the question for the one above it, so `Minion`
 only knows `Location`:
 
 ```php
@@ -169,5 +169,5 @@ None recorded upstream.
 ---
 
 *Derivative work adapted from "Message Chain" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

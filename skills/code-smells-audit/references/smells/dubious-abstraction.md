@@ -7,11 +7,11 @@ knows which altitude they are at. Robert Martin's rule is that a function
 should descend exactly one level below the operation its name promises; when
 a method named for a business step also carries the plumbing for one of those
 steps, the two levels sit at the same indentation and the reader has to hold
-both in mind at once. The same fault appears in names — a concept labelled
+both in mind at once. The same fault appears in names, a concept labelled
 after its storage or transport representation rather than what it means.
 The cost is comprehensibility and extension: a mental map of the workflow
 cannot form, and a mechanism baked into the wrong layer has to be prised out
-before anything can vary. It arises from tunnel vision — deciding an
+before anything can vary. It arises from tunnel vision, deciding an
 abstraction is correct requires deliberately stepping outside the code you
 just wrote, and consistency is a poor defence when every level is
 consistently wrong.
@@ -27,11 +27,11 @@ consistently wrong.
 - One public interface mixes intent-level operations with the low-level
   utilities they are built from, so callers cannot tell which is the
   supported entry point.
-- A name borrowed from the wrong layer — a domain object named after its
+- A name borrowed from the wrong layer, a domain object named after its
   wire format, or an entity method named after the mechanism it uses.
 - Asking "is this really this object's job?" starts an argument instead of
   producing an answer; the answer given is that it has always been this way.
-- Extraction is resisted because both halves "belong to the same feature" —
+- Extraction is resisted because both halves "belong to the same feature", 
   a feature is not an abstraction level (see [Long Method](long-method.md)).
 
 ### PHP / Laravel
@@ -44,9 +44,9 @@ consistently wrong.
   same class.
 - A job's `handle()` that names a business step but inlines `Storage::disk()`
   path arithmetic, stream handling, or serialization instead of delegating.
-- Controllers reaching through the framework's floorboards — pulling the raw
+- Controllers reaching through the framework's floorboards, pulling the raw
   PDO handle out of a connection, or resolving services from `app()` mid
-  method — inside code otherwise written in request/response terms.
+  method: inside code otherwise written in request/response terms.
 
 ### TS / React
 
@@ -64,7 +64,7 @@ consistently wrong.
 
 Translated from the upstream Python example.
 
-Smelly — `reset()` speaks the instrument's language, but `write()` is the
+Smelly: `reset()` speaks the instrument's language, but `write()` is the
 adapter's job and now lives on the instrument too:
 
 ```php
@@ -84,7 +84,7 @@ abstract class Instrument
 }
 ```
 
-Solution — `reset()` descends exactly one level, to the adapter that owns
+Solution: `reset()` descends exactly one level, to the adapter that owns
 the wire protocol:
 
 ```php
@@ -129,5 +129,5 @@ Appropriate Level of Abstraction
 ---
 
 *Derivative work adapted from "Dubious Abstraction" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

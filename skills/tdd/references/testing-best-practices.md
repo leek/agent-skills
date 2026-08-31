@@ -8,16 +8,16 @@ regressions.
 
 Before writing or keeping a test, answer:
 
-1. **Claim** — What behavior, business rule, regression, or contract does this
+1. **Claim**: What behavior, business rule, regression, or contract does this
    prove?
-2. **Boundary** — What public boundary can observe the claim while exercising
+2. **Boundary**: What public boundary can observe the claim while exercising
    the real owned code essential to it?
-3. **Oracle** — What independent source supplies the expected result: a spec,
+3. **Oracle**: What independent source supplies the expected result: a spec,
    worked example, known-good literal, or fixture not produced by the system
    under test?
-4. **Sensitivity** — What realistic defect would make this test fail? Would an
+4. **Sensitivity**: What realistic defect would make this test fail? Would an
    internal refactor with unchanged behavior still pass?
-5. **Outcome** — What observable result proves the claim: return value,
+5. **Outcome**: What observable result proves the claim: return value,
    persisted state, emitted payload, authorization decision, or external side
    effect?
 
@@ -75,7 +75,7 @@ boundary values and consequential unhappy paths, not only the happy path.
 - Test pure decisions and transformations as unit tests.
 - Test persistence, joins, transactions, triggers, views, constraints, and
   framework wiring as integration tests against the real test schema and
-  database engine—not mocked repositories or production data.
+  database engine, not mocked repositories or production data.
 - Test external adapters against a faithful fake or provider sandbox when the
   contract matters. A unit test can cover the payload builder; it cannot prove
   that credentials, networking, or the provider work.
@@ -101,10 +101,10 @@ boundary values and consequential unhappy paths, not only the happy path.
 
 For every test under review, record one disposition:
 
-- **Keep** — valuable claim, trustworthy boundary, independent oracle.
-- **Rewrite** — valuable claim, brittle or circular proof.
-- **Move** — valuable claim, wrong test level or environment.
-- **Delete** — no meaningful product behavior or distinct contract.
+- **Keep**: valuable claim, trustworthy boundary, independent oracle.
+- **Rewrite**: valuable claim, brittle or circular proof.
+- **Move**: valuable claim, wrong test level or environment.
+- **Delete**: no meaningful product behavior or distinct contract.
 
 Finish only when every new or changed test passes the value gate and every
 required behavior is covered once at a trustworthy boundary.

@@ -3,12 +3,12 @@
 `Within · Change Preventers · Responsibility`
 
 One class that changes for several unrelated reasons. A schema change edits
-it, a pricing-rule change edits it, a formatting change edits it — different
+it, a pricing-rule change edits it, a formatting change edits it, different
 motives, same file. The tell is that a small feature forces edits to methods
 that have nothing to do with one another, because the class quietly
 accumulated two or more kinds of decision: finding a thing and then doing
 something with the thing, say, or fetching data and rendering it. It is the
-inward mirror of Shotgun Surgery — there one change scatters across many
+inward mirror of Shotgun Surgery, there one change scatters across many
 classes, here many kinds of change converge on one. The cost is a Single
 Responsibility violation you feel operationally: unrelated teams keep editing
 the same file, the same merge conflicts recur every sprint, and a reader has
@@ -18,8 +18,8 @@ to work out which half of the class a method belongs to before touching it.
 
 ### Agnostic
 
-- You can name two or more axes of change — "when the vendor API moves",
-  "when the tax rules move" — that both land in this one class.
+- You can name two or more axes of change, "when the vendor API moves",
+  "when the tax rules move", that both land in this one class.
 - The methods fall into clusters that share no fields with each other; each
   cluster is a class waiting to be extracted.
 - Git history shows commits from unrelated features touching disjoint groups
@@ -32,7 +32,7 @@ to work out which half of the class a method belongs to before touching it.
 ### PHP / Laravel
 
 - An Eloquent model carrying query scopes, presentation accessors, export
-  building, and notification dispatch — a schema change, a copy change, and a
+  building, and notification dispatch, a schema change, a copy change, and a
   delivery change all edit the same file.
 - A "manager" or service class whose top half talks to an external API and
   whose bottom half writes to the database; both vendor churn and schema churn
@@ -49,7 +49,7 @@ to work out which half of the class a method belongs to before touching it.
 
 - A component that owns data fetching, view state, and layout, so an endpoint
   change and a redesign both edit it.
-- A context provider holding auth session, feature flags, and theme — three
+- A context provider holding auth session, feature flags, and theme, three
   unrelated concerns sharing one file and one re-render.
 - A hook mixing transport concerns (URL building, headers, retries) with
   domain mapping of the response.
@@ -63,7 +63,7 @@ to work out which half of the class a method belongs to before touching it.
 
 Translated from the upstream Python example.
 
-Smelly — one class both reads reports and modifies them, so storage changes
+Smelly; one class both reads reports and modifies them, so storage changes
 and editing rules land in the same file:
 
 ```php
@@ -89,7 +89,7 @@ $reportModifier = new ReportModifier();
 $modifiedReport = $reportModifier->run('report.csv', 'Parsed');
 ```
 
-Solution — reading and modifying split into classes with one reason to change
+Solution: reading and modifying split into classes with one reason to change
 each:
 
 ```php
@@ -137,5 +137,5 @@ None recorded upstream.
 ---
 
 *Derivative work adapted from "Divergent Change" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

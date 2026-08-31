@@ -5,7 +5,7 @@
 Two classes that do the same job, spelled differently. The behavior is
 interchangeable but the vocabulary is not: each class names its methods after
 the concrete type they live on, so nothing in the type system records that
-either one would do. The tell is at the call sites — code must know which
+either one would do. The tell is at the call sites: code must know which
 class it is holding before it knows which method to call, and every new
 variant adds another branch rather than another implementation. It grows when
 two people solve the same problem without knowing about each other's work, or
@@ -17,8 +17,8 @@ when no interface or abstract base existed to force one shared name.
 
 - Method names that differ only by the type they belong to (`hugZombie` /
   `hugSnowman`) while the bodies do the same work.
-- Call sites branch on concrete type — `instanceof`, a type tag, a `switch`
-  on class name — to choose which spelling to invoke.
+- Call sites branch on concrete type, `instanceof`, a type tag, a `switch`
+  on class name, to choose which spelling to invoke.
 - Rename the methods to match and the two bodies read as near-copies (the
   [Duplicated Code](duplicated-code.md) hiding underneath).
 - Neither class implements a common interface or extends a base that would
@@ -62,7 +62,7 @@ when no interface or abstract base existed to force one shared name.
 
 Translated from the upstream Python example.
 
-Smelly — same behavior, two vocabularies, so callers must know the concrete
+Smelly: same behavior, two vocabularies, so callers must know the concrete
 type:
 
 ```php
@@ -87,7 +87,7 @@ $target instanceof Zombie
     : $target->hugSnowman();
 ```
 
-Solution — one name, declared once, and the branch at the call site
+Solution: one name, declared once, and the branch at the call site
 disappears:
 
 ```php
@@ -136,5 +136,5 @@ Duplicate Abstraction
 ---
 
 *Derivative work adapted from "Alternative Classes with Different Interfaces"
-in Marcel Jerzyk's [Code Smells Catalog](https://codesmells.org/) (MIT) — see
+in Marcel Jerzyk's [Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

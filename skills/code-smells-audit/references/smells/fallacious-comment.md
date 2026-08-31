@@ -6,7 +6,7 @@ A comment or docblock that describes code as it used to be. Nothing executes
 a comment, so nothing enforces its agreement with the lines beneath it: the
 body gets reworked, the tests still pass, and the prose above the signature
 keeps asserting the old behavior. The vulnerable comments are the ones that
-narrate *what* the code does — they duplicate the implementation, so they
+narrate *what* the code does, they duplicate the implementation, so they
 rot the moment it changes. Comments that record *why* a decision was made
 survive rework, because the rationale outlives the mechanics. Detection is
 therefore a comparison, not a reading: hold the comment against the
@@ -19,7 +19,7 @@ holds.
 
 - The comment names parameters, return values, exceptions, or steps that the
   current signature or body no longer has.
-- The comment narrates mechanics rather than rationale — a
+- The comment narrates mechanics rather than rationale, a
   ["What" Comment](what-comment.md) is the form of comment that can drift at
   all.
 - The comment is a copy of one on a sibling function, still naming the
@@ -30,7 +30,7 @@ holds.
 ### PHP / Laravel
 
 - PHPDoc `@param`, `@return`, or `@var` contradicting the native PHP 8 types
-  on the same signature — the native types are enforced at runtime, the
+  on the same signature; the native types are enforced at runtime, the
   annotation never is.
 - `@throws` naming an exception the method stopped throwing, or omitting the
   one it now throws.
@@ -40,14 +40,14 @@ holds.
 - Comments in `config/*.php` or `.env.example` describing defaults or
   accepted values the code no longer reads.
 - Pest `it('…')` / PHPUnit `test_…` descriptions still stating the old rule
-  after the assertions inside were changed — the test name is a comment with
+  after the assertions inside were changed; the test name is a comment with
   the same failure mode.
 
 ### TS / React
 
 - TSDoc `@param` / `@returns` naming arguments or fields the signature or
   props type dropped; TypeScript checks the types and ignores the prose.
-- `eslint-disable-next-line` comments naming a rule that no longer fires —
+- `eslint-disable-next-line` comments naming a rule that no longer fires, 
   the suppression outlived the violation (`reportUnusedDisableDirectives`
   catches exactly this).
 - A comment above `useEffect` describing the trigger or cleanup while the
@@ -59,7 +59,7 @@ holds.
 
 Translated from the upstream Python example.
 
-Smelly — the docblock describes what the method actually does; the name
+Smelly; the docblock describes what the method actually does; the name
 describes an older version of it, and the reader cannot tell which to trust:
 
 ```php
@@ -72,7 +72,7 @@ public function renameDescription(Product $product, Manufacturer $manufacturer):
 }
 ```
 
-Solution — the name carries the behavior, so the comment that contradicted
+Solution; the name carries the behavior, so the comment that contradicted
 it has nothing left to say and is deleted:
 
 ```php
@@ -105,5 +105,5 @@ Comment are Opposite
 ---
 
 *Derivative work adapted from "Fallacious Comment" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

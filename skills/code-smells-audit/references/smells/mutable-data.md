@@ -4,7 +4,7 @@
 
 A value that anything holding a reference can rewrite at any moment. The
 object is handed around, each collaborator writes to it, and the last writer
-wins — silently, and in an order nobody declared. Bugs from this class of
+wins: silently, and in an order nobody declared. Bugs from this class of
 data are expensive precisely because they are rare and timing-dependent: the
 failure needs a specific sequence to reproduce, and by the time execution is
 paused the field already holds someone else's value. Fowler names shared
@@ -27,7 +27,7 @@ rarely stops at the one field it advertises, and with
 - A method both answers a question and changes state, so callers cannot read
   without writing (Separate Query from Modifier is the fix).
 - One object handed to several collaborators in sequence, each of which may
-  write to it — the object's final state is a function of call order.
+  write to it; the object's final state is a function of call order.
 - Derived values stored next to the inputs they were computed from and kept
   in sync by hand, so the two can disagree.
 - A defect that reproduces under load or in a specific test order but never
@@ -41,8 +41,8 @@ rarely stops at the one field it advertises, and with
 - An Eloquent model passed through jobs, listeners, and observers where any
   of them may `fill()`, `setAttribute()`, or assign `$model->attr = ...`, and
   the eventual `save()` sits far from the mutation that mattered.
-- Runtime configuration writes — `Config::set()` or `config(['a.b' => $x])`
-  mid-request — mutating state every later resolve reads.
+- Runtime configuration writes, `Config::set()` or `config(['a.b' => $x])`
+  mid-request: mutating state every later resolve reads.
 - Container singletons (`app()->singleton()`, `app()->instance()`) or static
   properties holding request-scoped data; under Octane the container outlives
   the request, so the mutation leaks into the next one.
@@ -52,8 +52,8 @@ rarely stops at the one field it advertises, and with
 
 ### TS / React
 
-- State or props written directly — `state.items.push(item)`,
-  `props.user.name = 'x'` — so React's `Object.is` comparison sees the same
+- State or props written directly, `state.items.push(item)`,
+  `props.user.name = 'x'`, so React's `Object.is` comparison sees the same
   reference and skips the re-render the code was counting on.
 - In-place array methods (`sort`, `reverse`, `splice`) applied to values held
   in state, where `toSorted`, `toReversed`, or a `slice()` copy would leave
@@ -71,7 +71,7 @@ rarely stops at the one field it advertises, and with
 
 Translated from the upstream Python example.
 
-Smelly — the quote is passed through pricing, discounting, and invoicing, any
+Smelly; the quote is passed through pricing, discounting, and invoicing, any
 of which may rewrite it:
 
 ```php
@@ -91,7 +91,7 @@ $discounts->apply($quote);   // may rewrite $quote->value
 $invoices->issue($quote);    // reads whatever the last writer left
 ```
 
-Solution — the class is `readonly`, so a change means producing a new value
+Solution; the class is `readonly`, so a change means producing a new value
 and the state transition becomes something a reader can see:
 
 ```php
@@ -147,5 +147,5 @@ None recorded upstream.
 ---
 
 *Derivative work adapted from "Mutable Data" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

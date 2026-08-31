@@ -10,7 +10,7 @@ Normalization policy:
 
 - Where two names denote the same refactoring across Fowler editions
   (Extract Method / Extract Function), the canonical name is the one used by
-  IDE refactoring tooling in this skill's target stacks (PhpStorm, VS Code) —
+  IDE refactoring tooling in this skill's target stacks (PhpStorm, VS Code), 
   the classic *Method* form. Where only the 2nd edition names the refactoring
   (Combine Functions into Class), its name stands.
 - Composite upstream names (`Move Method and Move Field`) expand to multiple

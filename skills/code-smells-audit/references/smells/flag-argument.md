@@ -4,7 +4,7 @@
 
 A boolean parameter that selects which of two behaviours the callee performs
 puts the decision on the wrong side of the call. `$concert->book($marcel,
-false)` tells the reader nothing — *false what?* — so understanding the call
+false)` tells the reader nothing (*false what?*) so understanding the call
 site means opening the method, and the method is really two methods stapled
 together behind one name. The literal at the call site is a
 [Boolean Blindness](boolean-blindness.md) problem; the branch inside is a
@@ -14,7 +14,7 @@ starts as `bool $isPremium`, becomes `string $ticketType`, then a switch over
 string codes, and now the method carries
 [Conditional Complexity](conditional-complexity.md) with
 [Primitive Obsession](primitive-obsession.md) on top. Splitting it into two
-named methods — `bookPremium`, `bookRegular` — removes the branch and puts the
+named methods (`bookPremium`, `bookRegular`) removes the branch and puts the
 meaning back where the reader looks first.
 
 ## Detection heuristics
@@ -23,7 +23,7 @@ meaning back where the reader looks first.
 
 - A parameter whose only job is to pick a branch, with the whole body wrapped
   in `if ($flag)` / `else`.
-- Call sites passing bare literals — `true`, `false`, `0`, `1`, `'full'` —
+- Call sites passing bare literals, `true`, `false`, `0`, `1`, `'full'`, 
   that carry no meaning without opening the callee.
 - Two or more boolean parameters in one signature, so the reader must decode
   a positional truth table and most combinations are never valid.
@@ -36,8 +36,8 @@ meaning back where the reader looks first.
 
 ### PHP / Laravel
 
-- Action and service methods with trailing switches — `handle(Order $order,
-  bool $force, bool $notify)` — where call sites read `handle($order, true,
+- Action and service methods with trailing switches, `handle(Order $order,
+  bool $force, bool $notify)`: where call sites read `handle($order, true,
   false)`.
 - Named arguments (`book(customer: $marcel, isPremium: false)`) used to patch
   readability: the call site becomes legible while the two-behaviour method
@@ -53,14 +53,14 @@ meaning back where the reader looks first.
 
 ### TS / React
 
-- Exported helpers with trailing booleans — `formatDate(date, true)`,
-  `fetchUsers(page, includeArchived)` — especially when the flag changes the
+- Exported helpers with trailing booleans, `formatDate(date, true)`,
+  `fetchUsers(page, includeArchived)`: especially when the flag changes the
   return shape, not just formatting.
 - Components taking a mode boolean (`isEditing`, `compact`) and returning two
   substantially different trees from one function body; those are two
   components sharing a props type.
 - Sets of mutually exclusive boolean props (`isPrimary`, `isSecondary`,
-  `isDanger`) that should be one `variant` union — the type currently permits
+  `isDanger`) that should be one `variant` union, the type currently permits
   states the component cannot render.
 - Callbacks whose signature carries a control flag, e.g.
   `onSelect(id: string, shouldRefetch: boolean)`, pushing caller policy into
@@ -73,7 +73,7 @@ meaning back where the reader looks first.
 
 Translated from the upstream Python example.
 
-Smelly — the flag chooses the behaviour, and `false` at the call site is
+Smelly; the flag chooses the behaviour, and `false` at the call site is
 unreadable:
 
 ```php
@@ -92,7 +92,7 @@ final class Concert
 $concert->book($marcel, false); // false what?
 ```
 
-Solution — one method per behaviour, so the name carries the meaning the
+Solution; one method per behaviour, so the name carries the meaning the
 literal used to hide:
 
 ```php
@@ -113,7 +113,7 @@ $concert->bookRegular($marcel);
 ```
 
 When both branches share substantial work, extract the shared part into a
-private method first, then split the public surface — the goal is two intents
+private method first, then split the public surface; the goal is two intents
 at the boundary, not two copies of the body.
 
 ## Refactorings
@@ -143,5 +143,5 @@ Boolean in Method Parameter
 ---
 
 *Derivative work adapted from "Flag Argument" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

@@ -1,0 +1,5 @@
+interface:
+  display_name: "Panel"
+  short_description: "Convene a panel of agent CLIs (grok, claude, codex, agy) on a prompt or a code review, then report one consensus grouped by how much they agree"
+policy:
+  allow_implicit_invocation: false

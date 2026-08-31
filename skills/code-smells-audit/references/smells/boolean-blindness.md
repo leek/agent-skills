@@ -5,7 +5,7 @@
 A `bool` carries exactly one bit and throws away everything about what that
 bit meant. The canonical case is `filter`: given a predicate returning true
 or false, does true mean keep the element or discard it? The signature cannot
-say, so the reader has to open the implementation or guess — and both
+say, so the reader has to open the implementation or guess, and both
 guesses type-check. The smell appears wherever a domain question with a name
 (`Keep = Take | Drop`, `Charge = Immediately | OnShipment`) has been
 flattened into a raw boolean at a parameter, a return type, or a field. It
@@ -22,7 +22,7 @@ is the same family as [Uncommunicative Name](uncommunicative-name.md) and
   `$opt`) rather than for the domain answer it encodes.
 - The same boolean threaded through several layers and inverted somewhere
   along the way (`$excludeDeleted` becoming `$includeDeleted`).
-- A comment beside each `true`/`false` argument explaining what it selects —
+- A comment beside each `true`/`false` argument explaining what it selects, 
   the ["What" Comment](what-comment.md) is the cover-up.
 - Two or more booleans in one signature or one record where several of the
   combinations are illegal states nobody prevents.
@@ -40,8 +40,8 @@ is the same family as [Uncommunicative Name](uncommunicative-name.md) and
 - Blade component boolean props (`<x-alert :dismissible="true"
   :inline="false" />`) multiplying into variant combinations that a single
   string-backed `variant` enum would cover.
-- Methods returning bare `bool` where the caller must distinguish outcomes —
-  "not found" versus "found, already up to date" — and cannot.
+- Methods returning bare `bool` where the caller must distinguish outcomes, 
+  "not found" versus "found, already up to date", and cannot.
 
 ### TS / React
 
@@ -49,7 +49,7 @@ is the same family as [Uncommunicative Name](uncommunicative-name.md) and
   polarity lives only in documentation. A returned union (`'take' | 'drop'`)
   moves it into the type.
 - Boolean prop sets (`isLoading`, `isError`, `isEmpty`) that a discriminated
-  union — `status: 'loading' | 'error' | 'empty' | 'ready'` — would make
+  union (`status: 'loading' | 'error' | 'empty' | 'ready'`) would make
   unrepresentable when contradictory.
 - Two or more boolean parameters in a row (`format(value, true, false)`);
   TypeScript will not catch a swap because both positions are `boolean`.
@@ -62,7 +62,7 @@ is the same family as [Uncommunicative Name](uncommunicative-name.md) and
 
 Translated from the upstream Haskell example.
 
-Smelly — the predicate's return type cannot say which way it points:
+Smelly: the predicate's return type cannot say which way it points:
 
 ```ts
 declare function filter<T>(items: T[], predicate: (item: T) => boolean): T[];
@@ -71,7 +71,7 @@ declare function filter<T>(items: T[], predicate: (item: T) => boolean): T[];
 const survivors = filter(users, (user) => user.deletedAt !== null);
 ```
 
-Solution — give the boolean a type with named inhabitants, and the call site
+Solution: give the boolean a type with named inhabitants, and the call site
 answers its own question:
 
 ```ts
@@ -106,5 +106,5 @@ None recorded upstream.
 ---
 
 *Derivative work adapted from "Boolean Blindness" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

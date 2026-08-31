@@ -2,7 +2,7 @@
 
 `Between · Data Dealers · Data`
 
-State that lives in the global scope is a broker every module can reach —
+State that lives in the global scope is a broker every module can reach, 
 the same intermediary role [Middle Man](middle-man.md) plays, except the
 broker here is the program itself, so nothing constrains who talks to it.
 Any code can read it and, worse, any code can write it, and there is no
@@ -10,7 +10,7 @@ mechanical way to find out which code does: the dependency is invisible at
 every call site, which is exactly the [Hidden Dependencies](hidden-dependencies.md)
 smell, and if the value is mutable you also inherit
 [Mutable Data](mutable-data.md) with an unbounded set of writers. Fowler's
-framing is the useful one — in the era before objects, even a
+framing is the useful one, in the era before objects, even a
 [Long Parameter List](long-parameter-list.md) was considered the lesser evil,
 and a Singleton is the same problem wearing a pattern's name. The exception
 worth remembering: modules do have to communicate somehow, and driving global
@@ -27,7 +27,7 @@ goal is balance, not purity.
 - Singletons, static registries, and service locators used as a place to
   stash values rather than as a lookup for behavior.
 - You cannot enumerate the writers of a value without grepping the entire
-  codebase — the read sites are findable, the write sites are not.
+  codebase; the read sites are findable, the write sites are not.
 - Behavior depends on execution order: a test passes alone and fails in the
   suite, or the second run of a job behaves differently from the first.
 - Tests need explicit reset or teardown to undo state a previous test left
@@ -37,7 +37,7 @@ goal is balance, not purity.
 
 ### PHP / Laravel
 
-- `$GLOBALS`, `global $x`, and mutable `public static` properties — including
+- `$GLOBALS`, `global $x`, and mutable `public static` properties, including
   static caches hung off models or helper classes.
 - `config(['services.x.key' => $value])` used as a runtime scratchpad: the
   write mutates the shared config repository for the rest of the process, so
@@ -46,7 +46,7 @@ goal is balance, not purity.
 - Container singletons (`$app->singleton()`, `app()->instance()`) that carry
   request-specific state, reached through a facade from anywhere, and never
   reset between jobs on the same worker.
-- Values smuggled through the request lifecycle instead of arguments —
+- Values smuggled through the request lifecycle instead of arguments, 
   `request()->merge()`, `session()->put()`, or middleware setting a static
   "current tenant" that everything downstream reads.
 - `env()` called outside `config/`, which makes behavior depend on the
@@ -56,7 +56,7 @@ goal is balance, not purity.
 ### TS / React
 
 - Module-scope `let` that is imported widely and reassigned: one instance per
-  bundle, shared by every consumer — and, on a Node server, shared across
+  bundle, shared by every consumer, and, on a Node server, shared across
   concurrent requests.
 - Values parked on `window` or `globalThis` to hand data between modules that
   do not import each other.
@@ -71,9 +71,9 @@ goal is balance, not purity.
 
 ## Example
 
-Authored for this card — upstream has no code example for this smell.
+Authored for this card: upstream has no code example for this smell.
 
-Smelly — the current tenant lives in a public static property, so every layer
+Smelly; the current tenant lives in a public static property, so every layer
 can read it and any layer can change it:
 
 ```php
@@ -82,7 +82,7 @@ final class TenantContext
     public static ?int $currentTenantId = null;
 }
 
-// middleware, console command, test bootstrap, a job retry — anywhere
+// middleware, console command, test bootstrap, a job retry, anywhere
 TenantContext::$currentTenantId = $tenant->id;
 
 final class InvoiceReport
@@ -97,7 +97,7 @@ final class InvoiceReport
 }
 ```
 
-Solution — the value is encapsulated in an object that owns it and is handed
+Solution; the value is encapsulated in an object that owns it and is handed
 to the collaborators that need it, so the dependency is declared and the set
 of writers is exactly one:
 
@@ -157,5 +157,5 @@ Global Variables
 ---
 
 *Derivative work adapted from "Global Data" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

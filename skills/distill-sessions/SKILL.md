@@ -10,14 +10,14 @@ Turn raw session transcripts into a ranked list of concrete improvements. Read-o
 
 ## Where the logs live
 
-- **Claude Code:** `~/.claude/projects/<slug>/*.jsonl` (top-level sessions). Per-session subagent transcripts are under `<uuid>/subagents/agent-*.jsonl` — **skip these** when counting "sessions"; they're part of a parent.
+- **Claude Code:** `~/.claude/projects/<slug>/*.jsonl` (top-level sessions). Per-session subagent transcripts are under `<uuid>/subagents/agent-*.jsonl`: **skip these** when counting "sessions"; they're part of a parent.
 - **Codex:** `~/.codex/sessions/<year>/<month>/<day>/rollout-*.jsonl`.
 
-Both are JSONL — one event per line.
+Both are JSONL, one event per line.
 
 ## 1. Pick the N most recent sessions
 
-Default N = 50 unless the user gives a number. `date`/`strftime` may be missing from the shell — use `perl` for timestamps.
+Default N = 50 unless the user gives a number. `date`/`strftime` may be missing from the shell, use `perl` for timestamps.
 
 ```bash
 { find ~/.claude/projects -name '*.jsonl' -type f | grep -v '/subagents/'; \
@@ -26,7 +26,7 @@ Default N = 50 unless the user gives a number. `date`/`strftime` may be missing 
 | perl -lane 'use POSIX qw(strftime); my($m,$s,@p)=@F; printf "%s %7dKB %s\n", strftime("%Y-%m-%d %H:%M",localtime($m)), $s/1024, join(" ",@p)'
 ```
 
-## 2. Extract signal (use jq — do NOT cat whole files)
+## 2. Extract signal (use jq: do NOT cat whole files)
 
 Files are large and full of tool-output noise. `jq` is the right tool. Two schemas:
 
@@ -44,7 +44,7 @@ jq -rc 'select(.type=="user") | .message.content[]? | select(.type=="tool_result
 
 **Codex**
 ```bash
-# human messages (the FIRST is an AGENTS.md preamble — ignore it)
+# human messages (the FIRST is an AGENTS.md preamble: ignore it)
 jq -rc 'select(.type=="event_msg" and .payload.type=="user_message") | .payload.message' FILE
 # shell commands
 jq -rc 'select(.type=="response_item" and .payload.type=="function_call") | .payload.arguments' FILE
@@ -55,25 +55,39 @@ jq -rc 'select(.type=="response_item" and .payload.type=="function_call_output")
 Surface corrections fast by grepping extracted human messages:
 `grep -iE "no,|actually|that.?s wrong|don.?t |stop |instead|you should have|i told you|revert|why did you|wrong"`
 
-## 3. Fan out — one subagent per batch
+## 3. Fan out: one subagent per batch
 
 50 sessions won't fit one context. Split the file list into ~7 round-robin batches (so big files spread out) and dispatch one subagent per batch **in parallel**, each with the jq cheat-sheet above and an identical brief. Each subagent returns a structured findings list; the orchestrator dedupes across batches and synthesizes. Round-robin assignment:
 ```bash
 awk '{print $NF}' top.txt | awk '{ b=((NR-1)%7)+1; print > ("batch_" b ".txt") }'
 ```
 
-## 4. What to find (four categories)
+## 4. What to find
 
-1. **Corrections** — the user pushed back ("no", "actually", "that's wrong", "don't do that", reverting/redoing). Highest value — capture every one.
-2. **Repeated / errored commands** — a command or tool that errored, or was retried several times before working. Note what finally fixed it.
-3. **Repeated setup steps** — the same setup/config/env/login/build/cache-clear rediscovered across more than one session.
-4. **Content moments** — something worth an article, tweet, tutorial, diagram, prompt, product idea, or example.
+You are proposing improvements to the agent's **environment**, so that future runs go better. Each lens below names what to look for and the moment that triggers it.
+
+**Evidence lenses**: what the transcript shows happening:
+
+1. **Corrections**: the user pushed back ("no", "actually", "that's wrong", "don't do that", reverting/redoing). Highest value, capture every one.
+2. **Repeated / errored commands**: a command or tool that errored, or was retried several times before working. Note what finally fixed it.
+3. **Repeated setup steps**: the same setup/config/env/login/build/cache-clear rediscovered across more than one session.
+4. **Content moments**: something worth an article, tweet, tutorial, diagram, prompt, product idea, or example.
+
+**Environment lenses**: what should change so it stops happening:
+
+5. **Navigation**: how easily did the agent find the right files? Hidden dependencies between files? Would a context pointer help? _Use when_ the session spent a long time hunting for one piece of information.
+6. **Automated checks**: could a linter, type check, test, or filesystem check have caught this? _Use when_ the agent made a mistake a machine could have caught.
+7. **Coding standards**: should the **reviewer** get a new rule, or an existing one clarified or removed? _Use when_ review failed to catch a mistake.
+8. **Steering files**: are there instructions in `CLAUDE.md` / `AGENTS.md` (repo or global) that belong in coding standards or an automated check instead? _Use when_ a steering file is large and unwieldy.
+9. **Tool economy**: expensive or chatty tool calls that could be streamlined; custom CLIs or MCP servers that are token-inefficient. _Use when_ one call burned a visible share of the context.
+10. **No-ops**: instructions in steering files that don't change the agent's behaviour versus the default. _Use when_ the steering files have grown without pruning.
+11. **Information access**: could the agent have been *given* the missing fact? Teed dev-server logs, read-only access to a third-party service, a status endpoint. _Use when_ a crucial piece of information simply wasn't reachable.
 
 ## 5. Redaction (mandatory)
 
 In every quoted evidence line, replace emails, API keys, tokens, secrets, passwords, and bearer strings with `[REDACTED]`. Keep quotes short.
 
-## 6. Output — a numbered proposal list
+## 6. Output: a numbered proposal list
 
 For each finding, give: the proposal, **the one verbatim (redacted) evidence line it came from** (with session basename), the destination, and a one-sentence why. Destinations:
 
@@ -86,3 +100,16 @@ For each finding, give: the proposal, **the one verbatim (redacted) evidence lin
 - **or nothing**, if it was a genuine one-off
 
 **Do not change anything.** Present the list and let the user choose which to apply. Lead with the cross-cutting themes (patterns that recurred across 3+ sessions are the highest-value to act on).
+
+## Reference: where a fix belongs
+
+All work goes through two stages, and they carry very different context pressure. The **implementation** agent bears the most: it explores, writes code, and debugs failures. The **reviewer** bears the least, it receives a diff, so it needs no exploration and usually writes no code.
+
+So **standards belong to the reviewer, not the implementer.** A proposal of the form "tell the agent to always do X while coding" is nearly always better placed as a review rule, where it costs nothing until there is a diff to check.
+
+The destinations, ranked by what they cost:
+
+- `CLAUDE.md` / `AGENTS.md` sit in every agent's context in this repo. Spend lines here incredibly sparingly, and mostly on **context pointers** to other files.
+- A coding standards doc is read at review time, not implementation time, cheap, and the right home for most rules.
+- Reference docs are free until a pointer reaches them. Look for an existing doc before writing a new one.
+- A skill costs its description in context if model-invoked, nothing if user-invoked. Follow `writing-for-agents`.

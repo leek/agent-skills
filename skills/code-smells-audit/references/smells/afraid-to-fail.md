@@ -10,8 +10,8 @@ result and starts describing the envelope around it. That is real coupling:
 the caller cannot use the value until it has re-derived what went wrong, and
 a caller who forgets the check carries a broken value deeper into the system
 until it surfaces somewhere unrelated. It comes from a well-meant reluctance
-to interrupt the flow — throwing feels rude, and silence usually gets away
-with it — but the Fail Fast principle wants the opposite: report at the point
+to interrupt the flow: throwing feels rude, and silence usually gets away
+with it, but the Fail Fast principle wants the opposite: report at the point
 of failure, either by throwing or by returning a Null Object of the expected
 type, never a status the caller has to decode.
 
@@ -19,8 +19,8 @@ type, never a status the caller has to decode.
 
 ### Agnostic
 
-- Functions return "status plus maybe a value" — a tuple, a dict, a wrapper
-  struct — rather than the value the name promises.
+- Functions return "status plus maybe a value", a tuple, a dict, a wrapper
+  struct, rather than the value the name promises.
 - Every call site repeats the same success check before it can touch the
   result, and the checks drift apart over time.
 - The return type is a union of the real result and a sentinel (`null`,
@@ -30,7 +30,7 @@ type, never a status the caller has to decode.
   already had in full.
 - Boilerplate accretes around every call to unwrap and re-check the result
   (see [Required Setup or Teardown Code](required-setup-or-teardown-code.md)).
-- Deleting one caller's check changes nothing visible until much later —
+- Deleting one caller's check changes nothing visible until much later, 
   failures are silent, not loud.
 
 ### PHP / Laravel
@@ -39,14 +39,14 @@ type, never a status the caller has to decode.
   throwing a domain exception, when Laravel's exception handler already turns
   a thrown exception into the right response.
 - `Model::find()` used where `findOrFail()` is meant, so the null travels into
-  the controller — or into the Blade view — before anyone notices.
+  the controller (or into the Blade view) before anyone notices.
 - `Http::get(...)` responses passed around for callers to test with
   `$response->successful()`, when `->throw()` at the call site would raise a
   `RequestException` at the point of failure.
 - Hand-rolled validation helpers returning an array of errors for callers to
   inspect, instead of a FormRequest or `validate()` throwing
   `ValidationException`.
-- Queued jobs that catch an exception, log it, and `return` — the queue
+- Queued jobs that catch an exception, log it, and `return`: the queue
   records success, so retries and the job's `failed()` hook never run.
 
 ### TS / React
@@ -66,7 +66,7 @@ type, never a status the caller has to decode.
 
 Translated from the upstream Python example.
 
-Smelly — the status code rides along with the value, and the caller has to
+Smelly; the status code rides along with the value, and the caller has to
 unpack both:
 
 ```php
@@ -88,7 +88,7 @@ if ($fooResponse['status'] === 200) {
 }
 ```
 
-Solution — fail at the point of failure, so the signature can promise a `Foo`
+Solution: fail at the point of failure, so the signature can promise a `Foo`
 and the caller has nothing to check:
 
 ```php
@@ -123,5 +123,5 @@ None recorded upstream.
 ---
 
 *Derivative work adapted from "Afraid To Fail" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

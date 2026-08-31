@@ -57,7 +57,7 @@ mysql -uroot -e "CREATE DATABASE myapp_feat_billing"
 mysql -uroot myapp_feat_billing < /tmp/snap.sql
 ```
 
-Skip `--routines --triggers` unless you actually use them — keeps the dump small.
+Skip `--routines --triggers` unless you actually use them: keeps the dump small.
 
 ### Schema-only sync
 
@@ -80,7 +80,7 @@ pg_dump --schema-only myapp_main | psql myapp_feat_billing  # schema only
 
 ## Cleanup
 
-`worktree-rm.sh --drop-db` handles the drop. Without `--drop-db`, the per-worktree DB lingers — useful if you're going to recreate the same branch later, wasteful otherwise.
+`worktree-rm.sh --drop-db` handles the drop. Without `--drop-db`, the per-worktree DB lingers: useful if you're going to recreate the same branch later, wasteful otherwise.
 
 ## Migrations between branches
 

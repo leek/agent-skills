@@ -2,8 +2,8 @@
 
 `Between · Bloaters · Data`
 
-The same small group of values keeps travelling together — through parameter
-lists, field declarations, payload keys, form inputs — without ever being
+The same small group of values keeps travelling together, through parameter
+lists, field declarations, payload keys, form inputs, without ever being
 given a name. `red, green, blue`; `street, city, postcode`; `amount,
 currency`. Each occurrence is cheap on its own, which is why the group never
 gets promoted into the class it is obviously describing, but the cost is paid
@@ -12,7 +12,7 @@ accepts it gets wider (see [Long Parameter List](long-parameter-list.md)), the
 rules that govern the group are re-implemented at each site instead of living
 with the data, and the values can drift apart because nothing enforces that
 they arrive as a set. Fowler's test is the quick one: remove one value from
-the group and ask whether the rest still mean anything — if they do not, the
+the group and ask whether the rest still mean anything: if they do not, the
 group is an object. The counterweight is that the extracted object should be
 immutable; a shared mutable bundle passed everywhere just trades this smell
 for [Mutable Data](mutable-data.md).
@@ -23,7 +23,7 @@ for [Mutable Data](mutable-data.md).
 
 - Two or more parameters recur in the same order across several signatures,
   often with a shared prefix or suffix (`startDate`/`endDate`,
-  `billingStreet`/`billingCity`) — the shared affix is the missing type name.
+  `billingStreet`/`billingCity`); the shared affix is the missing type name.
 - Delete one member of the group from a signature and the remainder stops
   making sense.
 - The same cluster of fields is declared side by side in more than one class.
@@ -32,7 +32,7 @@ for [Mutable Data](mutable-data.md).
 - Validation, formatting, or conversion for the group is re-written at each
   place that accepts it (see [Duplicated Code](duplicated-code.md)).
 - Adding a member to the concept means editing every signature that carries
-  it — the [Shotgun Surgery](shotgun-surgery.md) tell.
+  it: the [Shotgun Surgery](shotgun-surgery.md) tell.
 
 ### PHP / Laravel
 
@@ -40,13 +40,13 @@ for [Mutable Data](mutable-data.md).
   `city`, `postcode`, `country`), and the controller then passing those
   validated keys to services one argument at a time.
 - Migrations creating the same column cluster on multiple tables (`amount` +
-  `currency`, `lat` + `lng`) with no Eloquent custom cast — a class
+  `currency`, `lat` + `lng`) with no Eloquent custom cast, a class
   implementing `CastsAttributes` (or a `Castable` value object) is how a
   column group becomes one attribute.
 - `$casts` listing the members as separate primitives, so every consumer
   re-assembles the concept from `$model->amount` and `$model->currency`.
-- Blade components taking the group as separate props —
-  `<x-price :amount="$amount" :currency="$currency" />` — repeated at many
+- Blade components taking the group as separate props, 
+  `<x-price :amount="$amount" :currency="$currency" />`: repeated at many
   call sites instead of `<x-price :money="$money" />`.
 - Queued jobs, events, and notifications whose constructors accept the same
   primitives and serialize them individually into the payload, where one
@@ -59,7 +59,7 @@ for [Mutable Data](mutable-data.md).
   for it.
 - The group drilled as separate props through several component levels (see
   [Tramp Data](tramp-data.md)) rather than one typed object.
-- Adjacent `useState` calls that are always set together in the same handler —
+- Adjacent `useState` calls that are always set together in the same handler, 
   one state object or a `useReducer` is the missing bundle.
 - Zod/Valibot schemas repeating the same field trio in several places instead
   of composing a shared sub-schema via `.extend()` or `.merge()`.
@@ -70,7 +70,7 @@ for [Mutable Data](mutable-data.md).
 
 Translated from the upstream Python example.
 
-Smelly — the three components travel together through every signature that
+Smelly: the three components travel together through every signature that
 touches a color:
 
 ```php
@@ -85,7 +85,7 @@ function darken(int $red, int $green, int $blue, float $factor): array
 }
 ```
 
-Solution — the group becomes the immutable object it was describing, and the
+Solution; the group becomes the immutable object it was describing, and the
 behavior that operated on it moves in with the data:
 
 ```php
@@ -139,5 +139,5 @@ None recorded upstream.
 ---
 
 *Derivative work adapted from "Data Clump" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

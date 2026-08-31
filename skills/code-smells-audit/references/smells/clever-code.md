@@ -4,13 +4,13 @@
 
 Code you can follow, but only by admiring it first. Unlike
 [Obscured Intent](obscured-intent.md), its family sibling, the problem here
-isn't that the fragment is unreadable — it's that the reader is made to work
+isn't that the fragment is unreadable; it's that the reader is made to work
 out *why* it was written this way, and the answer is usually vanity or
 ignorance of the standard library. Two shapes dominate: leaning on a
 language's accidental complexity and obscure corners to compress logic into
 something surprising, and hand-rolling a mechanism the platform already ships,
 often triggered by an [Incomplete Library Class](incomplete-library-class.md)
-that was missing one method. Both charge the same tax — every future reader
+that was missing one method. Both charge the same tax, every future reader
 has to learn a bespoke thing instead of recognising a common one, and the
 reimplementation now needs owners, tests, and bug fixes the built-in already
 had. The narrow exception is domains where correctness is life-affecting or
@@ -21,7 +21,7 @@ which case a deliberate reimplementation is a decision, not a smell.
 
 ### Agnostic
 
-- A named helper reimplements something the standard library provides —
+- A named helper reimplements something the standard library provides, 
   string length, sorting, deduplication, set membership, deep merge, date
   arithmetic.
 - An expression whose behavior you have to look up: operator-precedence
@@ -40,8 +40,8 @@ which case a deliberate reimplementation is a decision, not a smell.
 - Hand-written loops doing what an array function already does:
   `array_column`, `array_unique`, `array_fill_keys`, `usort`, `str_contains`,
   `mb_strlen`, `array_is_list`.
-- A bespoke collection helper duplicating an existing method — `groupBy`,
-  `keyBy`, `partition`, `flatMap`, `sole`, `firstWhere` — instead of
+- A bespoke collection helper duplicating an existing method, `groupBy`,
+  `keyBy`, `partition`, `flatMap`, `sole`, `firstWhere`: instead of
   `Collection::macro()` when a genuinely new operation is needed.
 - Reimplemented framework machinery: a custom container, event dispatcher,
   paginator, or "repository" wrapper reproducing what Eloquent, the service
@@ -56,13 +56,13 @@ which case a deliberate reimplementation is a decision, not a smell.
 
 ### TS / React
 
-- Utility modules re-creating `Array.prototype` behavior — a manual
+- Utility modules re-creating `Array.prototype` behavior, a manual
   `groupBy`, `unique`, `chunk`, or `zip` where `Object.groupBy`, `Set`,
   `flatMap`, or an already-installed library covers it.
 - Type-level gymnastics: recursive conditional types or template-literal
   types whose error messages nobody can read, standing in for a plain union
   or a discriminated shape.
-- Terse idioms used as control flow — `~arr.indexOf(x)`, `+!!value`,
+- Terse idioms used as control flow, `~arr.indexOf(x)`, `+!!value`,
   `a?.b ?? c ?? d ?? e`, or bit flags on booleans instead of named fields.
 - A hand-rolled memoization, debounce, or deep-equality helper alongside a
   dependency that already exports one, or alongside `useMemo` /
@@ -74,7 +74,7 @@ which case a deliberate reimplementation is a decision, not a smell.
 
 Translated from the upstream Python examples.
 
-Smelly — a hand-rolled string length, with `-= -1` standing in for `++` for
+Smelly: a hand-rolled string length, with `-= -1` standing in for `++` for
 no reason but sport:
 
 ```php
@@ -93,7 +93,7 @@ final class MessageStats
 }
 ```
 
-Solution — the built-in, which also happens to be the one that handles
+Solution; the built-in, which also happens to be the one that handles
 multibyte input correctly:
 
 ```php
@@ -106,7 +106,7 @@ final class MessageStats
 }
 ```
 
-Smelly — an auto-vivifying array subclass invented so grouping can accumulate
+Smelly; an auto-vivifying array subclass invented so grouping can accumulate
 into missing keys:
 
 ```php
@@ -131,7 +131,7 @@ foreach ($orders as $order) {
 }
 ```
 
-Solution — the framework already groups, and every Laravel developer already
+Solution: the framework already groups, and every Laravel developer already
 knows this line:
 
 ```php
@@ -161,5 +161,5 @@ None recorded upstream.
 ---
 
 *Derivative work adapted from "Clever Code" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

@@ -1,6 +1,6 @@
 ---
 name: repository-cleanup
-description: Audit and clean Git repository state — branches, PRs, stashes, and worktrees.
+description: "Audit and clean Git repository state: branches, PRs, stashes, and worktrees."
 disable-model-invocation: true
 ---
 

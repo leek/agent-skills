@@ -1,0 +1,5 @@
+interface:
+  display_name: "Research"
+  short_description: "Investigate a question against high-trust primary sources and capture the findings as a cited Markdown file"
+policy:
+  allow_implicit_invocation: true

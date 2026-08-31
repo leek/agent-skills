@@ -9,7 +9,7 @@ and returns nothing, a plural name yields a collection, a validator refuses
 invalid input. When a name breaks one of those ties, every caller has to open
 the body to learn what it really does, and any caller who trusts the name
 instead ships a bug. Detect it by reading the name as a promise and checking
-the signature and body against it — the return type, the cardinality, and
+the signature and body against it, the return type, the cardinality, and
 whether anything is mutated or fetched along the way.
 
 ## Detection heuristics
@@ -20,7 +20,7 @@ whether anything is mutated or fetched along the way.
   returning a collection.
 - An `is` / `has` / `can` prefix on a method whose return type is not boolean,
   or that returns a third state such as null.
-- A `get` that mutates state, performs I/O, or lazily creates something —
+- A `get` that mutates state, performs I/O, or lazily creates something, 
   more than an accessor, at a call site that reads as free.
 - A `set` that returns a value, mixing a command with a query so callers
   cannot tell which they are invoking.
@@ -33,12 +33,12 @@ whether anything is mutated or fetched along the way.
   `role()` hands back a Collection, a `belongsTo` called `comments()` hands
   back one model, and every `$user->role` in the codebase misleads.
 - Accessors (`Attribute::get()` or `getFooAttribute()`) that write, dispatch a
-  job, or hit an API — property reads should not have side effects.
+  job, or hit an API: property reads should not have side effects.
 - `is*` / `has*` methods declared `: ?bool`, `: string`, or `: int`; the
   native return type is the check the name failed.
 - Query scopes that execute the query (`->get()`, `->first()`) instead of
   returning the Builder, breaking the chain every `scope*` name implies.
-- A `get*` on a service that is really a find-or-create — it persists a row
+- A `get*` on a service that is really a find-or-create, it persists a row
   the caller never asked it to write.
 
 ### TS / React
@@ -47,11 +47,11 @@ whether anything is mutated or fetched along the way.
   conditionally; the prefix is a contract that
   `eslint-plugin-react-hooks` enforces on everything wearing it.
 - Boolean-named props or state (`isLoading`, `hasError`) typed as a string
-  union or `boolean | undefined` — the name promises two states, the type
+  union or `boolean | undefined`: the name promises two states, the type
   carries three.
 - `handleX` / `onX` callbacks doing work beyond the event they name:
   navigating, firing analytics, mutating unrelated state.
-- Selectors or reducers named `get*` that dispatch or mutate — React assumes
+- Selectors or reducers named `get*` that dispatch or mutate, React assumes
   they are pure and may call them more than once per render.
 - A function named as if it completes the work but returning before its
   request settles, so `await`-less callers report success that never happened.
@@ -60,7 +60,7 @@ whether anything is mutated or fetched along the way.
 
 Translated from the upstream Python example.
 
-Smelly — three signatures, three broken promises: a plural name yielding one
+Smelly: three signatures, three broken promises: a plural name yielding one
 item, an `is` returning prose, and a setter that also answers:
 
 ```ts
@@ -82,7 +82,7 @@ class FooStore {
 }
 ```
 
-Solution — each signature is brought back in line with what its name already
+Solution; each signature is brought back in line with what its name already
 told the caller to expect:
 
 ```ts
@@ -128,5 +128,5 @@ Possible
 ---
 
 *Derivative work adapted from "Fallacious Method Name" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

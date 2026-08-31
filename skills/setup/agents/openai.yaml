@@ -1,0 +1,5 @@
+interface:
+  display_name: "Setup"
+  short_description: "Configure this repo for the engineering skills: the markdown tracker layout, triage status vocabulary, and domain doc layout"
+policy:
+  allow_implicit_invocation: false

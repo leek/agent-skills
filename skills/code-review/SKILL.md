@@ -1,36 +1,36 @@
 ---
 name: code-review
-description: Two-axis review of the diff since a fixed point — Standards (repo conventions) and Spec (ticket/PRD fidelity). Use when the user wants to review a branch, PR, WIP changes, or asks to "review since X".
+description: "Two-axis review of the diff since a fixed point: Standards (repo conventions) and Spec (ticket/PRD fidelity). Use when the user wants to review a branch, PR, WIP changes, or asks to \"review since X\"."
 ---
 
 # Code Review
 
 Two-axis review of the diff between `HEAD` and a fixed point the user supplies:
 
-- **Standards** — does the code conform to how this repo writes code?
-- **Spec** — does the code faithfully implement the originating ticket / PRD / spec?
+- **Standards**: does the code conform to how this repo writes code?
+- **Spec**: does the code faithfully implement the originating ticket / PRD / spec?
 
-Both axes run **separately** so they don't pollute each other's context, then this skill aggregates their findings. Prefer **parallel sub-agents** when the harness supports them; otherwise run both reviews **inline in sequence** in this session. Either path must finish both axes before aggregating — never leave a review handle running past session end.
+Both axes run **separately** so they don't pollute each other's context, then this skill aggregates their findings. Prefer **parallel sub-agents** when the harness supports them; otherwise run both reviews **inline in sequence** in this session. Either path must finish both axes before aggregating: never leave a review handle running past session end.
 
-This is not a bug hunt. If the harness ships its own correctness review, that answers a third, different question — *does it break?* — and complements this skill rather than replacing it.
+This is not a bug hunt. If the harness ships its own correctness review, that answers a third, different question (*does it break?*) and complements this skill rather than replacing it.
 
 ## Process
 
 ### 1. Pin the fixed point
 
-Whatever the user said is the fixed point — a commit SHA, branch name, tag, `main`, `HEAD~5`, etc. If they didn't specify one, ask for it (when invoked from `implement`, it's the ticket's base commit).
+Whatever the user said is the fixed point: a commit SHA, branch name, tag, `main`, `HEAD~5`, etc. If they didn't specify one, ask for it (when invoked from `implement`, it's the ticket's base commit).
 
 Capture the diff command once: `git diff <fixed-point>...HEAD` (three-dot, so the comparison is against the merge-base). Also note the list of commits via `git log <fixed-point>..HEAD --oneline`.
 
 When the caller passes a **path scope** (as `implement` does, so parallel sessions sharing one branch don't pollute the range), append it to both: `git diff <fixed-point>...HEAD -- <paths>` and `git log <fixed-point>..HEAD --oneline -- <paths>`.
 
-Before going further, confirm the fixed point resolves (`git rev-parse <fixed-point>`) and the diff is non-empty. A bad ref or empty diff should fail here — not inside two parallel reviews.
+Before going further, confirm the fixed point resolves (`git rev-parse <fixed-point>`) and the diff is non-empty. A bad ref or empty diff should fail here, not inside two parallel reviews.
 
 ### 2. Identify the spec source
 
 Look for the originating spec, in this order:
 
-1. Ticket references in the commit messages or branch name — read the matching markdown file under `.scratch/` (or wherever `.agents/issue-tracker.md`, written by `/setup`, says this repo keeps them).
+1. Ticket references in the commit messages or branch name: read the matching markdown file under `.scratch/` (or wherever `.agents/issue-tracker.md`, written by `/setup`, says this repo keeps them).
 2. A path the user passed as an argument.
 3. A PRD/spec file under `docs/`, `specs/`, or `.scratch/` matching the branch name or feature.
 4. If nothing is found, ask the user where the spec is. If they say there isn't one, the **Spec** axis skips and reports "no spec available".
@@ -41,44 +41,44 @@ Anything in the repo that documents how code should be written, in priority orde
 
 1. **`AGENTS.md`** at the repo root (and any standards docs under `docs/` it points at).
 2. **`CONTRIBUTING.md`**, **`CODING_STANDARDS.md`**, or other project standards under `docs/`.
-3. **Harness-specific or colocated rule files** — root and directory-scoped `CLAUDE.md`, `.cursor/rules`, or equivalents in directories the diff touches. Colocated rules are binding for their tree and override generic guidance for that path.
+3. **Harness-specific or colocated rule files**: root and directory-scoped `CLAUDE.md`, `.cursor/rules`, or equivalents in directories the diff touches. Colocated rules are binding for their tree and override generic guidance for that path.
 4. When both `AGENTS.md` and a harness-specific root file exist, prefer `AGENTS.md` for cross-harness conventions; apply harness-specific files as additional constraints for that environment.
 
-**Skip anything tooling already enforces.** Formatters, type checkers, and mechanical upgrade tools own their domains — a finding those tools would catch or fix is noise, not a review finding. In a Laravel repo that typically means Pint, Larastan, and Rector.
+**Skip anything tooling already enforces.** Formatters, type checkers, and mechanical upgrade tools own their domains; a finding those tools would catch or fix is noise, not a review finding. In a Laravel repo that typically means Pint, Larastan, and Rector.
 
-On top of whatever the repo documents, the Standards axis always carries the **smell baseline** below — a fixed set of Fowler code smells (_Refactoring_, ch.3) that applies even when a repo documents nothing. Two rules bind it:
+On top of whatever the repo documents, the Standards axis always carries the **smell baseline** below: a fixed set of Fowler code smells (_Refactoring_, ch.3) that applies even when a repo documents nothing. Two rules bind it:
 
 - **The repo overrides.** A documented repo standard always wins; where it endorses something the baseline would flag, suppress the smell.
 - **Always a judgement call.** Each smell is a labelled heuristic ("possible Feature Envy"), never a hard violation.
 
 Each smell reads *what it is* → *how to fix*; match it against the diff:
 
-- **Mysterious Name** — a function, variable, or type whose name doesn't reveal what it does or holds. → rename it; if no honest name comes, the design's murky.
-- **Duplicated Code** — the same logic shape appears in more than one hunk or file in the change. → extract the shared shape, call it from both.
-- **Feature Envy** — a method that reaches into another object's data more than its own. → move the method onto the data it envies.
-- **Data Clumps** — the same few fields or params keep travelling together (a type wanting to be born). → bundle them into one type, pass that.
-- **Primitive Obsession** — a primitive or string standing in for a domain concept that deserves its own type. → give the concept its own small type.
-- **Repeated Switches** — the same `switch`/`if`-cascade on the same type recurs across the change. → replace with polymorphism, or one map both sites share.
-- **Shotgun Surgery** — one logical change forces scattered edits across many files in the diff. → gather what changes together into one module.
-- **Divergent Change** — one file or module is edited for several unrelated reasons. → split so each module changes for one reason.
-- **Speculative Generality** — abstraction, parameters, or hooks added for needs the spec doesn't have. → delete it; inline back until a real need shows.
-- **Message Chains** — long `a.b().c().d()` navigation the caller shouldn't depend on. → hide the walk behind one method on the first object.
-- **Middle Man** — a class or function that mostly just delegates onward. → cut it, call the real target direct.
-- **Refused Bequest** — a subclass or implementer that ignores or overrides most of what it inherits. → drop the inheritance, use composition.
+- **Mysterious Name**: a function, variable, or type whose name doesn't reveal what it does or holds. → rename it; if no honest name comes, the design's murky.
+- **Duplicated Code**: the same logic shape appears in more than one hunk or file in the change. → extract the shared shape, call it from both.
+- **Feature Envy**: a method that reaches into another object's data more than its own. → move the method onto the data it envies.
+- **Data Clumps**: the same few fields or params keep travelling together (a type wanting to be born). → bundle them into one type, pass that.
+- **Primitive Obsession**: a primitive or string standing in for a domain concept that deserves its own type. → give the concept its own small type.
+- **Repeated Switches**: the same `switch`/`if`-cascade on the same type recurs across the change. → replace with polymorphism, or one map both sites share.
+- **Shotgun Surgery**: one logical change forces scattered edits across many files in the diff. → gather what changes together into one module.
+- **Divergent Change**: one file or module is edited for several unrelated reasons. → split so each module changes for one reason.
+- **Speculative Generality**: abstraction, parameters, or hooks added for needs the spec doesn't have. → delete it; inline back until a real need shows.
+- **Message Chains**: long `a.b().c().d()` navigation the caller shouldn't depend on. → hide the walk behind one method on the first object.
+- **Middle Man**: a class or function that mostly just delegates onward. → cut it, call the real target direct.
+- **Refused Bequest**: a subclass or implementer that ignores or overrides most of what it inherits. → drop the inheritance, use composition.
 
-### 4. Run both axes — sub-agents or inline
+### 4. Run both axes: sub-agents or inline
 
-**If the harness can spawn parallel sub-agents** (e.g. Claude Code Agent tool, Grok `spawn_subagent`, or equivalent): launch two foreground sub-agents in parallel, wait for both results before writing anything. Do not background them — a background handle can die with the session.
+**If the harness can spawn parallel sub-agents** (e.g. Claude Code Agent tool, Grok `spawn_subagent`, or equivalent): launch two foreground sub-agents in parallel, wait for both results before writing anything. Do not background them, a background handle can die with the session.
 
-**If sub-agents are unavailable:** run both reviews inline in this session, Standards first then Spec (or skip Spec when no source was found). Same briefs, same output shape — only the execution host changes.
+**If sub-agents are unavailable:** run both reviews inline in this session, Standards first then Spec (or skip Spec when no source was found). Same briefs, same output shape, only the execution host changes.
 
-**Standards brief** — include:
+**Standards brief**: include:
 
 - The full diff command and commit list.
-- The list of standards-source files you found in step 3, **plus the smell baseline from step 3 pasted in full** — a sub-agent has no other access to it.
-- The brief: "Report — per file/hunk where relevant — (a) every place the diff violates a documented standard: cite the standard (file + the rule); and (b) any baseline smell you spot: name it and quote the hunk. Distinguish hard violations from judgement calls — documented-standard breaches can be hard, but baseline smells are always judgement calls, and a documented repo standard overrides the baseline. Skip anything formatters, type checkers, or mechanical upgrade tools enforce. Under 400 words."
+- The list of standards-source files you found in step 3, **plus the smell baseline from step 3 pasted in full**: a sub-agent has no other access to it.
+- The brief: "Report (per file/hunk where relevant) (a) every place the diff violates a documented standard: cite the standard (file + the rule); and (b) any baseline smell you spot: name it and quote the hunk. Distinguish hard violations from judgement calls, documented-standard breaches can be hard, but baseline smells are always judgement calls, and a documented repo standard overrides the baseline. Skip anything formatters, type checkers, or mechanical upgrade tools enforce. Under 400 words."
 
-**Spec brief** — include:
+**Spec brief**: include:
 
 - The diff command and commit list.
 - The path or fetched contents of the spec.
@@ -88,9 +88,9 @@ If the spec is missing, skip the Spec axis and note this in the final report.
 
 ### 5. Aggregate
 
-Present the two reports under `## Standards` and `## Spec` headings, verbatim or lightly cleaned. Do **not** merge or rerank findings — the two axes are deliberately separate (see _Why two axes_).
+Present the two reports under `## Standards` and `## Spec` headings, verbatim or lightly cleaned. Do **not** merge or rerank findings; the two axes are deliberately separate (see _Why two axes_).
 
-End with a one-line summary: total findings per axis, and the worst issue _within each axis_ (if any). Don't pick a single winner across axes — that's the reranking the separation exists to prevent.
+End with a one-line summary: total findings per axis, and the worst issue _within each axis_ (if any). Don't pick a single winner across axes, that's the reranking the separation exists to prevent.
 
 ## Why two axes
 
@@ -103,7 +103,7 @@ Reporting them separately stops one axis from masking the other.
 
 ## When you're done
 
-Invoked from `implement`, hand the findings back to its loop — it decides what's real and fixes before committing; print no block. Invoked standalone, print the end-of-session block using the frame in [`wayfinder/references/pipeline-end-block.md`](../wayfinder/references/pipeline-end-block.md):
+Invoked from `implement`, hand the findings back to its loop; it decides what's real and fixes before committing; print no block. Invoked standalone, print the end-of-session block using the frame in [`wayfinder/references/pipeline-end-block.md`](../wayfinder/references/pipeline-end-block.md):
 
 ```text
 ---

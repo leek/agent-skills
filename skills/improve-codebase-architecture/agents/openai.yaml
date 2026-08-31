@@ -1,0 +1,5 @@
+interface:
+  display_name: "Improve Codebase Architecture"
+  short_description: "Scan a codebase for deepening opportunities, present them as a visual HTML report, then grill through whichever one you pick"
+policy:
+  allow_implicit_invocation: false

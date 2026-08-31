@@ -3,8 +3,8 @@
 `Within · Couplers · Data`
 
 Everything is public because nothing was ever made private. Members that only
-the class itself uses — a scratch field, a helper that exists to keep one
-method readable, the collection behind a getter — sit in the open where any
+the class itself uses; a scratch field, a helper that exists to keep one
+method readable, the collection behind a getter: sit in the open where any
 caller can bind to them, and the moment one does, an implementation detail
 has become a contract you have to keep. What follows is predictable: other
 classes start operating on the exposed internals rather than asking the owner
@@ -14,7 +14,7 @@ callers walk through the exposed structure to get what they want
 ([Message Chain](message-chain.md)). Exposed mutable fields add
 [Mutable Data](mutable-data.md) on top, since the owner can no longer
 guarantee its own invariants. The usual cause is not a decision at all but a
-habit — write it public to get it working, never go back and tighten it — so
+habit (write it public to get it working, never go back and tighten it) so
 the fix starts as an audit of what actually needs to be visible.
 
 ## Detection heuristics
@@ -28,7 +28,7 @@ the fix starts as an audit of what actually needs to be visible.
   reads or writes them.
 - A getter hands out the internal collection or array by reference, so
   callers can add and remove behind the owner's back.
-- Public members named like internals (`buffer`, `tmpState`, `stepTwo`) —
+- Public members named like internals (`buffer`, `tmpState`, `stepTwo`), 
   the vocabulary admits they were never meant to be seen.
 - The public surface is much larger than the class's job, so a reader cannot
   tell the entry points from the machinery.
@@ -41,7 +41,7 @@ the fix starts as an audit of what actually needs to be visible.
   so a request payload can mass-assign internals like `status`, `role_id`, or
   `balance`.
 - Models serialized straight into responses instead of through an API
-  Resource, making the table schema the public contract — `$hidden`,
+  Resource, making the table schema the public contract, `$hidden`,
   `$visible`, and `toArray()` overrides exist precisely to narrow it.
 - Relations and query builders exposed for callers to extend
   (`$order->lines()->create(...)` scattered across controllers) instead of an
@@ -68,7 +68,7 @@ the fix starts as an audit of what actually needs to be visible.
 
 Translated from the upstream Python example.
 
-Smelly — `count` is public, so anything can set it to anything and the
+Smelly: `count` is public, so anything can set it to anything and the
 counter's only rule (it goes up by one) is unenforceable:
 
 ```php
@@ -87,7 +87,7 @@ $counter->bump();
 $counter->count = 100; // nothing stops this
 ```
 
-Solution — the field is private and reachable only through the operations
+Solution; the field is private and reachable only through the operations
 the class chooses to offer:
 
 ```php
@@ -116,9 +116,9 @@ $counter->bump();
 echo $counter->count();
 ```
 
-PHP 8.4's asymmetric visibility gives the same guarantee with less ceremony —
+PHP 8.4's asymmetric visibility gives the same guarantee with less ceremony, 
 `public private(set) int $count = 0;` keeps reads open and confines writes to
-the class — but the decision is the point either way: publish the operations,
+the class, but the decision is the point either way: publish the operations,
 not the state.
 
 ## Refactorings
@@ -149,5 +149,5 @@ Excessive Exposure
 ---
 
 *Derivative work adapted from "Indecent Exposure" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

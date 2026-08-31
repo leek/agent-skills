@@ -1,16 +1,16 @@
 ---
 name: to-spec
-description: Turn the current conversation into a spec (PRD) and save it as markdown under .scratch/ — no interview, just synthesis, with Laravel test seams chosen from the tdd ranking rules rather than asked about.
+description: "Turn the current conversation into a spec (PRD) and save it as markdown under .scratch/: no interview, just synthesis, with Laravel test seams chosen from the tdd ranking rules rather than asked about."
 disable-model-invocation: true
 ---
 
 # To Spec
 
-Take the current conversation context and codebase understanding and produce a spec (a PRD). Do **not** interview the user — the interview already happened (usually a `grilling` session); this skill synthesizes it.
+Take the current conversation context and codebase understanding and produce a spec (a PRD). Do **not** interview the user: the interview already happened (usually a `grilling` session); this skill synthesizes it.
 
-If a load-bearing decision is genuinely unresolved — one the spec cannot be written without — don't guess and don't launch a full interview. Ask just that decision (via `AskUserQuestion` where available, otherwise a plain question in chat — recommended option first, trade-offs per option), or suggest a `grill-me` round if several are open.
+If a load-bearing decision is genuinely unresolved (one the spec cannot be written without) don't guess and don't launch a full interview. Ask just that decision (via `AskUserQuestion` where available, otherwise a plain question in chat: recommended option first, trade-offs per option), or suggest a `grill-me` round if several are open.
 
-**Written once per effort, revised in place after.** One spec covering everything the effort builds, written in a single session. If it came from a `wayfinder` map, that first write closes the map and does not run on it again. Later, if downstream work exposes a wrong or missing decision, re-run to **edit this spec in place** — never write a second spec beside it, and never reopen or re-close the map.
+**Written once per effort, revised in place after.** One spec covering everything the effort builds, written in a single session. If it came from a `wayfinder` map, that first write closes the map and does not run on it again. Later, if downstream work exposes a wrong or missing decision, re-run to **edit this spec in place**: never write a second spec beside it, and never reopen or re-close the map.
 
 Pipeline position: `grill-with-docs`/`wayfinder` (decide) → **`to-spec`** (write the spec) → `to-tickets` (break it into tickets) → `implement` (build one ticket per session).
 
@@ -18,25 +18,25 @@ Pipeline position: `grill-with-docs`/`wayfinder` (decide) → **`to-spec`** (wri
 
 ### 1. Explore the repo
 
-Understand the current state of the codebase if you haven't already. Use the project's domain vocabulary throughout the spec (read `CONTEXT.md` if one exists — `domain-modeling` maintains it) and respect any ADRs in the area being touched.
+Understand the current state of the codebase if you haven't already. Use the project's domain vocabulary throughout the spec (read `CONTEXT.md` if one exists: `domain-modeling` maintains it) and respect any ADRs in the area being touched.
 
-**Invoked with a `wayfinder` map, read the map and every closed decision ticket's `## Resolution` first** — those resolutions are the authoritative decisions the spec must encode. Don't synthesize from conversation memory alone; a fresh session may not hold what earlier ticket sessions decided.
+**Invoked with a `wayfinder` map, read the map and every closed decision ticket's `## Resolution` first**: those resolutions are the authoritative decisions the spec must encode. Don't synthesize from conversation memory alone; a fresh session may not hold what earlier ticket sessions decided.
 
 Finish exploring only when you can name the domain terms and ADRs that constrain the spec, the closest existing implementation and tests to imitate (or confirm none exist), and the tracker destination step 3 will use.
 
 ### 2. Sketch the test seams
 
-A **seam** is the public boundary the feature will be tested at (`codebase-design` holds the full deep-module vocabulary). Before proposing seams, consult and apply the Laravel ranking and selection rules in the `tdd` skill's **Seams — where tests go** section; it is the single source of truth. While sketching seams, look for a **deepening opportunity** — functionality worth hiding behind a smaller, more stable interface — and record it under Implementation Decisions.
+A **seam** is the public boundary the feature will be tested at (`codebase-design` holds the full deep-module vocabulary). Before proposing seams, consult and apply the Laravel ranking and selection rules in the `tdd` skill's **Seams: where tests go** section; it is the single source of truth. While sketching seams, look for a **deepening opportunity** (functionality worth hiding behind a smaller, more stable interface) and record it under Implementation Decisions.
 
-**Decide the seams yourself — don't ask.** Seam placement is test structure, which `grilling`'s **What still earns a question** hands to you: the ranking rules settle it, so apply them and move on. Record the chosen set in the spec with a one-line why per seam; the user reviews them as part of the step 3 draft, which is the only gate this step needs. Ask only on a genuine fork — two placements the rules rank equally that would make materially different work — and then ask just that one.
+**Decide the seams yourself: don't ask.** Seam placement is test structure, which `grilling`'s **What still earns a question** hands to you: the ranking rules settle it, so apply them and move on. Record the chosen set in the spec with a one-line why per seam; the user reviews them as part of the step 3 draft, which is the only gate this step needs. Ask only on a genuine fork, two placements the rules rank equally that would make materially different work, and then ask just that one.
 
 ### 3. Write and publish the spec
 
 Write the spec using the template below. Show the complete draft and wait for the user to approve publication or request changes.
 
-A spec is a markdown file under `.scratch/` — there is no external tracker. Read the layout from `.agents/issue-tracker.md` (written by `/setup`). If it's missing, try `docs/agents/issue-tracker.md` (legacy), then the path below; suggest running `/setup` once to make it durable.
+A spec is a markdown file under `.scratch/`: there is no external tracker. Read the layout from `.agents/issue-tracker.md` (written by `/setup`). If it's missing, try `docs/agents/issue-tracker.md` (legacy), then the path below; suggest running `/setup` once to make it durable.
 
-After approval, publish to `.scratch/<slug>/spec.md` with `status: ready-for-agent` in its YAML frontmatter (or the AFK-ready role string from `.agents/triage-labels.md` when that mapping differs). **Invoked with a map, reuse that map's directory** and set `map.md`'s frontmatter to `status: closed` — the map's job is done. A later in-place revision leaves the map closed.
+After approval, publish to `.scratch/<slug>/spec.md` with `status: ready-for-agent` in its YAML frontmatter (or the AFK-ready role string from `.agents/triage-labels.md` when that mapping differs). **Invoked with a map, reuse that map's directory** and set `map.md`'s frontmatter to `status: closed`: the map's job is done. A later in-place revision leaves the map closed.
 
 The spec covers the whole effort. Its short **Build Contract** is the canonical home for invariants, ordering, and shared seams every implementation ticket needs; detailed decisions below it hold ticket-specific context without repeating that contract. If the effort feels too big for one spec, say so and recommend narrowing it rather than writing a second spec beside the first.
 
@@ -77,15 +77,15 @@ The detailed decisions that were made. Keep Build Contract material in that sect
 - Config/env keys, feature flags
 - Architectural decisions and their reasoning
 
-Do NOT include specific file paths or code snippets — they go stale fast.
+Do NOT include specific file paths or code snippets; they go stale fast.
 Exception: a prototype-derived snippet that encodes a decision more precisely
-than prose (state machine, schema, enum, type shape) — inline it, note it came
+than prose (state machine, schema, enum, type shape), inline it, note it came
 from a prototype, trim to the decision-rich parts.
 
 ## Testing Decisions
 
 - The chosen seams (from step 2) and which behaviors each covers
-- Prior art — similar tests already in the codebase to imitate
+- Prior art: similar tests already in the codebase to imitate
 - Ground rules: test behavior through public interfaces, never presentation
   (no assertions on copy, layout, or CSS); don't test framework behavior;
   do test business rules, validation, persisted data, record-level

@@ -1,0 +1,5 @@
+interface:
+  display_name: "Commit"
+  short_description: "Commit the work done in this session, skipping files a parallel session also touched"
+policy:
+  allow_implicit_invocation: false

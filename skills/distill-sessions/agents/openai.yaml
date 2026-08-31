@@ -1,0 +1,5 @@
+interface:
+  display_name: "Distill Sessions"
+  short_description: "Mine recent AI-coding session logs for reusable patterns and propose concrete improvements"
+policy:
+  allow_implicit_invocation: false

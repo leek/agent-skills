@@ -2,7 +2,7 @@
 
 `Within · Bloaters · Measured Smells`
 
-A class that has accumulated too many fields, methods, and reasons to exist —
+A class that has accumulated too many fields, methods, and reasons to exist, 
 [Long Method](long-method.md) and
 [Long Parameter List](long-parameter-list.md) raised to class scope. It grows
 because, under time pressure, dropping new code into an existing class is
@@ -18,7 +18,7 @@ size is the symptom; the disease is too many responsibilities in one place.
 - Field and method counts far above the file's peers; the file scrolls for
   pages.
 - Low cohesion: distinct clusters of methods each using a disjoint subset of
-  the fields — the class is several classes sharing a namespace.
+  the fields; the class is several classes sharing a namespace.
 - A vague, role-free name: `Manager`, `Helper`, `Service`, `Utils`,
   `Processor`.
 - Its test file is enormous, slow, or was quietly never written because setup
@@ -28,21 +28,21 @@ size is the symptom; the disease is too many responsibilities in one place.
 ### PHP / Laravel
 
 - God Eloquent models: a `User` or `Order` accreting query scopes, accessors,
-  domain rules, formatting, and notification triggers — with a stack of
+  domain rules, formatting, and notification triggers, with a stack of
   traits (`HasThis`, `InteractsWithThat`) used to disguise the size rather
   than remove it.
 - Fat controllers: many actions plus a tail of private helpers shared between
-  them — each helper cluster is a service or action class in hiding.
+  them; each helper cluster is a service or action class in hiding.
 - Catch-all `*Service` / `*Manager` classes that absorb every new feature in
   their domain because they're "where that kind of code goes".
-- A constructor injecting a long list of dependencies — a
+- A constructor injecting a long list of dependencies, a
   [Long Parameter List](long-parameter-list.md) at class scale, signalling
   too many collaborators for one responsibility.
 
 ### TS / React
 
 - God components: a pile of `useState`/`useRef` declarations serving several
-  concerns at once — fetching, filtering, modals, form state — in one
+  concerns at once (fetching, filtering, modals, form state) in one
   component body.
 - Context providers bundling unrelated application state so every consumer
   re-renders for changes it doesn't care about.
@@ -53,9 +53,9 @@ size is the symptom; the disease is too many responsibilities in one place.
 
 ## Example
 
-Authored for this card — upstream has no code example for this smell.
+Authored for this card: upstream has no code example for this smell.
 
-Smelly — one component owns the list, the filters, the selection, and the
+Smelly: one component owns the list, the filters, the selection, and the
 export workflow:
 
 ```tsx
@@ -83,7 +83,7 @@ function OrdersPage() {
 }
 ```
 
-Solution — each responsibility extracted into a hook or child component; the
+Solution: each responsibility extracted into a hook or child component; the
 page becomes composition:
 
 ```tsx
@@ -130,5 +130,5 @@ Ice Berg Class
 ---
 
 *Derivative work adapted from "Large Class" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

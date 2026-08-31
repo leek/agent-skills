@@ -8,14 +8,14 @@ parameter multiplies the input combinations the method must handle and the
 knowledge a caller needs to use it correctly. The list usually grows in one
 of two ways: a routine generalized with one more variation flag at a time, or
 a method fed each field of an object individually because nobody handed it
-the object — a relationship between values that exists in the domain but was
+the object; a relationship between values that exists in the domain but was
 never given a type.
 
 ## Detection heuristics
 
 ### Agnostic
 
-- Four or more parameters — or three where several always travel together
+- Four or more parameters, or three where several always travel together
   across signatures (a [Data Clump](data-clump.md) in transit).
 - Adjacent parameters of the same type: call sites can swap them and nothing
   fails until runtime.
@@ -31,11 +31,11 @@ never given a type.
   already holds them.
 - Methods taking five scalars that all live on one Eloquent model the caller
   already has.
-- An `array $options` / `array $data` blob used to dodge the smell — the
+- An `array $options` / `array $data` blob used to dodge the smell, the
   list is still long, now untyped and undiscoverable too.
-- Call sites forced into named arguments just to stay readable — the coping
+- Call sites forced into named arguments just to stay readable, the coping
   mechanism marks the smell.
-- Constructors with a long dependency list — at class scope this signals
+- Constructors with a long dependency list, at class scope this signals
   [Large Class](large-class.md).
 
 ### TS / React
@@ -43,7 +43,7 @@ never given a type.
 - Functions with long positional signatures where a typed options object
   would name each value.
 - Components taking a dozen props, several forwarded untouched to children
-  (prop drilling) — the component-level form of the smell.
+  (prop drilling), the component-level form of the smell.
 - Custom hooks taking many positional arguments instead of one params
   object.
 - Boolean props and parameters multiplying rendering variants of one
@@ -53,7 +53,7 @@ never given a type.
 
 Translated from the upstream Python example.
 
-Smelly — five values that are really one concept, disassembled and
+Smelly: five values that are really one concept, disassembled and
 reassembled at every call:
 
 ```php
@@ -66,7 +66,7 @@ function report(string $author, string $commitId, array $files, string $shaId, s
 report($author, $commitId, $files, $shaId, $time);
 ```
 
-Solution — the values become the object they were pretending not to be, and
+Solution; the values become the object they were pretending not to be, and
 the behavior moves onto it:
 
 ```php
@@ -121,5 +121,5 @@ None recorded upstream.
 ---
 
 *Derivative work adapted from "Long Parameter List" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

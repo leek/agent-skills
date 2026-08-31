@@ -1,0 +1,5 @@
+interface:
+  display_name: "Code Smells Audit"
+  short_description: "Audit a codebase, path, or branch diff for classic code smells against the 56-smell Luzkan catalog (PHP/Laravel and TS/React heuristics)"
+policy:
+  allow_implicit_invocation: true

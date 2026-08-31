@@ -23,7 +23,7 @@ the code drifts away from the domain it models, since the concept that
 - Long runs of accessor calls on one collaborator feeding a local
   calculation, with nothing of the host's own involved.
 - Moving the method onto the envied class would shrink its parameter list to
-  nothing — a strong signal about where it belongs.
+  nothing, a strong signal about where it belongs.
 - Testing the method in isolation is impossible; the envied object must be
   built or mocked first.
 - Several methods across different classes all reach into the same object
@@ -32,8 +32,8 @@ the code drifts away from the domain it models, since the concept that
 
 ### PHP / Laravel
 
-- Service or action classes computing over a model's relations —
-  `$order->lines->sum(fn ($line) => $line->price * $line->quantity)` — where
+- Service or action classes computing over a model's relations, 
+  `$order->lines->sum(fn ($line) => $line->price * $line->quantity)`: where
   an accessor or a method on the model or its collection would own the rule.
 - Blade views and Filament columns assembling values from raw attributes
   (`$user->first_name.' '.$user->last_name`, status-to-colour maps) instead
@@ -41,7 +41,7 @@ the code drifts away from the domain it models, since the concept that
 - Observers and listeners reading and writing several attributes on the
   subject model to enforce a rule the model could enforce for itself.
 - Policies walking a chain of relations (`$post->author->team->plan->tier`)
-  to reach a verdict the far object should be asked for directly — Feature
+  to reach a verdict the far object should be asked for directly, Feature
   Envy arriving alongside [Message Chain](message-chain.md).
 - Jobs whose payload is an entity they immediately take apart, using its
   fields rather than asking it to do anything.
@@ -51,7 +51,7 @@ the code drifts away from the domain it models, since the concept that
 - Components deriving formatted strings, totals, or badge state from a prop
   entity's fields, rather than calling something the entity module exposes.
 - Helper functions whose only parameter is an object they immediately
-  destructure and recombine — a method on that object in disguise.
+  destructure and recombine, a method on that object in disguise.
 - Selectors or hooks reaching deep into another store slice's shape, which
   then break whenever that slice is reorganised.
 - Event handlers that read and write several fields of a passed-in object
@@ -61,7 +61,7 @@ the code drifts away from the domain it models, since the concept that
 
 Translated from the upstream Python example.
 
-Smelly — `Order` never touches its own state; every line computes from a
+Smelly: `Order` never touches its own state; every line computes from a
 `ShoppingItem`'s fields:
 
 ```php
@@ -108,7 +108,7 @@ final class Order
 }
 ```
 
-Solution — the taxed price and the line's own rendering move onto the item;
+Solution: the taxed price and the line's own rendering move onto the item;
 `Order` keeps only what is genuinely about the order:
 
 ```php
@@ -179,5 +179,5 @@ None recorded upstream.
 ---
 
 *Derivative work adapted from "Feature Envy" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

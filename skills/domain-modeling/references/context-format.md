@@ -41,9 +41,9 @@ _Avoid_: Client, buyer, account
 
 ## Contexts
 
-- [Ordering](./app/Domain/Ordering/CONTEXT.md) — receives and tracks customer orders
-- [Billing](./app/Domain/Billing/CONTEXT.md) — generates invoices and processes payments
-- [Fulfillment](./app/Domain/Fulfillment/CONTEXT.md) — manages warehouse picking and shipping
+- [Ordering](./app/Domain/Ordering/CONTEXT.md), receives and tracks customer orders
+- [Billing](./app/Domain/Billing/CONTEXT.md), generates invoices and processes payments
+- [Fulfillment](./app/Domain/Fulfillment/CONTEXT.md), manages warehouse picking and shipping
 
 ## Relationships
 

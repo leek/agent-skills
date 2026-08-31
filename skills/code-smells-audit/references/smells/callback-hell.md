@@ -9,7 +9,7 @@ sits four or five indents from the margin, under a cascade of closing
 brackets. Two things go wrong at once. The reader has to hold every enclosing
 scope in their head to understand the innermost line, which is the same
 comprehension tax as
-[Conditional Complexity](conditional-complexity.md) — the sibling this smell
+[Conditional Complexity](conditional-complexity.md), the sibling this smell
 is usually found next to. And control inverts: the caller no longer decides
 when, whether, or how often its continuation runs, because it handed that
 decision to whatever it passed the function into. Nesting also hides
@@ -30,7 +30,7 @@ which one you reach for depends on how much of the API you control.
   cb(err)`), because there is no single place errors can surface.
 - Steps that share no data are still nested, so they run one after another
   when they could have run together.
-- None of the intermediate steps has a name — the sequence can only be
+- None of the intermediate steps has a name; the sequence can only be
   described by reading it, not by listing it.
 - A value from level one is still in scope at level four, so the innermost
   callback silently depends on everything above it.
@@ -42,10 +42,10 @@ which one you reach for depends on how much of the API you control.
   lives in closure nesting instead of in `Bus::chain()` or a job class.
 - `DB::transaction(function () { ... })` wrapping
   `Model::withoutEvents(function () { ... })` wrapping a
-  `->each(function () { ... })` — three closures deep before the first write.
+  `->each(function () { ... })`: three closures deep before the first write.
 - `Http::pool(function (Pool $pool) { ... })` whose response handling opens
   further Guzzle `->then(function ($response) { ... })` callbacks per request.
-- Model event hooks registered from inside other closures — a
+- Model event hooks registered from inside other closures, a
   `static::created(function (Order $order) { ... })` inside `booted()` that
   itself registers listeners conditionally.
 - `Validator::make($data, $rules)->after(function ($validator) { ... })`
@@ -57,7 +57,7 @@ which one you reach for depends on how much of the API you control.
 
 - Node-style `(err, result) => { ... }` callbacks nested three deep where the
   promise API (`fs/promises`, `util.promisify`) exists and is unused.
-- `.then((res) => { fetch(...).then(...) })` — promises nested rather than
+- `.then((res) => { fetch(...).then(...) })`: promises nested rather than
   returned and chained, so the middle value is captured by closure scope
   instead of flowing through.
 - A chain of `useEffect` hooks coupled by state flags, each effect existing
@@ -71,7 +71,7 @@ which one you reach for depends on how much of the API you control.
 
 Translated from the upstream JavaScript example.
 
-Smelly — four steps, four indent levels, and `bread` is still in scope at the
+Smelly: four steps, four indent levels, and `bread` is still in scope at the
 bottom:
 
 ```ts
@@ -88,7 +88,7 @@ const makeSandwich = (): void => {
 };
 ```
 
-Solution — each step returns a promise, so the sequence reads top to bottom
+Solution; each step returns a promise, so the sequence reads top to bottom
 and the two independent steps can finally run at the same time:
 
 ```ts
@@ -130,5 +130,5 @@ Hierarchy of Callbacks, Pyramid of Doom
 ---
 
 *Derivative work adapted from "Callback Hell" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

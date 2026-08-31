@@ -3,7 +3,7 @@
 `Within · Bloaters · Measured Smells`
 
 A method that has grown past the point where a reader can hold it in their
-head. Length is only the symptom you can measure — the underlying problem is
+head. Length is only the symptom you can measure; the underlying problem is
 that the method contains several distinct steps or responsibilities that were
 never given names of their own, so every change requires re-reading the whole
 body, none of the trapped logic can be reused, and behavior the name never
@@ -16,7 +16,7 @@ in the moment than extracting a well-named helper.
 ### Agnostic
 
 - The body no longer fits on one screen. Common alarm thresholds sit around
-  20–30 lines — treat any number as a prompt to look closer, not a verdict.
+  20–30 lines: treat any number as a prompt to look closer, not a verdict.
 - Blank-line "paragraphs" or banner comments (`// validate`, `// persist`)
   partition the body into phases; each phase is an extraction waiting for a
   name.
@@ -28,7 +28,7 @@ in the moment than extracting a well-named helper.
 ### PHP / Laravel
 
 - Controller actions that validate, authorize, mutate models, fire events or
-  notifications, and shape the response inline — work that belongs in a
+  notifications, and shape the response inline, work that belongs in a
   FormRequest, a policy, and an action/service class.
 - A queued job's or Artisan command's `handle()` written as one long
   procedural script.
@@ -41,7 +41,7 @@ in the moment than extracting a well-named helper.
 ### TS / React
 
 - Component function bodies mixing data fetching, transformation, event
-  handlers, and hundreds of lines of JSX — each concern extractable into a
+  handlers, and hundreds of lines of JSX, each concern extractable into a
   custom hook or child component.
 - `useEffect` callbacks that orchestrate multi-step logic inline instead of
   calling named functions.
@@ -52,7 +52,7 @@ in the moment than extracting a well-named helper.
 
 ## Example
 
-Authored for this card — upstream has no code example for this smell.
+Authored for this card: upstream has no code example for this smell.
 
 Smelly:
 
@@ -93,7 +93,7 @@ public function store(StoreOrderRequest $request): RedirectResponse
 }
 ```
 
-Solution — each phase extracted behind a name; the action reads as its own
+Solution; each phase extracted behind a name; the action reads as its own
 summary:
 
 ```php
@@ -111,7 +111,7 @@ public function store(StoreOrderRequest $request): RedirectResponse
 
 with a `PlaceOrder` action injected through the controller's constructor and
 `PlaceOrder::handle()` delegating to `assertInStock()`, `discountFor()`, and
-`createOrderLines()` — short methods whose names carry the rules the long
+`createOrderLines()`: short methods whose names carry the rules the long
 body used to bury.
 
 ## Refactorings
@@ -143,5 +143,5 @@ Complex Method, God Method, Brain Method
 ---
 
 *Derivative work adapted from "Long Method" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

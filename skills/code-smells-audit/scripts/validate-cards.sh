@@ -59,7 +59,7 @@ SMELLS_DIR="$SKILL_DIR/references/smells"
 INDEX="$SKILL_DIR/references/index.md"
 
 # Ground truth: slug|title|occurrence lens, derived from upstream frontmatter
-# (Luzkan/smells). This table — not the index — is the source of record; the
+# (Luzkan/smells). This table (not the index) is the source of record; the
 # index is one of the things being validated against it.
 CATALOG='afraid-to-fail|Afraid To Fail|Responsibility
 alternative-classes-with-different-interfaces|Alternative Classes with Different Interfaces|Duplication
@@ -191,7 +191,7 @@ if [ ! -f "$INDEX" ]; then
   fail "references/index.md" "index missing"
 fi
 
-# --- Check 1: card set — every expected slug present, nothing unexpected ---
+# --- Check 1: card set: every expected slug present, nothing unexpected ---
 PRESENT=""
 while IFS='|' read -r slug _title _lens; do
   check
@@ -284,7 +284,7 @@ EOF
   fi
 
   # Every leaf section must have content, not just a heading ('## Detection
-  # heuristics' is a container — its content is the three ### subsections)
+  # heuristics' is a container; its content is the three ### subsections)
   while read -r heading; do
     [ "$heading" = "## Detection heuristics" ] && continue
     check
@@ -336,7 +336,7 @@ EOF
     refs="$(printf '%s\n' "$card" | awk '
       $0 == "## Refactorings" { insec = 1; next }
       insec && /^#/ { exit }
-      insec && /^- / { sub(/^- /, ""); sub(/ — .*$/, ""); print }')"
+      insec && /^- / { sub(/^- /, ""); sub(/, .*$/, ""); print }')"
     while read -r rname; do
       [ -n "$rname" ] || continue
       check
@@ -360,7 +360,7 @@ EOF
     fail "$file" "related-smells table has no rows (every smell has at least one upstream relation)"
   fi
   # any table line that is neither header, separator, nor a parsed row is a
-  # silent exemption — fail loudly instead
+  # silent exemption, fail loudly instead
   check
   data_rows="$(printf '%s\n' "$rel" | grep -c '^|' || true)"
   meta_rows="$(printf '%s\n' "$rel" | grep -Ec '^\| Smell \| Edge \|$|^\|[-| ]*\|$' || true)"

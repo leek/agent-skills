@@ -1,0 +1,5 @@
+interface:
+  display_name: "Code Review"
+  short_description: "Two-axis review of the diff since a fixed point: Standards (repo conventions) and Spec (ticket/PRD fidelity)"
+policy:
+  allow_implicit_invocation: true

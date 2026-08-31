@@ -2,7 +2,7 @@
 
 `Within · Change Preventers · Conditional Logic`
 
-A routine that does one job carries a branch for "the one weird case" — a
+A routine that does one job carries a branch for "the one weird case", a
 complex `if`, or a value check performed before the actual work begins. It
 usually starts as a hotfix: a single customer, a legacy import, a record type
 that arrives in the wrong shape, handled inline because the deadline was
@@ -14,7 +14,7 @@ fixture and its own assertion, and in change, because the next exception is
 cheapest to add as a sibling branch. Values that only the exceptional path
 populates become [Temporary Field](temporary-field.md)s on the surrounding
 object. [Null Check](null-check.md) is the most familiar member of this family
-— absence is just the special case everyone writes. Recursion is the honest
+: absence is just the special case everyone writes. Recursion is the honest
 exception: a base case is a special case that genuinely belongs.
 
 ## Detection heuristics
@@ -24,7 +24,7 @@ exception: a base case is a special case that genuinely belongs.
 - The first block of a method handles a case named after a customer, tenant,
   vendor, legacy import, or date cutoff, and the rest of the body is the
   general algorithm.
-- The condition tests something specific rather than categorical — a hardcoded
+- The condition tests something specific rather than categorical, a hardcoded
   id, slug, email address, or magic string
   ([Magic Number](magic-number.md)).
 - Variables assigned inside the exceptional branch are meaningless in the
@@ -41,8 +41,8 @@ exception: a base case is a special case that genuinely belongs.
 
 ### PHP / Laravel
 
-- Action or service classes opening with a branch for one tenant or plan —
-  `if ($team->slug === 'founder-plan')` — ahead of the logic every other team
+- Action or service classes opening with a branch for one tenant or plan, 
+  `if ($team->slug === 'founder-plan')`: ahead of the logic every other team
   runs through.
 - Eloquent accessors, scopes, and observers that test hardcoded keys
   (`if ($this->id === 1)`) instead of a column, cast, or policy that expresses
@@ -59,14 +59,14 @@ exception: a base case is a special case that genuinely belongs.
 ### TS / React
 
 - A component that returns a different tree before its main `return` based on
-  one prop value (`if (variant === 'legacy') return <LegacyTable />`) — that is
+  one prop value (`if (variant === 'legacy') return <LegacyTable />`); that is
   two components behind one export.
 - Reducers or state machines that handle one action outside the `switch`,
   usually just above it.
 - Hooks with an early return keyed to a specific route or id
   (`if (pathname === '/checkout') return fallback`), so the hook's contract
   differs per page.
-- API adapters with a per-vendor `if` in front of otherwise generic mapping —
+- API adapters with a per-vendor `if` in front of otherwise generic mapping, 
   one adapter per vendor behind a shared interface removes it.
 - Experiment or feature-flag branches (`if (flags.newPricing)`) left in place
   after the experiment concluded.
@@ -76,7 +76,7 @@ exception: a base case is a special case that genuinely belongs.
 Translated from the upstream Python example, which shows only the smelly
 half; the solution is authored for this card.
 
-Smelly — one import source is handled inline, ahead of the parse everything
+Smelly; one import source is handled inline, ahead of the parse everything
 else uses:
 
 ```ts
@@ -97,7 +97,7 @@ function parseOrder(payload: OrderPayload): Order {
 }
 ```
 
-Solution — each source owns its parsing behind a shared interface, so the
+Solution: each source owns its parsing behind a shared interface, so the
 entry point holds no exceptions:
 
 ```ts
@@ -117,7 +117,7 @@ function parseOrder(payload: OrderPayload): Order {
 ```
 
 When the exceptional path is genuinely small, consolidating the condition into
-one named predicate is enough — polymorphism is worth it once the branch has
+one named predicate is enough: polymorphism is worth it once the branch has
 its own body, its own fields, or its own tests.
 
 ## Refactorings
@@ -144,5 +144,5 @@ Complex Conditional
 ---
 
 *Derivative work adapted from "Special Case" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

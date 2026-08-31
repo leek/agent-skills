@@ -1,0 +1,5 @@
+interface:
+  display_name: "Wayfinder"
+  short_description: "Plan work too big for one agent session as a map of decision tickets in markdown under .scratch/, then resolve them one per session until the route to the..."
+policy:
+  allow_implicit_invocation: false

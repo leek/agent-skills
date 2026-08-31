@@ -1,0 +1,5 @@
+interface:
+  display_name: "Grill With Docs"
+  short_description: "Run a grilling session with domain-modeling alongside, capturing terms in CONTEXT.md and decisions as ADRs while they land. The default front door for..."
+policy:
+  allow_implicit_invocation: false

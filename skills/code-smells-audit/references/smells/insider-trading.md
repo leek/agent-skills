@@ -2,12 +2,12 @@
 
 `Between · Data Dealers · Responsibility`
 
-Two classes — or, in the modern framing, two modules — that know each other's
+Two classes (or, in the modern framing, two modules) that know each other's
 internals so well neither can be understood or changed alone. Fowler's
 original name, *Inappropriate Intimacy*, carried the image: each one reaches
 past the other's public surface into data and implementation details it was
 never meant to see. The 2018 rename generalized classes to modules, but the
-failure is unchanged — knowledge that should have stayed behind one boundary
+failure is unchanged: knowledge that should have stayed behind one boundary
 is traded across two. It rarely starts that way. Two collaborators that
 legitimately talk to each other accumulate one convenience accessor at a
 time, until the association runs in both directions and the pair is really a
@@ -21,7 +21,7 @@ and tests that must stand up the other half before they can assert anything.
 
 - Each class holds a reference to the other and calls back into it, so a
   change to either means reading both.
-- Accessors that exist for exactly one caller — a getter or setter added to
+- Accessors that exist for exactly one caller, a getter or setter added to
   expose a field to one specific collaborator and used nowhere else.
 - A method body that is mostly `other->x`, `other->y`, deciding on another
   object's data rather than its own (see [Feature Envy](feature-envy.md)).
@@ -32,7 +32,7 @@ and tests that must stand up the other half before they can assert anything.
 ### PHP / Laravel
 
 - Two Eloquent models that each define relations back onto the other *and*
-  each compute their own state by walking the other's rows — `Order`
+  each compute their own state by walking the other's rows, `Order`
   totalling `$this->invoice->lines` while `Invoice` re-derives status from
   `$this->order`. The relation pair is fine; the two-way derivation is not.
 - Code outside a model reading its internals through `getAttributes()`,
@@ -49,7 +49,7 @@ and tests that must stand up the other half before they can assert anything.
 ### TS / React
 
 - Modules importing from each other's internal paths (`../auth/internal/store`)
-  instead of a package entry point — often visible as a circular import.
+  instead of a package entry point, often visible as a circular import.
 - A child component handed a parent's raw `setState` and expected to know
   which shape the parent keeps its state in.
 - A custom hook that returns internal refs or unnormalized state only one
@@ -63,7 +63,7 @@ and tests that must stand up the other half before they can assert anything.
 
 Translated from the upstream Python example.
 
-Smelly — the association runs both ways, and each class calls a method on the
+Smelly; the association runs both ways, and each class calls a method on the
 other that exists only for it:
 
 ```php
@@ -102,7 +102,7 @@ final class Repo
 }
 ```
 
-Solution — the behaviour moves to the class that owns the data it needs, and
+Solution; the behaviour moves to the class that owns the data it needs, and
 the association points one way:
 
 ```php
@@ -156,5 +156,5 @@ Inappropriate Intimacy
 ---
 
 *Derivative work adapted from "Insider Trading" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

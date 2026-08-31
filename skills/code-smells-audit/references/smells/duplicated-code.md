@@ -7,8 +7,8 @@ worst smell in a codebase, and the cost is paid on every change: before you
 can edit one copy you have to find the others, diff them closely enough to be
 sure they are really the same, and then decide whether the change belongs to
 one of them or all of them. Exact clones are the cheap case. The expensive
-case is the near-copy that drifted — a missing guard, a different constant,
-one branch someone fixed and the rest nobody did — because the divergence is
+case is the near-copy that drifted, a missing guard, a different constant,
+one branch someone fixed and the rest nobody did, because the divergence is
 invisible until it produces a bug report from only one code path.
 
 ## Detection heuristics
@@ -17,7 +17,7 @@ invisible until it produces a bug report from only one code path.
 
 - The same statement sequence appears in two or more places, so a change to
   the rule means hunting down every copy.
-- Near-copies with small differences you cannot immediately explain — that is
+- Near-copies with small differences you cannot immediately explain; that is
   where the drift, and the [Oddball Solution](oddball-solution.md), hides.
 - Sibling subclasses whose method bodies are identical: candidates for
   pulling up.
@@ -37,7 +37,7 @@ invisible until it produces a bug report from only one code path.
 - Blade markup pasted with a few tokens changed instead of one component with
   props and slots.
 - An authorization rule re-implemented in a controller, a policy, and a Blade
-  `@can` — three copies that can disagree.
+  `@can`: three copies that can disagree.
 - Pest or PHPUnit tests repeating the same arrange block in every case
   instead of a factory state, a shared dataset, or `beforeEach()`.
 
@@ -55,7 +55,7 @@ invisible until it produces a bug report from only one code path.
 
 ## Example
 
-Authored for this card — upstream has no code example for this smell.
+Authored for this card: upstream has no code example for this smell.
 
 Smelly:
 
@@ -86,11 +86,11 @@ final class SendInvoiceReminder implements ShouldQueue
 }
 ```
 
-The second copy truncates where the first rounds — the reminder email quotes
+The second copy truncates where the first rounds, the reminder email quotes
 a total the invoice page never shows, and nothing in the code says which one
 is correct.
 
-Solution — the rule gets one home, and the copies become calls:
+Solution; the rule gets one home, and the copies become calls:
 
 ```php
 final class Invoice extends Model
@@ -145,5 +145,5 @@ Duplication
 ---
 
 *Derivative work adapted from "Duplicated Code" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

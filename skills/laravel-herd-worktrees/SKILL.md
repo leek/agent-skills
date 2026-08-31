@@ -9,7 +9,7 @@ Run multiple branches of a Laravel project in parallel, each reachable at its ow
 
 ## Mental Model
 
-- A **worktree** is a sibling directory of the main checkout with its own `HEAD`. Composer/Node deps, `vendor/`, `node_modules/`, `storage/`, and `bootstrap/cache/` are **per-worktree** — never share via symlink.
+- A **worktree** is a sibling directory of the main checkout with its own `HEAD`. Composer/Node deps, `vendor/`, `node_modules/`, `storage/`, and `bootstrap/cache/` are **per-worktree**: never share via symlink.
 - Herd's **parked directory** auto-serves every immediate subdirectory as `<dir>.test`. Park the *parent* of all worktrees once and every new worktree gets a URL for free.
 - `.env` is **untracked**, so it must be re-created in each worktree. `APP_URL`, `DB_DATABASE`, cache prefixes must differ per worktree to prevent cross-branch bleed.
 
@@ -39,7 +39,7 @@ herd parked
 
 Each immediate subdir is now `<name>.test`. Adding a worktree at `~/Code/myapp-feat` makes `myapp-feat.test` resolve immediately.
 
-If parking the parent is not desired (other non-Laravel dirs live there), use explicit `herd link` per worktree instead — see [references/herd-commands.md](./references/herd-commands.md).
+If parking the parent is not desired (other non-Laravel dirs live there), use explicit `herd link` per worktree instead: see [references/herd-commands.md](./references/herd-commands.md).
 
 ### 2. Create a new worktree
 
@@ -94,12 +94,12 @@ DB strategy details (sharing seeds, schema dumps, fresh vs. migrate): [reference
 
 ## Common Pitfalls
 
-- **Sharing `vendor/` via symlink** — breaks when branches have different package versions; autoload class maps drift.
-- **Forgetting `php artisan key:generate`** — encrypted cookies/sessions fail silently across worktrees that share `APP_KEY`.
-- **Same `SESSION_COOKIE` across `*.test` siblings** — cookies leak between branches because they share the `.test` parent domain. Set a unique `SESSION_COOKIE` per worktree.
-- **Same Redis DB without prefix** — cache keys collide; one branch invalidates another's cache.
-- **Running `composer install` against a stale `composer.lock`** after rebasing — always re-run install after switching base branches inside a worktree.
-- **Herd not picking up new worktree** — happens if the parent isn't parked or if the worktree directory name contains characters Herd rejects (stick to `[a-z0-9-]`).
+- **Sharing `vendor/` via symlink**: breaks when branches have different package versions; autoload class maps drift.
+- **Forgetting `php artisan key:generate`**: encrypted cookies/sessions fail silently across worktrees that share `APP_KEY`.
+- **Same `SESSION_COOKIE` across `*.test` siblings**: cookies leak between branches because they share the `.test` parent domain. Set a unique `SESSION_COOKIE` per worktree.
+- **Same Redis DB without prefix**: cache keys collide; one branch invalidates another's cache.
+- **Running `composer install` against a stale `composer.lock`** after rebasing: always re-run install after switching base branches inside a worktree.
+- **Herd not picking up new worktree**: happens if the parent isn't parked or if the worktree directory name contains characters Herd rejects (stick to `[a-z0-9-]`).
 
 ## Quick Diagnostics
 
@@ -115,6 +115,6 @@ If a `.test` URL 404s: check `herd parked` includes the parent, dir name is lowe
 
 ## Out of Scope
 
-- **Valet** — different tool. Herd-only here.
-- **Linux Herd** — paths and CLI differ; this skill assumes macOS Herd.
-- **Docker / Sail** — covered by other workflows. Worktrees still work but routing is via Docker, not Herd.
+- **Valet**: different tool. Herd-only here.
+- **Linux Herd**: paths and CLI differ; this skill assumes macOS Herd.
+- **Docker / Sail**: covered by other workflows. Worktrees still work but routing is via Docker, not Herd.

@@ -1,0 +1,5 @@
+interface:
+  display_name: "Nightly Docs Sweep"
+  short_description: "Run a documentation sweep so repo docs match the current implementation"
+policy:
+  allow_implicit_invocation: false

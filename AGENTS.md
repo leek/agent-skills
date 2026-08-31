@@ -36,13 +36,26 @@ cp template/SKILL.md.example skills/<skill-name>/SKILL.md
 ```
 skills/<skill-name>/
   SKILL.md            # required
-  scripts/            # optional — bash scripts (preferred)
+  agents/openai.yaml  # required: Codex-facing metadata (see below)
+  scripts/            # optional: bash scripts (preferred)
     <name>.sh
-  references/         # optional — supporting docs read on demand
-  *.md                # optional — skill-root companions (formats, seeds, short branch docs)
+  references/         # optional: supporting docs read on demand
+  *.md                # optional: skill-root companions (formats, seeds, short branch docs)
 ```
 
-**Companion files.** Prefer `references/` for material only some runs need. Skill-root `.md` companions (one level deep from `SKILL.md`) are allowed for formats, setup seeds, and short branch docs that every related path may open — e.g. `setup/issue-tracker.md`, `teach/MISSION-FORMAT.md`, `prototype/LOGIC.md`. Do not nest companions more than one level below `SKILL.md`.
+**Harness metadata.** `SKILL.md` frontmatter is what Claude Code and `npx skills` read; `agents/openai.yaml` is the same two facts for Codex:
+
+```yaml
+interface:
+  display_name: "Which Skill"
+  short_description: "Not sure which skill to reach for? Name the situation and get routed to one"
+policy:
+  allow_implicit_invocation: false   # must be the inverse of disable-model-invocation
+```
+
+CI fails if a skill is missing the file or the two disagree. Keep the skill bodies themselves harness-neutral: name a specific tool only with a stated fallback ("`AskUserQuestion` where available, otherwise ask in chat"), since an instruction naming a tool the running harness lacks is unfollowable, not merely unused.
+
+**Companion files.** Prefer `references/` for material only some runs need. Skill-root `.md` companions (one level deep from `SKILL.md`) are allowed for formats, setup seeds, and short branch docs that every related path may open: e.g. `setup/issue-tracker.md`, `teach/MISSION-FORMAT.md`, `prototype/LOGIC.md`. Do not nest companions more than one level below `SKILL.md`.
 
 ### 3. `SKILL.md` format
 
@@ -61,12 +74,14 @@ sections for material consulted on demand; anything only some runs need goes
 behind a pointer to a companion file or references/.
 ```
 
-**Invocation policy** — decide it per skill, deliberately:
+**Invocation policy**: decide it per skill, deliberately:
 
-- **Model-invoked** (default): the agent may reach for it autonomously, and other skills can invoke it. The `description` pays for itself in every context window, so it earns rich trigger phrasing — but **one trigger per branch**; synonyms restating the same branch are duplication.
-- **User-invoked** (`disable-model-invocation: true`): for flows with side effects (publishing issues, committing, interviewing the user) or that only make sense when the human asks. The `description` becomes a human-facing one-liner — no trigger lists.
+- **Model-invoked** (default): the agent may reach for it autonomously, and other skills can invoke it. The `description` pays for itself in every context window, so it earns rich trigger phrasing, but **one trigger per branch**; synonyms restating the same branch are duplication.
+- **User-invoked** (`disable-model-invocation: true`): for flows with side effects (publishing issues, committing, interviewing the user) or that only make sense when the human asks. The `description` becomes a human-facing one-liner, no trigger lists.
 
 The test: *could the model usefully reach for this on its own?* Reuse by other skills is a reason to keep it model-invoked; being a big deliberate workflow is a reason not to.
+
+**The invariant that follows: a user-invoked skill can never be reached by another skill**, not by name, not through any harness's skill-invocation tool. A skill that tells the agent to invoke one is broken; have it *recommend* the flow to the user instead. Shared reference two user-invoked skills both need can live in neither, so it goes in a file they both point at.
 
 ### 4. Register in the marketplace
 
@@ -84,13 +99,11 @@ Add a short section to `README.md` under **Available Skills**.
 
 ## Best Practices
 
-Skills load on-demand — only `name` + `description` load at startup. The full `SKILL.md` loads only when the agent decides the skill is relevant. A skill exists to wrangle determinism out of a stochastic system: the same *process* every run. Everything below serves that. (The full authoring reference is the `writing-great-skills` skill.)
+**How to write one is the `writing-for-agents` skill**: it is model-invoked, so reach for it rather than working from this file. Only what is specific to *this repo* lives here:
 
-- **Short beats complete.** Most upstream skills this repo ports from are 10–130 lines. Prune sentence-by-sentence: when one part of a sentence is a no-op, delete the whole sentence. Length that restates what the model already holds (via leading words like *seam*, *frontier*, *red → green*) is sediment.
-- **One job per skill.** Same lifecycle, different entity → one skill. A skill doing an interview *and* tool plumbing *and* session routing is three skills.
-- **Single source of truth.** A protocol referenced by several skills lives in exactly one (e.g. the question shape in `grilling`, tracker operations in `setup`'s seeds) — others point at it, never restate it.
-- **Progressive disclosure.** Inline what every run needs; push what only some runs need behind a pointer to `references/` or a skill-root companion. File references work one level deep from `SKILL.md`.
-- **Prefer scripts over inline code.** Script execution does not consume context — only its stdout does.
+- **Where the shared protocols live.** A protocol several skills need has exactly one owner, and the others point at it: the question shape and STE rules in `grilling`, tracker operations in `setup`'s seeds, the end-of-session banner in `wayfinder/references/pipeline-end-block.md`.
+- **Length.** Most skills here are 10–130 lines. Treat anything longer as owing an explanation.
+- **Prefer scripts over inline code.** Script execution does not consume context: only its stdout does.
 - **No dead references.** Every skill a skill mentions must exist in this repo (or be a documented harness built-in). Check before committing.
 
 ## Script Requirements
@@ -103,5 +116,6 @@ Skills load on-demand — only `name` + `description` load at startup. The full 
 
 ## Distribution Notes
 
-- Each skill folder is self-contained — users can copy a single `skills/<skill-name>/` into their agent's skills directory (e.g. `~/.claude/skills/`, or the equivalent for their harness).
+- Each skill folder is self-contained: users can copy a single `skills/<skill-name>/` into their agent's skills directory (e.g. `~/.claude/skills/`, or the equivalent for their harness).
+- **One documented exception:** the pipeline skills (`grill-me`, `wayfinder`, `to-spec`, `to-tickets`, `implement`, `to-questionnaire`, `code-review`) are one unit, not seven. They read each other's artifacts under `.scratch/<slug>/` and share the end-of-session banner in `wayfinder/references/pipeline-end-block.md` via a `../` reference. Copying one alone leaves that pointer dangling. Install the set, or accept that nothing depends on the banner and the skill still runs. Duplicating the banner into all seven would cost more than the caveat does; the verifier asserts the shared pointer stays in place.
 - Network access for skills running in claude.ai must be allowlisted at `claude.ai/settings/capabilities`.

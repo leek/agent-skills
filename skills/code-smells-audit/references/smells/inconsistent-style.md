@@ -7,7 +7,7 @@ reader's expectations are reset every time they open a new one. Reading a
 codebase should feel like reading one book, not a novel whose typeface
 changes each page: layout that shifts with each author's preference costs
 attention on every screen without ever failing a test. The dangerous variant
-is sequence inconsistency — the order of parameters for one concept flipped
+is sequence inconsistency: the order of parameters for one concept flipped
 between sibling methods. If the flipped parameters have different types the
 compiler catches it; if they share a type, the call site keeps compiling and
 quietly does the wrong thing. Detect it by comparing sibling files and
@@ -18,7 +18,7 @@ enforced rather than merely configured.
 
 ### Agnostic
 
-- The same construct formatted differently across files — argument wrapping,
+- The same construct formatted differently across files, argument wrapping,
   brace placement, quoting, trailing commas.
 - No formatter or linter enforced in CI, so style is per-author and diffs
   carry reformat noise unrelated to the change.
@@ -31,7 +31,7 @@ enforced rather than merely configured.
 ### PHP / Laravel
 
 - No Pint or PHP-CS-Fixer config committed, or one that exists but is never
-  run in CI — the rules are documented, not enforced.
+  run in CI; the rules are documented, not enforced.
 - Sibling actions taking `(User $user, Team $team)` in one class and
   `(Team $team, User $user)` in another; when the parameters are
   `int $userId, int $teamId` the swapped call site type-checks perfectly.
@@ -47,7 +47,7 @@ enforced rather than merely configured.
 
 - Prettier and ESLint both configured but disagreeing, so files flip
   formatting depending on which one ran last; or neither gated in CI.
-- Components declared inconsistently within one folder — `function Foo()`
+- Components declared inconsistently within one folder, `function Foo()`
   against `const Foo = () => …`, default exports against named exports.
 - Related hooks taking their positional arguments in a different order, with
   matching types, so the swap survives type-checking.
@@ -61,7 +61,7 @@ enforced rather than merely configured.
 
 Translated from the upstream Python example.
 
-Smelly — the sequence-inconsistency variant: two sibling methods take the
+Smelly; the sequence-inconsistency variant: two sibling methods take the
 same two `int` values in opposite order, and the second call site is wrong in
 a way nothing will report:
 
@@ -84,10 +84,10 @@ final class Character
 }
 
 $witcher->rangedAttack($skeleton, 300, 200);
-$witcher->meleeAttack($skeleton, 300, 200); // 300 is now the bonus — silently wrong
+$witcher->meleeAttack($skeleton, 300, 200); // 300 is now the bonus, silently wrong
 ```
 
-Solution — one order across the family, and named arguments at the call sites
+Solution: one order across the family, and named arguments at the call sites
 so a future reordering breaks loudly instead of silently:
 
 ```php
@@ -131,5 +131,5 @@ Sequence Inconsistency
 ---
 
 *Derivative work adapted from "Inconsistent Style" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

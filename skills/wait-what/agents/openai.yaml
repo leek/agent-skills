@@ -1,0 +1,5 @@
+interface:
+  display_name: "Wait What"
+  short_description: "Stop. That last message did not land. Re-pitch it"
+policy:
+  allow_implicit_invocation: false

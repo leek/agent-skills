@@ -6,7 +6,7 @@ Code the executor will never reach: a branch whose condition can no longer be
 true, statements after an unconditional `return`, a `catch` for an exception
 the body cannot throw, a private method with no callers, or a block someone
 commented out "just in case" and never came back for. It costs nothing at
-runtime, which is why it survives — the price is paid by every reader who has
+runtime, which is why it survives; the price is paid by every reader who has
 to work out whether it is safe to touch, and by every refactoring that has to
 carry it along. It usually arrives quietly: a way of working was replaced and
 the old path was never removed, or a
@@ -33,13 +33,13 @@ remembers the deletion.
   telemetry showing a path never taken.
 - Feature flags pinned on or off for so long that the other side is
   effectively deleted already.
-- Whole files reachable only from other dead files — transitive death, the
+- Whole files reachable only from other dead files, transitive death, the
   kind manual review misses.
 
 ### PHP / Laravel
 
-- Routes in `routes/web.php` or `routes/api.php` — visible in
-  `php artisan route:list` — pointing at controller actions no client, link,
+- Routes in `routes/web.php` or `routes/api.php`: visible in
+  `php artisan route:list`: pointing at controller actions no client, link,
   or form targets any more.
 - Eloquent accessors, mutators, casts, and scopes referring to columns a
   later migration dropped or renamed.
@@ -58,7 +58,7 @@ remembers the deletion.
 
 ### TS / React
 
-- Exported components, hooks, and types with no importers — what `knip` or
+- Exported components, hooks, and types with no importers, what `knip` or
   `ts-prune` reports, and what `noUnusedLocals` catches at file scope.
 - Props declared in the type and destructured in the signature but never
   used in the body or the JSX.
@@ -73,9 +73,9 @@ remembers the deletion.
 
 ## Example
 
-Authored for this card — upstream has no code example for this smell.
+Authored for this card: upstream has no code example for this smell.
 
-Smelly — an unreachable branch, an orphaned private method, and a
+Smelly: an unreachable branch, an orphaned private method, and a
 commented-out block kept "just in case":
 
 ```php
@@ -115,7 +115,7 @@ final class SubscriptionStatus
 }
 ```
 
-Solution — delete all three; the retry threshold in the unreachable branch
+Solution: delete all three; the retry threshold in the unreachable branch
 was never a real rule, and the git history holds the old wording:
 
 ```php
@@ -161,5 +161,5 @@ None recorded upstream.
 ---
 
 *Derivative work adapted from "Dead Code" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

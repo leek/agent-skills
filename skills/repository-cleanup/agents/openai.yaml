@@ -1,0 +1,5 @@
+interface:
+  display_name: "Repository Cleanup"
+  short_description: "Audit and clean Git repository state: branches, PRs, stashes, and worktrees"
+policy:
+  allow_implicit_invocation: false

@@ -5,12 +5,16 @@ on:
     branches: [main]
     paths:
       - 'skills/**'
+      - 'scripts/**'
+      - 'AGENTS.md'
       - '.claude-plugin/marketplace.json'
       - '.github/workflows/validate-skills.yml'
   pull_request:
     branches: [main]
     paths:
       - 'skills/**'
+      - 'scripts/**'
+      - 'AGENTS.md'
       - '.claude-plugin/marketplace.json'
 
 jobs:
@@ -58,3 +62,65 @@ jobs:
               print('Missing SKILL.md for:', missing, file=sys.stderr)
               sys.exit(1)
           PY
+
+      - name: Validate SKILL.md frontmatter is parseable YAML
+        run: |
+          python3 -m pip install --quiet pyyaml
+          python3 - <<'PY'
+          import glob, re, sys, yaml
+          bad = []
+          for p in sorted(glob.glob('skills/*/SKILL.md')):
+              m = re.match(r'^---\n(.*?)\n---\n', open(p, encoding='utf-8').read(), re.S)
+              if not m:
+                  bad.append(f'{p}: no frontmatter block')
+                  continue
+              try:
+                  d = yaml.safe_load(m.group(1))
+                  assert d.get('name') and d.get('description')
+              except Exception as e:
+                  # Usually an unquoted "colon space" inside description.
+                  bad.append(f'{p}: {str(e).splitlines()[0]}')
+          if bad:
+              print('\n'.join(bad), file=sys.stderr)
+              print('\nA description containing ": " must be quoted.', file=sys.stderr)
+              sys.exit(1)
+          print('frontmatter YAML OK')
+          PY
+
+      - name: Validate every skill ships harness metadata
+        run: |
+          python3 -m pip install --quiet pyyaml
+          python3 - <<'PY'
+          import os, re, sys, yaml
+          bad = []
+          for d in sorted(os.listdir('skills')):
+              skill = os.path.join('skills', d)
+              md = os.path.join(skill, 'SKILL.md')
+              if not os.path.isfile(md):
+                  continue
+              y = os.path.join(skill, 'agents', 'openai.yaml')
+              if not os.path.isfile(y):
+                  bad.append(f'{d}: missing agents/openai.yaml')
+                  continue
+              try:
+                  meta = yaml.safe_load(open(y))
+              except Exception as e:
+                  bad.append(f'{d}: unparseable openai.yaml ({e})')
+                  continue
+              fm = re.match(r'^---\n(.*?)\n---\n', open(md).read(), re.S)
+              user_invoked = bool(fm and re.search(r'^disable-model-invocation:\s*true\s*$', fm.group(1), re.M))
+              allowed = meta.get('policy', {}).get('allow_implicit_invocation')
+              if allowed is not (not user_invoked):
+                  bad.append(f'{d}: allow_implicit_invocation={allowed} contradicts SKILL.md frontmatter')
+              if not meta.get('interface', {}).get('short_description'):
+                  bad.append(f'{d}: openai.yaml has no short_description')
+          if bad:
+              print('\n'.join(bad), file=sys.stderr)
+              sys.exit(1)
+          print('harness metadata OK')
+          PY
+
+      - name: Run the collection verifier
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ripgrep
+          bash scripts/verify-skills-collection.sh

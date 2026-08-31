@@ -2,8 +2,8 @@
 
 `Between · Data Dealers · Data`
 
-A class that quietly fetches what it needs — from the global scope, a
-container, a static factory, the environment — instead of being given it. The
+A class that quietly fetches what it needs, from the global scope, a
+container, a static factory, the environment, instead of being given it. The
 constructor takes nothing, so the object looks free to create, and the
 dependency only announces itself at runtime, in the branch that happens to
 touch it. That makes construction a lie: the caller cannot tell from the
@@ -23,7 +23,7 @@ related dependencies rather than listing them all.
 ### Agnostic
 
 - An empty (or primitives-only) constructor on an object that is plainly not
-  stateless — the collaborators appear halfway down a method body instead.
+  stateless: the collaborators appear halfway down a method body instead.
 - Methods that construct or look up their own collaborators rather than
   receiving them.
 - The signature does not tell you what must be true for the call to succeed;
@@ -33,8 +33,8 @@ related dependencies rather than listing them all.
   environment variables, or seeding a global first.
 - Behavior varies by execution context (web request vs. background worker vs.
   CLI) with nothing in the API that names the context.
-- Editing a class that this one never references — no import, no
-  constructor argument — breaks it.
+- Editing a class that this one never references, no import, no
+  constructor argument, breaks it.
 
 ### PHP / Laravel
 
@@ -67,15 +67,15 @@ related dependencies rather than listing them all.
   test that renders them.
 - `process.env` / `import.meta.env` read inside components and utilities
   rather than passed in as configuration.
-- Ambient platform calls buried in logic — `Date.now()`, `Math.random()`,
-  `window.localStorage`, `navigator` — requiring fake timers or a jsdom
+- Ambient platform calls buried in logic, `Date.now()`, `Math.random()`,
+  `window.localStorage`, `navigator`: requiring fake timers or a jsdom
   global to exercise a pure-looking function.
 
 ## Example
 
 Translated from the upstream Python example.
 
-Smelly — `Cart` reaches out and resolves its customer, so nothing at the call
+Smelly: `Cart` reaches out and resolves its customer, so nothing at the call
 site says a customer is involved:
 
 ```php
@@ -92,7 +92,7 @@ final class Cart
 $cart = new Cart();
 ```
 
-Solution — the dependency is passed in, so the signature states the
+Solution; the dependency is passed in, so the signature states the
 requirement and a test can hand over whichever customer it wants:
 
 ```php
@@ -107,8 +107,8 @@ final class Cart
 $cart = new Cart($customer);
 ```
 
-In Laravel the constructor form costs nothing at the call site — the
-container still autowires `Cart` — but the edge is now visible to readers,
+In Laravel the constructor form costs nothing at the call site, the
+container still autowires `Cart`, but the edge is now visible to readers,
 to static analysis, and to tests.
 
 ## Refactorings
@@ -133,5 +133,5 @@ None recorded upstream.
 ---
 
 *Derivative work adapted from "Hidden Dependencies" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

@@ -1,6 +1,6 @@
 ---
 name: housekeeper
-description: Run a conservative code-project housekeeping pass — one proven low-risk cleanup at a time.
+description: "Run a conservative code-project housekeeping pass: one proven low-risk cleanup at a time."
 disable-model-invocation: true
 ---
 

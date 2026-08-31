@@ -3,7 +3,7 @@
 `Between · Data Dealers · Message Calls`
 
 A class whose methods mostly forward to another class. Encapsulation is meant
-to buy something — a rule enforced, a name improved, several calls combined —
+to buy something: a rule enforced, a name improved, several calls combined, 
 and a delegator that buys none of it charges every reader an extra file to
 open in return for no information. Fowler's rough test is that once half of a
 class's methods are one-line delegations, the class has stopped earning its
@@ -11,7 +11,7 @@ keep; Mäntylä's objection is maintenance, since each method added to the
 delegate has to be mirrored in every wrapper fronting it. It usually arrives
 as an over-correction of [Message Chain](message-chain.md): hide delegate
 applied at every hop until pass-throughs outnumber real behavior. Deleting the
-wrapper is the standard cure and the standard risk — remove too many and the
+wrapper is the standard cure and the standard risk, remove too many and the
 chains grow back, which is why these two smells are judged against each other
 rather than separately.
 
@@ -36,8 +36,8 @@ rather than separately.
 
 - A `Service` class whose methods each forward to one repository call, with no
   rule, transaction, or transformation of their own.
-- Repositories mirroring Eloquent one for one — `find()`, `all()`,
-  `create()`, `update()` — so the abstraction adds a layer but no policy.
+- Repositories mirroring Eloquent one for one, `find()`, `all()`,
+  `create()`, `update()`, so the abstraction adds a layer but no policy.
 - A model growing an accessor per related attribute
   (`getCustomerNameAttribute()` returning `$this->customer->name`), so every
   new customer field means another forwarding accessor.
@@ -49,7 +49,7 @@ rather than separately.
 
 ### TS / React
 
-- Components that only spread props onto one child — `<Button {...props} />` —
+- Components that only spread props onto one child, `<Button {...props} />`, 
   with no defaults, styling, or behavior added.
 - Custom hooks whose entire body is `return useContext(SomeContext)`,
   multiplied across a dozen contexts.
@@ -64,7 +64,7 @@ rather than separately.
 
 Translated from the upstream Python example.
 
-Smelly — `Minion` and `Location` both exist here only to forward the same
+Smelly: `Minion` and `Location` both exist here only to forward the same
 question down one more level:
 
 ```php
@@ -105,7 +105,7 @@ final class Field
 }
 ```
 
-Solution — drop the pass-throughs and let the caller ask the object that
+Solution: drop the pass-throughs and let the caller ask the object that
 actually knows:
 
 ```php
@@ -165,5 +165,5 @@ None recorded upstream.
 ---
 
 *Derivative work adapted from "Middle Man" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

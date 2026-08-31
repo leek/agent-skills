@@ -14,7 +14,7 @@ Full docs: https://herd.laravel.com/docs
 | `herd links` | List manual links. |
 | `herd open` | Open current site's `.test` URL. |
 
-For worktrees: **prefer `herd park` on the parent** — zero per-worktree work. Use `herd link` only if siblings include non-Laravel projects you don't want exposed.
+For worktrees: **prefer `herd park` on the parent**: zero per-worktree work. Use `herd link` only if siblings include non-Laravel projects you don't want exposed.
 
 ## PHP version per site
 
@@ -30,7 +30,7 @@ Use case: a legacy worktree on PHP 8.1 alongside a `main` worktree on 8.3.
 
 ## Services (Pro)
 
-`herd services` lists managed MySQL/Postgres/Redis/Meilisearch instances. They listen on standard ports, so all worktrees share one server — isolation comes from per-worktree DB names and Redis prefixes, not separate servers.
+`herd services` lists managed MySQL/Postgres/Redis/Meilisearch instances. They listen on standard ports, so all worktrees share one server: isolation comes from per-worktree DB names and Redis prefixes, not separate servers.
 
 ## Secure (HTTPS)
 
@@ -39,7 +39,7 @@ Use case: a legacy worktree on PHP 8.1 alongside a `main` worktree on 8.3.
 | `herd secure` | Generate a trusted cert for current site → `https://<name>.test`. |
 | `herd unsecure` | Revert to HTTP. |
 
-If you secure one worktree, secure them all (or none) — mixed HTTP/HTTPS confuses cookies on the shared `.test` parent domain.
+If you secure one worktree, secure them all (or none): mixed HTTP/HTTPS confuses cookies on the shared `.test` parent domain.
 
 ## Other useful commands
 
@@ -52,7 +52,7 @@ If you secure one worktree, secure them all (or none) — mixed HTTP/HTTPS confu
 
 ## Troubleshooting `*.test` not resolving
 
-1. `herd parked` — confirm parent is in the list.
-2. `dscacheutil -flushcache && sudo killall -HUP mDNSResponder` — flush macOS DNS.
+1. `herd parked`: confirm parent is in the list.
+2. `dscacheutil -flushcache && sudo killall -HUP mDNSResponder`: flush macOS DNS.
 3. Directory name must be lowercase, no spaces, no dots beyond what becomes the subdomain.
 4. `herd restart` if you just upgraded Herd.

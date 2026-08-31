@@ -1,6 +1,6 @@
 ---
 name: implement
-description: Implement one Laravel work item end to end — scope and claim it when trackable, TDD at chosen seams, commit, review, verify, and resolve it.
+description: "Implement one Laravel work item end to end: scope and claim it when trackable, TDD at chosen seams, commit, review, verify, and resolve it."
 disable-model-invocation: true
 ---
 
@@ -13,7 +13,7 @@ Pipeline position: `wayfinder` (decide) → `to-spec` (write the spec) → `to-t
 ## Laravel guardrails
 
 - **Never** run `migrate:fresh`, `migrate:rollback`, or another destructive database operation without explicit approval. Put schema changes in new migrations; sequence live-table changes expand–contract.
-- Verify identifiers before using them — route names, config keys, enum values, icon names, and package APIs. A manifest entry alone does not prove registration or use.
+- Verify identifiers before using them: route names, config keys, enum values, icon names, and package APIs. A manifest entry alone does not prove registration or use.
 
 ## Process
 
@@ -21,13 +21,13 @@ Pipeline position: `wayfinder` (decide) → `to-spec` (write the spec) → `to-t
 
 Classify the input and make its acceptance criteria explicit:
 
-- **Ticket** — fetch its full body and comments. From its parent spec, load the **Build Contract** section first when present, then the headings the ticket names or the implementation reaches. Read direct blockers' `Resolution` sections for handed-forward seams; load other closed tickets and the map only on demand. A `wayfinder` decision ticket is eligible only when its type is `task`; stop on the other types because they decide rather than build. A `task` is manual unblocking work, not code — do it yourself where you can, otherwise hand the human the precise checklist from `ticket-types`; get explicit approval before any destructive or irreversible step, record the resulting facts, and Resolve. It skips the seams/TDD/commit/review/verify loop (steps 2–7), which assume code changes. The ticket is the work item.
-- **Spec** — fetch its full body and comments. If it holds more than one independently deliverable ticket or cannot fit one session, stop and tell the user to run `to-tickets`; otherwise the spec itself is the work item.
-- **Conversation** — restate the scope and behavior criteria in a few lines. It has no tracker claim or resolution.
+- **Ticket**: fetch its full body and comments. From its parent spec, load the **Build Contract** section first when present, then the headings the ticket names or the implementation reaches. Read direct blockers' `Resolution` sections for handed-forward seams; load other closed tickets and the map only on demand. A `wayfinder` decision ticket is eligible only when its type is `task`; stop on the other types because they decide rather than build. A `task` is manual unblocking work, not code, do it yourself where you can, otherwise hand the human the precise checklist from `ticket-types`; get explicit approval before any destructive or irreversible step, record the resulting facts, and Resolve. It skips the seams/TDD/commit/review/verify loop (steps 2–7), which assume code changes. The ticket is the work item.
+- **Spec**: fetch its full body and comments. If it holds more than one independently deliverable ticket or cannot fit one session, stop and tell the user to run `to-tickets`; otherwise the spec itself is the work item.
+- **Conversation**: restate the scope and behavior criteria in a few lines. It has no tracker claim or resolution.
 
-Work items are markdown files under `.scratch/` — there is no external tracker. When launch context already identifies the selected file, its status, and blockers, revalidate those exact files rather than rereading the tracker layout. Otherwise read the layout once through `.agents/issue-tracker.md` (written by `/setup`). If it's missing, try `docs/agents/issue-tracker.md` (legacy), then the `setup` skill's seed. Confirm every direct blocker is closed through the item's `blocked-by` frontmatter, and stop before claiming if any remain open. Then claim before building:
+Work items are markdown files under `.scratch/`: there is no external tracker. When launch context already identifies the selected file, its status, and blockers, revalidate those exact files rather than rereading the tracker layout. Otherwise read the layout once through `.agents/issue-tracker.md` (written by `/setup`). If it's missing, try `docs/agents/issue-tracker.md` (legacy), then the `setup` skill's seed. Confirm every direct blocker is closed through the item's `blocked-by` frontmatter, and stop before claiming if any remain open. Then claim before building:
 
-- On a ticket from `to-tickets`, or a directly implemented spec, set its frontmatter `status: in-progress` and `claimed-by:` to a session-unique value, then re-read to confirm you won the claim (compare-after-write — see the tracker's Working in parallel rules).
+- On a ticket from `to-tickets`, or a directly implemented spec, set its frontmatter `status: in-progress` and `claimed-by:` to a session-unique value, then re-read to confirm you won the claim (compare-after-write, see the tracker's Working in parallel rules).
 - On a `wayfinder` decision ticket, use the Wayfinding **Claim** operation (`claimed-by`).
 
 If the item is already claimed or in progress, stop; treat the claim as stale only when its work is visibly committed or clearly abandoned.
@@ -38,7 +38,7 @@ Finish this step only when the work fits one session, its acceptance criteria ar
 
 ### 2. Choose the seams
 
-Use the ranking and selection rules in the `tdd` skill's **Seams — where tests go** section. Reuse seams already recorded in the spec; otherwise **choose them yourself and state the choice** — one line per seam, no approval round. Seam placement is test structure, which `grilling`'s **What still earns a question** hands to you, and the rules are the single source of truth. Ask only on a genuine fork the rules rank equally where the two placements would make materially different work.
+Use the ranking and selection rules in the `tdd` skill's **Seams: where tests go** section. Reuse seams already recorded in the spec; otherwise **choose them yourself and state the choice**: one line per seam, no approval round. Seam placement is test structure, which `grilling`'s **What still earns a question** hands to you, and the rules are the single source of truth. Ask only on a genuine fork the rules rank equally where the two placements would make materially different work.
 
 Finish this step when every acceptance criterion has a seam.
 
@@ -50,7 +50,7 @@ Finish the loop only when every acceptance criterion is covered at a chosen seam
 
 ### 4. Format and commit a reviewable checkpoint
 
-Run the repository's configured formatter; when it uses Pint, run `vendor/bin/pint --dirty`. Check `git status --porcelain`, stage only work-item files by explicit path, and leave foreign changes unstaged. Commit to the current branch — no new branch, no worktree. Record the paths you touched; review scopes to them (next step), so a parallel session's commits on the same branch neither get staged here nor reviewed there.
+Run the repository's configured formatter; when it uses Pint, run `vendor/bin/pint --dirty`. Check `git status --porcelain`, stage only work-item files by explicit path, and leave foreign changes unstaged. Commit to the current branch: no new branch, no worktree. Record the paths you touched; review scopes to them (next step), so a parallel session's commits on the same branch neither get staged here nor reviewed there.
 
 Finish this step with every work-item change committed, every foreign change untouched, and the checkpoint commit SHA recorded.
 
@@ -62,7 +62,7 @@ Finish this step only when review reports no unresolved actionable findings and 
 
 ### 6. Run the final automated checks
 
-Ask the user first (via `AskUserQuestion` where available, otherwise a plain question in chat) whether to run the full test suite as the final automated gate. If they decline, skip the full run — the focused tests from step 3 stand as the automated evidence — and record the skip so step 8 reports it plainly.
+Ask the user first (via `AskUserQuestion` where available, otherwise a plain question in chat) whether to run the full test suite as the final automated gate. If they decline, skip the full run (the focused tests from step 3 stand as the automated evidence) and record the skip so step 8 reports it plainly.
 
 When approved, run the repository's full test suite (`php artisan test` when the repo defines no wrapper). Fix failures caused by the work. Prove an unrelated failure pre-existing against `base_sha`, then note it plainly instead of expanding scope.
 
@@ -78,11 +78,11 @@ If an external dependency prevents verification, keep the committed implementati
 
 After successful verification, record what was built, any justified deviation, verification evidence, the implementation commit SHA or SHAs, and any public seam a direct successor should reuse; check off every satisfied acceptance criterion. This `Resolution` is the successor handoff, so keep the seam and evidence concrete without retelling the parent spec. Resolve the work item according to its branch:
 
-- **Ticket, or a directly implemented spec** — set its frontmatter `status: closed` and append `## Resolution`.
-- **`wayfinder` decision ticket** — use the Wayfinding **Resolve** operation.
-- **Conversation** — report the result without touching any file under `.scratch/`.
+- **Ticket, or a directly implemented spec**: set its frontmatter `status: closed` and append `## Resolution`.
+- **`wayfinder` decision ticket**: use the Wayfinding **Resolve** operation.
+- **Conversation**: report the result without touching any file under `.scratch/`.
 
-Leave every parent open — a ticket never closes its spec, and `implement` never touches the map (the map was already closed by `to-spec`, or by a spec-less `to-tickets`, when the spec or tickets were written). A spec is **complete** when every ticket in its `tickets/` is closed — a derived state you report, not a status you write onto the spec. When the spec itself was the one-session work item, close that spec directly. Keep the resolution write out of code commits: if `.scratch/` is tracked, commit it separately; never fold it into an implementation commit. Resolution text cites the implementation commits, never its own closure commit.
+Leave every parent open; a ticket never closes its spec, and `implement` never touches the map (the map was already closed by `to-spec`, or by a spec-less `to-tickets`, when the spec or tickets were written). A spec is **complete** when every ticket in its `tickets/` is closed; a derived state you report, not a status you write onto the spec. When the spec itself was the one-session work item, close that spec directly. Keep the resolution write out of code commits: if `.scratch/` is tracked, commit it separately; never fold it into an implementation commit. Resolution text cites the implementation commits, never its own closure commit.
 
 For trackable work, re-read the markdown file after writing it and verify its final state.
 
@@ -90,7 +90,7 @@ Finish when the implementation commits and any separate resolution commit are re
 
 ## When you're done
 
-Print the end-of-session block using the frame in [`wayfinder/references/pipeline-end-block.md`](../wayfinder/references/pipeline-end-block.md). For a trackable work item with a parent, check the markdown tracker for the remaining frontier before writing the block — don't guess at what's left.
+Print the end-of-session block using the frame in [`wayfinder/references/pipeline-end-block.md`](../wayfinder/references/pipeline-end-block.md). For a trackable work item with a parent, check the markdown tracker for the remaining frontier before writing the block, don't guess at what's left.
 
 ```text
 ---

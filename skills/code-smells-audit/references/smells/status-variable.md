@@ -3,7 +3,7 @@
 `Within · Obfuscators · Unnecessary Complexity`
 
 A mutable primitive declared before an operation, written to during it, and
-read afterwards as a switch — `$found = false` ahead of a search, `$success`
+read afterwards as a switch, `$found = false` ahead of a search, `$success`
 ahead of a save, `$i = 0` ahead of a loop. It is really a signal rather than a
 defect of its own: wherever one appears you will usually find an
 [Imperative Loop](imperative-loops.md) that caused it, plus some combination
@@ -12,7 +12,7 @@ of [Clever Code](clever-code.md), [Mutable Data](mutable-data.md),
 being smuggled through the flag. The cost is that the reader can no longer
 tell what a block does by looking at any one line: meaning is spread across
 the initialisation, every assignment inside the body, and the check at the
-end, and correctness depends on all of them agreeing. Flags also leak — once
+end, and correctness depends on all of them agreeing. Flags also leak, once
 one exists, callers start reading it, and downstream code grows checks that
 must run before anything else can proceed. Nearly always a direct return, an
 exception, or a built-in expresses the same thing in one statement.
@@ -26,12 +26,12 @@ exception, or a built-in expresses the same thing in one statement.
 - A counter or accumulator declared above a loop and only meaningful after
   the loop has finished.
 - `found`, `ok`, `success`, `valid`, `hasError`, `done`, `flag`, `result` as
-  variable names — the name states the mechanism, not the value.
+  variable names, the name states the mechanism, not the value.
 - A loop that could `return` the moment it has the answer but sets a flag and
   keeps going instead.
 - The same flag assigned in more than one branch, so establishing its final
   value means tracing every path.
-- A flag surviving past the block that computed it — stored on the object,
+- A flag surviving past the block that computed it, stored on the object,
   returned alongside the real value, or checked again by the caller.
 - `while (! $done)` with the exit condition mutated somewhere inside the
   body rather than stated in the condition.
@@ -46,7 +46,7 @@ exception, or a built-in expresses the same thing in one statement.
   throw.
 - `$errors = []` accumulated by hand across a loop where `Validator::make()`
   or a collection `reject()` would collect the same failures.
-- Flags promoted to model attributes or `$this` properties — a
+- Flags promoted to model attributes or `$this` properties, a
   `public bool $processed` on a job or service that exists only to be read by
   the next method, which is a [Temporary Field](temporary-field.md) grown out
   of a local flag.
@@ -61,8 +61,8 @@ exception, or a built-in expresses the same thing in one statement.
   `findIndex`, or `includes` is a single expression.
 - `let result` declared with no initialiser and assigned in branches, instead
   of each branch returning its own value.
-- A `useState` boolean that only ever mirrors something derivable —
-  `isEmpty`, `hasResults`, `isValid` — recomputed by an effect rather than
+- A `useState` boolean that only ever mirrors something derivable, 
+  `isEmpty`, `hasResults`, `isValid`: recomputed by an effect rather than
   derived inline or with `useMemo`.
 - Paired loading flags (`isLoading`, `isError`, `isDone`) hand-maintained
   around a fetch, where a query library's status or a `useReducer` union
@@ -76,7 +76,7 @@ exception, or a built-in expresses the same thing in one statement.
 
 Translated from the upstream Python examples.
 
-Smelly — two status variables, a hand-driven index and a `found` flag, and an
+Smelly: two status variables, a hand-driven index and a `found` flag, and an
 infinite loop if `'foo'` is absent:
 
 ```php
@@ -100,7 +100,7 @@ final class NameIndex
 }
 ```
 
-Solution — the built-in states the question, handles the absent case, and
+Solution: the built-in states the question, handles the absent case, and
 leaves nothing mutable behind:
 
 ```php
@@ -144,5 +144,5 @@ None recorded upstream.
 ---
 
 *Derivative work adapted from "Status Variable" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

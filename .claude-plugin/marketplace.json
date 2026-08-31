@@ -48,8 +48,10 @@
         "./skills/to-tickets",
         "./skills/triage",
         "./skills/verify",
+        "./skills/wait-what",
         "./skills/wayfinder",
-        "./skills/writing-great-skills"
+        "./skills/which-skill",
+        "./skills/writing-for-agents"
       ]
     }
   ]

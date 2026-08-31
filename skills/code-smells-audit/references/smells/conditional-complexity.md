@@ -4,9 +4,9 @@
 
 An `if`/`elseif` cascade or `switch` that dispatches on a type code, and grows
 a branch every time the product grows a feature. The first branch is fine; the
-second is the warning. What makes it a smell is not the `switch` keyword —
+second is the warning. What makes it a smell is not the `switch` keyword, 
 Mäntylä's correction to Fowler's original *Switch Statement* naming, which
-Fowler later accepted by renaming it *Repeated Switching* — but the fact that
+Fowler later accepted by renaming it *Repeated Switching*, but the fact that
 the same set of cases reappears elsewhere in the codebase. Once it does,
 adding a variant means finding and editing every copy, which is an Open-Closed
 violation and the mechanism behind [Shotgun Surgery](shotgun-surgery.md).
@@ -24,7 +24,7 @@ code, [Callback Hell](callback-hell.md).
 
 ### Agnostic
 
-- The same set of cases is switched on in more than one place — a new variant
+- The same set of cases is switched on in more than one place, a new variant
   means editing all of them, and forgetting one is silent.
 - The branch condition reads a type code, status string, or enum
   discriminator, rather than asking the object to act.
@@ -42,8 +42,8 @@ code, [Callback Hell](callback-hell.md).
 - A `match ($type)` or `switch ($status)` in a service that maps each case to
   its own method, mirrored by a `@switch`/`@case` block in Blade and a third
   copy in a notification.
-- Branching on a string column — `if ($user->role === 'admin') { ... }
-  elseif ($user->role === 'editor')` — where a backed enum implementing a
+- Branching on a string column, `if ($user->role === 'admin') { ... }
+  elseif ($user->role === 'editor')`, where a backed enum implementing a
   behaviour interface, or a policy, would carry the decision.
 - Controllers dispatching on `$request->input('type')` instead of resolving
   an implementation from a container binding, a tagged set
@@ -57,7 +57,7 @@ code, [Callback Hell](callback-hell.md).
 ### TS / React
 
 - A `switch (action.type)` reducer where each case holds domain logic rather
-  than a state transition — the dispatch table is fine, the business rules
+  than a state transition; the dispatch table is fine, the business rules
   inside it are not.
 - Components selecting output by string prop
   (`if (variant === 'primary') return <Primary />; ...`) where a
@@ -75,7 +75,7 @@ code, [Callback Hell](callback-hell.md).
 
 Translated from the upstream Python example.
 
-Smelly — a branch per format, and every new codec edits this method:
+Smelly: a branch per format, and every new codec edits this method:
 
 ```php
 final class Exporter
@@ -95,7 +95,7 @@ final class Exporter
 }
 ```
 
-Solution — each format is a class behind one interface, and `Exporter` looks
+Solution; each format is a class behind one interface, and `Exporter` looks
 the implementation up instead of knowing the list:
 
 ```php
@@ -122,7 +122,7 @@ final class Exporter
 ```
 
 Note what survives: one lookup that can still fail. The goal was never to
-delete every conditional, only to stop repeating this one — adding FLAC now
+delete every conditional, only to stop repeating this one, adding FLAC now
 means adding a class and a map entry in a service provider, with `Exporter`
 untouched.
 
@@ -157,5 +157,5 @@ Polymorphism to if/else or switch/case
 ---
 
 *Derivative work adapted from "Conditional Complexity" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

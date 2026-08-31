@@ -1,0 +1,5 @@
+interface:
+  display_name: "To Questionnaire"
+  short_description: "Turn a decision the user can't fully answer into a Markdown questionnaire for someone else to fill in, async or over a meeting"
+policy:
+  allow_implicit_invocation: false

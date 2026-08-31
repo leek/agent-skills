@@ -1,0 +1,5 @@
+interface:
+  display_name: "Writing For Agents"
+  short_description: "Reference for writing documents an agent consumes"
+policy:
+  allow_implicit_invocation: true

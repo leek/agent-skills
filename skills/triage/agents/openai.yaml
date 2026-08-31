@@ -1,0 +1,5 @@
+interface:
+  display_name: "Triage"
+  short_description: "Move markdown issues and external-PR requests through triage roles: categorise, verify, grill if needed, and write agent-ready briefs"
+policy:
+  allow_implicit_invocation: false

@@ -5,12 +5,12 @@
 A value hitchhikes through a run of methods that have no use for it. Each one
 declares the parameter, forwards it untouched, and only the last frame in the
 line actually reads it. Where [Message Chain](message-chain.md) is the caller
-walking to distant data, this is the data being walked to the caller — same
+walking to distant data, this is the data being walked to the caller, same
 coupling, opposite direction. The tell is that the parameter does not belong
 to the abstraction each intermediate signature claims to present, which is
 what makes it a form of [Dubious Abstraction](dubious-abstraction.md): a
 method that says it renders a row should not need a session token to do it.
-It often appears as the cheap escape from [Global Data](global-data.md) —
+It often appears as the cheap escape from [Global Data](global-data.md), 
 the global was removed, but the value it carried was threaded through every
 signature instead of being moved next to the behaviour that uses it, which is
 what the Law of Demeter asks for.
@@ -26,7 +26,7 @@ what the Law of Demeter asks for.
 - Adding one field to a payload means editing every signature between the
   producer and the single consumer.
 - The parameter's type sits at a different level of abstraction than the
-  method that accepts it — a transport or request type deep inside domain
+  method that accepts it: a transport or request type deep inside domain
   code.
 - Removing the parameter from a middle layer is a purely mechanical edit with
   no logic to reason about.
@@ -41,7 +41,7 @@ what the Law of Demeter asks for.
 - Whole Eloquent models handed to a nested Action purely so the innermost one
   can read `$model->id`, when the intermediate steps never touch the model.
 - Blade `@include('rows', ['order' => $order, 'currency' => $currency])`
-  chains where `$currency` is only read two partials down — component slots
+  chains where `$currency` is only read two partials down, component slots
   or a view model end the relay.
 - Auth context threaded by hand through service calls where a Gate check, a
   policy, or an injected `AuthManager` would let each layer ask for what it
@@ -54,7 +54,7 @@ what the Law of Demeter asks for.
 - Prop drilling: a value passed through three or more components that only
   hand it further down. Context, a store, or passing `children` through the
   middle removes the relay.
-- Handlers re-wrapped to forward arguments they ignore —
+- Handlers re-wrapped to forward arguments they ignore, 
   `onChange={(event, meta) => onChange(event, meta)}` where `meta` is read
   only at the leaf.
 - Custom hooks that accept a config object solely to spread it into another
@@ -70,7 +70,7 @@ what the Law of Demeter asks for.
 Translated from the upstream Python example, which shows only the smelly
 half; the solution is authored for this card.
 
-Smelly — the turn timer is declared at every level of the walk and read only
+Smelly; the turn timer is declared at every level of the walk and read only
 by `Troop`:
 
 ```php
@@ -117,7 +117,7 @@ final class Troop
 }
 ```
 
-Solution — give the timer to the object that reads it and the intermediate
+Solution: give the timer to the object that reads it and the intermediate
 signatures lose a parameter they were only babysitting:
 
 ```php
@@ -198,5 +198,5 @@ None recorded upstream.
 ---
 
 *Derivative work adapted from "Tramp Data" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

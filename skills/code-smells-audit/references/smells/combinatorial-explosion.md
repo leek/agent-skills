@@ -3,8 +3,8 @@
 `Within · Bloaters · Responsibility`
 
 A pile of code that all does almost the same thing, where "almost" is the
-whole problem. Independent choices — which transport, which format, which
-filter, which state — were folded into a single hierarchy or a single chain
+whole problem. Independent choices, which transport, which format, which
+filter, which state: were folded into a single hierarchy or a single chain
 of branches instead of being kept as separate decisions, so the number of
 methods and cases is the product of the options rather than their sum. Adding
 one option along any axis multiplies the work: a variant has to be written
@@ -19,13 +19,13 @@ combination, and Open–Closed, because the shape of the code invites another
 
 ### Agnostic
 
-- Method names read as a matrix — the option grid is spelled out in the
+- Method names read as a matrix; the option grid is spelled out in the
   identifiers rather than expressed as parameters or collaborators.
 - Adding one option along one axis means writing N new methods or cases, not
   one.
 - Several conditionals in the same class branch on the same field in the same
   order (see [Conditional Complexity](conditional-complexity.md)).
-- The variants differ only in constant data — a string, a format, a count —
+- The variants differ only in constant data, a string, a format, a count, 
   never in structure.
 - Subclasses are named after combinations of traits rather than after
   concepts, folding two hierarchies into one (see
@@ -49,8 +49,8 @@ combination, and Open–Closed, because the shape of the code invites another
 
 ### TS / React
 
-- Component families named by combination — `PrimaryLargeButton`,
-  `PrimarySmallButton`, `GhostLargeButton` — where the axes are props and a
+- Component families named by combination, `PrimaryLargeButton`,
+  `PrimarySmallButton`, `GhostLargeButton`: where the axes are props and a
   variant lookup.
 - One hook per data shape × per fetch mode (`useUserList`,
   `useUserListPolling`, `useTeamList`, `useTeamListPolling`) where a single
@@ -66,7 +66,7 @@ combination, and Open–Closed, because the shape of the code invites another
 
 Translated from the upstream Python example.
 
-Smelly — every method re-derives the same state grid, so a fourth state means
+Smelly; every method re-derives the same state grid, so a fourth state means
 editing all of them:
 
 ```ts
@@ -94,7 +94,7 @@ class Minion {
 }
 ```
 
-Solution — each state owns its own answers and the minion delegates, so a new
+Solution: each state owns its own answers and the minion delegates, so a new
 state is one entry rather than one branch per method:
 
 ```ts
@@ -149,5 +149,5 @@ None recorded upstream.
 ---
 
 *Derivative work adapted from "Combinatorial Explosion" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

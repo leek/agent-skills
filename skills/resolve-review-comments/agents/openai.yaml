@@ -1,0 +1,5 @@
+interface:
+  display_name: "Resolve Review Comments"
+  short_description: "Triage, fix or rebut, then reply-and-resolve every review comment on a pull request, including AI-review bot findings (Codex, Copilot, Gemini)"
+policy:
+  allow_implicit_invocation: true

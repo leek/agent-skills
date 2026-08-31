@@ -1,0 +1,5 @@
+interface:
+  display_name: "Architecture Satisfaction"
+  short_description: "Run a bounded architectural refactor loop toward a stated design"
+policy:
+  allow_implicit_invocation: false

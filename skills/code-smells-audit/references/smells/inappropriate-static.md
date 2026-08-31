@@ -3,8 +3,8 @@
 `Between · Object Oriented Abusers · Interfaces`
 
 A static method is a decision that the behaviour it holds will never need to
-vary. That is true of a genuinely stateless operation — `max`, a pure format
-helper, a global constant — and it is the reason Fowler and Martin both treat
+vary. That is true of a genuinely stateless operation, `max`, a pure format
+helper, a global constant, and it is the reason Fowler and Martin both treat
 those as fine. It stops being true the moment the method encodes a rule that
 could plausibly have a second version: `HourlyPayCalculator::calculatePay()` is
 one payment algorithm among many that will eventually be asked for, and being
@@ -13,7 +13,7 @@ tests, where faking a hard-wired static needs a mocking framework doing tricks
 rather than a seam the design provides, and then in production, where every
 call site is welded to one implementation. The counterweight is
 [Speculative Generality](speculative-generality.md): if no second algorithm
-exists or is planned and the operation holds no state, leave it static —
+exists or is planned and the operation holds no state, leave it static, 
 the smell is a static that resists substitution *and* has a reason to vary.
 
 ## Detection heuristics
@@ -21,15 +21,15 @@ the smell is a static that resists substitution *and* has a reason to vary.
 ### Agnostic
 
 - A static method whose first parameter is a domain object it then reasons
-  about — that is an instance method on that type, spelled backwards.
+  about; that is an instance method on that type, spelled backwards.
 - Static methods carrying business rules that already have known variants:
   pricing, tax, discounting, ranking, permissions, scoring.
-- Static state: caches, counters, memoization tables, "current" values — that
+- Static state: caches, counters, memoization tables, "current" values, that
   is [Global Data](global-data.md) with an access modifier.
 - The test for a caller can only be written by monkey-patching, aliasing, or
   rewriting the class loader; or it silently hits the real clock, filesystem,
   or network because there was no seam to interpose.
-- No caller can select an alternative implementation in *any* environment —
+- No caller can select an alternative implementation in *any* environment, 
   not in tests, not per tenant, not behind a flag.
 - A `*Utils` / `*Helper` class of statics with a private constructor: a module
   of procedures wearing a class as a namespace.
@@ -45,10 +45,10 @@ the smell is a static that resists substitution *and* has a reason to vary.
   smell. Your own `PriceCalculator::for($order)` with no interface and no
   container binding is.
 - Static domain rules called directly from controllers, jobs, and listeners:
-  `TaxTable::rateFor($country)`, `Scoring::rank($lead)` — no constructor to
+  `TaxTable::rateFor($country)`, `Scoring::rank($lead)`: no constructor to
   inject, so every consumer is coupled to the one implementation.
 - Static methods on Eloquent models that are not query scopes and not factories
-  — `Order::monthlyRevenue()` running its own queries — which cannot be varied
+ (`Order::monthlyRevenue()` running its own queries) which cannot be varied
   per tenant or faked in a unit test.
 - `public static` arrays or properties used as caches or lookup tables that
   survive across requests under Octane and across jobs on a long-lived worker
@@ -60,7 +60,7 @@ the smell is a static that resists substitution *and* has a reason to vary.
 
 ### TS / React
 
-- `class DateUtils { static format() {} }` — the `static` keyword is doing
+- `class DateUtils { static format() {} }`: the `static` keyword is doing
   namespace duty; a plain exported function is simpler, and either way the
   substitution problem is the *direct import*, not the keyword.
 - A component or hook importing a concrete effectful function
@@ -72,14 +72,14 @@ the smell is a static that resists substitution *and* has a reason to vary.
 - `static` registries or handler maps on a class, populated at import time by
   side-effecting modules.
 - `Date.now()`, `crypto.randomUUID()`, `Math.random()` called inline inside
-  reducers, hooks, or render bodies — non-deterministic statics that force fake
+  reducers, hooks, or render bodies, non-deterministic statics that force fake
   timers on every test that touches the component.
 
 ## Example
 
 Translated from the upstream Python example.
 
-Smelly — the pay rule is a static utility, so `PayrollRun` is welded to it:
+Smelly; the pay rule is a static utility, so `PayrollRun` is welded to it:
 
 ```php
 final class PayCalculator
@@ -102,7 +102,7 @@ final class PayrollRun
 }
 ```
 
-Solution — the rule becomes an object behind a contract, injected by the
+Solution; the rule becomes an object behind a contract, injected by the
 container, so a salaried or contractor calculator can be bound in its place and
 the test supplies a stub instead of patching a class:
 
@@ -160,5 +160,5 @@ Static Cling
 ---
 
 *Derivative work adapted from "Inappropriate Static" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

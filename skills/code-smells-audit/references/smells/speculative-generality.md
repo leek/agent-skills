@@ -8,12 +8,12 @@ caller passes the same value for, an extension point with no extensions.
 Humans are poor guessers about their own future, and the instinct to prepare
 for anticipated scenarios is strong enough that developers pay a real cost
 today against a benefit that stays hypothetical. The cost is not just the
-extra file — it is that readers must understand the general case to follow
+extra file; it is that readers must understand the general case to follow
 the specific one, and later changes have to be threaded through a seam that
 was never load-bearing. Left long enough it decays into its neighbours: the
 hollow layers become [Lazy Elements](lazy-element.md) and the unused branches
 become [Dead Code](dead-code.md). The counterweight is
-[Dubious Abstraction](dubious-abstraction.md) — the answer is not "never
+[Dubious Abstraction](dubious-abstraction.md); the answer is not "never
 abstract" but "abstract on the second real case, not the first imagined one".
 
 ## Detection heuristics
@@ -26,20 +26,20 @@ abstract" but "abstract on the second real case, not the first imagined one".
   use.
 - Parameters, options bags, or config keys where every call site passes the
   same literal, and defaults nobody overrides.
-- Hook points — events, callbacks, strategy slots, plugin registries — with
+- Hook points (events, callbacks, strategy slots, plugin registries) with
   no subscribers.
 - Hedged names: `AbstractBase*`, `Generic*`, `*Provider`, `*Factory`, or a
   `V2` sitting beside a `V1` where only one is live.
 - Comments or tickets promising "so we can later support X" where "later"
   has visibly passed.
-- Intermediate levels in a hierarchy that add no fields and no behaviour —
+- Intermediate levels in a hierarchy that add no fields and no behaviour, 
   the layer exists to hold a category, not a difference.
 - Unused parameters kept "for symmetry" with a sibling signature.
 
 ### PHP / Laravel
 
 - An interface bound to one implementation in a service provider so the
-  driver could be swapped later — and it never was, not even by a fake in
+  driver could be swapped later, and it never was, not even by a fake in
   tests.
 - A `config/*.php` `driver` key or an `Illuminate\Support\Manager` subclass
   offering a driver menu of exactly one.
@@ -50,8 +50,8 @@ abstract" but "abstract on the second real case, not the first imagined one".
   no caller has ever passed.
 - Events dispatched with no listeners registered, and listeners registered
   for events nothing dispatches.
-- Multi-tenant, multi-currency, or multi-locale scaffolding — a `tenants`
-  table with one row, a `currency` column that is always `USD` — carried by
+- Multi-tenant, multi-currency, or multi-locale scaffolding, a `tenants`
+  table with one row, a `currency` column that is always `USD`: carried by
   an app that has never had a second one.
 - Deeply parameterised query builders where every caller uses the same two
   arguments.
@@ -77,7 +77,7 @@ abstract" but "abstract on the second real case, not the first imagined one".
 
 Translated from the upstream Python example.
 
-Smelly — a medieval fighting game with no animals in it; `Animal` exists
+Smelly: a medieval fighting game with no animals in it; `Animal` exists
 because someday there might be horses:
 
 ```php
@@ -108,7 +108,7 @@ final class Pikeman extends Human
 }
 ```
 
-Solution — collapse the speculative layer into the one that carries real
+Solution: collapse the speculative layer into the one that carries real
 differences:
 
 ```php
@@ -137,7 +137,7 @@ final class Pikeman extends Human
 ```
 
 When the horses do arrive, extracting `Animal` again is a mechanical
-refactoring against three known subclasses — far cheaper than the years of
+refactoring against three known subclasses, far cheaper than the years of
 readers who had to ask what an `Animal` was doing in a game about soldiers.
 
 ## Refactorings
@@ -165,5 +165,5 @@ None recorded upstream.
 ---
 
 *Derivative work adapted from "Speculative Generality" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

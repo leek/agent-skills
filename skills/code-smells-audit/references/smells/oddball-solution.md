@@ -5,7 +5,7 @@
 One problem solved two different ways in two parts of the same project. It is
 duplication, but not the copy-paste kind: the shapes differ enough that no
 clone detector and no diff will pair them, so you only find it by recognising
-the intent. The damage is that neither variant is authoritative — a reader
+the intent. The damage is that neither variant is authoritative, a reader
 cannot tell which approach is the house style, and a change to the approach
 has to be applied separately to each idiosyncratic version, which is how this
 smell breeds Shotgun Surgery. The usual origin is a set of near-but-not-quite
@@ -15,7 +15,7 @@ uniform interfaces that each caller adapted to in its own way.
 
 ### Agnostic
 
-- The same concern — retries, caching, date handling, error reporting — is
+- The same concern (retries, caching, date handling, error reporting) is
   implemented two ways, with no rule saying which is right.
 - A hand-rolled implementation sitting next to a shared helper that already
   covers the case.
@@ -38,7 +38,7 @@ uniform interfaces that each caller adapted to in its own way.
 - Dates handled with Carbon in one module and `strtotime()` / `date()` string
   juggling in the next.
 - Configuration read through `config()` in one service and `env()` directly in
-  another — and once `config:cache` runs, `env()` returns null outside config
+  another, and once `config:cache` runs, `env()` returns null outside config
   files, so the odd variant is also the broken one.
 
 ### TS / React
@@ -52,13 +52,13 @@ uniform interfaces that each caller adapted to in its own way.
 - Failures surfaced by throwing to an error boundary on one path and returned
   as `{ error }` on another, so callers cannot handle them uniformly.
 - One module parsing API responses with a schema validator while its sibling
-  asserts the shape with `as` — same intent, very different guarantees.
+  asserts the shape with `as`: same intent, very different guarantees.
 
 ## Example
 
 Translated from the upstream Python example.
 
-Smelly — each subclass builds its own connection and names the query
+Smelly: each subclass builds its own connection and names the query
 operation differently:
 
 ```php
@@ -98,7 +98,7 @@ final class Usb3Instrument extends Instrument
 }
 ```
 
-Solution — one adapter owns connecting and querying, and both instruments
+Solution: one adapter owns connecting and querying, and both instruments
 speak through it:
 
 ```php
@@ -161,5 +161,5 @@ Inconsistent Solution
 ---
 
 *Derivative work adapted from "Oddball Solution" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

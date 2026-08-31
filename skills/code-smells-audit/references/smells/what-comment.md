@@ -6,7 +6,7 @@ A comment that narrates what the code below it does, rather than why it does
 it. Treating every comment as a smell is contentious, so this is the narrow
 subcategory that almost always pays out: if a comment restates the mechanics
 of the code, the code failed to say them itself, and the comment is
-deodorant sprayed over whatever made it unreadable — an uncommunicative
+deodorant sprayed over whatever made it unreadable, an uncommunicative
 name, a magic number, an unextracted phase, a bare boolean. The comment also
 duplicates knowledge that now has two places to drift, so when the code moves
 on and the prose does not, the smell rots into a
@@ -20,7 +20,7 @@ exists, a conclusion from a code review, domain rules a reader cannot infer.
 
 - The comment paraphrases the statement below it. Delete it and nothing is
   lost that a better name could not carry.
-- Banner comments partition a body into phases (`// validate`, `// send`) —
+- Banner comments partition a body into phases (`// validate`, `// send`), 
   each banner is an extraction whose name is already written.
 - A doc block that only re-lists parameters and types the signature already
   declares.
@@ -34,20 +34,20 @@ exists, a conclusion from a code review, domain rules a reader cannot infer.
 - Docblocks repeating what PHP 8 types already say (`@param int $id`,
   `@return void`) on controllers, actions, or Eloquent models.
 - Phase banners inside a controller action, queued job's `handle()`, or
-  Artisan command — the banner names the action or service class that should
+  Artisan command; the banner names the action or service class that should
   exist.
 - Comments annotating a magic status value (`// 2 = cancelled`) where a
   backed enum or class constant would carry the meaning
   (see [Magic Number](magic-number.md)).
 - A comment beside a boolean argument explaining which behavior it selects
-  (`$this->sync($order, true); // force`) — the flag needs a name, not a
+  (`$this->sync($order, true); // force`); the flag needs a name, not a
   note.
 - Prose describing a long query builder chain instead of a named local scope
   on the model.
 
 ### TS / React
 
-- JSDoc mirroring the TypeScript signature (`@param {string} name`) —
+- JSDoc mirroring the TypeScript signature (`@param {string} name`), 
   duplicated information, free to drift, checked by nothing.
 - Section comments inside a component body (`// derived state`,
   `// handlers`) marking a custom hook or child component waiting to be
@@ -64,7 +64,7 @@ exists, a conclusion from a code review, domain rules a reader cannot infer.
 
 Translated from the upstream Python example.
 
-Smelly — two banner comments partition the method into the two methods it
+Smelly: two banner comments partition the method into the two methods it
 should have been:
 
 ```php
@@ -82,7 +82,7 @@ public function run(): void
 }
 ```
 
-Solution — each banner becomes a method name, and the comments are not
+Solution; each banner becomes a method name, and the comments are not
 deleted so much as promoted:
 
 ```php
@@ -136,5 +136,5 @@ Comment
 ---
 
 *Derivative work adapted from "What" Comment in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

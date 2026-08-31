@@ -5,14 +5,14 @@
 An object whose data is acted upon entirely from outside itself. In
 object-oriented code, data and the behavior over that data are supposed to
 travel together; when a type carries only fields, the rules about those
-fields have gone somewhere else — usually into a manager, helper, or service
+fields have gone somewhere else, usually into a manager, helper, or service
 that reaches in, reads state, decides, and writes back. The name comes from
 locus of control: the object's outcomes are governed by forces outside it
 rather than by its own actions. That inversion violates Tell, Don't Ask and
 couples every caller to the object's internal shape, so a field rename ripples
 outward and no single place can enforce an invariant. Classes typically start
-this way honestly — data is spotted as an independent thing and extracted
-before it has grown any behavior — and never finish the journey. Note that a
+this way honestly: data is spotted as an independent thing and extracted
+before it has grown any behavior, and never finish the journey. Note that a
 plain immutable DTO or value type crossing a boundary is not automatically
 this smell; the smell is behavior about that data implemented elsewhere.
 
@@ -24,7 +24,7 @@ this smell; the smell is behavior about that data implemented elsewhere.
   or `*Utils` next door holds every rule about them.
 - Callers ask for state and then decide, rather than telling the object to
   act; the object's own name never appears as the subject of a verb.
-- The same derivation — a total, a validity check, a display label — is
+- The same derivation (a total, a validity check, a display label) is
   recomputed from the object's fields at several call sites.
 - Setters exist for fields no collaborator has a legitimate reason to change,
   so the object cannot defend its own invariants.
@@ -34,7 +34,7 @@ this smell; the smell is behavior about that data implemented elsewhere.
 ### PHP / Laravel
 
 - Eloquent models reduced to `$fillable` and `$casts` while a `*Service`
-  reads `$model->attribute`, computes, and assigns back — the rule belongs
+  reads `$model->attribute`, computes, and assigns back, the rule belongs
   on the model as an accessor, a scope, or a named domain method.
 - Decisions made from raw attributes in Blade or Filament
   (`@if ($order->status === 'paid')`) where `$order->isPaid()` would let the
@@ -63,7 +63,7 @@ this smell; the smell is behavior about that data implemented elsewhere.
 
 Translated from the upstream Python example.
 
-Smelly — the commit is inert data and a separate manager performs every
+Smelly; the commit is inert data and a separate manager performs every
 change on its behalf:
 
 ```ts
@@ -90,7 +90,7 @@ const commit: Commit = {
 commitManager.updateAuthor(commit, 'Marcel Jerzyk');
 ```
 
-Solution — the commit owns its own state and the manager disappears:
+Solution: the commit owns its own state and the manager disappears:
 
 ```ts
 class Commit {
@@ -140,5 +140,5 @@ Data Class
 ---
 
 *Derivative work adapted from "Fate over Action" in Marcel Jerzyk's
-[Code Smells Catalog](https://codesmells.org/) (MIT) — see
+[Code Smells Catalog](https://codesmells.org/) (MIT), see
 [ATTRIBUTION.md](../ATTRIBUTION.md).*

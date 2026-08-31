@@ -6,6 +6,6 @@ disable-model-invocation: true
 
 # Grill With Docs
 
-Run a `grilling` session, using the `domain-modeling` skill alongside it — canonical terms land in `CONTEXT.md` and load-bearing decisions become ADRs *as they resolve*, not in a cleanup pass afterwards.
+Run a `grilling` session, using the `domain-modeling` skill alongside it: canonical terms land in `CONTEXT.md` and load-bearing decisions become ADRs *as they resolve*, not in a cleanup pass afterwards.
 
-When done, print `grill-me`'s routing block — only the outermost skill prints one.
+When done, print `grill-me`'s routing block, only the outermost skill prints one.
