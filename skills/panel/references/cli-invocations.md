@@ -38,7 +38,10 @@ Three rules hold for every CLI:
 
 ## agy
 
-- Headless: `-p` / `--print` runs one prompt and exits (`--print-timeout` defaults to 5m).
+- Headless: `-p` / `--print` runs one prompt and exits.
+- **Always pass `--print-timeout 30m`.** The default is 5m, and a code review takes longer
+  than that, so without it agy dies with `Error: timeout waiting for response` after five
+  minutes and the seat returns nothing. Put it before `-p` like every other flag.
 - Flag order: `-p` / `--print` consumes the NEXT token as its prompt value, so put every
   other flag **before** `-p` and give the task as `-p`'s value last, 
   `agy --dangerously-skip-permissions -p "$TASK"`. Putting `-p` first (`agy -p

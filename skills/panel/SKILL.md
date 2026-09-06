@@ -82,7 +82,7 @@ Headless commands (`< /dev/null` stops the CLI blocking on stdin):
 |---|---|
 | `claude` | `claude -p "$TASK" --dangerously-skip-permissions < /dev/null` |
 | `codex` | `codex exec --dangerously-bypass-approvals-and-sandbox --cd "$PWD" "$TASK" < /dev/null` |
-| `agy` | `agy --dangerously-skip-permissions -p "$TASK" < /dev/null` |
+| `agy` | `agy --dangerously-skip-permissions --print-timeout 30m -p "$TASK" < /dev/null` |
 | `grok` | `grok -p "$TASK" --always-approve < /dev/null` |
 
 In **review** shape, the task string is this brief. Name the pinned diff from step 1 in
