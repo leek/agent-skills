@@ -34,7 +34,7 @@ configure_provider() {
       PROVIDER_BIN_ENV_NAME="AUTOPILOT_GROK_BIN"
       PROVIDER_EVENT_FORMATTER="format_claude_event"
       PROVIDER_EXECUTOR="run_grok_provider"
-      PROVIDER_RESULT_EXTRACTOR="extract_claude_result"
+      PROVIDER_RESULT_EXTRACTOR="extract_grok_result"
       PROVIDER_CONFIG_READER="grok_configured_value"
       PROVIDER_CONFIG_SOURCE="config"
       PROVIDER_MODEL_KEY="default"
@@ -281,25 +281,81 @@ run_grok_provider() {
     --verbatim
     --always-approve
     --output-format streaming-messages-json
-    --json-schema "$SCHEMA_JSON"
     --cwd "$REPO_ROOT"
     --no-plan
     --max-turns 200
-    --no-alt-screen
   )
   [[ -z "$REQUESTED_MODEL" ]] || args+=(--model "$REQUESTED_MODEL")
   [[ -z "$REQUESTED_EFFORT" ]] || args+=(--effort "$REQUESTED_EFFORT")
-  # Positional prompt starts a multi-turn headless session. -p/--single exits after
-  # one assistant message, so a JSON-schema worker returns continue with an empty
-  # completed_ref before it can read the contract or use tools.
-  args+=("$prompt")
-  python3 "$SCRIPT_DIR/lib/run-grok-headless.py" \
-    "$PROVIDER_BIN" "${args[@]}" < /dev/null >"$event_pipe" 2>"$error_pipe"
+  # -p is one user prompt with a full tool loop and JSON events on stdout.
+  # --json-schema constrains every assistant text to the result object, so the
+  # worker emits continue with an empty completed_ref and exits before tools.
+  # A positional prompt (no -p) opens the TUI and needs a tty.
+  args+=(-p "$prompt")
+  "$PROVIDER_BIN" "${args[@]}" < /dev/null >"$event_pipe" 2>"$error_pipe"
 }
 
 extract_claude_result() {
   local event_file="$1" result_file="$2"
   jq -c 'select(.structured_output | type == "object") | .structured_output' "$event_file" | tail -n 1 >"$result_file"
+}
+
+extract_grok_result() {
+  local event_file="$1" result_file="$2"
+  python3 - "$event_file" "$result_file" <<'PY'
+import json
+import re
+import sys
+
+src, dest = sys.argv[1], sys.argv[2]
+required = ("status", "completed_ref", "next_ref", "summary", "reason")
+
+def valid(obj):
+    return isinstance(obj, dict) and all(k in obj for k in required)
+
+def parse_obj(text):
+    if not isinstance(text, str):
+        return text if valid(text) else None
+    text = text.strip()
+    try:
+        obj = json.loads(text)
+        return obj if valid(obj) else None
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", text, re.S)
+        if not match:
+            return None
+        try:
+            obj = json.loads(match.group(0))
+        except json.JSONDecodeError:
+            return None
+        return obj if valid(obj) else None
+
+found = None
+for line in open(src):
+    line = line.strip()
+    if not line.startswith("{"):
+        continue
+    try:
+        ev = json.loads(line)
+    except json.JSONDecodeError:
+        continue
+    so = ev.get("structured_output")
+    if valid(so):
+        found = so
+    if ev.get("type") == "assistant":
+        for block in (ev.get("message") or {}).get("content") or []:
+            if block.get("type") == "text":
+                parsed = parse_obj(block.get("text") or "")
+                if parsed is not None:
+                    found = parsed
+    if ev.get("type") == "result":
+        parsed = parse_obj(ev.get("result"))
+        if parsed is not None:
+            found = parsed
+
+with open(dest, "w") as out:
+    out.write(json.dumps(found, separators=(",", ":")) if found else "")
+PY
 }
 
 extract_codex_result() {

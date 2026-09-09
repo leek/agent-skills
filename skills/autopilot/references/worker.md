@@ -47,7 +47,7 @@ Rules that hold in every branch:
 
 ## Report progress
 
-JSON-schema sessions constrain assistant text to the result object. Do not write assistant text until the unit is closed. Your first output must be a tool call. Keep intermediate progress in tool calls only. Emit the structured result exactly once, as the final action of the session, after verification and the durable commit.
+Your first output must be a tool call that reads this contract. JSON-schema sessions constrain assistant text to the result object, so keep intermediate progress in tool calls only. Otherwise emit one short plain-text update after claiming, when entering a long test or implementation phase, before review and verification, and after the durable commit. Never put the result object in those updates. Emit the structured result exactly once, as the final action of the session, after verification and the durable commit.
 
 ## Return the unit result
 
