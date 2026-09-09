@@ -4,7 +4,7 @@ Execute one unit from an existing engineering pipeline, then return the required
 
 ## Orient
 
-1. Follow repository-level instructions already loaded by the harness; read them from disk only when they are absent from the session. Once likely work paths are known, discover and read every deeper `AGENTS.md`, `CLAUDE.md`, `CLAUDE.md.local`, and path-matched project rule that applies.
+1. Follow repository-level instructions already loaded by the harness; read them from disk only when they are absent from the session. Once likely work paths are known, discover and read every deeper `AGENTS.md`, `AGENTS.local.md`, `CLAUDE.md`, `CLAUDE.md.local`, and path-matched project rule that applies.
 2. Treat the Autopilot run ID, workflow path, and runner-generated context manifest in the launch prompt as authoritative data. The manifest is a compact snapshot, not a substitute for the tracker files it names.
 3. Read the one workflow file supplied for this mode completely before acting. Read supporting skills only when that workflow reaches them.
 
@@ -47,7 +47,7 @@ Rules that hold in every branch:
 
 ## Report progress
 
-Emit one short operational update after selecting and claiming the unit, when entering a long test or implementation phase, before review and verification, and after the durable commit or resolution. Name the unit and current phase without including reasoning, secrets, or command output. These updates are plain-text messages, never the result object: invoke the structured result tool exactly once, as the final action of the session. Continue working after each update.
+JSON-schema sessions constrain assistant text to the result object. Do not write assistant text until the unit is closed. Your first output must be a tool call. Keep intermediate progress in tool calls only. Emit the structured result exactly once, as the final action of the session, after verification and the durable commit.
 
 ## Return the unit result
 

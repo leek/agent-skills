@@ -283,13 +283,18 @@ run_grok_provider() {
     --output-format streaming-messages-json
     --json-schema "$SCHEMA_JSON"
     --cwd "$REPO_ROOT"
-    --no-memory
     --no-plan
+    --max-turns 200
+    --no-alt-screen
   )
   [[ -z "$REQUESTED_MODEL" ]] || args+=(--model "$REQUESTED_MODEL")
   [[ -z "$REQUESTED_EFFORT" ]] || args+=(--effort "$REQUESTED_EFFORT")
-  args+=(-p "$prompt")
-  "$PROVIDER_BIN" "${args[@]}" >"$event_pipe" 2>"$error_pipe"
+  # Positional prompt starts a multi-turn headless session. -p/--single exits after
+  # one assistant message, so a JSON-schema worker returns continue with an empty
+  # completed_ref before it can read the contract or use tools.
+  args+=("$prompt")
+  python3 "$SCRIPT_DIR/lib/run-grok-headless.py" \
+    "$PROVIDER_BIN" "${args[@]}" < /dev/null >"$event_pipe" 2>"$error_pipe"
 }
 
 extract_claude_result() {

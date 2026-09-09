@@ -142,7 +142,7 @@ build_prompt() {
     "$workflow_line" \
     "The runner selected the exact unit from current tracker and Git state." \
     "Iteration context manifest (JSON): $context_json" \
-    "Perform exactly that unit. On success return it as completed_ref with an empty next_ref; the runner computes the next frontier. Return only the required structured result."
+    "Perform exactly that unit. Your first output must be a tool call that reads the worker contract. Do not emit the structured result until the unit is implemented, verified, committed, and closed on disk. continue requires a non-empty completed_ref naming that closed unit and an empty next_ref."
 }
 
 tracker_terminal_result() {
