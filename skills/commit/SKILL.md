@@ -25,6 +25,9 @@ repo at the same time; that is expected, and none of their work is yours to comm
    and ignores whatever another session has already staged, so a foreign `git add` can never ride
    along. Never `git add -A`, `git add .`, or `commit -a`. For a partially staged file from step 3,
    `git commit -m "<subject>" -- <path>` after `git add -p` instead.
+   **New files are the exception:** `--only` silently skips untracked paths, so `git add -- <new-path>`
+   each file you created first, then include it in the same `--only` list. Check
+   `git status --porcelain` afterwards; a `??` line for one of your files means it was skipped.
 5. **Subject.** Conventional Commits: `type(scope): summary`: imperative mood, lowercase,
    no trailing period, under 72 chars. Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`,
    `perf`, `build`, `ci`. Scope optional. Add a short body only when *why* is not obvious from the
