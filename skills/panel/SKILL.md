@@ -131,14 +131,18 @@ and its one-line **reason**. For a Conflict, state both sides and who holds each
 Then a one-line summary: how many points at each grade, the responder count `N`, and any
 CLI that was absent or errored.
 
-Close with a **Recommended next steps** block, ordered by confidence:
+Close with a **Recommended next steps** block:
 
-1. **Fix now**: list every Unanimous and Majority point as a checklist. These are the
-   panel's confident calls.
-2. **Weigh**: list the Split, Lone, and Conflict points. Decide each on its merits; do
-   not batch-apply them.
-3. **Offer the shortcut**: ask whether to apply the Fix-now set as one commit, naming
-   the count, e.g. "Reply *fix all* to apply the 3 confident fixes."
+1. **Fix list**: every point at every grade, Unanimous through Lone, as one checklist. Do not
+   curate: a Lone finding is a real finding until verified otherwise. For a Conflict, list both
+   sides and say which one the code supports.
+2. **Offer the shortcut**: ask whether to verify and apply the whole list as one commit, naming
+   the count, e.g. "Reply *fix all* to verify and apply all 11 points."
+
+On *fix all*, work every point: verify each against the code, apply the ones that hold, and
+report the ones that do not with a one-line reason. Never apply only the confident subset and
+hand the rest back as "weigh individually"; the user asked for the panel so they would not have
+to re-adjudicate it. Ask only about a point that conflicts with a recorded decision.
 
 ## Safety
 

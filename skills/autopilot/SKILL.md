@@ -22,7 +22,7 @@ Pass `--repo <path>` when the target is not the current repository, `--max-itera
 
 Run the script as a background task and poll its output: one iteration is a full build lifecycle and routinely outlasts a foreground shell-command timeout. Immediately report the run ID, worker session model and effort, log path, and printed observer commands. Then report worker milestones and five-minute heartbeats from stderr as they arrive; leave routine tool events in the log.
 
-Foreground run mode prints progress to stderr and one terminal result object to stdout; completion is exit code `0` with `status: complete`. Observer modes keep their operational messages on stderr: `--status` prints one state object, `--history` prints an array of retained states, `--tmux` prints one launch object, and `--follow` streams the human-readable run log to stdout.
+Foreground run mode prints progress to stderr and one terminal result object to stdout; completion is exit code `0` with `status: complete`. Observer modes keep their operational messages on stderr: `--status` prints one state object, `--history` prints an array of retained states, `--tmux` prints one launch object, and `--follow` streams the human-readable run log to stdout, and `--wait` blocks until the run leaves `running`, prints the final state object, and exits with the run's terminal code (below). Prefer one `--wait` call with `run_in_background` over any sleep or `/loop` polling of `--status`. With no run for the root, `--status` prints `{"status":"none",…}` and exits 1.
 
 Use the printed commands to inspect a run independently:
 
@@ -69,6 +69,8 @@ The runner does not take that on trust. It snapshots every work item beside the 
 Stopping at a gate leaves the in-progress marker and the run's claim in place on purpose: that marker is how a later process recognizes its own resumable work rather than colliding with another session's.
 
 ## Human gates
+
+A build ticket whose frontmatter says `deploy-gate: true` is a human gate after it closes: the runner stops with `needs_input` instead of continuing to the next ticket, because the unit must be deployed on its own before its dependents are built (expand before migrate before contract; a command before the enforcement that relies on it). Deploy, then rerun the same command; the closed ticket is the resume point.
 
 Headless workers cannot conduct a live interview or approve a new spec or ticket breakdown. Stop with `needs_input` when `wayfinder` reaches a HITL ticket, `to-spec` needs seam or publication approval, `to-tickets` needs breakdown approval, or implementation exposes an undecided product question. After resolving the gate interactively, rerun the same command; tracker state and commits are the resume point.
 

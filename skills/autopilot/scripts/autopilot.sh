@@ -148,6 +148,7 @@ Usage:
   autopilot.sh --status --root <ref> [--repo <path>]
   autopilot.sh --follow --root <ref> [--repo <path>]
   autopilot.sh --history --root <ref> [--repo <path>]
+  autopilot.sh --wait --root <ref> [--repo <path>]     # block until terminal; exit = run status
 
 Run options:
   --repo <path>         Target Git repository (default: current directory)
@@ -170,7 +171,7 @@ EOF
 
 set_mode() {
   local requested="$1"
-  [[ "$MODE" == "run" ]] || runner_failure "--status, --follow, and --history are mutually exclusive"
+  [[ "$MODE" == "run" ]] || runner_failure "--status, --follow, --wait, and --history are mutually exclusive"
   MODE="$requested"
 }
 
@@ -230,6 +231,10 @@ while [[ $# -gt 0 ]]; do
       set_mode "history"
       shift
       ;;
+    --wait)
+      set_mode "wait"
+      shift
+      ;;
     --tmux)
       USE_TMUX="true"
       shift
@@ -285,6 +290,10 @@ case "$MODE" in
   history)
     print_history
     exit 0
+    ;;
+  wait)
+    wait_for_run
+    exit $?
     ;;
 esac
 

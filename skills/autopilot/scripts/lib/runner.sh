@@ -400,6 +400,21 @@ run_autopilot_loop() {
         fi
         COMPLETED_REFS="${COMPLETED_REFS}${completed_ref}
 "
+        if work_item_is_deploy_gate "$completed_ref"; then
+          # The closed unit must ship on its own before anything that depends on
+          # it is built (expand → migrate → contract, feature flag before enforcement).
+          # Stop here; rerunning the same command after the deploy resumes from
+          # the tracker, which now shows this unit closed.
+          result_status="needs_input"
+          REASON="$completed_ref is marked deploy-gate: true. Deploy it before continuing, then rerun the same autopilot command."
+          SUMMARY="Autopilot reached a deploy gate after $completed_ref."
+          jq --arg status "$result_status" --arg reason "$REASON" --arg summary "$SUMMARY" \
+            '.status = $status | .reason = $reason | .summary = $summary | .next_ref = ""' \
+            "$result_file" >"$result_file.gated" && mv -- "$result_file.gated" "$result_file"
+          cp -- "$result_file" "$RESULT_FILE_STATE" || true
+          announce_activity "$SUMMARY"
+          terminal_exit="$(terminal_exit_for_status "$result_status")"
+        fi
         ;;
       complete|needs_input|blocked|failed) terminal_exit="$(terminal_exit_for_status "$result_status")" ;;
     esac

@@ -32,7 +32,11 @@ read_follow_state() {
 }
 
 print_status() {
-  [[ -f "$STATE_FILE" ]] || runner_failure "no Autopilot run found for this root"
+  if [[ ! -f "$STATE_FILE" ]]; then
+    emit_stderr "no Autopilot run found for this root"
+    jq -cn --arg root "$ROOT_REF" '{status:"none",root:$root,runner_alive:false,worker_alive:false,tmux_alive:false}'
+    exit 1
+  fi
   validate_state "$STATE_FILE" || runner_failure "runner state is invalid: $STATE_FILE"
 
   local runner_pid worker_pid runner_process_started worker_process_started runner_alive worker_alive
@@ -158,6 +162,52 @@ follow_log() {
       return 0
     fi
   done
+}
+
+# --wait: block until the run leaves `running`, then print the final state object
+# on stdout and exit with the run's terminal code (0 complete, 2 needs_input,
+# 3 blocked, 4 failed, 5 runner died / no run). One background call replaces a
+# sleep-poll loop.
+wait_for_run() {
+  if [[ ! -f "$STATE_FILE" ]]; then
+    emit_stderr "no Autopilot run found for this root"
+    jq -cn --arg root "$ROOT_REF" '{status:"none",root:$root}'
+    return 5
+  fi
+  validate_state "$STATE_FILE" || runner_failure "runner state is invalid: $STATE_FILE"
+
+  local wait_run_id wait_state_file current_status runner_pid runner_process_started interval
+  interval="${AUTOPILOT_WAIT_INTERVAL_SECONDS:-15}"
+  read_state_fields "$STATE_FILE" '[.run_id]'
+  wait_run_id="${STATE_FIELDS[0]:-}"
+  wait_state_file="$RUNS_DIR/$wait_run_id/state.json"
+  [[ -f "$wait_state_file" ]] || wait_state_file="$STATE_FILE"
+
+  emit_stderr "waiting for run $wait_run_id to leave running (every ${interval}s)"
+  while :; do
+    read_follow_state "$wait_state_file"
+    current_status="$FOLLOW_STATE_STATUS"
+    runner_pid="$FOLLOW_STATE_RUNNER_PID"
+    runner_process_started="$FOLLOW_STATE_RUNNER_STARTED"
+    if [[ "$current_status" != "running" ]]; then
+      break
+    fi
+    if ! pid_is_alive "$runner_pid" "$runner_process_started"; then
+      emit_stderr "runner stopped without recording terminal state"
+      jq -c . "$wait_state_file"
+      return 5
+    fi
+    sleep "$interval"
+  done
+  emit_stderr "run reached $current_status"
+  jq -c . "$wait_state_file"
+  case "$current_status" in
+    complete) return 0 ;;
+    needs_input) return 2 ;;
+    blocked) return 3 ;;
+    failed) return 4 ;;
+    *) return 5 ;;
+  esac
 }
 
 print_history() {

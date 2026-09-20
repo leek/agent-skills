@@ -69,6 +69,20 @@ resolve_work_item() {
   canonical_existing_file "$ref"
 }
 
+# True when the work item's frontmatter carries `deploy-gate: true`: the unit
+# must be deployed on its own before its dependents are built.
+work_item_is_deploy_gate() {
+  local file="$1" value
+  [[ -f "$file" ]] || file="$REPO_ROOT/$1"
+  [[ -f "$file" ]] || return 1
+  value="$(awk '
+    NR == 1 && $0 !~ /^---[[:space:]]*$/ { exit }
+    NR > 1 && /^---[[:space:]]*$/ { exit }
+    /^deploy-gate:[[:space:]]*/ { sub(/^deploy-gate:[[:space:]]*/, ""); print; exit }
+  ' "$file" 2>/dev/null | tr -d '\r' | tr '[:upper:]' '[:lower:]' | sed -E 's/[[:space:]#].*$//')"
+  [[ "$value" == true || "$value" == yes ]]
+}
+
 # Reads status/claim from YAML frontmatter (all pipeline files now use it),
 # falling back to a legacy bold "**Status:**" line for older files.
 read_work_item_state() {
