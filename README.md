@@ -61,6 +61,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | `wait-what` | user | Stop; that last message did not land. Re-pitch it. |
 | `wayfinder` | user | Plan work too big for one agent session as a map of decision tickets in markdown under .scratch/, then resolve them one per session until the route to the destination is clear. |
 | `which-skill` | user | Not sure which skill to reach for? Name the situation and get routed to one. |
+| `wizard` | model | Generate an interactive bash wizard that walks a human through steps only they can perform: provisioning, dashboard credentials, CI secrets, one-off migrations or cutovers. |
 | `writing-for-agents` | model | Reference for writing documents an agent consumes: skills, AGENTS.md/CLAUDE.md, and reference docs reached by a pointer. |
 
 ## Subagents (Claude Code)

@@ -31,6 +31,8 @@ Most work runs one straight line (**decide → spec → tickets → build**) ove
 
 **Before any of it, once per repo:** `setup` writes the tracker, status vocabulary, and domain doc layout.
 
+**Steps only a human can do** (a third-party dashboard, credentials, CI secrets, a one-off cutover) → `wizard` scripts the walkthrough.
+
 ## After the code exists
 
 - Review the diff → `code-review`. Want four independent models on it instead of one → `panel`.

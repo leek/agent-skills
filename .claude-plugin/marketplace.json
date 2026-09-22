@@ -52,6 +52,7 @@
         "./skills/wait-what",
         "./skills/wayfinder",
         "./skills/which-skill",
+        "./skills/wizard",
         "./skills/writing-for-agents"
       ]
     }
