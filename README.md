@@ -45,6 +45,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | `nightly-docs-sweep` | user | Run a documentation sweep for a codebase. |
 | `panel` | user | Convene a panel of agent CLIs (grok, claude, codex, agy) on a prompt or a code review, each in its own headless subagent, then report one consensus grouped by how much they agree. |
 | `prototype` | model | Build a throwaway prototype to answer a design question. |
+| `release` | user | Commit this session's work, bump the version, tag, push, and publish a GitHub release with grouped notes. |
 | `repository-cleanup` | user | Audit and clean Git repository state. |
 | `research` | model | Investigate a question against high-trust primary sources and capture the findings as a cited Markdown file. |
 | `resolve-review-comments` | model | Triage, fix or rebut, then reply-and-resolve every review comment on a PR (including AI-review bot findings). |

@@ -1,0 +1,5 @@
+interface:
+  display_name: "Release"
+  short_description: "Commit this session's work, bump the version, tag, push, and publish a GitHub release with grouped notes"
+policy:
+  allow_implicit_invocation: false

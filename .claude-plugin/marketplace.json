@@ -36,6 +36,7 @@
         "./skills/nightly-docs-sweep",
         "./skills/panel",
         "./skills/prototype",
+        "./skills/release",
         "./skills/repository-cleanup",
         "./skills/research",
         "./skills/resolve-review-comments",
