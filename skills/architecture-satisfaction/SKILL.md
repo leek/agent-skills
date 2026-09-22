@@ -2,6 +2,7 @@
 name: architecture-satisfaction
 description: Run a bounded architectural refactor loop toward a stated design.
 disable-model-invocation: true
+argument-hint: "The architectural target to refactor toward"
 ---
 
 # Architecture Satisfaction

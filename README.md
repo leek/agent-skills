@@ -113,7 +113,7 @@ skills/
     references/      # optional: supporting docs
 ```
 
-The `SKILL.md` frontmatter requires only two fields:
+The `SKILL.md` frontmatter requires only two fields (Claude Code reads a few optional ones such as `argument-hint` and `allowed-tools`; other harnesses ignore them, see [`AGENTS.md`](./AGENTS.md)):
 
 ```markdown
 ---

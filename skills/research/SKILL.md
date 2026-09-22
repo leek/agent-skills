@@ -1,6 +1,8 @@
 ---
 name: research
 description: Investigate a question against high-trust primary sources and capture the findings as a cited Markdown file. Use when the user wants a topic researched, docs or package facts gathered, reading legwork delegated, or a wayfinder research ticket resolved.
+argument-hint: "The question to research"
+allowed-tools: "WebFetch WebSearch"
 ---
 
 # Research

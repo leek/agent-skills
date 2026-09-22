@@ -2,6 +2,7 @@
 name: autopilot
 description: Drive an existing wayfinder map, spec, or set of tickets to completion through fresh top-level Claude Code, Codex, or Grok sessions.
 disable-model-invocation: true
+argument-hint: "Path to a wayfinder map, spec, or ticket"
 ---
 
 # Autopilot

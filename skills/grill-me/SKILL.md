@@ -2,6 +2,7 @@
 name: grill-me
 description: "Run a grilling session: the user wants their plan, decision, or idea stress-tested one question at a time."
 disable-model-invocation: true
+argument-hint: "The plan, decision, or idea to stress-test"
 ---
 
 # Grill Me

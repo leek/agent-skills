@@ -2,6 +2,7 @@
 name: wayfinder
 description: Plan work too big for one agent session as a map of decision tickets in markdown under .scratch/, then resolve them one per session until the route to the destination is clear.
 disable-model-invocation: true
+argument-hint: "A loose idea, or an existing map under .scratch/"
 ---
 
 # Wayfinder

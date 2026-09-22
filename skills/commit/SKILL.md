@@ -2,6 +2,7 @@
 name: commit
 description: Commit the work done in this session, skipping files a parallel session also touched.
 disable-model-invocation: true
+allowed-tools: "Bash(git status *) Bash(git diff *) Bash(git add *) Bash(git commit *) Bash(git show *) Bash(git log *)"
 ---
 
 # Commit

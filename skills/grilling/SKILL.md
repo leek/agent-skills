@@ -1,6 +1,7 @@
 ---
 name: grilling
 description: Interview the user one decision at a time until reaching shared understanding, resolving each branch of the decision tree with recommended options and trade-offs. Use when a plan, design, or idea needs its soft spots found and forced into the open, or when another skill needs the interview protocol.
+user-invocable: false
 ---
 
 # Grilling

@@ -1,6 +1,8 @@
 ---
 name: code-review
 description: "Two-axis review of the diff since a fixed point: Standards (repo conventions) and Spec (ticket/PRD fidelity). Use when the user wants to review a branch, PR, WIP changes, or asks to \"review since X\"."
+argument-hint: "since <ref>, or a PR or branch (omit for WIP changes)"
+allowed-tools: "Bash(git diff *) Bash(git log *) Bash(git merge-base *)"
 ---
 
 # Code Review

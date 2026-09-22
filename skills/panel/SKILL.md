@@ -3,6 +3,8 @@ name: panel
 description: Convene a panel of agent CLIs (grok, claude, codex, agy) on a prompt or a code review, then report one consensus grouped by how much they agree.
 disable-model-invocation: true
 argument-hint: "A prompt, or a review scope like 'review since main'"
+allowed-tools: "Bash(grok *) Bash(claude *) Bash(codex *) Bash(agy *)"
+compatibility: "Needs at least one of the grok, claude, codex, or agy CLIs on PATH"
 ---
 
 # Panel

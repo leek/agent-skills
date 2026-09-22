@@ -64,6 +64,7 @@ CI fails if a skill is missing the file or the two disagree. Keep the skill bodi
 name: <skill-name>
 description: <see invocation policy below>
 disable-model-invocation: true   # only on user-invoked flows
+argument-hint: "What the user passes"   # optional, see below
 ---
 
 # <Skill Title>
@@ -80,6 +81,16 @@ behind a pointer to a companion file or references/.
 - **User-invoked** (`disable-model-invocation: true`): for flows with side effects (publishing issues, committing, interviewing the user) or that only make sense when the human asks. The `description` becomes a human-facing one-liner, no trigger lists.
 
 The test: *could the model usefully reach for this on its own?* Reuse by other skills is a reason to keep it model-invoked; being a big deliberate workflow is a reason not to.
+
+**Optional Claude Code fields.** Other harnesses ignore unknown frontmatter, so these cost nothing elsewhere. Full list: [frontmatter reference](https://code.claude.com/docs/en/skills#frontmatter-reference). Use the ones that carry a real fact about the skill:
+
+- `argument-hint`: on any skill that takes input. Say what the input is, and what happens when it is omitted.
+- `allowed-tools`: pre-approve only the commands the skill exists to run (`commit` → `git add/commit`, `research` → `WebFetch WebSearch`). Deny rules in settings still win. Never pre-approve a destructive command the body says to ask about first.
+- `user-invocable: false`: for a protocol other skills run that has its own user front door (`grilling` behind `grill-me`). It hides the `/` entry; the model can still invoke it.
+- `compatibility`: environment the skill cannot run without (Herd on macOS, a CLI on PATH). Documentation only.
+- Not adopted, on purpose: `context: fork` (our skills read the conversation), `when_to_use` (Codex and `npx skills` read only `description`, so triggers stay there), `model`/`effort`/`paths`/`hooks` (no skill has a fact that needs them yet).
+
+Note `disable-model-invocation: true` also stops a skill running when a Claude Code scheduled task fires with the skill as its prompt. The loop skills (`dependency-audit`, `nightly-docs-sweep`) are driven by user-typed `/loop`, which is unaffected.
 
 **The invariant that follows: a user-invoked skill can never be reached by another skill**, not by name, not through any harness's skill-invocation tool. A skill that tells the agent to invoke one is broken; have it *recommend* the flow to the user instead. Shared reference two user-invoked skills both need can live in neither, so it goes in a file they both point at.
 

@@ -2,6 +2,7 @@
 name: implement
 description: "Implement one Laravel work item end to end: scope and claim it when trackable, TDD at chosen seams, commit, review, verify, and resolve it."
 disable-model-invocation: true
+argument-hint: "A ticket or spec path (omit to use the conversation scope)"
 ---
 
 # Implement

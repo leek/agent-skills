@@ -2,6 +2,7 @@
 name: resolve-review-comments
 description: Triage, fix or rebut, then reply-and-resolve every review comment on a pull request, including AI-review bot findings (Codex, Copilot, Gemini). Use when the user wants to address, respond to, action, or clear the review comments on a PR.
 argument-hint: "A PR number or URL (defaults to the PR for the current branch)"
+allowed-tools: "Bash(gh pr view *) Bash(gh pr diff *) Bash(gh api *)"
 ---
 
 # Resolve Review Comments

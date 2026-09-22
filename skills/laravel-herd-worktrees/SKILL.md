@@ -1,6 +1,7 @@
 ---
 name: laravel-herd-worktrees
 description: Create, list, or remove git worktrees for Laravel projects served by Laravel Herd on macOS. Use when the user needs a branch worktree, .test URL, or per-worktree PHP/composer isolation.
+compatibility: "macOS with Laravel Herd installed"
 ---
 
 # Laravel Herd + Git Worktrees

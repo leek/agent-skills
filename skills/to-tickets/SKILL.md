@@ -2,6 +2,7 @@
 name: to-tickets
 description: Break a spec into tracer-bullet vertical-slice tickets with explicit blocking edges, take one green light on the breakdown, and save one markdown file per ticket beside the spec.
 disable-model-invocation: true
+argument-hint: "[spec path or wayfinder map] (defaults to the conversation)"
 ---
 
 # To Tickets

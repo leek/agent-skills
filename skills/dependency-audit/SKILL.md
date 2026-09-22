@@ -2,6 +2,7 @@
 name: dependency-audit
 description: Run a weekly dependency audit for Composer or npm projects and propose a safe upgrade plan.
 disable-model-invocation: true
+allowed-tools: "Bash(composer outdated *) Bash(composer audit) Bash(composer audit *) Bash(npm outdated *) Bash(npm audit) Bash(npm audit *)"
 ---
 
 # Dependency Audit Weekly
