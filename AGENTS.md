@@ -89,8 +89,9 @@ The test: *could the model usefully reach for this on its own?* Reuse by other s
 - `allowed-tools`: pre-approve only the commands the skill exists to run (`commit` → `git add/commit`, `research` → `WebFetch WebSearch`). Deny rules in settings still win. Never pre-approve a destructive command the body says to ask about first.
 - `user-invocable: false`: for a protocol other skills run that has its own user front door (`grilling` behind `grill-me`). It hides the `/` entry; the model can still invoke it.
 - `compatibility`: environment the skill cannot run without (Herd on macOS, a CLI on PATH). Documentation only.
+- `model` / `effort`: only on one-turn, user-invoked skills whose work is mechanical (`which-skill`, `wait-what`, `commit`, `panel`). The override lasts the rest of the turn, so never on a skill other skills chain into, and never on interviews. For a `context: fork` skill, put them on the agent file instead.
 - `context: fork` + `agent: leek-skills:<name>` + `background: false`: only on a skill whose body is the whole task and never needs the conversation (`research`, `dependency-audit`). Everything else reads the conversation and stays inline; see Subagents below.
-- Not adopted, on purpose: `when_to_use` (Codex and `npx skills` read only `description`, so triggers stay there), `model`/`effort`/`paths`/`hooks` (no skill has a fact that needs them yet).
+- Not adopted, on purpose: `when_to_use` (Codex and `npx skills` read only `description`, so triggers stay there), `paths`/`hooks` (no skill has a fact that needs them yet).
 
 Note `disable-model-invocation: true` also stops a skill running when a Claude Code scheduled task fires with the skill as its prompt. The loop skills (`dependency-audit`, `nightly-docs-sweep`) are driven by user-typed `/loop`, which is unaffected.
 

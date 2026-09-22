@@ -2,6 +2,8 @@
 name: wait-what
 description: "Stop. That last message did not land. Re-pitch it."
 disable-model-invocation: true
+model: sonnet
+effort: low
 ---
 
 Wait, I don't understand where you've got to here. Re-pitch that.

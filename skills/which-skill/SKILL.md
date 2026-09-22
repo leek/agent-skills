@@ -3,6 +3,8 @@ name: which-skill
 description: Not sure which skill to reach for? Name the situation and get routed to one.
 disable-model-invocation: true
 argument-hint: "Describe your situation"
+model: sonnet
+effort: low
 ---
 
 # Which Skill

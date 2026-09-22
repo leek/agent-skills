@@ -5,6 +5,8 @@ disable-model-invocation: true
 argument-hint: "A prompt, or a review scope like 'review since main'"
 allowed-tools: "Bash(grok *) Bash(claude *) Bash(codex *) Bash(agy *)"
 compatibility: "Needs at least one of the grok, claude, codex, or agy CLIs on PATH"
+model: sonnet
+effort: medium
 ---
 
 # Panel
