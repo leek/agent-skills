@@ -18,7 +18,7 @@ Show this to the user, then immediately proceed to Step 2. The user reads and th
 
 ### 2. Spawn sub-agents
 
-Spawn 3+ sub-agents in parallel, using whatever the harness provides (in Claude Code, the Agent tool; Grok, `spawn_subagent`). Each must produce a **radically different** interface for the deepened module. Where the harness has no sub-agents, produce the designs yourself one at a time, writing each down in full before starting the next; the point is genuine independence, not the parallelism.
+Spawn 3+ sub-agents in parallel, using whatever the harness provides (in Claude Code with this plugin installed, the Agent tool with `subagent_type=leek-skills:module-designer`, which arrives with the codebase-design and domain-modeling vocabulary preloaded; plain Claude Code, the Agent tool; Grok, `spawn_subagent`). Each must produce a **radically different** interface for the deepened module. Where the harness has no sub-agents, produce the designs yourself one at a time, writing each down in full before starting the next; the point is genuine independence, not the parallelism.
 
 Prompt each sub-agent with a separate technical brief (file paths, coupling details, dependency category from [deepening.md](deepening.md), what sits behind the seam). The brief is independent of the user-facing problem-space explanation in Step 1. Give each agent a different design constraint:
 

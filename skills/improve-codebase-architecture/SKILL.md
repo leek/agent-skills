@@ -24,7 +24,7 @@ This command is _informed_ by the project's domain model and built on a shared d
 
 Read the project's domain glossary (`CONTEXT.md`) and any ADRs in the area you're touching first.
 
-Then walk the codebase in a **read-only sub-agent** where the harness has one (in Claude Code, the Agent tool with `subagent_type=Explore`; elsewhere, whatever read-only sweep it offers), so the sweep's file dumps stay out of this context and only the findings come back. Without sub-agents, walk it inline. Don't follow rigid heuristics: explore organically and note where you experience friction:
+Then walk the codebase in a **read-only sub-agent** where the harness has one (in Claude Code with this plugin installed, the Agent tool with `subagent_type=leek-skills:deepening-scout`, which has the codebase-design vocabulary preloaded and remembers what this project already deepened; plain Claude Code, `subagent_type=Explore`; elsewhere, whatever read-only sweep it offers), so the sweep's file dumps stay out of this context and only the findings come back. Without sub-agents, walk it inline. Don't follow rigid heuristics: explore organically and note where you experience friction:
 
 - Where does understanding one concept require bouncing between many small modules?
 - Where are modules **shallow**: interface nearly as complex as the implementation?

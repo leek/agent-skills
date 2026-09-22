@@ -109,6 +109,45 @@ check "AGENTS has no dangling spec/ layout" \
 check "marketplace description not Claude-only product claim" \
   bash -c '! rg -q "for Claude\"" .claude-plugin/marketplace.json'
 
+# 11. Subagents: every agent has frontmatter, every reference resolves, fallbacks kept
+check "agents dir exists" test -d agents
+check "every agent has name + description" \
+  bash -c '
+    for f in agents/*.md; do
+      n=$(basename "$f" .md)
+      awk -v n="$n" "/^---\$/{c++} c==1 && /^name:[[:space:]]*\"?\"?\$/{exit 1} c==1 && /^name:/{if (\$2 != n) exit 1; found=1} c==1 && /^description:[[:space:]]*[^[:space:]]/{desc=1} c==2{exit} END{exit !(found && desc)}" "$f" || { echo "bad agent frontmatter: $f" >&2; exit 1; }
+    done'
+check "every leek-skills:<agent> reference resolves to agents/<agent>.md" \
+  bash -c '
+    rg -o "leek-skills:[a-z-]+" skills README.md AGENTS.md --no-filename | sort -u | sed "s/^leek-skills://" | while read -r a; do
+      case "$a" in codebase-design|domain-modeling) continue;; esac   # skills preloaded by agents
+      test -f "agents/$a.md" || { echo "dangling agent reference: $a" >&2; exit 1; }
+    done'
+check "every agent is referenced by some skill" \
+  bash -c '
+    for f in agents/*.md; do
+      n=$(basename "$f" .md)
+      rg -q "leek-skills:$n" skills || { echo "unreferenced agent: $n" >&2; exit 1; }
+    done'
+check "agent skills: preloads are scoped and model-invoked" \
+  bash -c '
+    rg -o "^\s+-\s+leek-skills:[a-z-]+" agents --no-filename | sed "s/.*leek-skills://" | sort -u | while read -r s; do
+      test -f "skills/$s/SKILL.md" || { echo "preloaded skill missing: $s" >&2; exit 1; }
+      ! rg -q "^disable-model-invocation: true" "skills/$s/SKILL.md" || { echo "preloading a user-invoked skill: $s" >&2; exit 1; }
+    done'
+check "forked skills name an existing agent and wait for the result" \
+  bash -c '
+    for f in $(rg -l "^context: fork" skills --glob "**/SKILL.md"); do
+      a=$(rg -o "^agent: leek-skills:[a-z-]+" "$f" | sed "s/.*leek-skills://")
+      test -n "$a" && test -f "agents/$a.md" || { echo "$f: context: fork without a resolvable agent:" >&2; exit 1; }
+      rg -q "^background: false" "$f" || { echo "$f: forked skill must set background: false" >&2; exit 1; }
+    done'
+check "skills naming an agent keep a non-Claude fallback" \
+  bash -c '
+    for f in $(rg -l "subagent_type=leek-skills:" skills); do
+      rg -qi "elsewhere|inline|other harness|plain Claude Code" "$f" || { echo "$f: names an agent without a fallback clause" >&2; exit 1; }
+    done'
+
 if [[ "$fail" -ne 0 ]]; then
   echo "verify-skills-collection: FAILED" >&2
   exit 1

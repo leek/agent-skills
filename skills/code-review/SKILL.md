@@ -70,7 +70,7 @@ Each smell reads *what it is* → *how to fix*; match it against the diff:
 
 ### 4. Run both axes: sub-agents or inline
 
-**If the harness can spawn parallel sub-agents** (e.g. Claude Code Agent tool, Grok `spawn_subagent`, or equivalent): launch two foreground sub-agents in parallel, wait for both results before writing anything. Do not background them, a background handle can die with the session.
+**If the harness can spawn parallel sub-agents** (e.g. Claude Code Agent tool, Grok `spawn_subagent`, or equivalent): launch two foreground sub-agents in parallel, wait for both results before writing anything. Do not background them, a background handle can die with the session. In Claude Code with this plugin installed, use the typed agents `leek-skills:standards-reviewer` and `leek-skills:spec-reviewer` (read-only tools enforced, the Standards one remembers this repo's recurring violations); elsewhere, any general sub-agent with the briefs below.
 
 **If sub-agents are unavailable:** run both reviews inline in this session, Standards first then Spec (or skip Spec when no source was found). Same briefs, same output shape, only the execution host changes.
 

@@ -45,8 +45,10 @@ consensus to form: say which are missing and stop.
 
 ### 3. Fan out: one subagent per CLI, in parallel
 
-Spawn one subagent per present CLI, all in a single message so they run at once.
-Give each subagent the **same** task string and this brief:
+Spawn one subagent per present CLI, all in a single message so they run at once (in
+Claude Code with this plugin installed, `subagent_type=leek-skills:panelist`: a small,
+cheap wrapper, since the thinking happens inside the CLI it runs). Give each subagent
+the **same** task string and this brief:
 
 - **Pass the task safely: never inline it.** A prompt with a backtick, `$`, or quote
   gets run by the shell if you paste it into the command. Put the task in a variable

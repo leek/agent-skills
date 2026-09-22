@@ -62,6 +62,10 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | `which-skill` | user | Not sure which skill to reach for? Name the situation and get routed to one. |
 | `writing-for-agents` | model | Reference for writing documents an agent consumes: skills, AGENTS.md/CLAUDE.md, and reference docs reached by a pointer. |
 
+## Subagents (Claude Code)
+
+Installing the plugin also loads the subagents in [`agents/`](./agents) as `leek-skills:<name>`. The skills dispatch them where they already fan out work: `code-review` → `standards-reviewer` + `spec-reviewer`, `codebase-design` (design-it-twice) → `module-designer`, `improve-codebase-architecture` → `deepening-scout`, `distill-sessions` → `session-miner`, `panel` → `panelist`, `code-smells-audit` → `smell-sweeper`; `research` and `dependency-audit` fork into `researcher` and `dependency-auditor`. Other harnesses ignore the directory and the skills fall back to inline or generic sub-agents, as before. Conventions in [`AGENTS.md`](./AGENTS.md#subagents-agents).
+
 ## Installation
 
 ### `npx skills` (any agent)

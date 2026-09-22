@@ -13,6 +13,7 @@ This repo also doubles as a [Claude Code plugin marketplace](https://docs.claude
 ```
 .claude-plugin/marketplace.json   # Claude Code plugin manifest
 skills/<skill-name>/SKILL.md      # one folder per skill
+agents/<agent-name>.md            # Claude Code subagents the skills dispatch (see Subagents)
 template/SKILL.md.example         # starting point; renamed so installers do not treat it as a real skill
 ```
 
@@ -88,7 +89,8 @@ The test: *could the model usefully reach for this on its own?* Reuse by other s
 - `allowed-tools`: pre-approve only the commands the skill exists to run (`commit` → `git add/commit`, `research` → `WebFetch WebSearch`). Deny rules in settings still win. Never pre-approve a destructive command the body says to ask about first.
 - `user-invocable: false`: for a protocol other skills run that has its own user front door (`grilling` behind `grill-me`). It hides the `/` entry; the model can still invoke it.
 - `compatibility`: environment the skill cannot run without (Herd on macOS, a CLI on PATH). Documentation only.
-- Not adopted, on purpose: `context: fork` (our skills read the conversation), `when_to_use` (Codex and `npx skills` read only `description`, so triggers stay there), `model`/`effort`/`paths`/`hooks` (no skill has a fact that needs them yet).
+- `context: fork` + `agent: leek-skills:<name>` + `background: false`: only on a skill whose body is the whole task and never needs the conversation (`research`, `dependency-audit`). Everything else reads the conversation and stays inline; see Subagents below.
+- Not adopted, on purpose: `when_to_use` (Codex and `npx skills` read only `description`, so triggers stay there), `model`/`effort`/`paths`/`hooks` (no skill has a fact that needs them yet).
 
 Note `disable-model-invocation: true` also stops a skill running when a Claude Code scheduled task fires with the skill as its prompt. The loop skills (`dependency-audit`, `nightly-docs-sweep`) are driven by user-typed `/loop`, which is unaffected.
 
@@ -107,6 +109,20 @@ Add the skill path to `.claude-plugin/marketplace.json` under the `leek-skills` 
 ### 5. Update the README
 
 Add a short section to `README.md` under **Available Skills**.
+
+## Subagents (`agents/`)
+
+`agents/<name>.md` at the repo root are [Claude Code subagent definitions](https://code.claude.com/docs/en/sub-agents). They are **typed shells for work the skills already delegate**: read-only tool sets, a cheaper model where the thinking happens elsewhere, preloaded vocabulary via `skills:`, and cross-session `memory:`. Claude Code loads them as `leek-skills:<name>`; every other harness never sees the directory.
+
+Rules:
+
+- **Skills stay the source of truth and stay harness-neutral.** A skill names its agent as the Claude Code branch of an existing "if the harness has sub-agents … otherwise inline" sentence, never as the only path. The verifier fails a skill that names an agent without a fallback clause.
+- **Agents carry no procedure of their own.** An agent body states its role, its standing rules (read-only, output shape), and how to use its memory; the brief it receives from the skill is the task. The exception is a skill with `context: fork`, whose SKILL.md body *is* the prompt: keep that body an actionable task, not guidelines.
+- **Reference by scoped name** (`leek-skills:module-designer`), both in `subagent_type` and in a skill's `agent:` field. Preloaded skills are scoped too (`skills: [leek-skills:codebase-design]`), and only model-invoked skills can be preloaded.
+- **`tools:` takes bare tool names**, not permission patterns; scope Bash with the skill's `allowed-tools` instead. Plugin agents cannot set `hooks`, `mcpServers`, or `permissionMode`.
+- **Extra frontmatter is safe** (verified: Codex's `SkillFrontmatter` has no `deny_unknown_fields`, `npx skills` copies SKILL.md verbatim, Grok reads Claude skills as-is). `context: fork` therefore changes only Claude Code, where the body runs in the named agent with `$ARGUMENTS` but without the conversation.
+- **`.claude-plugin/plugin.json` pins the plugin name** so agents namespace as `leek-skills:` under `--plugin-dir` as well as a marketplace install; the version stays in `marketplace.json` only.
+- `memory: project` writes under the *target* repo's `.claude/`; say so in the skill when the agent uses it.
 
 ## Best Practices
 

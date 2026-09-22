@@ -57,7 +57,7 @@ Surface corrections fast by grepping extracted human messages:
 
 ## 3. Fan out: one subagent per batch
 
-50 sessions won't fit one context. Split the file list into ~7 round-robin batches (so big files spread out) and dispatch one subagent per batch **in parallel**, each with the jq cheat-sheet above and an identical brief. Each subagent returns a structured findings list; the orchestrator dedupes across batches and synthesizes. Round-robin assignment:
+50 sessions won't fit one context. Split the file list into ~7 round-robin batches (so big files spread out) and dispatch one subagent per batch **in parallel**, each with the jq cheat-sheet above and an identical brief (in Claude Code with this plugin installed, `subagent_type=leek-skills:session-miner`: log-read-only, skips project CLAUDE.md, and remembers patterns from earlier distillations so it can mark them recurring; elsewhere, any sub-agent the harness offers). Each subagent returns a structured findings list; the orchestrator dedupes across batches and synthesizes. Round-robin assignment:
 ```bash
 awk '{print $NF}' top.txt | awk '{ b=((NR-1)%7)+1; print > ("batch_" b ".txt") }'
 ```

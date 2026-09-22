@@ -41,7 +41,9 @@ For a whole-repo sweep, fan out sub-agents by codebase size:
   partition running all lens passes; merge candidate lists before verifying.
 
 Each sub-agent gets the target list, this workflow's sweep instructions, and
-the index section(s) for the lens or lenses it will sweep, nothing more.
+the index section(s) for the lens or lenses it will sweep, nothing more. In Claude
+Code with this plugin installed, dispatch `subagent_type=leek-skills:smell-sweeper`
+(read-only, no project CLAUDE.md); elsewhere, any read-only sub-agent.
 
 ### 2. Sweep: one detection pass per occurrence lens
 

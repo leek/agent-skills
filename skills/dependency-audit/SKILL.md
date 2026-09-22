@@ -2,6 +2,9 @@
 name: dependency-audit
 description: Run a weekly dependency audit for Composer or npm projects and propose a safe upgrade plan.
 disable-model-invocation: true
+context: fork
+agent: leek-skills:dependency-auditor
+background: false
 allowed-tools: "Bash(composer outdated *) Bash(composer audit) Bash(composer audit *) Bash(npm outdated *) Bash(npm audit) Bash(npm audit *)"
 ---
 
@@ -10,6 +13,8 @@ allowed-tools: "Bash(composer outdated *) Bash(composer audit) Bash(composer aud
 ## Goal
 
 Deliver a weekly dependency audit summary for the package manager this project uses.
+
+In Claude Code with this plugin installed, this skill runs in its own `dependency-auditor` subagent (read-only, remembers packages the project has chosen to hold back); the report comes back to the main session when it finishes. In other harnesses it runs inline; the steps are the same.
 
 ## Detect package manager
 
