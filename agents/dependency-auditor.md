@@ -1,6 +1,6 @@
 ---
 name: dependency-auditor
-description: Runs the dependency-audit skill in isolation. Detects Composer or npm, runs the outdated and audit commands, and returns the weekly upgrade report. Never applies upgrades. The dependency-audit skill forks into this agent; not for ad-hoc use.
+description: Runs the dependency-audit skill in isolation. Detects Composer or npm, runs the outdated and audit commands, and returns the upgrade report. Never applies upgrades. The dependency-audit skill forks into this agent; not for ad-hoc use.
 tools: Read, Grep, Glob, Bash
 disallowedTools: Edit, Write, NotebookEdit
 model: sonnet

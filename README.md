@@ -30,7 +30,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | `code-smells-audit` | model | Audit a codebase, path, glob, or branch diff for classic code smells using the 56-smell Luzkan catalog, with detection heuristics tuned to PHP/Laravel and TS/React: sweep nine occurrence lenses, adversarially verify every candidate against the smell's card definition, emit a ranked markdown findings report. |
 | `codebase-design` | model | Shared vocabulary for designing deep modules in a PHP/Laravel codebase. |
 | `commit` | user | Commit the work done in this session, skipping files a parallel session also touched. |
-| `dependency-audit` | user | Run a weekly Composer or npm dependency audit and propose a safe upgrade plan. |
+| `dependency-audit` | user | Run a Composer or npm dependency audit and propose a safe upgrade plan. |
 | `diagnosing-bugs` | model | Diagnosis loop for hard bugs and performance regressions. |
 | `distill-sessions` | user | Mine your recent AI-coding session logs (Claude Code + OpenAI Codex) for reusable patterns: corrections you gave, commands that errored or were retried, setup steps rediscovered across sessions, and content-worthy moments, then propose where each belongs (CLAUDE.md/AGENTS.md line, slash command/skill, hook, tool fix, config change, or content idea). |
 | `domain-modeling` | model | Build and sharpen a project's domain model: challenge terms against the glossary, resolve fuzzy language, stress-test concepts with concrete scenarios, and record CONTEXT.md entries and ADRs the moment decisions land. |

@@ -1,5 +1,5 @@
 interface:
   display_name: "Dependency Audit"
-  short_description: "Run a weekly dependency audit for Composer or npm projects and propose a safe upgrade plan"
+  short_description: "Run a dependency audit for Composer or npm projects and propose a safe upgrade plan"
 policy:
   allow_implicit_invocation: false

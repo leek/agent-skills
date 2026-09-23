@@ -1,40 +1,32 @@
 ---
 name: dependency-audit
-description: Run a weekly dependency audit for Composer or npm projects and propose a safe upgrade plan.
+description: Run a dependency audit for Composer or npm projects and propose a safe upgrade plan.
 disable-model-invocation: true
 context: fork
 agent: leek-skills:dependency-auditor
 background: false
+argument-hint: "composer | npm (omit to auto-detect)"
 allowed-tools: "Bash(composer outdated *) Bash(composer audit) Bash(composer audit *) Bash(npm outdated *) Bash(npm audit) Bash(npm audit *)"
 ---
 
-# Dependency Audit Weekly
+# Dependency Audit
 
 ## Goal
 
-Deliver a weekly dependency audit summary for the package manager this project uses.
+Deliver a dependency audit summary for the package manager this project uses.
 
 In Claude Code with this plugin installed, this skill runs in its own `dependency-auditor` subagent (read-only, remembers packages the project has chosen to hold back); the report comes back to the main session when it finishes. In other harnesses it runs inline; the steps are the same.
 
 ## Detect package manager
 
-Inspect the project root:
+**The package manager is `$ARGUMENTS`.** If it is `composer` or `npm`, audit only that manager, and stop and report if its manifest (`composer.json` or `package.json`) is missing. If it names any other manager, stop and report that only Composer and npm are supported. If it is empty, inspect the project root:
 
 - `composer.json` present → **Composer** (PHP)
 - `package.json` present → **npm** (JavaScript / TypeScript)
 - Both present → audit **both**, report each section separately
 - Neither present → stop and report that the directory is not a Composer or npm project
 
-## Loop
-
-Kickoff prompt (harnesses that support scheduled loops):
-
-```text
-/loop 7d Start the "Dependency Audit Weekly" loop.
-Goal: deliver a weekly dependency audit summary.
-Between iterations run the outdated command(s) for the detected manager(s).
-Exit when: summary is posted with recommended upgrades.
-```
+## Run
 
 ### Composer
 
@@ -67,6 +59,6 @@ Keep the report direct. Do not apply upgrades unless the user asks you to do the
 
 ## Guardrails
 
-- Do not modify the check command or exit criteria to force success.
+- Do not modify the check commands to force success.
 - Do not skip, disable, or bypass checks to make the audit look clean.
 - If package metadata is missing, dependency resolution fails, or audit output is blocked by registry/authentication issues, stop and report the blocker.
