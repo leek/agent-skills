@@ -41,9 +41,10 @@ Verified bot behaviour (2026-09):
 
 - `mergeable`: `CONFLICTING` means rebase or resolve. `UNKNOWN` means GitHub is still
   computing, so re-poll.
-- `mergeStateStatus`: `CLEAN` means go. `BLOCKED` means an approval or required check
-  is missing. `BEHIND` means run `gh pr update-branch N`. `DIRTY` means conflicts.
-  `UNSTABLE` means a non-required check failed.
+- `mergeStateStatus`: `CLEAN` or `UNSTABLE` (a non-required check failed) means go.
+  `BLOCKED` means an approval or required check is missing: a pending required check is
+  not a reason to wait (see Merge). `BEHIND` means run `gh pr update-branch N`, then
+  merge without waiting for the new CI run. `DIRTY` means conflicts.
 - `reviewDecision`: `CHANGES_REQUESTED` blocks. `REVIEW_REQUIRED` blocks when branch
   protection requires a review.
 - `isDraft`: run `gh pr ready N` only when the context implies the PR should ship.
@@ -64,4 +65,5 @@ gh pr merge N --squash --delete-branch          # or --rebase / --merge
 gh pr view N --json state,mergedAt,mergeCommit
 ```
 
-Avoid `--auto`: it lands the PR later, after the pre-merge re-check has already run.
+If the merge is refused only because required checks are still pending, re-run it with
+`--auto` so GitHub lands it when they pass, and report it as queued. Do not wait.
