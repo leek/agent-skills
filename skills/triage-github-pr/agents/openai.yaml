@@ -1,0 +1,5 @@
+interface:
+  display_name: "Triage GitHub PR"
+  short_description: "Triage a pull request end to end, from reviews and checks through fixes to a clean merge"
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,5 @@
+interface:
+  display_name: "Fix Nightwatch Issues"
+  short_description: "Triage open Nightwatch production issues by root cause, fix the legit ones, and resolve them"
+policy:
+  allow_implicit_invocation: false

@@ -34,6 +34,9 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | `diagnosing-bugs` | model | Diagnosis loop for hard bugs and performance regressions. |
 | `distill-sessions` | user | Mine your recent AI-coding session logs (Claude Code + OpenAI Codex) for reusable patterns: corrections you gave, commands that errored or were retried, setup steps rediscovered across sessions, and content-worthy moments, then propose where each belongs (CLAUDE.md/AGENTS.md line, slash command/skill, hook, tool fix, config change, or content idea). |
 | `domain-modeling` | model | Build and sharpen a project's domain model: challenge terms against the glossary, resolve fuzzy language, stress-test concepts with concrete scenarios, and record CONTEXT.md entries and ADRs the moment decisions land. |
+| `fix-github-issues` | user | Verify, triage, fix, and close review-bot GitHub issues one finding at a time. |
+| `fix-nightwatch-issues` | user | Triage open Laravel Nightwatch production issues by root cause, fix the legit ones, and resolve them with evidence. |
+| `fix-posthog-issues` | user | Triage active PostHog error-tracking issues by root cause, fix the legit ones, and resolve or suppress the rest. |
 | `grill-me` | user | Run a grilling session: the user wants their plan, decision, or idea stress-tested one question at a time. |
 | `grill-with-docs` | user | Run a grilling session with domain-modeling alongside, capturing terms in CONTEXT.md and decisions as ADRs while they land. |
 | `grilling` | model | Interview the user one decision at a time until reaching shared understanding, resolving each branch of the decision tree with recommended options and trade-offs. |
@@ -57,6 +60,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | `to-spec` | user | Turn the current conversation into a spec (PRD) and save it as markdown under .scratch/: no interview, just synthesis, with Laravel test seams chosen from the tdd ranking rules rather than asked about. |
 | `to-tickets` | user | Break a spec into tracer-bullet vertical-slice tickets with explicit blocking edges, take one green light on the breakdown, and save one markdown file per ticket beside the spec. |
 | `triage` | user | Move issues and external PRs through a state machine of triage roles: categorise, verify, grill if needed, and write agent-ready briefs. |
+| `triage-github-pr` | user | Triage a GitHub pull request end to end, from reviews and checks through fixes to a clean merge. |
 | `verify` | model | Exercise a change end to end in the running application (hit the route, run the command, click through the page) and report what actually happened. |
 | `wait-what` | user | Stop; that last message did not land. Re-pitch it. |
 | `wayfinder` | user | Plan work too big for one agent session as a map of decision tickets in markdown under .scratch/, then resolve them one per session until the route to the destination is clear. |
@@ -66,7 +70,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 
 ## Subagents (Claude Code)
 
-Installing the plugin also loads the subagents in [`agents/`](./agents) as `leek-skills:<name>`. The skills dispatch them where they already fan out work: `code-review` → `standards-reviewer` + `spec-reviewer`, `codebase-design` (design-it-twice) → `module-designer`, `improve-codebase-architecture` → `deepening-scout`, `distill-sessions` → `session-miner`, `panel` → `panelist`, `code-smells-audit` → `smell-sweeper`; `research` and `dependency-audit` fork into `researcher` and `dependency-auditor`. Other harnesses ignore the directory and the skills fall back to inline or generic sub-agents, as before. Conventions in [`AGENTS.md`](./AGENTS.md#subagents-agents).
+Installing the plugin also loads the subagents in [`agents/`](./agents) as `leek-skills:<name>`. The skills dispatch them where they already fan out work: `code-review` → `standards-reviewer` + `spec-reviewer`, `codebase-design` (design-it-twice) → `module-designer`, `improve-codebase-architecture` → `deepening-scout`, `distill-sessions` → `session-miner`, `panel` → `panelist`, `code-smells-audit` → `smell-sweeper`, `fix-github-issues` + `triage-github-pr` → `finding-verifier`; `research` and `dependency-audit` fork into `researcher` and `dependency-auditor`. Other harnesses ignore the directory and the skills fall back to inline or generic sub-agents, as before. Conventions in [`AGENTS.md`](./AGENTS.md#subagents-agents).
 
 ## Installation
 

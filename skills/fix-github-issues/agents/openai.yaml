@@ -1,0 +1,5 @@
+interface:
+  display_name: "Fix GitHub Issues"
+  short_description: "Verify, triage, fix, and close review-bot GitHub issues one finding at a time"
+policy:
+  allow_implicit_invocation: false

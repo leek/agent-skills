@@ -39,11 +39,13 @@ Most work runs one straight line (**decide → spec → tickets → build**) ove
 - Prove it in the running app → `verify`.
 - Ship the session's work → `commit`.
 - Review comments waiting on a PR → `resolve-review-comments`.
+- A PR to take all the way to merged (reviews, checks, fixes, merge) → `triage-github-pr`.
 - Merge or rebase blocked → `resolving-merge-conflicts`.
 
 ## Something is wrong
 
 - Broken, throwing, failing, or slow → `diagnosing-bugs`.
+- A backlog of production or review-bot issues → `fix-nightwatch-issues`, `fix-posthog-issues`, or `fix-github-issues` for the source they come from.
 - The shape of the code is the problem, not one bug → `improve-codebase-architecture` to find the opportunity, `architecture-satisfaction` to run the refactor loop, `codebase-design` for the vocabulary either one uses.
 - Suspect a specific module smells → `code-smells-audit`.
 - Unsure whether a state model or a UI direction holds up → `prototype`.

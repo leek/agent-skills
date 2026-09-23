@@ -1,0 +1,5 @@
+interface:
+  display_name: "Fix PostHog Issues"
+  short_description: "Triage active PostHog error-tracking issues by root cause, fix the legit ones, and resolve or suppress the rest"
+policy:
+  allow_implicit_invocation: false
