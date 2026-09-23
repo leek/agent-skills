@@ -93,7 +93,7 @@ report it.
 
 Just before you merge, run step 1, then fetch the three comment surfaces again and
 compare them with the snapshot. Anything new, or a review still in flight, goes back to
-step 3 with only the new items. Allow at most **two** fix rounds. After two, stop and
+step 3 with only the new items. Allow at most **five** fix rounds. After five, stop and
 report what is still open, because bots often answer each fix with a fresh nit.
 
 Merge only when nothing is new, every gate is green, and nothing blocks. Use the merge
