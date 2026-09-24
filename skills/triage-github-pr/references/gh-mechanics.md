@@ -7,7 +7,10 @@
 ```bash
 gh pr view N --json number,title,state,isDraft,mergeable,mergeStateStatus,reviewDecision,headRefName,headRefOid,baseRefName,statusCheckRollup,reviewRequests,commits,url
 gh pr diff N
-gh pr checks N                        # non-zero exit = failing or pending
+gh pr checks N --json name,state,bucket,link \
+  --jq '.[] | select(.bucket == "fail") | {name, link}'   # finished failures on the head
+# A GitHub Actions link ends in /job/<job-id>: read only the failed steps
+gh run view --job <job-id> --log-failed
 # Reviews: state, body, and the commit each one reviewed
 gh api repos/{owner}/{repo}/pulls/N/reviews --paginate \
   --jq '.[] | {id, user: .user.login, state, commit: .commit_id[:8], at: .submitted_at, body}'
