@@ -8,6 +8,8 @@ disable-model-invocation: true
 
 Take the current conversation context and codebase understanding and produce a spec (a PRD). Do **not** interview the user: the interview already happened (usually a `grilling` session); this skill synthesizes it.
 
+**Carry the source material through.** Every link, doc, or reference the user brought into the conversation (a vendor guide, API docs, an issue, a thread) is cited in the spec where it applies. Material that was pasted rather than linked has no other home, so save it verbatim beside the spec (`.scratch/<slug>/research/<name>.md`) and link that file. The spec is the only artifact the build sessions inherit: a fact left out of both is gone.
+
 If a load-bearing decision is genuinely unresolved (one the spec cannot be written without) don't guess and don't launch a full interview. Ask just that decision (via `AskUserQuestion` where available, otherwise a plain question in chat: recommended option first, trade-offs per option), or suggest a `grill-me` round if several are open.
 
 **Written once per effort, revised in place after.** One spec covering everything the effort builds, written in a single session. If it came from a `wayfinder` map, that first write closes the map and does not run on it again. Later, if downstream work exposes a wrong or missing decision, re-run to **edit this spec in place**: never write a second spec beside it, and never reopen or re-close the map.
@@ -76,11 +78,6 @@ The detailed decisions that were made. Keep Build Contract material in that sect
 - Filament resources/pages or Livewire components affected
 - Config/env keys, feature flags
 - Architectural decisions and their reasoning
-
-Do NOT include specific file paths or code snippets; they go stale fast.
-Exception: a prototype-derived snippet that encodes a decision more precisely
-than prose (state machine, schema, enum, type shape), inline it, note it came
-from a prototype, trim to the decision-rich parts.
 
 ## Testing Decisions
 

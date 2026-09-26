@@ -105,8 +105,6 @@ When the spec sequences deploys (expand/migrate/contract, "ship A, deploy, then 
 
 Files are numbered from `01` in topological order: every blocker has a lower number than the ticket it blocks. Numbers order dependencies; they do not serialize independent tickets.
 
-Avoid file paths and code snippets; they go stale fast. Exception: a prototype-derived snippet that encodes a decision more precisely than prose (state machine, schema, enum shape); trim to the decision-rich parts.
-
 ## After publishing
 
 Work the **frontier** (any ticket whose blockers are all done) with `implement`, one ticket per fresh session. Unblocked, unclaimed tickets can run in parallel in the same checkout. `implement` claims each ticket before building, by setting its frontmatter `status: in-progress` and `claimed-by:` to a session-unique value (compare-after-write, per the tracker's Claim operation), so a second session skips work already in progress instead of colliding with it.
