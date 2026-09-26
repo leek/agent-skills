@@ -52,7 +52,7 @@ Most work runs one straight line (**decide → spec → tickets → build**) ove
 
 ## Repo upkeep
 
-`housekeeper` (low-risk cleanup), `repository-cleanup` (branches, PRs, stashes, worktrees), `dependency-audit` (upgrade plan), `distill-sessions` (mine session logs for improvements), `domain-modeling` (terms and ADRs), `laravel-herd-worktrees` (worktree plus `.test` URL).
+`housekeeper` (low-risk cleanup), `repository-cleanup` (branches, PRs, stashes, worktrees), `scratch-cleanup` (file research, remove finished efforts, report open work in `.scratch/`), `dependency-audit` (upgrade plan), `distill-sessions` (mine session logs for improvements), `domain-modeling` (terms and ADRs), `laravel-herd-worktrees` (worktree plus `.test` URL).
 
 ## Running out of context
 

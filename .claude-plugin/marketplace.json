@@ -43,6 +43,7 @@
         "./skills/research",
         "./skills/resolve-review-comments",
         "./skills/resolving-merge-conflicts",
+        "./skills/scratch-cleanup",
         "./skills/setup",
         "./skills/tdd",
         "./skills/teach",

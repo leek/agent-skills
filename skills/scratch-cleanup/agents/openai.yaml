@@ -1,0 +1,5 @@
+interface:
+  display_name: "Scratch Cleanup"
+  short_description: "Sweep a dusty .scratch/: file research into docs/, remove finished efforts, and report the work still open"
+policy:
+  allow_implicit_invocation: false

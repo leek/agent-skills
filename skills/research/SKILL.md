@@ -22,7 +22,7 @@ In Claude Code with the plugin installed, the body below runs in the `researcher
 
 1. Investigate the question against **primary sources**: official docs, package source (`vendor/` for Composer, `node_modules/` for npm), specs, first-party APIs, never a secondary write-up of them. Follow every claim back to the source that owns it. In a Laravel project with Boost, prefer the `search-docs` MCP tool over web search for framework and package questions, it returns version-pinned ecosystem docs.
 2. Write the findings to a single Markdown file, citing each claim's source: a URL, a file path, or `package@version`. End the file with a short **What this unblocks** section: the answer in one or two lines (or what stayed unanswered and why), and what it makes decidable, no pipeline banners or skill routing.
-3. Save it where the repo already keeps such notes; match the existing convention. If there is none, `.scratch/research/<slug>.md` is the default, say where it landed.
+3. Save it where the repo already keeps such notes; match the existing convention. If there is none, `.scratch/research/<slug>.md` is the default (an inbox that `scratch-cleanup` later files into `docs/`), say where it landed.
 4. Report back: the answer in a few lines, the file path, and a **Next** block (below). The final message is data for the caller, who relays the answer plus the path to the user rather than re-pasting the document.
 
 ### Wayfinder integration
