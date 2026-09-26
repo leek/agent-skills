@@ -1,7 +1,6 @@
 ---
 name: to-spec
-description: "Turn the current conversation into a spec (PRD) and save it as markdown under .scratch/: no interview, just synthesis, with Laravel test seams chosen from the tdd ranking rules rather than asked about."
-disable-model-invocation: true
+description: "Turn the current conversation into a spec (PRD) and save it as markdown under .scratch/: no interview, just synthesis, with Laravel test seams chosen from the tdd ranking rules rather than asked about. Use when the user wants a spec or PRD written from what was just discussed, when a grilling or wayfinder session has settled its decisions, or when an existing spec needs revising in place."
 ---
 
 # To Spec

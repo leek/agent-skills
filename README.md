@@ -56,7 +56,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | `tdd` | model | The red → green loop tuned for Pest/PHPUnit in a Laravel codebase: seams, what a good test is, and the anti-patterns to refuse. |
 | `teach` | user | Teach the user a new skill or concept, within this workspace. |
 | `to-questionnaire` | user | Turn a decision the user can't fully answer into a Markdown questionnaire for someone else to fill in, async or over a meeting. |
-| `to-spec` | user | Turn the current conversation into a spec (PRD) and save it as markdown under .scratch/: no interview, just synthesis, with Laravel test seams chosen from the tdd ranking rules rather than asked about. |
+| `to-spec` | model | Turn the current conversation into a spec (PRD) and save it as markdown under .scratch/: no interview, just synthesis, with Laravel test seams chosen from the tdd ranking rules rather than asked about. |
 | `to-tickets` | user | Break a spec into tracer-bullet vertical-slice tickets with explicit blocking edges, take one green light on the breakdown, and save one markdown file per ticket beside the spec. |
 | `triage` | user | Move issues and external PRs through a state machine of triage roles: categorise, verify, grill if needed, and write agent-ready briefs. |
 | `triage-github-pr` | user | Triage a GitHub pull request end to end, from reviews and checks through fixes to a clean merge. |
