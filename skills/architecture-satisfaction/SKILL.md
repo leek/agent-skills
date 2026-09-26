@@ -23,7 +23,7 @@ Stop when the architecture is satisfactory and checks pass.
 
 Use this for a deliberate architectural refactor where the desired destination can be stated in concrete terms and the current system can be tested after each meaningful change.
 
-This is not a general cleanup pass. Use `housekeeper` for low-risk code hygiene, `repository-cleanup` for Git branch/PR/worktree/stash cleanup, and `nightly-docs-sweep` for documentation drift.
+This is not a general cleanup pass. Use `housekeeper` for low-risk code hygiene, and `repository-cleanup` for Git branch/PR/worktree/stash cleanup.
 
 ## Define Satisfactory First
 

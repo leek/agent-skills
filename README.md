@@ -45,7 +45,6 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | `implement` | user | Implement one Laravel work item end to end: scope and claim it when trackable, TDD at agreed seams, commit, review, verify, and resolve it. |
 | `improve-codebase-architecture` | user | Scan a codebase for deepening opportunities, present them as a visual HTML report, then grill through whichever one you pick. |
 | `laravel-herd-worktrees` | model | Use when working with Laravel projects served by Laravel Herd alongside git worktrees on macOS. |
-| `nightly-docs-sweep` | user | Run a documentation sweep for a codebase. |
 | `panel` | user | Convene a panel of agent CLIs (grok, claude, codex, agy) on a prompt or a code review, each in its own headless subagent, then report one consensus grouped by how much they agree. |
 | `prototype` | model | Build a throwaway prototype to answer a design question. |
 | `release` | user | Commit this session's work, bump the version, tag, push, and publish a GitHub release with grouped notes. |

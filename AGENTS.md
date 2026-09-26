@@ -93,7 +93,7 @@ The test: *could the model usefully reach for this on its own?* Reuse by other s
 - `context: fork` + `agent: leek-skills:<name>` + `background: false`: only on a skill whose body is the whole task and never needs the conversation (`research`, `dependency-audit`). Everything else reads the conversation and stays inline; see Subagents below.
 - Not adopted, on purpose: `when_to_use` (Codex and `npx skills` read only `description`, so triggers stay there), `paths`/`hooks` (no skill has a fact that needs them yet).
 
-Note `disable-model-invocation: true` also stops a skill running when a Claude Code scheduled task fires with the skill as its prompt. The loop skills (`dependency-audit`, `nightly-docs-sweep`) are driven by user-typed `/loop`, which is unaffected.
+Note `disable-model-invocation: true` also stops a skill running when a Claude Code scheduled task fires with the skill as its prompt. The loop skill (`dependency-audit`) is driven by user-typed `/loop`, which is unaffected.
 
 **The invariant that follows: a user-invoked skill can never be reached by another skill**, not by name, not through any harness's skill-invocation tool. A skill that tells the agent to invoke one is broken; have it *recommend* the flow to the user instead. Shared reference two user-invoked skills both need can live in neither, so it goes in a file they both point at.
 
