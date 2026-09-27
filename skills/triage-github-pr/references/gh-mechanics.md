@@ -64,9 +64,17 @@ Verified bot behaviour (2026-09):
 ## Merge
 
 ```bash
-gh pr merge N --squash --delete-branch          # or --rebase / --merge
+gh pr list --base <head> --state open --json number,title,url   # stacked PRs; must be empty
+gh pr merge N --squash                           # or --rebase / --merge; never --delete-branch
 gh pr view N --json state,mergedAt,mergeCommit
 ```
+
+Never pass `--delete-branch`, and never delete a branch by any other route
+(`git push --delete`, `gh api -X DELETE .../git/refs/...`). Deleting a branch closes
+every open PR that uses it as its base. If the repo has "automatically delete head
+branches" on (`gh api repos/{owner}/{repo} --jq .delete_branch_on_merge` is `true`),
+the merge itself deletes the head branch, so the stacked-PR check above is what
+protects dependents. Do not change that repo setting yourself.
 
 If the merge is refused only because required checks are still pending, re-run it with
 `--auto` so GitHub lands it when they pass, and report it as queued. Do not wait.

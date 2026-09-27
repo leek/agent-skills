@@ -108,6 +108,13 @@ starts new required checks, so the `--auto` rule in the references queues the me
 and you do not come back if that run fails. Use the merge method named in the
 guidance, or the one in the project context, or else the repo's recent history. Never use `--admin` unless the guidance authorizes it.
 
+**Never delete a branch.** Leave the head branch in place after the merge, even when
+the project context or a merge example says `--delete-branch`: deleting a branch
+closes every open PR based on it. Before merging, list open PRs whose base is this
+PR's head branch (see [Merge](references/gh-mechanics.md#merge)). If any exist, the PR
+is stacked: merge only on the user's explicit approval in this conversation, because
+the repo's auto-delete setting can still remove the branch on merge.
+
 **Stop instead of merging** when branch protection refuses the merge because a
 required check failed, a conflict would change intent, a human `CHANGES_REQUESTED`
 is still open, a LEGIT finding needs a human or infra decision, the PR is a draft without clear intent to
