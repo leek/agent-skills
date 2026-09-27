@@ -56,6 +56,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | `resolve-review-comments` | model | Triage, fix or rebut, then reply-and-resolve every review comment on a PR (including AI-review bot findings). |
 | `resolving-merge-conflicts` | model | "Use when you need to resolve an in-progress git merge/rebase conflict." |
 | `scratch-cleanup` | user | Sweep a dusty .scratch/: file research into docs/, remove finished efforts, and report the work still open. |
+| `scratch-status` | user | Report what is still open across `.scratch/`: every effort's open tickets and decisions, what blocks it, how stale it is, and the next skill to run. Read-only. |
 | `setup` | user | Configure this repo for the engineering skills: the markdown issue tracker layout, triage label vocabulary, and domain doc layout. |
 | `tdd` | model | The red → green loop tuned for Pest/PHPUnit in a Laravel codebase: seams, what a good test is, and the anti-patterns to refuse. |
 | `teach` | user | Teach the user a new skill or concept, within this workspace. |

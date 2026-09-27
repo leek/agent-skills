@@ -1,0 +1,5 @@
+interface:
+  display_name: "Scratch Status"
+  short_description: "Report what is still open across .scratch/: read-only, never files or removes anything"
+policy:
+  allow_implicit_invocation: false

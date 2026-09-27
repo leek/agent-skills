@@ -47,6 +47,7 @@
         "./skills/resolve-review-comments",
         "./skills/resolving-merge-conflicts",
         "./skills/scratch-cleanup",
+        "./skills/scratch-status",
         "./skills/setup",
         "./skills/tdd",
         "./skills/teach",
