@@ -1,0 +1,16 @@
+{
+  "description": "browser-test: block non-read-only browser commands from the browser-tester and browser-test-planner agents. Every other caller passes through untouched.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/skills/browser-test/scripts/guard-browser.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

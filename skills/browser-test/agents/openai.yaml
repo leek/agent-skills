@@ -1,0 +1,5 @@
+interface:
+  display_name: "Browser Test"
+  short_description: "Test a web app from a start URL and a plain-language prompt with cheap parallel browser workers; read-only unless you confirm a write"
+policy:
+  allow_implicit_invocation: false

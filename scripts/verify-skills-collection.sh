@@ -148,6 +148,18 @@ check "skills naming an agent keep a non-Claude fallback" \
       rg -qi "elsewhere|inline|other harness|plain Claude Code" "$f" || { echo "$f: names an agent without a fallback clause" >&2; exit 1; }
     done'
 
+# 12. Plugin hooks: valid JSON, every script they run exists, the browser-test guard holds
+check "hooks.json is valid and every script it runs exists" \
+  python3 -c '
+import json, os, re, sys
+h = json.load(open("hooks/hooks.json"))
+cmds = [k["command"] for gs in h["hooks"].values() for g in gs for k in g["hooks"]]
+missing = [p for c in cmds for p in re.findall(r"\$\{CLAUDE_PLUGIN_ROOT\}/([^\"\s]+)", c) if not os.path.isfile(p)]
+sys.exit(f"hooks.json runs missing scripts: {missing}" if missing else 0)
+'
+check "browser-test guard tests pass" \
+  python3 -m unittest -q skills/browser-test/scripts/test_guard_browser.py
+
 if [[ "$fail" -ne 0 ]]; then
   echo "verify-skills-collection: FAILED" >&2
   exit 1
