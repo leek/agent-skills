@@ -26,6 +26,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 |---|---|---|
 | `architecture-satisfaction` | user | Run a bounded architectural refactor loop. |
 | `autopilot` | user | Drive an existing wayfinder map, spec, or set of tickets to completion through fresh top-level Claude Code, Codex, or Grok sessions. |
+| `chatter-scout` | user | Sweep the web for new chatter on a topic, skip what earlier runs saw, verify the rest in cheap parallel subagents, and write one ranked, cited findings file for a blog post or digest. |
 | `code-review` | model | Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes: Standards (does the diff follow this repo's documented conventions, including colocated CLAUDE.md rules?) and Spec (does it implement what the originating ticket/PRD asked?). |
 | `code-smells-audit` | model | Audit a codebase, path, glob, or branch diff for classic code smells using the 56-smell Luzkan catalog, with detection heuristics tuned to PHP/Laravel and TS/React: sweep nine occurrence lenses, adversarially verify every candidate against the smell's card definition, emit a ranked markdown findings report. |
 | `codebase-design` | model | Shared vocabulary for designing deep modules in a PHP/Laravel codebase. |
@@ -71,7 +72,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 
 ## Subagents (Claude Code)
 
-Installing the plugin also loads the subagents in [`agents/`](./agents) as `leek-skills:<name>`. The skills dispatch them where they already fan out work: `code-review` → `standards-reviewer` + `spec-reviewer`, `codebase-design` (design-it-twice) → `module-designer`, `improve-codebase-architecture` → `deepening-scout`, `distill-sessions` → `session-miner`, `panel` → `panelist`, `code-smells-audit` → `smell-sweeper`, `fix-github-issues` + `triage-github-pr` → `finding-verifier`; `research` and `dependency-audit` fork into `researcher` and `dependency-auditor`. Other harnesses ignore the directory and the skills fall back to inline or generic sub-agents, as before. Conventions in [`AGENTS.md`](./AGENTS.md#subagents-agents).
+Installing the plugin also loads the subagents in [`agents/`](./agents) as `leek-skills:<name>`. The skills dispatch them where they already fan out work: `code-review` → `standards-reviewer` + `spec-reviewer`, `codebase-design` (design-it-twice) → `module-designer`, `improve-codebase-architecture` → `deepening-scout`, `distill-sessions` → `session-miner`, `panel` → `panelist`, `chatter-scout` → `chatter-sweeper` + `chatter-verifier`, `code-smells-audit` → `smell-sweeper`, `fix-github-issues` + `triage-github-pr` → `finding-verifier`; `research` and `dependency-audit` fork into `researcher` and `dependency-auditor`. Other harnesses ignore the directory and the skills fall back to inline or generic sub-agents, as before. Conventions in [`AGENTS.md`](./AGENTS.md#subagents-agents).
 
 ## Installation
 

@@ -1,0 +1,5 @@
+interface:
+  display_name: "Chatter Scout"
+  short_description: "Find new, verified chatter on a topic and write a ranked findings file for a blog post or digest"
+policy:
+  allow_implicit_invocation: false

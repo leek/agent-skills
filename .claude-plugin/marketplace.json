@@ -17,6 +17,7 @@
       "skills": [
         "./skills/architecture-satisfaction",
         "./skills/autopilot",
+        "./skills/chatter-scout",
         "./skills/code-review",
         "./skills/code-smells-audit",
         "./skills/codebase-design",
