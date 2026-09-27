@@ -25,6 +25,7 @@
         "./skills/diagnosing-bugs",
         "./skills/distill-sessions",
         "./skills/domain-modeling",
+        "./skills/fix-ci-failures",
         "./skills/fix-github-issues",
         "./skills/fix-nightwatch-issues",
         "./skills/fix-posthog-issues",

@@ -1,0 +1,5 @@
+interface:
+  display_name: "Fix CI Failures"
+  short_description: "Triage a branch's latest failed CI runs from their existing logs and fix the real ones"
+policy:
+  allow_implicit_invocation: false
