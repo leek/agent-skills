@@ -13,7 +13,7 @@
       "name": "leek-skills",
       "description": "Personal skills collection",
       "source": "./",
-      "strict": false,
+      "strict": true,
       "skills": [
         "./skills/architecture-satisfaction",
         "./skills/autopilot",
