@@ -39,8 +39,10 @@ session's uncommitted work. One release, one version, one tag, one GitHub releas
    versioned by its tags alone; skip the commit. Done when `HEAD` is the release commit or
    there was nothing to bump.
 5. **Tag and push.** `git tag -a <version> -m "<version>: <summary>"`, then
-   `git push origin <branch> <version>` in one command. Stop if the tag already exists. Done
-   when the push reports both refs.
+   `git push origin <branch> <version>` in one command. First check that the tag is free
+   with `git tag -l <version>` (empty output means free); stop if it already exists. Never
+   probe with a bare `git tag <version>`: that creates a lightweight tag instead of
+   checking. Done when the push reports both refs.
 6. **Publish.** Write the notes from the diff, not from the subjects: one bullet per
    user-visible change, grouped under `##` headings by area (the scopes in the subjects
    are a good start), the release commit itself omitted, no attribution trailers.
