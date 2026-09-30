@@ -4,7 +4,7 @@ description: Runs the research skill's brief in isolation. Investigates a questi
 tools: Read, Grep, Glob, Bash, WebFetch, WebSearch, Write
 disallowedTools: Edit, NotebookEdit
 memory: user
-maxTurns: 40
+maxTurns: 120
 color: blue
 ---
 

@@ -20,10 +20,12 @@ In Claude Code with the plugin installed, the body below runs in the `researcher
 
 ## The research brief
 
-1. Investigate the question against **primary sources**: official docs, package source (`vendor/` for Composer, `node_modules/` for npm), specs, first-party APIs, never a secondary write-up of them. Follow every claim back to the source that owns it. In a Laravel project with Boost, prefer the `search-docs` MCP tool over web search for framework and package questions, it returns version-pinned ecosystem docs.
-2. Write the findings to a single Markdown file, citing each claim's source: a URL, a file path, or `package@version`. End the file with a short **What this unblocks** section: the answer in one or two lines (or what stayed unanswered and why), and what it makes decidable, no pipeline banners or skill routing.
-3. Save it where the repo already keeps such notes; match the existing convention. If there is none, `.scratch/research/<slug>.md` is the default (an inbox that `scratch-cleanup` later files into `docs/`), say where it landed.
-4. Report back: the answer in a few lines, the file path, and a **Next** block (below). The final message is data for the caller, who relays the answer plus the path to the user rather than re-pasting the document.
+1. **Create the findings file first**, before any investigation: a single Markdown file holding the question and an empty findings list. Save it where the repo already keeps such notes; match the existing convention. If there is none, `.scratch/research/<slug>.md` is the default (an inbox that `scratch-cleanup` later files into `docs/`). A run cut off partway then still leaves its findings behind.
+2. Investigate the question against **primary sources**: official docs, package source (`vendor/` for Composer, `node_modules/` for npm), specs, first-party APIs, never a secondary write-up of them. Follow every claim back to the source that owns it. In a Laravel project with Boost, prefer the `search-docs` MCP tool over web search for framework and package questions, it returns version-pinned ecosystem docs.
+3. **Append to the file as you go**: after each source settles a claim, add it with its citation (a URL, a file path, or `package@version`). Never hold findings back to write in one pass at the end.
+4. **Budget turns.** This run has a hard turn cap and is killed without a final message when it hits it. At about 100 turns, stop investigating whatever is left: record the open parts as unanswered in the file, then finish with steps 5 and 6.
+5. End the file with a short **What this unblocks** section: the answer in one or two lines (or what stayed unanswered and why), and what it makes decidable, no pipeline banners or skill routing.
+6. Report back: the answer in a few lines, the file path, and a **Next** block (below). The final message is data for the caller, who relays the answer plus the path to the user rather than re-pasting the document.
 
 ### Wayfinder integration
 
