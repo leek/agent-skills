@@ -34,7 +34,7 @@ A review is **in flight** while any of these holds on the PR:
 
 Wait with a scheduled wakeup where the harness has one, otherwise re-poll these
 signals. Never use `gh pr checks --watch` (it waits on CI) or a `sleep` loop. Stop
-waiting after 15 minutes. Name the reviewer that never finished and go on without it.
+waiting after 30 minutes. Name the reviewer that never finished and go on without it.
 
 Completion criterion: no in-flight signal, or the timeout is reached and named.
 
