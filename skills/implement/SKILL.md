@@ -28,8 +28,10 @@ Classify the input and make its acceptance criteria explicit:
 
 Work items are markdown files under `.scratch/`: there is no external tracker. When launch context already identifies the selected file, its status, and blockers, revalidate those exact files rather than rereading the tracker layout. Otherwise read the layout once through `.agents/issue-tracker.md` (written by `/setup`). If it's missing, try `docs/agents/issue-tracker.md` (legacy), then the `setup` skill's seed. Confirm every direct blocker is closed through the item's `blocked-by` frontmatter, and stop before claiming if any remain open. Then claim before building:
 
-- On a ticket from `to-tickets`, or a directly implemented spec, set its frontmatter `status: in-progress` and `claimed-by:` to a session-unique value, then re-read to confirm you won the claim (compare-after-write, see the tracker's Working in parallel rules).
+- On a ticket from `to-tickets`, or a directly implemented spec, set its frontmatter `status: in-progress` and `claimed-by:` to a session-unique value, then re-read to confirm you won the claim (compare-after-write, see the tracker's Working in parallel rules). A spec built directly is claimed exactly like a ticket; it is the file you build from, not a parent to leave alone.
 - On a `wayfinder` decision ticket, use the Wayfinding **Claim** operation (`claimed-by`).
+
+A ticket or spec is **trackable**: its frontmatter `status` is the state of record. Some repos also keep a ledger or prose summary of efforts in their tracker doc; update it when the repo asks, but it never replaces the frontmatter write. Building in a linked worktree changes nothing: write and commit the frontmatter there, and it reaches the main checkout when the branch merges.
 
 If the item is already claimed or in progress, stop; treat the claim as stale only when its work is visibly committed or clearly abandoned.
 
@@ -79,13 +81,13 @@ If an external dependency prevents verification, keep the committed implementati
 
 After successful verification, record what was built, any justified deviation, verification evidence, the implementation commit SHA or SHAs, and any public seam a direct successor should reuse; check off every satisfied acceptance criterion. This `Resolution` is the successor handoff, so keep the seam and evidence concrete without retelling the parent spec. Resolve the work item according to its branch:
 
-- **Ticket, or a directly implemented spec**: set its frontmatter `status: closed` and append `## Resolution`.
+- **Ticket, or a directly implemented spec**: set its frontmatter `status: closed` and append `## Resolution`. Write `closed` exactly, never an invented value such as `built` or `done`.
 - **`wayfinder` decision ticket**: use the Wayfinding **Resolve** operation.
 - **Conversation**: report the result without touching any file under `.scratch/`.
 
 Leave every parent open; a ticket never closes its spec, and `implement` never touches the map (the map was already closed by `to-spec`, or by a spec-less `to-tickets`, when the spec or tickets were written). A spec is **complete** when every ticket in its `tickets/` is closed; a derived state you report, not a status you write onto the spec. When the spec itself was the one-session work item, close that spec directly. Keep the resolution write out of code commits: if `.scratch/` is tracked, commit it separately; never fold it into an implementation commit. Resolution text cites the implementation commits, never its own closure commit.
 
-For trackable work, re-read the markdown file after writing it and verify its final state.
+For trackable work, re-read the markdown file after writing it and verify its frontmatter reads `status: closed` with a `## Resolution` section.
 
 Finish when the implementation commits and any separate resolution commit are recorded and the tracker's final state is verified, or the conversation-only result is reported. Then stop; any next work item gets a fresh session with a clean context.
 
