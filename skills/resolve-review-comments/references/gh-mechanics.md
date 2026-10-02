@@ -5,19 +5,20 @@ pull-request number.
 
 ## Read the three comment surfaces
 
-Review comments live in three different places, pull all three:
+Review comments live in three different places, pull all three. `--paginate` matters: without it
+REST returns only the first 30 of each.
 
 ```bash
 # 1. Reviews (top-level bodies + state; identifies which bot reviewed which commit)
-gh api repos/OWNER/REPO/pulls/PR/reviews \
-  --jq '.[] | {id, user: .user.login, state, commit: .commit_id[:10], body: (.body[:200])}'
+gh api repos/OWNER/REPO/pulls/PR/reviews --paginate \
+  --jq '.[] | {id, user: .user.login, state, commit: .commit_id[:10], body}'
 
 # 2. Inline review comments (the threads you resolve): the reviewed commit is commit_id
-gh api repos/OWNER/REPO/pulls/PR/comments \
+gh api repos/OWNER/REPO/pulls/PR/comments --paginate \
   --jq '.[] | "=== #\(.id) | \(.user.login) | \(.path):\(.line // .original_line) | commit \(.commit_id[:10]) ===\n\(.body)\n"'
 
 # 3. General issue comments (not attached to a line)
-gh api repos/OWNER/REPO/issues/PR/comments --jq '.[] | {id, user: .user.login, body}'
+gh api repos/OWNER/REPO/issues/PR/comments --paginate --jq '.[] | {id, user: .user.login, body}'
 ```
 
 The PR's commit range, to compare a reviewed commit against HEAD:
@@ -33,12 +34,13 @@ REST exposes comment ids but cannot resolve threads. GraphQL `reviewThreads` giv
 thread id (`PRRT_…`) and its member comments' `databaseId` (== the REST comment id):
 
 ```bash
-gh api graphql -f query='
-query {
+gh api graphql --paginate -F pr=PR -f query='
+query($pr: Int!, $endCursor: String) {
   repository(owner:"OWNER", name:"REPO") {
-    pullRequest(number: PR) {
-      reviewThreads(first:100) {
-        nodes { id isResolved comments(first:5){ nodes { databaseId path } } }
+    pullRequest(number: $pr) {
+      reviewThreads(first:100, after: $endCursor) {
+        pageInfo { hasNextPage endCursor }
+        nodes { id isResolved comments(first:1){ nodes { databaseId path } } }
       }
     }
   }
@@ -84,10 +86,11 @@ reply_and_resolve 3790734406 PRRT_kwDO…0Y "$NOT_BUG_Y"
 ## Confirm
 
 ```bash
-gh api graphql -f query='query { repository(owner:"OWNER", name:"REPO"){
-  pullRequest(number:PR){ reviewThreads(first:100){ nodes { isResolved } } } } }' \
-  --jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved==false)] | length'
-# 0 == every thread resolved
+gh api graphql --paginate -F pr=PR -f query='query($pr: Int!, $endCursor: String) {
+  repository(owner:"OWNER", name:"REPO"){ pullRequest(number:$pr){
+    reviewThreads(first:100, after: $endCursor){ pageInfo { hasNextPage endCursor } nodes { isResolved } } } } }' \
+  --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved==false) | 1' | wc -l
+# 0 == every thread resolved, across every page
 ```
 
 ## Notes

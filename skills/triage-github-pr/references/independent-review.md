@@ -7,8 +7,12 @@ it never reads the other reviews first, so their framing cannot narrow what it s
 ## Inputs to hand the reviewer
 
 - The PR title, body, and commit messages (intent, not evidence).
-- The range to review: `<base-sha>...<head-sha>` on the first pass, or
-  `<last-reviewed-sha>..<head-sha>` on a re-review (step 5).
+- The range to review. First pass: `<base-sha>...<head-sha>`. Re-review (step 6),
+  after `git fetch origin`: when `git merge-base --is-ancestor <last-reviewed-sha> <head-sha>`
+  holds, only the PR's own new commits,
+  `git log -p --no-merges <last-reviewed-sha>..<head-sha> ^origin/<base>`, which leaves
+  out what `gh pr update-branch` merged in from the base. When it does not hold (a
+  rebase or force-push), the whole `<base-sha>...<head-sha>` again.
 - The repo's `AGENTS.md` / `CLAUDE.md` and `.agents/github-review.md` when present.
 - This brief. Do **not** pass the PR's review comments.
 

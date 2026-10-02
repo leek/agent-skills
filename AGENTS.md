@@ -14,7 +14,8 @@ This repo also doubles as a [Claude Code plugin marketplace](https://docs.claude
 .claude-plugin/marketplace.json   # Claude Code plugin manifest
 skills/<skill-name>/SKILL.md      # one folder per skill
 agents/<agent-name>.md            # Claude Code subagents the skills dispatch (see Subagents)
-hooks/hooks.json                  # Claude Code plugin hooks, keyed to one agent type (see Subagents)
+hooks/hooks.json                  # Claude Code plugin hooks, each keyed to its agent types (see Subagents)
+hooks/*.py                        # guard scripts shared by more than one skill, with their tests
 template/SKILL.md.example         # starting point; renamed so installers do not treat it as a real skill
 ```
 
@@ -121,7 +122,7 @@ Rules:
 - **Skills stay the source of truth and stay harness-neutral.** A skill names its agent as the Claude Code branch of an existing "if the harness has sub-agents … otherwise inline" sentence, never as the only path. The verifier fails a skill that names an agent without a fallback clause.
 - **Agents carry no procedure of their own.** An agent body states its role, its standing rules (read-only, output shape), and how to use its memory; the brief it receives from the skill is the task. The exception is a skill with `context: fork`, whose SKILL.md body *is* the prompt: keep that body an actionable task, not guidelines.
 - **Reference by scoped name** (`leek-skills:module-designer`), both in `subagent_type` and in a skill's `agent:` field. Preloaded skills are scoped too (`skills: [leek-skills:codebase-design]`), and only model-invoked skills can be preloaded.
-- **`tools:` takes bare tool names**, not permission patterns; scope Bash with the skill's `allowed-tools` instead. Plugin agents cannot set `hooks`, `mcpServers`, or `permissionMode`. A guard an agent needs goes in the plugin's `hooks/hooks.json`, and its script exits 0 unless the hook input's `agent_type` names that agent (verified: the main session sends no `agent_type`, a plugin agent sends `leek-skills:<name>`). The hook runs on every matching tool call in every session, so the non-matching path must stay instant. `browser-test`'s guard is the one example; it is Python, not bash, because it parses shell words.
+- **`tools:` takes bare tool names**, not permission patterns; scope Bash with the skill's `allowed-tools` instead. Plugin agents cannot set `hooks`, `mcpServers`, or `permissionMode`. A guard an agent needs goes in the plugin's `hooks/hooks.json`, and its script exits 0 unless the hook input's `agent_type` names that agent (verified: the main session sends no `agent_type`, a plugin agent sends `leek-skills:<name>`). The hook runs on every matching tool call in every session, so the non-matching path must stay instant. Two exist: `browser-test`'s guard, and `hooks/guard-review-agents.py`, which holds `finding-verifier` and `pr-reviewer` to read-only commands because both read untrusted review text. Both are Python, not bash, because they parse shell words.
 - **Extra frontmatter is safe** (verified: Codex's `SkillFrontmatter` has no `deny_unknown_fields`, `npx skills` copies SKILL.md verbatim, Grok reads Claude skills as-is). `context: fork` therefore changes only Claude Code, where the body runs in the named agent with `$ARGUMENTS` but without the conversation.
 - **`.claude-plugin/plugin.json` pins the plugin name** so agents namespace as `leek-skills:` under `--plugin-dir` as well as a marketplace install; the version stays in `marketplace.json` only.
 - `memory: project` writes under the *target* repo's `.claude/`; say so in the skill when the agent uses it.

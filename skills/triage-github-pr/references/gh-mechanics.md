@@ -5,7 +5,7 @@
 ## Gather
 
 ```bash
-gh pr view N --json number,title,state,isDraft,mergeable,mergeStateStatus,reviewDecision,headRefName,headRefOid,baseRefName,statusCheckRollup,reviewRequests,commits,url
+gh pr view N --json number,title,state,isDraft,mergeable,mergeStateStatus,reviewDecision,headRefName,headRefOid,baseRefName,isCrossRepository,maintainerCanModify,statusCheckRollup,reviewRequests,commits,url
 gh pr diff N
 gh pr checks N --json name,state,bucket,link \
   --jq '.[] | select(.bucket == "fail") | {name, link}'   # finished failures on the head
@@ -16,19 +16,28 @@ gh api repos/{owner}/{repo}/pulls/N/reviews --paginate \
   --jq '.[] | {id, user: .user.login, state, commit: .commit_id[:8], at: .submitted_at, body}'
 # Inline comments: where most actionable findings live
 gh api repos/{owner}/{repo}/pulls/N/comments --paginate \
-  --jq '.[] | {id, user: .user.login, path, line: (.line // .original_line), commit: .commit_id[:8], body}'
+  --jq '.[] | {id, user: .user.login, path, line: (.line // .original_line), commit: .commit_id[:8], at: .updated_at, body}'
 # Issue comments: bot summaries and humans not on a line
 gh api repos/{owner}/{repo}/issues/N/comments --paginate \
   --jq '.[] | {id, user: .user.login, at: .updated_at, body}'
 ```
+
+The snapshot is every `{id, at}` pair from the three comment calls. At step 6, an id
+not in it, or an id whose `at` changed, is new: bots often edit a summary comment in
+place instead of posting another.
 
 ## In-flight signals
 
 ```bash
 gh pr view N --json reviewRequests -q '.reviewRequests[].login'          # unsubmitted reviewers
 gh api repos/{owner}/{repo}/issues/N/reactions --jq '.[] | select(.user.type == "Bot") | {u: .user.login, c: .content}'
-gh pr view N --json statusCheckRollup -q '.statusCheckRollup[] | select(.status != "COMPLETED") | .name'
+# Pending checks. A CheckRun has .status; a commit StatusContext has only .state.
+gh pr view N --json statusCheckRollup -q '.statusCheckRollup[]
+  | select(if .__typename == "StatusContext" then .state == "PENDING" or .state == "EXPECTED" else .status != "COMPLETED" end)
+  | (.name // .context)'
 ```
+
+This lists CI too. Only a review bot's own check counts as in flight; ignore the rest.
 
 Verified bot behaviour (2026-09):
 
@@ -40,6 +49,13 @@ Verified bot behaviour (2026-09):
 - **Copilot** (`copilot-pull-request-reviewer[bot]`) submits a `COMMENTED` review, whose
   `commit_id` is the commit it reviewed.
 
+## CI failures
+
+Each failed check on the head is a finding. Mark it LEGIT only when the error points at
+code this PR changed and the error reproduces at the head. Flaky tests, infra errors,
+and failures that also happen on the base are not caused by the PR, so mark them
+AUTO-DISMISS.
+
 ## Merge gates
 
 - `mergeable`: `CONFLICTING` means rebase or resolve. `UNKNOWN` means GitHub is still
@@ -47,23 +63,71 @@ Verified bot behaviour (2026-09):
 - `mergeStateStatus`: `CLEAN` or `UNSTABLE` (a non-required check failed) means go.
   `BLOCKED` means an approval or required check is missing: a pending required check is
   not a reason to wait (see Merge). `BEHIND` means run `gh pr update-branch N`, then
-  merge without waiting for the new CI run. `DIRTY` means conflicts.
-- `reviewDecision`: `CHANGES_REQUESTED` blocks. `REVIEW_REQUIRED` blocks when branch
-  protection requires a review.
+  run step 6 again from the top on the new head, without waiting for the new CI run.
+  `DIRTY` means conflicts.
+- `reviewDecision`: `CHANGES_REQUESTED` blocks, and pushing a fix does not clear it.
+  `REVIEW_REQUIRED` blocks when branch protection requires a review, and your own
+  review does not satisfy it: GitHub never lets a PR's author approve it.
 - `isDraft`: run `gh pr ready N` only when the context implies the PR should ship.
+
+## Stop cases
+
+Stop instead of merging when:
+
+- branch protection refuses the merge because a required check failed or a required
+  approval is missing (`REVIEW_REQUIRED`);
+- a conflict would change intent;
+- a human `CHANGES_REQUESTED` stands. After you push its fix, re-request that reviewer
+  (`gh pr edit N --add-reviewer <login>`) and name them as the blocker. Dismiss a
+  review only when the guidance or project context says to;
+- a LEGIT finding needs a human or infra decision;
+- the PR is a draft without clear intent to ship, or the guidance says not to merge;
+- the PR is stacked, or its base is a deploy branch (`production`, `staging`, or any
+  branch the project context names), and the user has not approved the merge in this
+  conversation.
 
 ## Check out the head branch safely
 
-- The branch is already checked out in another worktree (`git worktree list`): work
-  there, or run `git switch --detach origin/<head>` and push with
-  `git push origin HEAD:<head>`.
-- The tree is clean: `gh pr checkout N`.
-- The tree is dirty: run `git fetch origin && git worktree add .claude/worktrees/pr-N <head>`,
-  always at that path, never a sibling directory. Work and push from there. After the
-  merge, and only after the user says yes at step 7, `cd` back to
-  the main checkout and run `git worktree remove .claude/worktrees/pr-N` (no `--force`;
-  if git refuses, the tree holds unsaved work, so report it instead).
-  A stopped or `--auto`-queued PR keeps its worktree.
+Never reuse a checkout without proof that it is the PR head. Before the first change,
+`git rev-parse HEAD` must equal `headRefOid`; if it does not, use a fresh worktree.
+
+- **Fork PR** (`isCrossRepository` is true): you can push only when
+  `maintainerCanModify` is true; otherwise stop, naming that as the blocker. Run
+  `git worktree add --detach .claude/worktrees/pr-N`, `cd` into it, run
+  `gh pr checkout N` there (it tracks the fork's branch), and push with `git push`.
+- **The tree is clean** and no other worktree has the branch: `gh pr checkout N`. If it
+  refuses because a local branch of that name has diverged, use the worktree below.
+- **Otherwise** (a dirty tree, or the branch checked out in another worktree, which may
+  hold someone's unsaved work): `git fetch origin && git worktree add --detach
+  .claude/worktrees/pr-N origin/<head>`, always at that path, never a sibling
+  directory. Work there, and push with `git push origin HEAD:<head>` (no `--force`;
+  if the push is refused, someone else pushed, so go back to step 3).
+
+After the merge, and only after the user says yes at step 7, `cd` back to the main
+checkout and run `git worktree remove .claude/worktrees/pr-N` (no `--force`; if git
+refuses, the tree holds unsaved work, so report it instead). A stopped or
+`--auto`-queued PR keeps its worktree.
+
+## Reply and resolve
+
+Reply to an inline comment, then resolve its thread. Map comment ids to thread ids
+first: REST cannot resolve, and GraphQL `reviewThreads` gives the thread id (`PRRT_…`)
+with its comments' `databaseId` (the REST comment id).
+
+```bash
+gh api graphql --paginate -F owner='{owner}' -F repo='{repo}' -F pr=N -f query='
+query($owner: String!, $repo: String!, $pr: Int!, $endCursor: String) {
+  repository(owner: $owner, name: $repo) { pullRequest(number: $pr) {
+    reviewThreads(first: 100, after: $endCursor) {
+      pageInfo { hasNextPage endCursor }
+      nodes { id isResolved comments(first: 1) { nodes { databaseId } } } } } } }' \
+  --jq '.data.repository.pullRequest.reviewThreads.nodes[] | {thread: .id, resolved: .isResolved, comment: .comments.nodes[0].databaseId}'
+gh api repos/{owner}/{repo}/pulls/N/comments/COMMENT_ID/replies -f body="$BODY"
+gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "PRRT_…"}) { thread { isResolved } } }'
+```
+
+Keep `$BODY` free of apostrophes and backticks. A resolve that returns nothing means no
+write access or a stale thread id: re-query the threads.
 
 ## Scratch databases
 
@@ -86,9 +150,12 @@ stays registered for `repository-cleanup`.
 
 ```bash
 gh pr list --base <head> --state open --json number,title,url   # stacked PRs; must be empty
-gh pr merge N --squash                           # or --rebase / --merge; never --delete-branch
-gh pr view N --json state,mergedAt,mergeCommit
+gh pr merge N --squash --match-head-commit <reviewed head sha>  # or --rebase / --merge; never --delete-branch
+gh pr view N --json state,mergedAt,mergeCommit,autoMergeRequest
 ```
+
+`--match-head-commit` makes GitHub refuse the merge when the head moved after your
+re-check. On that refusal, run step 6 again from the top.
 
 Never pass `--delete-branch`, and never delete a branch by any other route
 (`git push --delete`, `gh api -X DELETE .../git/refs/...`). Deleting a branch closes
@@ -98,4 +165,5 @@ the merge itself deletes the head branch, so the stacked-PR check above is what
 protects dependents. Do not change that repo setting yourself.
 
 If the merge is refused only because required checks are still pending, re-run it with
-`--auto` so GitHub lands it when they pass, and report it as queued. Do not wait.
+`--auto` (keeping `--match-head-commit`) so GitHub lands it when they pass, and report
+it as queued: `autoMergeRequest` is set. Do not wait.
