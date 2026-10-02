@@ -139,14 +139,6 @@ PR's head branch (see [Merge](references/gh-mechanics.md#merge)). If any exist, 
 is stacked: merge only on the user's explicit approval in this conversation, because
 the repo's auto-delete setting can still remove the branch on merge.
 
-**Remove the worktree and databases you made.** Once the PR shows merged, not merely
-queued by `--auto`, remove the worktree step 5 created for it (see
-[Check out the head branch safely](references/gh-mechanics.md#check-out-the-head-branch-safely))
-and drop every database you created for the run (see
-[Scratch databases](references/gh-mechanics.md#scratch-databases)).
-A worktree you did not create stays, and so does a queued merge's: name it in the
-report so the user's next `repository-cleanup` run removes it once the merge lands.
-
 **Stop instead of merging** when branch protection refuses the merge because a
 required check failed, a conflict would change intent, a human `CHANGES_REQUESTED`
 is still open, a LEGIT finding needs a human or infra decision, the PR is a draft without clear intent to
@@ -157,6 +149,20 @@ merge it only on the user's explicit approval in this conversation.
 In every stop case, leave the PR open, post one comment that disposes of every finding
 and names the blocker, and report.
 
-Completion criterion: `gh pr view N --json state,mergedAt` shows merged and the worktree
-and databases you created are gone, or the blocker comment is posted. Report the merge SHA, and one line per finding, yours included:
+Completion criterion: `gh pr view N --json state,mergedAt` shows merged, or the blocker
+comment is posted. Report the merge SHA, and one line per finding, yours included:
 fixed in `<sha>`, stale, auto-dismiss, hallucination, or minor (not fixed).
+
+## 7. Ask once, then clean up
+
+Remove nothing while the PRs are in flight. After the last named PR, list every worktree
+(step 5) and database (see [Scratch databases](references/gh-mechanics.md#scratch-databases))
+you created for a PR that now shows merged, and ask one yes/no question: "Can I delete
+everything I created for these PRs?" On yes, remove them all; on no, remove nothing. An
+answer that names items to keep keeps those. Skip the question when the list is empty.
+
+A stopped or `--auto`-queued PR's worktree and databases are not on the list, and
+neither is anything you did not create. Name them in the report, so the user's next
+`repository-cleanup` run offers them once the merge lands.
+
+Completion criterion: the user answered, and the report names everything kept.

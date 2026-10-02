@@ -60,8 +60,9 @@ Verified bot behaviour (2026-09):
 - The tree is clean: `gh pr checkout N`.
 - The tree is dirty: run `git fetch origin && git worktree add .claude/worktrees/pr-N <head>`,
   always at that path, never a sibling directory. Work and push from there. After the
-  merge, `cd` back to the main checkout and run `git worktree remove .claude/worktrees/pr-N`
-  (no `--force`; if git refuses, the tree holds unsaved work, so report it instead).
+  merge, and only after the user says yes at step 7, `cd` back to
+  the main checkout and run `git worktree remove .claude/worktrees/pr-N` (no `--force`;
+  if git refuses, the tree holds unsaved work, so report it instead).
   A stopped or `--auto`-queued PR keeps its worktree.
 
 ## Scratch databases
@@ -76,10 +77,10 @@ printf '%s\t%s\t%s\t%s\n' "$(date +%s)" <pgsql|mysql> <database> "<worktree path
   >> "$(git rev-parse --path-format=absolute --git-common-dir)/scratch-databases"
 ```
 
-When you remove the worktree, drop the database and its parallel-testing copies
+After the user says yes at step 7, drop the database and its parallel-testing copies
 (`<database>_test_<N>`) with the repo's client (`DROP DATABASE IF EXISTS`), then delete
-its line from that file. A stopped or `--auto`-queued PR keeps both, registered, for
-`repository-cleanup` to remove after the merge.
+its line from that file. A database the user kept, and a stopped or `--auto`-queued PR's,
+stays registered for `repository-cleanup`.
 
 ## Merge
 

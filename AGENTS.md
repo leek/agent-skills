@@ -128,7 +128,7 @@ Rules:
 
 ## Worktrees
 
-No skill tells the agent to create a worktree, yet sessions run in one all the time (`claude --worktree`, subagents with `isolation: worktree`, the dirty-tree recipes in `triage-github-pr` and `fix-ci-failures`). A skill that creates a worktree or a scratch database removes it when its work is done (`triage-github-pr`, `fix-github-issues`, `fix-ci-failures` say how), and registers each database in `<git-common-dir>/scratch-databases`. Whatever is left (a queued merge, a stopped run, a harness worktree) is `repository-cleanup`'s job, through `skills/repository-cleanup/scripts/prune-merged-worktrees.sh`. No hook runs it: cleanup happens when the user asks.
+No skill tells the agent to create a worktree, yet sessions run in one all the time (`claude --worktree`, subagents with `isolation: worktree`, the dirty-tree recipes in `triage-github-pr` and `fix-ci-failures`). A skill that creates a worktree or a scratch database registers each database in `<git-common-dir>/scratch-databases`, and removes nothing until the end of its run: then it lists what it created and asks one yes/no question before deleting any of it (`triage-github-pr`, `fix-github-issues`, `fix-ci-failures` say how). Whatever is left (an item the user kept, a queued merge, a stopped run, a harness worktree) is `repository-cleanup`'s job, through `skills/repository-cleanup/scripts/prune-merged-worktrees.sh`, which lists by default and removes only the exact names passed to it. No hook runs it: cleanup happens when the user asks, and every removal is one the user selected.
 
 ## Best Practices
 

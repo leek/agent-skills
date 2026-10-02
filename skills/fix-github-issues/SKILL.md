@@ -86,10 +86,13 @@ printf '%s\t%s\t%s\t%s\n' "$(date +%s)" <pgsql|mysql> <database> "<worktree path
   >> "$(git rev-parse --path-format=absolute --git-common-dir)/scratch-databases"
 ```
 
-Before you report, remove any worktree you created (`git worktree remove`, no
-`--force`), drop each database you created and its parallel-testing copies
-(`<database>_test_<N>`) with the repo's client (`DROP DATABASE IF EXISTS`), and delete
-their lines from that file.
+Remove nothing during the run. Before you report, list every worktree and database you
+created and ask one yes/no question: "Can I delete everything I created for these
+issues?" On yes, remove them all: `git worktree remove` (no `--force`), then each
+database and its parallel-testing copies (`<database>_test_<N>`) with the repo's client
+(`DROP DATABASE IF EXISTS`), deleting their lines from that file. On no, remove nothing;
+an answer that names items to keep keeps those. What stays stays registered, for
+`repository-cleanup`. Skip the question when you created nothing.
 
 A LEGIT finding you cannot fix (a secret rotation, infra, a human decision) keeps the
 issue OPEN. Comment to dispose of the other findings, and name what is blocking.
@@ -109,6 +112,6 @@ comment with one bullet per finding:
 If you later find a misclassified finding, reopen the issue with a correction note.
 
 Completion criterion: every issue in the working set is closed with a disposition, or
-stays open with a comment that names its blocker, and no worktree or database you created
-remains. Report the tally: fixed, stale,
-auto-dismiss, hallucination, and blocked.
+stays open with a comment that names its blocker, and the user answered the clean-up
+question. Report the tally: fixed, stale,
+auto-dismiss, hallucination, and blocked, and name each worktree or database kept.

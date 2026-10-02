@@ -1,8 +1,13 @@
 #!/bin/bash
-# Remove git worktrees whose pull request has merged, when nothing in them can be lost,
-# and drop the scratch databases created for them.
+# List the git worktrees whose pull request has merged, and the scratch databases left
+# behind, then remove only the ones a human selected by exact name.
 #
-# A linked worktree is removed only when every check holds:
+# Run with no arguments, the script changes nothing: it prints the candidates (the plan).
+# It removes a worktree only when --remove names its path, and drops a database only when
+# --drop names it, and each name must be a candidate in the plan this same run computes.
+# One name that is not a candidate stops the run before anything changes.
+#
+# A linked worktree is a candidate only when every check holds:
 #   - its HEAD is the head of a merged PR, or an ancestor of it. A worktree on a branch
 #     must match a merged PR from that same branch; a detached worktree must sit
 #     exactly on a merged PR's head commit.
@@ -12,35 +17,38 @@
 #   - it is not locked, and it is not the checkout this script runs from.
 # Local branches stay; only the directory goes.
 #
-# Databases dropped after a worktree is removed (pgsql and mysql, local hosts only):
-#   - every database registered for that worktree in <git-common-dir>/scratch-databases
-#     (lines: epoch<TAB>connection<TAB>database<TAB>worktree path, or "-" for none)
-#   - the DB_DATABASE of the worktree's .env and .env.testing
-#   - the parallel-testing copies of each: <database>_test_<N>
-# Registry lines with no worktree, or whose worktree directory is gone, are dropped once
-# they are 12 hours old. A database named by the main checkout's .env, .env.testing, or
-# phpunit.xml(.dist), or by a remaining worktree's .env or .env.testing, is never dropped,
-# nor is a parallel-testing copy of one.
+# Candidate databases (pgsql and mysql, local hosts only), each listed by its exact name,
+# parallel-testing copies (<database>_test_<N>) included as names of their own:
+#   - source "worktree": registered for a candidate worktree in <git-common-dir>/scratch-databases
+#     (lines: epoch<TAB>connection<TAB>database<TAB>worktree path, or "-" for none), or the
+#     DB_DATABASE of its .env and .env.testing. Dropping one needs its worktree in --remove too.
+#   - source "registry": a registry line 12 hours old with no worktree, or whose directory is gone
+#   - source "orphan": a local database named <app db>_* that no checkout uses
+# A database named by the main checkout's .env, .env.testing, or phpunit.xml(.dist), or by
+# a remaining worktree's .env or .env.testing, is never a candidate, nor is a
+# parallel-testing copy of one.
 #
-# Usage: prune-merged-worktrees.sh [--dry-run] [--orphan-databases]
-#   --dry-run  report what would be removed and dropped, change nothing
-#   --orphan-databases  list, never drop, local databases named <app db>_* that no checkout
-#              uses (leftovers of removed worktrees and one-off test runs), as JSON
-#              [{"connection","database","size"}]; touches no worktree and needs no gh
+# Usage: prune-merged-worktrees.sh                          list candidates, change nothing
+#        prune-merged-worktrees.sh [--remove <path>]... [--drop <connection>:<database>]...
+#   --dry-run is accepted and does nothing extra: listing is already the default.
 #
-# Output (default): JSON {"removed":[paths],"dropped":[databases],"kept":[{"path","reason"}]} on
-# stdout. "kept" lists only worktrees and databases a check protected.
+# Output, listing: JSON {"worktrees":[{"path","branch","databases":[names]}],
+#   "databases":[{"connection","database","size","source","worktree"}],"kept":[{"path","reason"}]}
+# Output, removing: JSON {"removed":[paths],"dropped":[databases],"kept":[{"path","reason"}]}
+# "kept" lists only worktrees and databases a check protected or a removal refused.
 
 set -e
 
-DRY_RUN=0
-ORPHANS=0
-for arg in "$@"; do
-  case "$arg" in
-    --dry-run) DRY_RUN=1 ;;
-    --orphan-databases) ORPHANS=1 ;;
-    *) echo "Unknown arg: $arg" >&2; exit 2 ;;
+remove_args=()
+drop_args=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --dry-run) ;;
+    --remove) [ -n "${2:-}" ] || { echo "--remove needs a path" >&2; exit 2; }; remove_args+=("$2"); shift ;;
+    --drop)   [ -n "${2:-}" ] || { echo "--drop needs <connection>:<database>" >&2; exit 2; }; drop_args+=("$2"); shift ;;
+    *) echo "Unknown arg: $1" >&2; exit 2 ;;
   esac
+  shift
 done
 
 main=$(git worktree list --porcelain | awk '/^worktree /{ print substr($0, 10); exit }')
@@ -48,9 +56,13 @@ common=$(git rev-parse --path-format=absolute --git-common-dir)
 registry="$common/scratch-databases"
 here=$(pwd -P)
 
-removed=()
-dropped=()
 kept=()
+wt_cands=()   # path<TAB>branch
+db_cands=()   # connection<TAB>database<TAB>worktree<TAB>source<TAB>size<TAB>host<TAB>port<TAB>user<TAB>pass
+
+json_str() { printf '"%s"' "$(printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"; }
+join() { local IFS=,; echo "$*"; }
+keep() { kept+=("{\"path\":$(json_str "$1"),\"reason\":$(json_str "$2")}"); }
 
 # --- databases ------------------------------------------------------------------
 
@@ -90,8 +102,11 @@ creds_for() {  # creds_for <connection> <env files...>; sets host port user pass
     break
   done
   [ -n "$host" ] || host=127.0.0.1
+  [ -n "$user" ] || user=root
   [ -n "$port" ] || { [ "$conn" = pgsql ] && port=5432 || port=3306; }
 }
+
+is_local() { case "$host" in 127.0.0.1|localhost|::1) return 0 ;; esac; return 1; }
 
 sql() {  # sql <connection> <statement>; uses host port user pass
   case "$1" in
@@ -100,69 +115,46 @@ sql() {  # sql <connection> <statement>; uses host port user pass
   esac
 }
 
-drop_db() {  # drop_db <connection> <db> <worktree being removed> <env files...>
-  local conn=$1 db=$2 wt=$3 d all; shift 3
+server_dbs() {  # server_dbs <connection>: "name size" per line; uses host port user pass
+  case "$1" in
+    pgsql) sql pgsql "SELECT datname || ' ' || pg_size_pretty(pg_database_size(datname)) FROM pg_database WHERE NOT datistemplate" ;;
+    mysql) sql mysql "SELECT schema_name, '-' FROM information_schema.schemata" | tr '\t' ' ' ;;
+  esac
+}
+
+is_db_cand() {  # is_db_cand <connection> <db>
+  local c
+  for c in ${db_cands[@]+"${db_cands[@]}"}; do
+    [ "$(printf '%s' "$c" | cut -f1-2)" = "$1	$2" ] && return 0
+  done
+  return 1
+}
+
+add_db_cand() {  # add_db_cand <connection> <db> <worktree> <source> <size>; uses host port user pass
+  is_db_cand "$1" "$2" && return 0
+  db_cands+=("$1	$2	$3	$4	$5	$host	$port	$user	$pass")
+}
+
+# A database and its parallel-testing copies, each a candidate unless something uses it.
+plan_db() {  # plan_db <connection> <db> <worktree> <source> <env files...>
+  local conn=$1 db=$2 wt=$3 src=$4 all d size; shift 4
   case "$conn" in pgsql|mysql) ;; *) return 0 ;; esac   # sqlite files live in the worktree
   [[ "$db" =~ ^[A-Za-z0-9_]+$ ]] || return 0
-  is_protected "$db" "$wt" && return 0   # shared with the main checkout or a remaining worktree
+  if is_protected "$db" "$wt"; then keep "$db" "used by the main checkout or a remaining worktree"; return 0; fi
   creds_for "$conn" "$@"
-  case "$host" in 127.0.0.1|localhost|::1) ;; *)
-    kept+=("{\"path\":\"$db\",\"reason\":\"database host $host is not local\"}"); return 0 ;;
-  esac
-  case "$conn" in
-    pgsql) all=$(sql pgsql "SELECT datname FROM pg_database" 2>/dev/null) || return 0 ;;
-    mysql) all=$(sql mysql "SHOW DATABASES" 2>/dev/null) || return 0 ;;
-  esac
-  for d in $(printf '%s\n' "$all" | grep -E "^${db}(_test_[0-9]+)?$"); do
-    is_protected "$d" "$wt" && continue
-    if [ "$DRY_RUN" -eq 1 ]; then
-      echo ">> would drop $conn database $d" >&2; dropped+=("\"$d\"")
-    elif case "$conn" in pgsql) sql pgsql "DROP DATABASE IF EXISTS \"$d\"" ;; mysql) sql mysql "DROP DATABASE IF EXISTS \`$d\`" ;; esac; then
-      echo ">> dropped $conn database $d" >&2; dropped+=("\"$d\"")
-    else
-      kept+=("{\"path\":\"$d\",\"reason\":\"drop failed (open connections?)\"}")
-    fi
-  done
+  is_local || { keep "$db" "database host $host is not local"; return 0; }
+  all=$(server_dbs "$conn" 2>/dev/null) || return 0
+  while read -r d size; do
+    [[ "$d" =~ ^${db}(_test_[0-9]+)?$ ]] || continue
+    is_protected "$d" "$wt" || add_db_cand "$conn" "$d" "$wt" "$src" "$size"
+  done <<< "$all"
 }
 
-forget() {  # forget <db> <worktree>: delete matching registry lines
-  [ "$DRY_RUN" -eq 0 ] && [ -f "$registry" ] || return 0
-  awk -F'\t' -v d="$1" -v w="$2" '!($3 == d && $4 == w)' "$registry" > "$registry.tmp" && mv "$registry.tmp" "$registry"
-}
-
-if [ "$ORPHANS" -eq 1 ]; then
-  out=()
-  for f in "$main/.env" "$main/.env.testing"; do
-    conn=$(env_get "$f" DB_CONNECTION)
-    case "$conn" in pgsql|mysql) ;; *) continue ;; esac
-    case " ${seen:-} " in *" $conn "*) continue ;; esac; seen="${seen:-} $conn"
-    creds_for "$conn" "$f"
-    case "$host" in 127.0.0.1|localhost|::1) ;; *) continue ;; esac
-    case "$conn" in
-      pgsql) all=$(sql pgsql "SELECT datname || ' ' || pg_size_pretty(pg_database_size(datname)) FROM pg_database WHERE NOT datistemplate" 2>/dev/null) || continue ;;
-      mysql) all=$(sql mysql "SELECT schema_name, '-' FROM information_schema.schemata" 2>/dev/null | tr '\t' ' ') || continue ;;
-    esac
-    prefixes=$(printf '%s\n' "$protected" | awk -F'\t' '$1 == "MAIN" { print $2 }' | sort -u)
-    while read -r d size; do
-      [ -n "$d" ] || continue
-      for p in $prefixes; do
-        case "$d" in "${p}_"*)
-          is_protected "$d" "" || out+=("{\"connection\":\"$conn\",\"database\":\"$d\",\"size\":\"$size\"}")
-          break ;;
-        esac
-      done
-    done <<< "$all"
-  done
-  join() { local IFS=,; echo "$*"; }
-  echo "[$(join "${out[@]}")]"
-  exit 0
-fi
-
-# --- worktrees ------------------------------------------------------------------
+# --- plan: worktrees ------------------------------------------------------------
 
 echo ">> Fetching merged PRs" >&2
 merged=$(gh pr list --state merged --limit 300 --json headRefName,headRefOid \
-  --jq '.[] | "\(.headRefName)\t\(.headRefOid)"') || { echo "gh pr list failed; no worktree removed" >&2; merged=""; }
+  --jq '.[] | "\(.headRefName)\t\(.headRefOid)"') || { echo "gh pr list failed; no worktree is a candidate" >&2; merged=""; }
 
 # One tab-separated line per linked worktree (the main worktree is skipped): path, HEAD,
 # branch, flags. Empty fields become "-" because read collapses adjacent tabs.
@@ -196,54 +188,139 @@ while IFS=$'\t' read -r path head branch flags; do
   if [ -z "$reason" ] && [ -n "$(git -C "$path" status --porcelain 2>/dev/null)" ]; then
     reason="uncommitted or untracked changes"
   fi
-  if [ -n "$reason" ]; then
-    echo ">> keep $path ($reason)" >&2
-    kept+=("{\"path\":\"$path\",\"reason\":\"$reason\"}")
-    continue
-  fi
+  if [ -n "$reason" ]; then keep "$path" "$reason"; continue; fi
 
-  # Read the databases before the .env files go with the directory.
-  stash=$(mktemp -d); trap 'rm -rf "$stash"' EXIT
-  for f in .env .env.testing; do [ -f "$path/$f" ] && cp "$path/$f" "$stash/$f"; done
-  dbs=$( {
+  wt_cands+=("$path	${branch/#-/detached}")
+  wt_dbs=$(mktemp)
+  {
     for f in .env .env.testing; do
-      c=$(env_get "$stash/$f" DB_CONNECTION); d=$(env_get "$stash/$f" DB_DATABASE)
+      c=$(env_get "$path/$f" DB_CONNECTION); d=$(env_get "$path/$f" DB_DATABASE)
       [ -n "$d" ] && printf '%s\t%s\n' "$c" "$d"
     done
     [ -f "$registry" ] && awk -F'\t' -v w="$path" '$4 == w { print $2 "\t" $3 }' "$registry"
-  } | sort -u )
-
-  if [ "$DRY_RUN" -eq 1 ]; then
-    echo ">> would remove $path (${branch/#-/detached})" >&2
-  elif git -C "$main" worktree remove "$path" >&2; then
-    echo ">> removed $path (${branch/#-/detached})" >&2
-  else
-    kept+=("{\"path\":\"$path\",\"reason\":\"git worktree remove refused\"}")
-    rm -rf "$stash"; continue
-  fi
-  removed+=("\"$path\"")
-
+  } | sort -u > "$wt_dbs"
   while IFS=$'\t' read -r c d; do
-    [ -n "$d" ] || continue
-    drop_db "$c" "$d" "$path" "$stash/.env" "$stash/.env.testing" "$main/.env" "$main/.env.testing"
-    forget "$d" "$path"
-  done <<< "$dbs"
-  rm -rf "$stash"
+    [ -n "$d" ] && plan_db "$c" "$d" "$path" worktree "$path/.env" "$path/.env.testing" "$main/.env" "$main/.env.testing"
+  done < "$wt_dbs"
+  rm -f "$wt_dbs"
 done <<< "$worktrees"
 
-[ "$DRY_RUN" -eq 1 ] || git -C "$main" worktree prune
+# --- plan: registry lines a run left behind, and orphans --------------------------
 
-# Registry lines a run left behind: no worktree, or its directory is gone, 12 hours on.
 if [ -f "$registry" ]; then
   now=$(date +%s)
   stale=$(awk -F'\t' -v now="$now" '$1 < now - 43200 { print $2 "\t" $3 "\t" $4 }' "$registry")
   while IFS=$'\t' read -r c d w; do
     [ -n "$d" ] || continue
     [ "$w" = "-" ] || [ ! -d "$w" ] || continue
-    drop_db "$c" "$d" "$w" "$main/.env" "$main/.env.testing"
-    forget "$d" "$w"
+    plan_db "$c" "$d" "$w" registry "$main/.env" "$main/.env.testing"
   done <<< "$stale"
 fi
 
-join() { local IFS=,; echo "$*"; }
-echo "{\"removed\":[$(join "${removed[@]}")],\"dropped\":[$(join "${dropped[@]}")],\"kept\":[$(join "${kept[@]}")]}"
+seen=""
+prefixes=$(printf '%s\n' "$protected" | awk -F'\t' '$1 == "MAIN" { print $2 }' | sort -u)
+for f in "$main/.env" "$main/.env.testing"; do
+  conn=$(env_get "$f" DB_CONNECTION)
+  case "$conn" in pgsql|mysql) ;; *) continue ;; esac
+  case " $seen " in *" $conn "*) continue ;; esac; seen="$seen $conn"
+  creds_for "$conn" "$f"
+  is_local || continue
+  all=$(server_dbs "$conn" 2>/dev/null) || continue
+  while read -r d size; do
+    [ -n "$d" ] || continue
+    for p in $prefixes; do
+      case "$d" in "${p}_"*)
+        is_protected "$d" "" || add_db_cand "$conn" "$d" - orphan "$size"
+        break ;;
+      esac
+    done
+  done <<< "$all"
+done
+
+# --- listing (the default) ------------------------------------------------------
+
+if [ ${#remove_args[@]} -eq 0 ] && [ ${#drop_args[@]} -eq 0 ]; then
+  wt_json=()
+  for w in ${wt_cands[@]+"${wt_cands[@]}"}; do
+    p=$(printf '%s' "$w" | cut -f1); b=$(printf '%s' "$w" | cut -f2)
+    names=()
+    for c in ${db_cands[@]+"${db_cands[@]}"}; do
+      [ "$(printf '%s' "$c" | cut -f3)" = "$p" ] && names+=("$(json_str "$(printf '%s' "$c" | cut -f2)")")
+    done
+    wt_json+=("{\"path\":$(json_str "$p"),\"branch\":$(json_str "$b"),\"databases\":[$(join ${names[@]+"${names[@]}"})]}")
+    echo ">> candidate worktree $p ($b)" >&2
+  done
+  db_json=()
+  for c in ${db_cands[@]+"${db_cands[@]}"}; do
+    IFS=$'\t' read -r conn d w src size _ <<< "$c"
+    db_json+=("{\"connection\":$(json_str "$conn"),\"database\":$(json_str "$d"),\"size\":$(json_str "$size"),\"source\":$(json_str "$src"),\"worktree\":$(json_str "$w")}")
+    echo ">> candidate $conn database $d ($size, $src)" >&2
+  done
+  echo ">> Nothing changed. Remove only what a human selects: --remove <path> / --drop <connection>:<database>" >&2
+  echo "{\"worktrees\":[$(join ${wt_json[@]+"${wt_json[@]}"})],\"databases\":[$(join ${db_json[@]+"${db_json[@]}"})],\"kept\":[$(join ${kept[@]+"${kept[@]}"})]}"
+  exit 0
+fi
+
+# --- check every selected name before changing anything --------------------------
+
+in_list() {  # in_list <value> <items...>
+  local v=$1 i; shift
+  for i in "$@"; do [ "$i" = "$v" ] && return 0; done
+  return 1
+}
+
+wt_paths=()
+for w in ${wt_cands[@]+"${wt_cands[@]}"}; do wt_paths+=("$(printf '%s' "$w" | cut -f1)"); done
+
+errors=()
+for p in ${remove_args[@]+"${remove_args[@]}"}; do
+  in_list "$p" ${wt_paths[@]+"${wt_paths[@]}"} || errors+=("--remove $p: not a candidate worktree")
+done
+selected_dbs=()
+for a in ${drop_args[@]+"${drop_args[@]}"}; do
+  conn=${a%%:*}; d=${a#*:}
+  if [ "$conn" = "$a" ] || ! is_db_cand "$conn" "$d"; then errors+=("--drop $a: not a candidate database"); continue; fi
+  for c in "${db_cands[@]}"; do
+    [ "$(printf '%s' "$c" | cut -f1-2)" = "$conn	$d" ] || continue
+    w=$(printf '%s' "$c" | cut -f3)
+    if [ "$w" != "-" ] && [ -d "$w" ] && ! in_list "$w" ${remove_args[@]+"${remove_args[@]}"}; then
+      errors+=("--drop $a: its worktree $w stays, so the database stays")
+    else
+      selected_dbs+=("$c")
+    fi
+  done
+done
+if [ ${#errors[@]} -gt 0 ]; then
+  printf '>> %s\n' "${errors[@]}" >&2
+  echo ">> Nothing changed. Run with no arguments to list the candidates." >&2
+  exit 1
+fi
+
+# --- remove exactly the selected names ----------------------------------------------
+
+removed=()
+dropped=()
+failed_wts=()
+for p in ${remove_args[@]+"${remove_args[@]}"}; do
+  if git -C "$main" worktree remove "$p" >&2; then
+    echo ">> removed $p" >&2; removed+=("$(json_str "$p")")
+  else
+    keep "$p" "git worktree remove refused"; failed_wts+=("$p")
+  fi
+done
+[ ${#removed[@]} -eq 0 ] || git -C "$main" worktree prune
+
+for c in ${selected_dbs[@]+"${selected_dbs[@]}"}; do
+  IFS=$'\t' read -r conn d w src size host port user pass <<< "$c"
+  if in_list "$w" ${failed_wts[@]+"${failed_wts[@]}"}; then keep "$d" "its worktree was not removed"; continue; fi
+  if case "$conn" in pgsql) sql pgsql "DROP DATABASE IF EXISTS \"$d\"" ;; mysql) sql mysql "DROP DATABASE IF EXISTS \`$d\`" ;; esac; then
+    echo ">> dropped $conn database $d" >&2; dropped+=("$(json_str "$d")")
+    if [ -f "$registry" ]; then
+      awk -F'\t' -v d="$d" '$3 != d' "$registry" > "$registry.tmp" && mv "$registry.tmp" "$registry"
+    fi
+  else
+    keep "$d" "drop failed (open connections?)"
+  fi
+done
+
+echo "{\"removed\":[$(join ${removed[@]+"${removed[@]}"})],\"dropped\":[$(join ${dropped[@]+"${dropped[@]}"})],\"kept\":[$(join ${kept[@]+"${kept[@]}"})]}"
