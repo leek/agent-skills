@@ -126,6 +126,10 @@ Rules:
 - **`.claude-plugin/plugin.json` pins the plugin name** so agents namespace as `leek-skills:` under `--plugin-dir` as well as a marketplace install; the version stays in `marketplace.json` only.
 - `memory: project` writes under the *target* repo's `.claude/`; say so in the skill when the agent uses it.
 
+## Worktrees
+
+No skill tells the agent to create a worktree, yet sessions run in one all the time (`claude --worktree`, subagents with `isolation: worktree`, the dirty-tree recipes in `triage-github-pr` and `fix-ci-failures`). A skill that creates a worktree or a scratch database removes it when its work is done (`triage-github-pr`, `fix-github-issues`, `fix-ci-failures` say how), and registers each database in `<git-common-dir>/scratch-databases`. Whatever is left (a queued merge, a stopped run, a harness worktree) is `repository-cleanup`'s job, through `skills/repository-cleanup/scripts/prune-merged-worktrees.sh`. No hook runs it: cleanup happens when the user asks.
+
 ## Best Practices
 
 **How to write one is the `writing-for-agents` skill**: it is model-invoked, so reach for it rather than working from this file. Only what is specific to *this repo* lives here:

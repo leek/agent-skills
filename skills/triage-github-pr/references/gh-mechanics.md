@@ -59,7 +59,27 @@ Verified bot behaviour (2026-09):
   `git push origin HEAD:<head>`.
 - The tree is clean: `gh pr checkout N`.
 - The tree is dirty: run `git fetch origin && git worktree add .claude/worktrees/pr-N <head>`,
-  work and push from there, then `git worktree remove` it.
+  always at that path, never a sibling directory. Work and push from there. After the
+  merge, `cd` back to the main checkout and run `git worktree remove .claude/worktrees/pr-N`
+  (no `--force`; if git refuses, the tree holds unsaved work, so report it instead).
+  A stopped or `--auto`-queued PR keeps its worktree.
+
+## Scratch databases
+
+Run tests against the repo's configured test database when you can. When the run
+needs its own (a worktree `.env`, a throwaway test database), name it
+`<app db>_pr<N>`, never a name the main checkout's `.env`, `.env.testing`, or
+`phpunit.xml` uses, and register it the moment you create it:
+
+```bash
+printf '%s\t%s\t%s\t%s\n' "$(date +%s)" <pgsql|mysql> <database> "<worktree path, or ->" \
+  >> "$(git rev-parse --path-format=absolute --git-common-dir)/scratch-databases"
+```
+
+When you remove the worktree, drop the database and its parallel-testing copies
+(`<database>_test_<N>`) with the repo's client (`DROP DATABASE IF EXISTS`), then delete
+its line from that file. A stopped or `--auto`-queued PR keeps both, registered, for
+`repository-cleanup` to remove after the merge.
 
 ## Merge
 

@@ -76,6 +76,21 @@ logic, auth, or data changes and run it green. Commit it on its own (Conventiona
 Commits, explicit staging). Put `fixes #NNN` **only** on the commit that resolves the
 issue's last legit finding, so the issue closes at the right moment.
 
+Run tests against the repo's configured test database when you can. When the run needs
+its own (a worktree `.env`, a throwaway test database), name it `<app db>_issues_<date>`,
+never a name the main checkout's `.env`, `.env.testing`, or `phpunit.xml` uses, and
+register it the moment you create it:
+
+```bash
+printf '%s\t%s\t%s\t%s\n' "$(date +%s)" <pgsql|mysql> <database> "<worktree path, or ->" \
+  >> "$(git rev-parse --path-format=absolute --git-common-dir)/scratch-databases"
+```
+
+Before you report, remove any worktree you created (`git worktree remove`, no
+`--force`), drop each database you created and its parallel-testing copies
+(`<database>_test_<N>`) with the repo's client (`DROP DATABASE IF EXISTS`), and delete
+their lines from that file.
+
 A LEGIT finding you cannot fix (a secret rotation, infra, a human decision) keeps the
 issue OPEN. Comment to dispose of the other findings, and name what is blocking.
 
@@ -94,5 +109,6 @@ comment with one bullet per finding:
 If you later find a misclassified finding, reopen the issue with a correction note.
 
 Completion criterion: every issue in the working set is closed with a disposition, or
-stays open with a comment that names its blocker. Report the tally: fixed, stale,
+stays open with a comment that names its blocker, and no worktree or database you created
+remains. Report the tally: fixed, stale,
 auto-dismiss, hallucination, and blocked.

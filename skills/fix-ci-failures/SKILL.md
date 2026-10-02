@@ -65,7 +65,8 @@ No LEGIT left: go to step 4.
 
 Work on the branch without disturbing a dirty tree or another worktree's checkout. When
 the tree is dirty or the branch is checked out elsewhere, use
-`git worktree add .claude/worktrees/ci-<branch> origin/B`, and remove it when done. Per
+`git worktree add .claude/worktrees/ci-<branch> origin/B` (at that path, never a sibling
+directory), and run `git worktree remove` on it once the push is done or declined. Per
 LEGIT failure: make the minimal change, run the failing command locally until it is
 green, then commit with explicit staging (Conventional Commits, naming the job).
 

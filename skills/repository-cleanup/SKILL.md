@@ -1,6 +1,6 @@
 ---
 name: repository-cleanup
-description: "Audit and clean Git repository state: branches, PRs, stashes, and worktrees."
+description: "Audit and clean Git repository state: branches, PRs, stashes, worktrees, and the local databases old worktrees left behind."
 disable-model-invocation: true
 ---
 
@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 ## Goal
 
-Inspect local and remote branches, pull requests, commits, stashes, and worktrees. Recover valuable work and clean proven stale state until the repository is current and organized.
+Inspect local and remote branches, pull requests, commits, stashes, worktrees, and the local databases left behind by old worktrees. Recover valuable work and clean proven stale state until the repository is current and organized.
 
 ## Loop Prompt
 
@@ -28,12 +28,12 @@ This loop cleans Git repository state. It is not a source-code housekeeping pass
 
 1. Inspect the current working tree before changing anything: current branch, uncommitted changes, stashes, remotes, upstreams, and registered worktrees.
 2. Fetch current remote state safely, pruning stale remote-tracking refs when appropriate.
-3. Inventory local branches, remote branches, open and recently closed pull requests, unmerged commits, stashes, and worktrees.
+3. Inventory local branches, remote branches, open and recently closed pull requests, unmerged commits, stashes, worktrees, and orphaned databases (see Databases).
 4. Classify each item as current, valuable but unfinished, superseded, merged, abandoned, or uncertain.
 5. Record evidence for each classification: upstream status, merge base, PR state, commit reachability, stash contents, worktree dirtiness, owner, and recent activity.
 6. Recover valuable work before cleanup. Move useful commits or stashed changes to the appropriate current branch, preserve patches, or keep a clearly named branch.
 7. Clean only proven stale state: delete merged local branches, prune stale remote-tracking refs, drop only explicitly approved stale stashes, remove clean obsolete worktrees, and close or delete remote state only with approval.
-8. Rerun the inventory after cleanup until every remaining branch, pull request, commit, stash, and worktree is intentional.
+8. Rerun the inventory after cleanup until every remaining branch, pull request, commit, stash, worktree, and database is intentional.
 
 ## Inventory Commands
 
@@ -54,7 +54,20 @@ gh pr list --state open --json number,title,headRefName,baseRefName,author,updat
 gh pr list --state closed --limit 30 --json number,title,headRefName,baseRefName,author,updatedAt,closedAt,mergedAt,url
 ```
 
+Worktrees whose PR merged, and the databases created for them, come from one script. Preview first; run it without `--dry-run` only on approval:
+
+```bash
+bash scripts/prune-merged-worktrees.sh --dry-run          # merged, clean worktrees + their databases
+bash scripts/prune-merged-worktrees.sh --orphan-databases # local <app db>_* databases no checkout uses
+```
+
 If `gh` is unavailable or the repository is not on GitHub, use the equivalent provider CLI, web UI, or local Git evidence and report the PR visibility gap.
+
+## Databases
+
+Worktrees and one-off test runs leave local databases behind: a per-worktree `DB_DATABASE`, throwaway test databases (`<app>_pr42`, `<app>_triage_<date>`), and Laravel parallel testing's `<db>_test_N` copies of each. `--orphan-databases` lists, with sizes, the local pgsql and mysql databases named `<app db>_*` that the main checkout's `.env`, `.env.testing`, and `phpunit.xml`, and every remaining worktree's `.env` files, do not name. It drops nothing and never lists a parallel-testing copy of a database in use.
+
+Classify each listed database by its name: a PR number, branch, worktree, or date that maps to merged or removed work is **abandoned**; a name that reads as a deliberate copy (`_backup`, `_snapshot`, `_pre_migration`) or maps to nothing is **uncertain**. Show the list grouped that way, with sizes, and drop only the names the user approves, with the repo's own client and credentials (`DROP DATABASE IF EXISTS`). Each drop is irreversible: offer a `pg_dump`/`mysqldump` first for anything uncertain.
 
 ## Classification Guide
 
@@ -73,6 +86,7 @@ Uncertain items are not cleanup candidates until more evidence or user approval 
 - Do not delete remote branches, close pull requests, remove worktrees, or discard patches unless the user approved the exact action or the stale state is already proven safe by repository policy.
 - Do not drop stashes until their contents have been inspected and the user has approved the exact stash to drop.
 - Before removing a worktree, verify it has no uncommitted changes and its branch/commits have been classified.
+- Drop a database only when the user approved that exact name. Never drop one the main checkout or a remaining worktree uses.
 - Before deleting a branch with unique commits, preserve the work by merging, cherry-picking, tagging, renaming, or exporting patches.
 - Before dropping a valuable stash, recover it onto the appropriate branch or preserve it as a patch with enough context to reapply.
 - Prefer small batches. Re-inventory after each batch so the next decision uses current evidence.
@@ -82,7 +96,7 @@ Uncertain items are not cleanup candidates until more evidence or user approval 
 End with:
 
 - Repository state inventoried.
-- Branches, pull requests, commits, stashes, and worktrees classified.
+- Branches, pull requests, commits, stashes, worktrees, and databases classified.
 - Valuable work recovered or preserved.
 - Cleanup actions taken, with evidence for each.
 - Verification commands run after cleanup.
