@@ -42,7 +42,9 @@ banner() {
   printf '%s  %s stages%s\n\n' "$DIM" "$TOTAL_STAGES" "$RESET"
   printf '%s  You drive the browser; this wizard tells you exactly what to do and\n' "$DIM"
   printf '  captures the values you copy back. Stop any time with Ctrl-C and re-run\n'
-  printf '  later, since it remembers values already saved.%s\n' "$RESET"
+  printf '  later, since it remembers values already saved.\n\n'
+  printf '  Where a value is already known it is suggested: press Enter to accept it,\n'
+  printf '  or Ctrl-U to clear it and type your own.%s\n' "$RESET"
   pause "Ready to start?"
 }
 
@@ -95,18 +97,27 @@ _existing() {
   printf '%s' "${line#*=}"
 }
 
-# ask KEY "Prompt" reads a value into $KEY. Offers the existing .env value as
-# a default on re-runs (Enter keeps it). Visible input (non-secret).
+# ask KEY "Prompt" [DEFAULT] reads a value into $KEY. Visible input
+# (non-secret). The suggested value is the existing .env value on re-runs,
+# else DEFAULT; Enter accepts it. On bash 4+ at a terminal it is prefilled on
+# the input line, editable in place; otherwise it is shown in [brackets].
 ask() {
-  local key="$1" prompt="$2" current input
-  current=$(_existing "$key" || true)
-  if [[ -n "$current" ]]; then
-    printf '  %s%s%s %s[Enter keeps current]%s ' "$BOLD" "$prompt" "$RESET" "$DIM" "$RESET"
+  local key="$1" prompt="$2" suggested input
+  suggested=$(_existing "$key" || true)
+  [[ -n "$suggested" ]] || suggested="${3:-}"
+  if [[ -n "$suggested" && -t 0 && "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+    # \001 / \002 tell readline the colour codes take no width.
+    read -r -e -i "$suggested" \
+      -p "  "$'\001'"$BOLD"$'\002'"$prompt"$'\001'"$RESET"$'\002'" " input || true
   else
-    printf '  %s%s%s ' "$BOLD" "$prompt" "$RESET"
+    if [[ -n "$suggested" ]]; then
+      printf '  %s%s%s %s[%s]%s ' "$BOLD" "$prompt" "$RESET" "$DIM" "$suggested" "$RESET"
+    else
+      printf '  %s%s%s ' "$BOLD" "$prompt" "$RESET"
+    fi
+    read -r input || true
+    [[ -z "$input" ]] && input="$suggested"
   fi
-  read -r input || true
-  [[ -z "$input" && -n "$current" ]] && input="$current"
   printf -v "$key" '%s' "$input"
 }
 
@@ -184,9 +195,15 @@ finish() {
 # Replace the example below. Set TOTAL_STAGES to match the stages you write.
 # ──────────────────────────────────────────────────────────────────────────
 
-TOTAL_STAGES=1
+TOTAL_STAGES=2
 
 banner "Stripe setup"
+
+# ── Example stage: a value the agent already knows, prefilled ─────────────
+stage "Stripe: account"
+say "Confirm the Stripe account name (read from the repo; press Enter if right)."
+ask STRIPE_ACCOUNT_NAME "Stripe account name:" "acme-staging"
+write_env STRIPE_ACCOUNT_NAME "$STRIPE_ACCOUNT_NAME"
 
 # ── Example stage: replace with your real steps ───────────────────────────
 stage "Stripe: API keys"
