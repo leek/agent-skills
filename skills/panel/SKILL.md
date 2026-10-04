@@ -98,9 +98,11 @@ plain words, with **no backticks**, so nothing is left for a shell to expand:
 > files you need. Report concrete findings only, for each, a one-line claim, the
 > file:line, and a one-line reason. Review only; do not modify any file. Be concise.
 
-**Keep review read-only.** Run on a clean working tree. After every subagent returns,
-run `git status --porcelain`; if a CLI changed a tracked file or added one, revert it
-(`git checkout -- <path>`, delete new files) and name that CLI in the report. This tree
+**Keep review read-only.** Before fanning out, save `git status --porcelain` and
+`git diff` as the baseline. After every subagent returns, compare against it. A path
+the CLIs changed that was clean in the baseline: revert it (`git checkout -- <path>`,
+delete new files) and name that CLI. A path that was already dirty holds the user's
+unsaved work: report it and leave it as it is. This tree
 check (not a per-CLI flag) is what enforces review-only.
 
 Per-CLI notes: read-only options and their traps, structured-output flags,
@@ -114,7 +116,9 @@ First check the panel had a quorum: at least two CLIs must have **responded**, n
 been present. With fewer, there is no consensus: report the single result plainly and
 say the panel was short.
 
-Collect the results. Match points that make the same claim, even when worded differently
+Collect the results. Only a returned `{ cli, status, points[] }` object is a result: a
+panelist pauses while its CLI runs, and a notification without that object is interim,
+so end the turn with no reply and wait for the next one. Match points that make the same claim, even when worded differently
 or aimed at the same area. Grade each cluster by the share of the responders (`N`) that
 raised it, and state `N` so a grade is never read as more agreement than it holds:
 

@@ -27,7 +27,9 @@ session's uncommitted work. One release, one version, one tag, one GitHub releas
    foreign ones is left out and named in the report. Skip this step when there is nothing
    of yours to commit. Done when `git status --porcelain` shows none of your files.
 3. **Choose the version.** `git log <last-tag>..HEAD --format='%h %s'`. No commits means
-   nothing to release: say so and stop. Bump from `$0` when given; otherwise from the
+   nothing to release. When step 2 left changes out as not this session's, list them and
+   ask once whether to commit them (they are often the user's own earlier work); on yes,
+   commit them as step 2 does and continue. Otherwise say so and stop. Bump from `$0` when given; otherwise from the
    subjects: `!` or `BREAKING CHANGE` → major (minor while still `0.x`), any `feat` → minor,
    anything else → patch. Done when the new version is stated with the rule that chose it.
 4. **Bump the version file.** Find the one file whose version string equals the last tag:
