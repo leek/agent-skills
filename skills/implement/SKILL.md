@@ -1,13 +1,15 @@
 ---
 name: implement
-description: "Implement one Laravel work item end to end: scope and claim it when trackable, TDD at chosen seams, commit, review, verify, and resolve it."
+description: "Implement one Laravel work item end to end, or every ticket of a spec in one run: scope and claim it when trackable, TDD at chosen seams, commit, review, verify, resolve it, and open a PR when asked."
 disable-model-invocation: true
-argument-hint: "A ticket or spec path (omit to use the conversation scope)"
+argument-hint: "A ticket or spec path; add `all` to build every ticket of the spec on one branch with one PR (omit to use the conversation scope)"
 ---
 
 # Implement
 
-Implement exactly one work item per session, test-first and verified end to end. A work item is a **ticket**, a spec small enough for one session, or an agreed conversation scope.
+Implement exactly one work item per session, test-first and verified end to end. A work item is a **ticket**, a spec small enough for one session, or an agreed conversation scope. The one exception is a **spec run**, which builds every ticket of a spec in one session.
+
+**Spec runs and PR delivery** live in [`references/spec-run.md`](references/spec-run.md). Read it before step 1 when the user asks to build a whole spec (`all`, "implement all of …"), or asks for a branch, a worktree, or a PR.
 
 Pipeline position: `wayfinder` (decide) → `to-spec` (write the spec) → `to-tickets` (break it into tickets) → **`implement` (build one ticket per session, review and verify inside)**.
 
@@ -23,7 +25,7 @@ Pipeline position: `wayfinder` (decide) → `to-spec` (write the spec) → `to-t
 Classify the input and make its acceptance criteria explicit:
 
 - **Ticket**: fetch its full body and comments. From its parent spec, load the **Build Contract** section first when present, then the headings the ticket names or the implementation reaches. Read direct blockers' `Resolution` sections for handed-forward seams; load other closed tickets and the map only on demand. A `wayfinder` decision ticket is eligible only when its type is `task`; stop on the other types because they decide rather than build. A `task` is manual unblocking work, not code, do it yourself where you can, otherwise hand the human the precise checklist from `ticket-types`; get explicit approval before any destructive or irreversible step, record the resulting facts, and Resolve. It skips the seams/TDD/commit/review/verify loop (steps 2–7), which assume code changes. The ticket is the work item.
-- **Spec**: fetch its full body and comments. If it holds more than one independently deliverable ticket or cannot fit one session, stop and tell the user to run `to-tickets`; otherwise the spec itself is the work item.
+- **Spec**: fetch its full body and comments. If it holds more than one independently deliverable ticket or cannot fit one session, it needs tickets: with its `tickets/` published and a spec run asked for, run the spec run; otherwise stop and tell the user to run `to-tickets`. A spec that fits one session is itself the work item.
 - **Conversation**: restate the scope and behavior criteria in a few lines. It has no tracker claim or resolution.
 
 Work items are markdown files under `.scratch/`: there is no external tracker. When launch context already identifies the selected file, its status, and blockers, revalidate those exact files rather than rereading the tracker layout. Otherwise read the layout once through `.agents/issue-tracker.md` (written by `/setup`). If it's missing, try `docs/agents/issue-tracker.md` (legacy), then the `setup` skill's seed. Confirm every direct blocker is closed through the item's `blocked-by` frontmatter, and stop before claiming if any remain open. Then claim before building:
@@ -53,7 +55,7 @@ Finish the loop only when every acceptance criterion is covered at a chosen seam
 
 ### 4. Format and commit a reviewable checkpoint
 
-Run the repository's configured formatter; when it uses Pint, run `vendor/bin/pint --dirty`. Check `git status --porcelain`, stage only work-item files by explicit path, and leave foreign changes unstaged. Commit to the current branch: no new branch, no worktree. Record the paths you touched; review scopes to them (next step), so a parallel session's commits on the same branch neither get staged here nor reviewed there.
+Run the repository's configured formatter on the paths you touched (`vendor/bin/pint <paths>` for Pint), so a parallel session's uncommitted files stay as they are. Check `git status --porcelain`, stage only work-item files by explicit path, and leave foreign changes unstaged. Commit to the current branch (PR delivery created it before step 1); this step creates no branch or worktree. Record the paths you touched; review scopes to them (next step), so a parallel session's commits on the same branch neither get staged here nor reviewed there.
 
 Finish this step with every work-item change committed, every foreign change untouched, and the checkpoint commit SHA recorded.
 
@@ -69,7 +71,7 @@ Finish this step only when review reports no unresolved actionable findings and 
 
 Ask the user first (via `AskUserQuestion` where available, otherwise a plain question in chat) whether to run the full test suite as the final automated gate. If they decline, skip the full run (the focused tests from step 3 stand as the automated evidence) and record the skip so step 8 reports it plainly.
 
-When approved, run the repository's full test suite (`php artisan test` when the repo defines no wrapper). Fix failures caused by the work. Prove an unrelated failure pre-existing against `base_sha`, then note it plainly instead of expanding scope.
+When approved, run the repository's documented full-suite command: its `AGENTS.md` or `CLAUDE.md`, composer scripts, or CI workflow names it; use `php artisan test` only when none does. Fix failures caused by the work. Prove an unrelated failure pre-existing against `base_sha`, then note it plainly instead of expanding scope.
 
 Any code fix returns to steps 3–5 before this gate runs again. Finish this step when the user declined the full run, or when every caused check passes and every remaining failure has base-SHA evidence.
 
@@ -107,7 +109,8 @@ Next:
 
 Stage-specific **Next** conditions (only those that apply, most likely first):
 
-- **More frontier tickets on the parent spec** → `/clear`, then `/implement <next frontier ticket>` (resume your own claimed-but-unfinished ticket first if you stopped mid-work); name it and how many remain
+- **A PR is open and review bots are still running** → `/resolve-review-comments <PR>` once they post; name the PR and the worktree path
+- **More frontier tickets on the parent spec** → `/clear`, then `/implement <next frontier ticket>` (resume your own claimed-but-unfinished ticket first if you stopped mid-work), or `/implement <spec path> all` to build the rest in one run; name it and how many remain
 - **Every ticket on the spec is closed** → nothing to run; say the spec is complete and name anything deferred out of scope
 - **Remaining tickets are all blocked** → `/implement <the blocker>` first, or `/grill-me` if the blocker is a decision
 - **The build exposed a decision nobody made** → `/grill-me` on it, then re-run `/to-spec` if the spec is now wrong

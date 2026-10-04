@@ -55,9 +55,9 @@ Then ask **exactly one** question, because step 5 writes a file per ticket and r
 
 Publishing creates external artifacts: do it only after step 4's green light.
 
-Write one markdown file per ticket into `.scratch/<slug>/tickets/` (the `tickets/` directory **beside the spec**) there is no external tracker. Read the layout from `.agents/issue-tracker.md` (written by `/setup`) when the repo has one (`docs/agents/issue-tracker.md` is the legacy path); suggest running `/setup` once to make the paths durable. Set each ticket's `status` to `ready-for-agent`, or the AFK-ready role string from `.agents/triage-labels.md` when that mapping differs.
+Write one markdown file per ticket into `.scratch/<slug>/tickets/` (the `tickets/` directory **beside the spec**, created with `mkdir -p` before the first write): there is no external tracker. Read the layout from `.agents/issue-tracker.md` (written by `/setup`) when the repo has one (`docs/agents/issue-tracker.md` is the legacy path); suggest running `/setup` once to make the paths durable. Set each ticket's `status` to `ready-for-agent`, or the AFK-ready role string from `.agents/triage-labels.md` when that mapping differs.
 
-Publish in dependency order (**blockers first**) so each ticket's edges reference real identifiers. Publish idempotently: before writing, read what `tickets/` already holds, if this spec was already broken down, don't mint a second set; a re-run only fills gaps a failed mid-loop run left behind.
+Publish in dependency order (**blockers first**) so each ticket's edges reference real identifiers. Publish idempotently: before writing, read what `tickets/` already holds, if this spec was already broken down, don't mint a second set; a re-run only fills gaps a failed mid-loop run left behind, or adds tickets for what an in-place spec revision introduced, numbered after the existing ones.
 
 Do NOT close or modify the parent spec. Invoked directly on a spec-less map, set that `map.md`'s frontmatter to `status: closed`: `to-tickets` is then the handoff that ends the map. Invoked on a spec, leave the already-closed map alone.
 
@@ -124,6 +124,7 @@ Next:
 Stage-specific **Next** conditions (only those that apply, most likely first):
 
 - **Tickets published with a frontier** → `/implement <frontier ticket>` in one fresh session per ticket; parallelize only independent frontier tickets
+- **The user wants the whole spec built in one go** → `/implement <spec path> all` (one branch, a worktree when asked, one PR at the end)
 - **Every ticket is blocked by another that is still open** → `/implement <that blocker>` first; name it
 - **A ticket turned out to be a decision, not a build** → `/grill-me` on it (or `/wayfinder` if there are several)
 - **Cutting the tickets exposed a gap the spec never settled** → `/grill-me` on the gap, then re-run `/to-spec`

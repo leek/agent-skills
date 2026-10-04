@@ -24,7 +24,7 @@ Next:
 Stage-specific **Next** conditions (only those that apply, most likely first):
 
 - **Plan resolved, spans several tickets** → `/to-spec` to record it
-- **Plan resolved, fits one session** → `/to-tickets`, or `/implement` if it's genuinely one ticket
+- **Plan resolved, fits one session** → `/to-tickets`, or `/implement` if it's genuinely one ticket (say "in a worktree, open a PR" to get its branch and PR delivery)
 - **Resolved but too big for one spec, or still foggy** → `/wayfinder` to chart it as a map
 - **A branch is blocked on knowledge someone else holds** → `/to-questionnaire` on that branch
 - **A branch is blocked on a fact worth reading for** → `/research` on that question
