@@ -33,7 +33,7 @@ A **seam** is the public boundary the feature will be tested at (`codebase-desig
 
 ### 3. Write and publish the spec
 
-Write the spec using the template below. Show the complete draft and wait for the user to approve publication or request changes.
+Write the spec using the template below. Every decision the draft would make that the conversation did not (a new table, flag, setting, switch, or user-visible behavior) goes into a **Needs decision** list above the draft, one line each with your recommendation, and stays out of the draft body. Show the list and the complete draft, and wait for the user to approve publication or request changes. Publish only when every Needs decision item is accepted or replaced, and write the accepted ones into the body. More than three items, or any that touches an ADR, money, or data loss, means the grill ended early: recommend `/grill-me` on them instead.
 
 A spec is a markdown file under `.scratch/`: there is no external tracker. Read the layout from `.agents/issue-tracker.md` (written by `/setup`). If it's missing, try `docs/agents/issue-tracker.md` (legacy), then the path below; suggest running `/setup` once to make it durable.
 
@@ -111,6 +111,7 @@ Next:
 Stage-specific **Next** conditions (only those that apply, most likely first):
 
 - **Spec published, work spans several tickets** → `/to-tickets <spec ref>`
+- **Spec revised after its tickets were published** → `/to-tickets <spec ref>` to add tickets for the change; name which existing tickets the revision touches
 - **Spec published, work fits one session** → `/implement <spec ref>`
 - **A load-bearing decision is still open** → `/grill-me` on that decision, naming it; re-run `/to-spec` after
 - **Several decisions open, or the effort is bigger than one spec** → `/wayfinder` to chart it first, on a narrower destination

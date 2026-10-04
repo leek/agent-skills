@@ -40,6 +40,7 @@ Ask only about what the user's own context can settle:
 - **Constraint-bound trade-offs**: choices hanging on their budget, timeline, team, or existing infrastructure.
 - **Hard-to-reverse commitments**: data migrations, public interface shape, third-party lock-in.
 - **Genuine forks**: two reasonable readings of the request that lead to materially different work.
+- **ADR conflicts**: a choice that contradicts a recorded ADR. Name the ADR in the framing.
 
 Everything else is yours to decide. Framework idiom, file layout, interface naming, test structure, error-handling shape, where a helper lives, a library choice with an obvious ecosystem default: settle these and keep moving.
 
@@ -55,6 +56,7 @@ Maintain a running internal ledger:
 - `implied`: decisions that follow from earlier answers, plus every default you settled off the ladder, tag which rung settled it.
 - `open`: branches still worth asking about.
 - `deferred`: questions blocked by missing context, a pending fact lookup, external constraints, or user choice.
+- `dismissed`: items the user ruled out or told you to drop. They stay silent for the rest of the session: no question, summary, risk list, or hand-off names them again.
 
 Before asking anything, check the ledger. Never re-ask a resolved or implied branch. When a deferred fact resolves, move its downstream branches back to `open`.
 
@@ -94,6 +96,8 @@ Where `AskUserQuestion` is available, use it: decisions become click-to-answer:
 
 Without the tool, ask the same shape in chat (numbered options, recommendation first, trade-off per line) and wait for the answer. Never print fake tool JSON.
 
+A rejected question did not land. Ask the same decision again once, rewritten: the situation first, fewer terms, and each option stated as what will happen. If the user rejects that too, take the recommended option, record it as `implied`, and move on.
+
 ## Stop Conditions
 
 Stop when:
@@ -103,6 +107,8 @@ Stop when:
 - Remaining branches depend on information outside the current context.
 
 A request for a summary, PRD, or implementation plan is a request to *record* the settled decisions, not permission to resolve open branches by yourself.
+
+Before the plan resolves, sweep two branches grills skip: what the user sees when a dependency fails or returns partial data, and, for an integration, which fields the source returns that the product drops. Settle each off the ladder or ask.
 
 Before ending, settle or explicitly abandon every `deferred` branch; no fact lookup may still be running, and no task ID belongs in any summary or hand-off text (a task handle dies with the session).
 
