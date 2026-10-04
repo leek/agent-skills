@@ -1,6 +1,6 @@
 ---
 name: pr-reviewer
-description: Independent correctness review of a pull request's diff (bugs, security, data, broken contracts, missing tests), done without seeing the PR's other reviews. Returns one severity-tagged line per finding. Read-only. Dispatched by the triage-github-pr skill.
+description: Independent correctness review of a pull request's diff (bugs, security, data, broken contracts, missing tests), done without seeing the PR's other reviews. Returns one severity-tagged line per finding. Read-only. Dispatched by the triage-github-pr skill, and as code-review's Correctness axis.
 tools: Read, Grep, Glob, Bash
 disallowedTools: Edit, Write, NotebookEdit
 omitClaudeMd: true

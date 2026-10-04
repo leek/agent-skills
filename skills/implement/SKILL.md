@@ -61,6 +61,8 @@ Finish this step with every work-item change committed, every foreign change unt
 
 Run the `code-review` skill against `base_sha`, scoped to the work-item paths you recorded (so concurrent commits on the shared branch stay out of the range). Resolve every actionable finding through the `tdd` loop, rerun affected focused checks and static analysis, format, stage explicit paths, and commit the fixes. Re-run `code-review` after each fix commit.
 
+`code-review`'s Correctness axis hunts bugs and failure modes; its BLOCKING and MAJOR findings are actionable like any other. A fix that adds a mechanism (job, lock, claim, retry) is new surface, so the re-review after that fix commit covers it. Whatever this step misses goes to the PR's review bots, one round per push.
+
 Finish this step only when review reports no unresolved actionable findings and every work-item change is committed.
 
 ### 6. Run the final automated checks

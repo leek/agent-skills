@@ -109,7 +109,13 @@ No LEGIT left: go to step 6.
 Otherwise work on the head branch without disturbing a dirty tree, following
 [Check out the head branch safely](references/gh-mechanics.md#check-out-the-head-branch-safely)
 (fork PRs included). Per LEGIT finding: make the minimal change, add a test for any
-logic, auth, or data change, run it green, then commit with explicit staging. Push.
+logic, auth, or data change, run it green, then commit with explicit staging.
+
+**Review before you push.** Every push buys another round from every bot, and a fix
+that adds a mechanism (a job, a lock, a claim, a retry, an outbox, a stream) is new
+surface the next round reviews. So run step 1's brief on the unpushed fix range first,
+with its failure-mode probes aimed at each mechanism the fix added. Fix what it finds in
+the same round, then push.
 Then reply to each inline thread whose finding you fixed or dismissed (`fixed in <sha>`,
 or the one-line evidence) and resolve it: see
 [Reply and resolve](references/gh-mechanics.md#reply-and-resolve). Leave MINOR threads open.

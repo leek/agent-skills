@@ -1,20 +1,19 @@
 ---
 name: code-review
-description: "Two-axis review of the diff since a fixed point: Standards (repo conventions) and Spec (ticket/PRD fidelity). Use when the user wants to review a branch, PR, WIP changes, or asks to \"review since X\"."
+description: "Three-axis review of the diff since a fixed point: Correctness (bugs, failure modes, security), Standards (repo conventions) and Spec (ticket/PRD fidelity). Use when the user wants to review a branch, PR, WIP changes, or asks to \"review since X\"."
 argument-hint: "since <ref>, or a PR or branch (omit for WIP changes)"
 allowed-tools: "Bash(git diff *) Bash(git log *) Bash(git merge-base *)"
 ---
 
 # Code Review
 
-Two-axis review of the diff between `HEAD` and a fixed point the user supplies:
+Three-axis review of the diff between `HEAD` and a fixed point the user supplies:
 
+- **Correctness**: would this change break something? Bugs, failure modes (what a side effect does when it fails, repeats, or races), security, data, broken contracts, missing tests.
 - **Standards**: does the code conform to how this repo writes code?
 - **Spec**: does the code faithfully implement the originating ticket / PRD / spec?
 
-Both axes run **separately** so they don't pollute each other's context, then this skill aggregates their findings. Prefer **parallel sub-agents** when the harness supports them; otherwise run both reviews **inline in sequence** in this session. Either path must finish both axes before aggregating: never leave a review handle running past session end.
-
-This is not a bug hunt. If the harness ships its own correctness review, that answers a third, different question (*does it break?*) and complements this skill rather than replacing it.
+The axes run **separately** so they don't pollute each other's context, then this skill aggregates their findings. Prefer **parallel sub-agents** when the harness supports them; otherwise run the reviews **inline in sequence** in this session. Either path must finish every axis before aggregating: never leave a review handle running past session end.
 
 ## Process
 
@@ -26,7 +25,7 @@ Capture the diff command once: `git diff <fixed-point>...HEAD` (three-dot, so th
 
 When the caller passes a **path scope** (as `implement` does, so parallel sessions sharing one branch don't pollute the range), append it to both: `git diff <fixed-point>...HEAD -- <paths>` and `git log <fixed-point>..HEAD --oneline -- <paths>`.
 
-Before going further, confirm the fixed point resolves (`git rev-parse <fixed-point>`) and the diff is non-empty. A bad ref or empty diff should fail here, not inside two parallel reviews.
+Before going further, confirm the fixed point resolves (`git rev-parse <fixed-point>`) and the diff is non-empty. A bad ref or empty diff should fail here, not inside three parallel reviews.
 
 ### 2. Identify the spec source
 
@@ -68,11 +67,13 @@ Each smell reads *what it is* → *how to fix*; match it against the diff:
 - **Middle Man**: a class or function that mostly just delegates onward. → cut it, call the real target direct.
 - **Refused Bequest**: a subclass or implementer that ignores or overrides most of what it inherits. → drop the inheritance, use composition.
 
-### 4. Run both axes: sub-agents or inline
+### 4. Run the axes: sub-agents or inline
 
-**If the harness can spawn parallel sub-agents** (e.g. Claude Code Agent tool, Grok `spawn_subagent`, or equivalent): launch two foreground sub-agents in parallel, wait for both results before writing anything. Do not background them, a background handle can die with the session. In Claude Code with this plugin installed, use the typed agents `leek-skills:standards-reviewer` and `leek-skills:spec-reviewer` (read-only tools enforced, the Standards one remembers this repo's recurring violations); elsewhere, any general sub-agent with the briefs below.
+**If the harness can spawn parallel sub-agents** (e.g. Claude Code Agent tool, Grok `spawn_subagent`, or equivalent): launch three foreground sub-agents in parallel, wait for all results before writing anything. Do not background them, a background handle can die with the session. In Claude Code with this plugin installed, use the typed agents `leek-skills:pr-reviewer`, `leek-skills:standards-reviewer` and `leek-skills:spec-reviewer` (read-only tools enforced, the Standards one remembers this repo's recurring violations); elsewhere, any general sub-agent with the briefs below, the Correctness one on your strongest model.
 
-**If sub-agents are unavailable:** run both reviews inline in this session, Standards first then Spec (or skip Spec when no source was found). Same briefs, same output shape, only the execution host changes.
+**If sub-agents are unavailable:** run the reviews inline in this session, Correctness first, then Standards, then Spec (or skip Spec when no source was found). Same briefs, same output shape, only the execution host changes.
+
+**Correctness brief**: hand over the brief in [`triage-github-pr/references/independent-review.md`](../triage-github-pr/references/independent-review.md) in full, failure-mode probes included, with the diff command and commit list as its range, the commit messages as intent, and the repo's `AGENTS.md` / `CLAUDE.md`. Do not pass any PR review comments: this axis is the view they did not shape. Its output is the brief's `Self N: [BLOCKING | MAJOR | MINOR]` lines, each with a concrete failing case.
 
 **Standards brief**: include:
 
@@ -90,18 +91,19 @@ If the spec is missing, skip the Spec axis and note this in the final report.
 
 ### 5. Aggregate
 
-Present the two reports under `## Standards` and `## Spec` headings, verbatim or lightly cleaned. Do **not** merge or rerank findings; the two axes are deliberately separate (see _Why two axes_).
+Present the reports under `## Correctness`, `## Standards` and `## Spec` headings, verbatim or lightly cleaned. Do **not** merge or rerank findings; the axes are deliberately separate (see _Why three axes_).
 
 End with a one-line summary: total findings per axis, and the worst issue _within each axis_ (if any). Don't pick a single winner across axes, that's the reranking the separation exists to prevent.
 
-## Why two axes
+## Why three axes
 
-A change can pass one axis and fail the other:
+A change can pass any axis and fail another:
 
 - Code that follows every standard but implements the wrong thing → **Standards pass, Spec fail.**
 - Code that does exactly what the issue asked but breaks the project's conventions → **Spec pass, Standards fail.**
+- Code that is conventional and faithful to the spec but loses work when a queue push fails, or races a concurrent request → **Standards and Spec pass, Correctness fail.** This is the axis PR review bots spend most of their rounds on; asking it here, before the PR, is what keeps those rounds short.
 
-Reporting them separately stops one axis from masking the other.
+Reporting them separately stops one axis from masking another.
 
 ## When you're done
 
@@ -110,7 +112,7 @@ Invoked from `implement`, hand the findings back to its loop; it decides what's 
 ```text
 ---
 Pipeline: decide → spec → tickets → **build**   (review runs inside build)
-Done: <n Standards findings, m Spec findings; the worst per axis>
+Done: <n Correctness, m Standards, k Spec findings; the worst per axis>
 Next:
   • <condition> → /<skill> <ref>
 ```
@@ -119,4 +121,4 @@ Stage-specific **Next** conditions (only those that apply):
 
 - **Real findings to fix** → fix them, or `/implement <ticket>` if they belong to an open ticket
 - **Spec axis skipped (no spec)** → `/to-spec` if this work deserved one
-- **Clean on both axes** → nothing to run; say so
+- **Clean on every axis** → nothing to run; say so
