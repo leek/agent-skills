@@ -39,6 +39,8 @@ A spec is a markdown file under `.scratch/`: there is no external tracker. Read 
 
 After approval, publish to `.scratch/<slug>/spec.md` with `status: ready-for-agent` in its YAML frontmatter (or the AFK-ready role string from `.agents/triage-labels.md` when that mapping differs). **Invoked with a map, reuse that map's directory** and set `map.md`'s frontmatter to `status: closed`: the map's job is done. A later in-place revision leaves the map closed.
 
+Approval to publish covers the commit. Unless `git check-ignore -q .scratch` says the repo ignores it, commit the effort directory: `git add -- .scratch/<slug>`, then `git commit --only -m "docs(scratch): <slug> spec" -- .scratch/<slug>`. The add comes first because `--only` skips untracked files. `implement` carries a committed spec onto its PR branch even before it is pushed.
+
 The spec covers the whole effort. Its short **Build Contract** is the canonical home for invariants, ordering, and shared seams every implementation ticket needs; detailed decisions below it hold ticket-specific context without repeating that contract. If the effort feels too big for one spec, say so and recommend narrowing it rather than writing a second spec beside the first.
 
 ## Spec template

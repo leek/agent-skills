@@ -8,7 +8,8 @@ Two additions to the `implement` process. A **spec run** builds every ticket of 
 2. Create it from the fresh default branch (`git fetch origin` first):
    - The user asked for a worktree, or the tree is dirty: `git worktree add -b <branch> .claude/worktrees/<branch> origin/<default>`, at that path, never a sibling directory. Make it runnable with `laravel-herd-worktrees`' **Bootstrap a bare worktree** section, then work there.
    - Otherwise: `git switch -c <branch> origin/<default>`.
-3. Record `base_sha` on the new branch. Claims, resolutions, and code all commit to this branch.
+3. When the work comes from `.scratch/<slug>/` and the new branch lacks it or holds an older copy (committed on local `<default>`, not pushed), bring it over: `git checkout <default> -- .scratch/<slug>`, then commit it as `docs(scratch): <slug>`.
+4. Record `base_sha` on the new branch. Claims, resolutions, and code all commit to this branch.
 
 ## Spec run
 
@@ -25,3 +26,11 @@ Run it on a spec whose `tickets/` already exist and the user asked to build all 
 1. Push the branch and open the PR with `gh pr create`. Body: what now works, one line per ticket closed, and the verification evidence.
 2. Read the PR's unresolved review threads once (the GraphQL `reviewThreads` query in `resolve-review-comments`). When any exist, run `resolve-review-comments` on the PR. When review bots are still running, say so in the end block.
 3. Keep the worktree: it holds the PR branch. Name its path in the report; `repository-cleanup` removes it after the merge.
+4. Without a worktree, return the main checkout to the default branch: `git switch <default> && git pull --ff-only`. Say so in the report, so the next request starts on fresh `<default>`.
+
+## Follow-up on a delivered PR
+
+A later request that changes the same work ("also fix…", "tweak…") checks the PR first: `gh pr view <branch> --json state -q .state`.
+
+- `OPEN`: commit to the PR branch, in its worktree when it has one, and push.
+- `MERGED` or `CLOSED`: the branch is finished. Start from fresh `origin/<default>`: a new branch and PR by default, or straight onto `<default>` when the user says main.

@@ -61,6 +61,8 @@ Publish in dependency order (**blockers first**) so each ticket's edges referenc
 
 Do NOT close or modify the parent spec. Invoked directly on a spec-less map, set that `map.md`'s frontmatter to `status: closed`: `to-tickets` is then the handoff that ends the map. Invoked on a spec, leave the already-closed map alone.
 
+Commit the tickets the same way `to-spec` commits a spec: unless `git check-ignore -q .scratch` says the repo ignores it, `git add -- .scratch/<slug>`, then `git commit --only -m "docs(scratch): <slug> tickets" -- .scratch/<slug>`. `implement` carries a committed but unpushed effort directory onto its PR branch; an uncommitted one it cannot reach from a worktree.
+
 ## Ticket template
 
 This template is canonical.

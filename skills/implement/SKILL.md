@@ -9,7 +9,7 @@ argument-hint: "A ticket or spec path; add `all` to build every ticket of the sp
 
 Implement exactly one work item per session, test-first and verified end to end. A work item is a **ticket**, a spec small enough for one session, or an agreed conversation scope. The one exception is a **spec run**, which builds every ticket of a spec in one session.
 
-**Spec runs and PR delivery** live in [`references/spec-run.md`](references/spec-run.md). Read it before step 1 when the user asks to build a whole spec (`all`, "implement all of …"), or asks for a branch, a worktree, or a PR.
+**Spec runs and PR delivery** live in [`references/spec-run.md`](references/spec-run.md). Read it before step 1 when the user asks to build a whole spec (`all`, "implement all of …"), or asks for a branch, a worktree, or a PR, or asks for a change to work already delivered as a PR.
 
 Pipeline position: `wayfinder` (decide) → `to-spec` (write the spec) → `to-tickets` (break it into tickets) → **`implement` (build one ticket per session, review and verify inside)**.
 
@@ -71,7 +71,7 @@ Finish this step only when review reports no unresolved actionable findings and 
 
 Ask the user first (via `AskUserQuestion` where available, otherwise a plain question in chat) whether to run the full test suite as the final automated gate. If they decline, skip the full run (the focused tests from step 3 stand as the automated evidence) and record the skip so step 8 reports it plainly.
 
-When approved, run the repository's documented full-suite command: its `AGENTS.md` or `CLAUDE.md`, composer scripts, or CI workflow names it; use `php artisan test` only when none does. Fix failures caused by the work. Prove an unrelated failure pre-existing against `base_sha`, then note it plainly instead of expanding scope.
+When approved, run the repository's documented full-suite command: its `AGENTS.md` or `CLAUDE.md`, composer scripts, or CI workflow names it; use `php artisan test` only when none does. A run that can outlast the foreground limit goes to the background (Bash `run_in_background` where available). Then end the turn with no reply and let its completion notification wake you; a check-in that only says it is still running costs the user a turn. Fix failures caused by the work. Prove an unrelated failure pre-existing against `base_sha`, then note it plainly instead of expanding scope.
 
 Any code fix returns to steps 3–5 before this gate runs again. Finish this step when the user declined the full run, or when every caused check passes and every remaining failure has base-SHA evidence.
 

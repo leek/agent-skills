@@ -108,7 +108,14 @@ Stop when:
 
 A request for a summary, PRD, or implementation plan is a request to *record* the settled decisions, not permission to resolve open branches by yourself.
 
-Before the plan resolves, sweep two branches grills skip: what the user sees when a dependency fails or returns partial data, and, for an integration, which fields the source returns that the product drops. Settle each off the ladder or ask.
+Before the plan resolves, sweep the branches grills skip. Each one has forced a rebuild after the build:
+
+- **Trigger**: does the behavior run automatically, or does a person start it? Where in the UI do they see and drive it?
+- **Ownership**: who creates, edits, and removes each new entity, and on which screen?
+- **Display**: for an integration, which returned fields the product shows and which it drops, and their order of importance on the screen.
+- **Failure**: what the user sees when a dependency fails or returns partial data.
+
+Settle each off the ladder or ask.
 
 Before ending, settle or explicitly abandon every `deferred` branch; no fact lookup may still be running, and no task ID belongs in any summary or hand-off text (a task handle dies with the session).
 
