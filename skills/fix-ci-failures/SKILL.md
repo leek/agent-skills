@@ -66,7 +66,7 @@ No LEGIT left: go to step 4.
 Work on the branch without disturbing a dirty tree or another worktree's checkout. When
 the tree is dirty or the branch is checked out elsewhere, use
 `git worktree add .claude/worktrees/ci-<branch> origin/B` (at that path, never a sibling
-directory). Leave it in place until the end of the run: step 4 asks before removing it. Per
+directory), then make it runnable with `laravel-herd-worktrees`' **Bootstrap a bare worktree** section before running anything in it. Leave it in place until the end of the run: step 4 asks before removing it. Per
 LEGIT failure: make the minimal change, run the failing command locally until it is
 green, then commit with explicit staging (Conventional Commits, naming the job).
 

@@ -16,7 +16,7 @@ If the list holds exactly as many issues as the limit, raise the limit and list 
 
 - Clean tree: `git switch -c fix/issues-<run> origin/<default>`.
 - Dirty tree: `git worktree add -b fix/issues-<run> .claude/worktrees/issues-<run> origin/<default>`,
-  always at that path, never a sibling directory. Work there.
+  always at that path, never a sibling directory. Work there, after you make it runnable with `laravel-herd-worktrees`' **Bootstrap a bare worktree** section before running anything in it.
 
 ## Scratch databases
 

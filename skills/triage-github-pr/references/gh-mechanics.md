@@ -92,7 +92,9 @@ Never reuse a checkout without proof that it is the PR head. Before the first ch
 `git rev-parse HEAD` must equal `headRefOid`; if it does not, use a fresh worktree.
 
 - **Fork PR** (`isCrossRepository` is true): you can push only when
-  `maintainerCanModify` is true; otherwise stop, naming that as the blocker. Run
+  `maintainerCanModify` is true; otherwise stop, naming that as the blocker. A push
+  refused with 403 while it is true means an organization owns the fork, which blocks
+  maintainer pushes: treat it as false, and offer merge-then-follow-up-PR in the report. Run
   `git worktree add --detach .claude/worktrees/pr-N`, `cd` into it, run
   `gh pr checkout N` there (it tracks the fork's branch), and push with `git push`.
 - **The tree is clean** and no other worktree has the branch: `gh pr checkout N`. If it
@@ -102,6 +104,8 @@ Never reuse a checkout without proof that it is the PR head. Before the first ch
   .claude/worktrees/pr-N origin/<head>`, always at that path, never a sibling
   directory. Work there, and push with `git push origin HEAD:<head>` (no `--force`;
   if the push is refused, someone else pushed, so go back to step 3).
+
+A new worktree starts bare (no `vendor/`, no `.env`): make it runnable with `laravel-herd-worktrees`' **Bootstrap a bare worktree** section before running anything in it. Its last check proves `HEAD` equals `headRefOid`, which also catches a helper that branched off the default branch.
 
 After the merge, and only after the user says yes at step 7, `cd` back to the main
 checkout and run `git worktree remove .claude/worktrees/pr-N` (no `--force`; if git
