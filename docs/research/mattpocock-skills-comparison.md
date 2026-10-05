@@ -232,3 +232,31 @@ This makes the next action decidable: take the correctness patch first, then cho
 2. **`retro` coding-standards lens sharpened**: classify a violation as mechanical (fixed pattern, banned API, import shape, file location) → build a deterministic check (linter rule, pre-commit hook, CI job) instead of writing a prose rule; reserve standards docs for judgement calls. Automated-checks lens: read the repo's existing check command first; a repo with no guardrail at all is itself a finding. Local `distill-sessions` lenses 6 and 7 lack both refinements. Cheap to fold in (two sentences each).
 3. `link-skills.sh` stops linking `misc/`; CLAUDE.md updated to match. Not applicable: local layout is flat and ships via marketplace.
 4. `.agents/*.md` (invocation, writing-docs) unchanged since baseline.
+
+---
+
+## Delta check, 2026-10-05
+
+- Upstream `main` now at `4588b32ecab9ecc9fc8cc6b6c5e7d675b6004b0d` (2026-10-05). 25 non-merge commits since `c55ee46`; 46 files changed outside `docs/`.
+- Local `main` at `5304db1`. Neither Sept 22 item landed: no `pr` skill, and `distill-sessions` lenses 6–7 still lack the deterministic-check refinements.
+
+### What changed upstream
+
+1. **`pr`, `retro`, `implement-spec` graduated to `engineering/`.** `pr` is unchanged in substance (model-invoked PR-body template: Summary visual, before/after Evidence, Merge Danger door + blast radius; credits Dex Horthy's `show-me`). `retro` now closes the main flow in `ask-matt`.
+2. **`CONTEXT.md` / `CONTEXT-MAP.md` renamed to `GLOSSARY.md` / `GLOSSARY-MAP.md`** across every skill, `CONTEXT-FORMAT.md` → `GLOSSARY-FORMAT.md`. Local still uses `CONTEXT.md` in 51 places across 16 files (`domain-modeling`, `grill-with-docs`, `setup`, `tdd`, `triage`, `to-spec`, `to-tickets`, `diagnosing-bugs`, `wait-what`, `improve-codebase-architecture`, `codebase-design`, `grilling`, `agents/module-designer.md`); `teach` already uses `GLOSSARY-FORMAT.md`, so the collection is internally split.
+3. **Post-bug reflection routed to `retro`.** `ask-matt` drops the `diagnosing-bugs` → `improve-codebase-architecture` hand-off: run `/retro` in the same session after the fix; architecture only when the finding is a missing seam. Local `diagnosing-bugs` Phase 6 already recommends (not invokes) the architecture skill; it has no pointer to `distill-sessions`.
+4. **`implement-spec`**: whole spec in one run via parallel implementer subagents in worktrees over the ready frontier, merged onto one integration branch, one `code-review` at the end. Local covers this with `implement/references/spec-run.md` (sequential, inline) and `autopilot` (fresh-process loop). Not imported; parallel fan-out is the only new idea.
+5. **`resolving-merge-conflicts` removed** ("no longer needed"). Local keeps it; `which-skill` routes to it.
+6. **`chief-of-staff`** (in-progress, user-invoked, 25 lines): long-running single session that delegates all work to subagents and suggests schedules. Experimental; no local action.
+7. Docs-only: "unslop" pass over docs pages; removed promoted skills keep an archived docs page. Not applicable (no local docs pages).
+
+### Recommended pull
+
+1. Add `pr` as a model-invoked format reference with Laravel/PHP example visuals and a `CREDITS.md`; point `implement/references/spec-run.md` and `fix-github-issues/references/mechanics.md` PR-body lines at it.
+2. Fold `retro`'s two refinements into `distill-sessions` lenses 6–7: read the repo's existing check command first; no guardrail is itself a finding; classify mechanical violations → deterministic check, judgement calls → standards doc.
+3. Decide the `GLOSSARY.md` rename. If adopted, read `GLOSSARY.md` with `CONTEXT.md` as a legacy fallback so existing project repos keep working.
+4. Optional: `diagnosing-bugs` Phase 6 suggests `/distill-sessions` on this session for environment fixes, beside the architecture recommendation.
+
+### Applied, 2026-10-05
+
+All four landed, plus two changes to the recommendation: `distill-sessions` was renamed to `retro` (with a `this` scope for the current session), and `implement-spec` was adopted after all. `autopilot` drives ticketed work through fresh sessions and `implement <spec> all` builds sequentially; neither runs the frontier in parallel. The local version keeps the tracker in the orchestrator, gives each implementer a bootstrapped worktree and its own test database, and cuts tickets first when the spec has none.
