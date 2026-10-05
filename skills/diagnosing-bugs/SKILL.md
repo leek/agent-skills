@@ -138,3 +138,5 @@ Required before declaring done:
 - [ ] The hypothesis that turned out correct is stated in the commit / PR message, so the next debugger learns
 
 **Then ask: what would have prevented this bug?** If the answer involves architectural change (no good test seam, tangled callers, hidden coupling), write up the specifics and **recommend `improve-codebase-architecture` to the user**: it is user-invoked, so only they can start it. Make the recommendation **after** the fix is in, not before, you have more information now than when you started.
+
+If the answer is the agent's environment instead (a check that would have caught it, a log or service the agent could not read, a standard review missed), recommend `/retro this` to the user before they clear the session.
