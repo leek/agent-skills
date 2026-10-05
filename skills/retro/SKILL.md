@@ -1,12 +1,15 @@
 ---
-name: distill-sessions
-description: Mine recent AI-coding session logs for reusable patterns and propose concrete improvements.
+name: retro
+description: Look back over AI-coding sessions (this one, or recent session logs) and propose improvements to the agent's environment.
 disable-model-invocation: true
+argument-hint: "'this' for the current session, or how many recent session logs to mine (default 50)"
 ---
 
-# Distill Sessions
+# Retro
 
-Turn raw session transcripts into a ranked list of concrete improvements. Read-only analysis of the logs; **never modify the log files**. Output a numbered proposal list with one verbatim (redacted) evidence line per finding, then let the user pick which to apply.
+Turn sessions into a ranked list of concrete improvements to the agent's **environment**, not the code. Read-only analysis; **never modify the log files**. Output a numbered proposal list with one verbatim (redacted) evidence line per finding, then let the user pick which to apply.
+
+**Scope.** `this`, or a run straight after a build or a bug fix: the current session. Its conversation is already in context, so skip steps 1–3 and apply the lenses in step 4 to it. After the context was cleared, find that session's log in step 1 and mine only it. Otherwise: the N most recent sessions, steps 1–6.
 
 ## Where the logs live
 
@@ -57,7 +60,7 @@ Surface corrections fast by grepping extracted human messages:
 
 ## 3. Fan out: one subagent per batch
 
-50 sessions won't fit one context. Split the file list into ~7 round-robin batches (so big files spread out) and dispatch one subagent per batch **in parallel**, on a cheaper model where the harness lets you pick one (extraction, not judgement), each with the jq cheat-sheet above and an identical brief (in Claude Code with this plugin installed, `subagent_type=leek-skills:session-miner`: log-read-only, skips project CLAUDE.md, and remembers patterns from earlier distillations so it can mark them recurring; elsewhere, any sub-agent the harness offers). Each subagent returns a structured findings list; the orchestrator dedupes across batches and synthesizes. Round-robin assignment:
+50 sessions won't fit one context. Split the file list into ~7 round-robin batches (so big files spread out) and dispatch one subagent per batch **in parallel**, on a cheaper model where the harness lets you pick one (extraction, not judgement), each with the jq cheat-sheet above and an identical brief (in Claude Code with this plugin installed, `subagent_type=leek-skills:session-miner`: log-read-only, skips project CLAUDE.md, and remembers patterns from earlier retros so it can mark them recurring; elsewhere, any sub-agent the harness offers). Each subagent returns a structured findings list; the orchestrator dedupes across batches and synthesizes. Round-robin assignment:
 ```bash
 awk '{print $NF}' top.txt | awk '{ b=((NR-1)%7)+1; print > ("batch_" b ".txt") }'
 ```
@@ -76,8 +79,8 @@ You are proposing improvements to the agent's **environment**, so that future ru
 **Environment lenses**: what should change so it stops happening:
 
 5. **Navigation**: how easily did the agent find the right files? Hidden dependencies between files? Would a context pointer help? _Use when_ the session spent a long time hunting for one piece of information.
-6. **Automated checks**: could a linter, type check, test, or filesystem check have caught this? _Use when_ the agent made a mistake a machine could have caught.
-7. **Coding standards**: should the **reviewer** get a new rule, or an existing one clarified or removed? _Use when_ review failed to catch a mistake.
+6. **Automated checks**: could a linter, type check, test, or filesystem check have caught this? Read the repo's own check commands first (`composer.json` / `package.json` scripts, Pint/PHPStan/Larastan config, the CI workflow), so a check that exists but is unwired or silently broken is the finding, not a reinvention. A repo with no **guardrail** (no pre-commit hook and no CI job running its lint, static analysis, or tests) is itself a finding. _Use when_ the agent made a mistake a machine could have caught, or the repo has no guardrail at all.
+7. **Coding standards**: should the **reviewer** get a new rule, or an existing one clarified or removed? Classify the violation first. A **mechanical** one (a fixed syntactic pattern, a banned function or facade, an import shape, a file-location rule) gets a deterministic check instead of a prose rule: a custom PHPStan/Larastan or ESLint rule, a Pest arch test, a pre-commit hook, or a CI job, whichever the repo's existing guardrail makes cheapest. Reserve the standards doc for **judgement calls** (cross-file consistency, "matches the surrounding style", anything no check could replace). _Use when_ review failed to catch a mistake.
 8. **Steering files**: are there instructions in `CLAUDE.md` / `AGENTS.md` (repo or global) that belong in coding standards or an automated check instead? _Use when_ a steering file is large and unwieldy.
 9. **Tool economy**: expensive or chatty tool calls that could be streamlined; custom CLIs or MCP servers that are token-inefficient. _Use when_ one call burned a visible share of the context.
 10. **No-ops**: instructions in steering files that don't change the agent's behaviour versus the default. _Use when_ the steering files have grown without pruning.

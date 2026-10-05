@@ -34,7 +34,6 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | `commit` | user | Commit the work done in this session, skipping files a parallel session also touched. |
 | `dependency-audit` | user | Run a Composer or npm dependency audit and propose a safe upgrade plan. |
 | `diagnosing-bugs` | model | Diagnosis loop for hard bugs and performance regressions. |
-| `distill-sessions` | user | Mine your recent AI-coding session logs (Claude Code + OpenAI Codex) for reusable patterns: corrections you gave, commands that errored or were retried, setup steps rediscovered across sessions, and content-worthy moments, then propose where each belongs (CLAUDE.md/AGENTS.md line, slash command/skill, hook, tool fix, config change, or content idea). |
 | `domain-modeling` | model | Build and sharpen a project's domain model: challenge terms against the glossary, resolve fuzzy language, stress-test concepts with concrete scenarios, and record CONTEXT.md entries and ADRs the moment decisions land. |
 | `fix-ci-failures` | user | Read a branch's latest failed CI runs, triage each failure from its existing logs, and fix the real ones. |
 | `fix-github-issues` | user | Verify, triage, fix, and close review-bot GitHub issues one finding at a time. |
@@ -54,6 +53,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | `release` | user | Commit this session's work, bump the version, tag, push, and publish a GitHub release with grouped notes. |
 | `repository-cleanup` | user | Audit and clean Git repository state, including the local databases old worktrees left behind. |
 | `research` | model | Investigate a question against high-trust primary sources and capture the findings as a cited Markdown file. |
+| `retro` | user | Look back over AI-coding sessions (this one, or your recent Claude Code + OpenAI Codex logs) for corrections, errored or retried commands, rediscovered setup, and missing checks or information, then propose where each fix belongs (a deterministic check, a review rule, a CLAUDE.md/AGENTS.md pointer, a skill, a hook, a tool or config fix, or a content idea). |
 | `resolve-review-comments` | model | Triage, fix or rebut, then reply-and-resolve every review comment on a PR (including AI-review bot findings). |
 | `resolving-merge-conflicts` | model | "Use when you need to resolve an in-progress git merge/rebase conflict." |
 | `scratch-cleanup` | user | Sweep a dusty .scratch/: file research into docs/, remove finished efforts, and report the work still open. |
@@ -75,7 +75,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 
 ## Subagents (Claude Code)
 
-Installing the plugin also loads the subagents in [`agents/`](./agents) as `leek-skills:<name>`. The skills dispatch them where they already fan out work: `code-review` → `standards-reviewer` + `spec-reviewer`, `codebase-design` (design-it-twice) → `module-designer`, `improve-codebase-architecture` → `deepening-scout`, `distill-sessions` → `session-miner`, `panel` → `panelist`, `browser-test` → `browser-test-planner` + `browser-tester` + `browser-writer`, `chatter-scout` → `chatter-sweeper` + `chatter-verifier`, `code-smells-audit` → `smell-sweeper`, `fix-github-issues` + `triage-github-pr` → `finding-verifier`, `triage-github-pr` → `pr-reviewer`; `research` and `dependency-audit` fork into `researcher` and `dependency-auditor`. The one plugin hook, [`hooks/hooks.json`](./hooks/hooks.json), guards `browser-tester` and `browser-test-planner` so they can only run read-only browser commands. Other harnesses ignore the directory and the skills fall back to inline or generic sub-agents, as before. Conventions in [`AGENTS.md`](./AGENTS.md#subagents-agents).
+Installing the plugin also loads the subagents in [`agents/`](./agents) as `leek-skills:<name>`. The skills dispatch them where they already fan out work: `code-review` → `standards-reviewer` + `spec-reviewer`, `codebase-design` (design-it-twice) → `module-designer`, `improve-codebase-architecture` → `deepening-scout`, `retro` → `session-miner`, `panel` → `panelist`, `browser-test` → `browser-test-planner` + `browser-tester` + `browser-writer`, `chatter-scout` → `chatter-sweeper` + `chatter-verifier`, `code-smells-audit` → `smell-sweeper`, `fix-github-issues` + `triage-github-pr` → `finding-verifier`, `triage-github-pr` → `pr-reviewer`; `research` and `dependency-audit` fork into `researcher` and `dependency-auditor`. The one plugin hook, [`hooks/hooks.json`](./hooks/hooks.json), guards `browser-tester` and `browser-test-planner` so they can only run read-only browser commands. Other harnesses ignore the directory and the skills fall back to inline or generic sub-agents, as before. Conventions in [`AGENTS.md`](./AGENTS.md#subagents-agents).
 
 ## Installation
 

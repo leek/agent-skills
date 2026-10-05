@@ -1,0 +1,5 @@
+interface:
+  display_name: "Retro"
+  short_description: "Look back over AI-coding sessions and propose improvements to the agent's environment"
+policy:
+  allow_implicit_invocation: false
