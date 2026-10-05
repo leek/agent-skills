@@ -45,6 +45,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | `handoff` | user | Compact the current conversation into a handoff document for another agent to pick up. |
 | `housekeeper` | user | Run a conservative code-project housekeeping pass. |
 | `implement` | user | Implement one Laravel work item end to end: scope and claim it when trackable, TDD at agreed seams, commit, review, verify, and resolve it. |
+| `implement-spec` | user | Build a whole spec fast: parallel implementer subagents work the ticket frontier, each in its own worktree, merging onto one integration branch; then one review, one verification pass, and one PR. Cuts the tickets first when the spec has none. |
 | `improve-codebase-architecture` | user | Scan a codebase for deepening opportunities, present them as a visual HTML report, then grill through whichever one you pick. |
 | `laravel-herd-worktrees` | model | Use when working with Laravel projects served by Laravel Herd alongside git worktrees on macOS. |
 | `panel` | user | Convene a panel of agent CLIs (grok, claude, codex, agy) on a prompt or a code review, each in its own headless subagent, then report one consensus grouped by how much they agree. |

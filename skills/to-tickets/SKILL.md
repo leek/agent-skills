@@ -109,7 +109,7 @@ Files are numbered from `01` in topological order: every blocker has a lower num
 
 ## After publishing
 
-Work the **frontier** (any ticket whose blockers are all done) with `implement`, one ticket per fresh session. Unblocked, unclaimed tickets can run in parallel in the same checkout. `implement` claims each ticket before building, by setting its frontmatter `status: in-progress` and `claimed-by:` to a session-unique value (compare-after-write, per the tracker's Claim operation), so a second session skips work already in progress instead of colliding with it.
+Work the **frontier** (any ticket whose blockers are all done) with `implement`, one ticket per fresh session, or build the whole graph in parallel with `implement-spec`. Unblocked, unclaimed tickets can run in parallel in the same checkout. `implement` claims each ticket before building, by setting its frontmatter `status: in-progress` and `claimed-by:` to a session-unique value (compare-after-write, per the tracker's Claim operation), so a second session skips work already in progress instead of colliding with it.
 
 ## When you're done
 
@@ -127,6 +127,7 @@ Stage-specific **Next** conditions (only those that apply, most likely first):
 
 - **Tickets published with a frontier** → `/implement <frontier ticket>` in one fresh session per ticket; parallelize only independent frontier tickets
 - **The user wants the whole spec built in one go** → `/implement <spec path> all` (one branch, a worktree when asked, one PR at the end)
+- **The frontier is wide and the user wants it fast** → `/implement-spec <spec path>` (parallel implementers, one integration branch, one PR)
 - **Every ticket is blocked by another that is still open** → `/implement <that blocker>` first; name it
 - **A ticket turned out to be a decision, not a build** → `/grill-me` on it (or `/wayfinder` if there are several)
 - **Cutting the tickets exposed a gap the spec never settled** → `/grill-me` on the gap, then re-run `/to-spec`

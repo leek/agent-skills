@@ -27,6 +27,7 @@ Most work runs one straight line (**decide → spec → tickets → build**) ove
 | a spec | build ticket files | `to-tickets` |
 | an inbound issue or external PR | it categorised and briefed | `triage` |
 | one ticket | it built end to end | `implement` |
+| a spec | the whole thing built fast, in parallel, this session | `implement-spec` (`implement <spec> all` for one-by-one, no subagents) |
 | a map, spec, or tickets, and no wish to babysit | it driven to done | `autopilot` |
 
 **Before any of it, once per repo:** `setup` writes the tracker, status vocabulary, and domain doc layout.

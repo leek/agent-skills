@@ -110,7 +110,7 @@ Next:
 Stage-specific **Next** conditions (only those that apply, most likely first):
 
 - **A PR is open and review bots are still running** → `/resolve-review-comments <PR>` once they post; name the PR and the worktree path
-- **More frontier tickets on the parent spec** → `/clear`, then `/implement <next frontier ticket>` (resume your own claimed-but-unfinished ticket first if you stopped mid-work), or `/implement <spec path> all` to build the rest in one run; name it and how many remain
+- **More frontier tickets on the parent spec** → `/clear`, then `/implement <next frontier ticket>` (resume your own claimed-but-unfinished ticket first if you stopped mid-work), or `/implement <spec path> all` to build the rest in one run, or `/implement-spec <spec path>` to build them in parallel; name it and how many remain
 - **Every ticket on the spec is closed** → nothing to run; say the spec is complete and name anything deferred out of scope
 - **Remaining tickets are all blocked** → `/implement <the blocker>` first, or `/grill-me` if the blocker is a decision
 - **The build exposed a decision nobody made** → `/grill-me` on it, then re-run `/to-spec` if the spec is now wrong
