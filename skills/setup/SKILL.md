@@ -10,7 +10,7 @@ Scaffold the per-repo configuration that the engineering skills assume:
 
 - **Markdown tracker**: where maps, specs, and tickets live as files under `.scratch/`
 - **Triage status**: the `status:` frontmatter strings used for the five canonical triage roles
-- **Domain docs**: where `CONTEXT.md` and ADRs live, and the consumer rules for reading them
+- **Domain docs**: where `GLOSSARY.md` and ADRs live, and the consumer rules for reading them
 
 This is a prompt-driven skill, not a deterministic script. Explore, present what you found, confirm with the user, then write.
 
@@ -21,7 +21,7 @@ This is a prompt-driven skill, not a deterministic script. Explore, present what
 Read whatever exists; don't assume:
 
 - `AGENTS.md` / `CLAUDE.md` at the repo root: does an `## Agent skills` section already exist?
-- `CONTEXT.md` at the repo root, `docs/adr/`
+- `GLOSSARY.md` at the repo root (or the old `CONTEXT.md` / `CONTEXT-MAP.md`), `docs/adr/`
 - `.agents/`: does this skill's prior output already exist (`domain.md`, `issue-tracker.md`, `triage-labels.md`)? These sit next to `.agents/skills/`; they are not skills.
 - `docs/agents/`: leftover from an older setup. If those files exist and `.agents/` does not, move them.
 - `.scratch/`: is the convention already in use, and at which levels?
@@ -35,7 +35,7 @@ Summarise what's present and missing, then take the sections in order; one secti
 
 **Section B: Triage status vocabulary.** Skip entirely if the `triage` skill isn't installed. If it is, ask exactly one question: keep the default status strings? (recommended: **yes**). Defaults: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. Collect overrides only on "no".
 
-**Section C (Domain docs.** Default to **single-context**) one `CONTEXT.md` + `docs/adr/` at the repo root. Write it without asking. Offer multi-context (a root `CONTEXT-MAP.md` pointing at per-module `CONTEXT.md` files) only when exploration found real module boundaries (`app-modules/`, `modules/`, a monorepo layout).
+**Section C (Domain docs.** Default to **single-context**) one `GLOSSARY.md` + `docs/adr/` at the repo root. Write it without asking. Offer multi-context (a root `GLOSSARY-MAP.md` pointing at per-module `GLOSSARY.md` files) only when exploration found real module boundaries (`app-modules/`, `modules/`, a monorepo layout). Found the old names? Include renaming them in the draft: `git mv` each `CONTEXT.md` to `GLOSSARY.md` and `CONTEXT-MAP.md` to `GLOSSARY-MAP.md`, then fix the map's links.
 
 ### 3. Confirm and write
 

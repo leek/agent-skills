@@ -79,7 +79,7 @@ Every word the user reads (the framing, the question, the option labels and desc
 - **Active voice, and name the actor.** "The job retries the payment", not "the payment is retried".
 - **One word, one meaning.** Choose a term and keep it for the whole session. Never alternate between `ticket` and `issue`, or `seam` and `boundary`.
 - **No noun stack longer than 3 words.** "User account deletion confirmation screen" becomes "the screen that confirms account deletion".
-- **Plain words around exact names.** Technical names stay exact (a class, a package, a framework, a domain term from `CONTEXT.md`) because a plainer word would lose the precision. Everything around them is plain English, and a load-bearing name gets a gloss on first use: "a seam (the place a test calls the code)".
+- **Plain words around exact names.** Technical names stay exact (a class, a package, a framework, a domain term from `GLOSSARY.md`) because a plainer word would lose the precision. Everything around them is plain English, and a load-bearing name gets a gloss on first use: "a seam (the place a test calls the code)".
 - **No abbreviation the user has not used first**, and no idiom, metaphor, or figure of speech.
 
 These rules govern the text shown to the user. They do not govern the code, the spec, or any artifact; those keep the project's own vocabulary.

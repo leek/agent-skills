@@ -34,13 +34,13 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | `commit` | user | Commit the work done in this session, skipping files a parallel session also touched. |
 | `dependency-audit` | user | Run a Composer or npm dependency audit and propose a safe upgrade plan. |
 | `diagnosing-bugs` | model | Diagnosis loop for hard bugs and performance regressions. |
-| `domain-modeling` | model | Build and sharpen a project's domain model: challenge terms against the glossary, resolve fuzzy language, stress-test concepts with concrete scenarios, and record CONTEXT.md entries and ADRs the moment decisions land. |
+| `domain-modeling` | model | Build and sharpen a project's domain model: challenge terms against the glossary, resolve fuzzy language, stress-test concepts with concrete scenarios, and record GLOSSARY.md entries and ADRs the moment decisions land. |
 | `fix-ci-failures` | user | Read a branch's latest failed CI runs, triage each failure from its existing logs, and fix the real ones. |
 | `fix-github-issues` | user | Verify, triage, fix, and close review-bot GitHub issues one finding at a time. |
 | `fix-nightwatch-issues` | user | Triage open Laravel Nightwatch production issues by root cause, fix the legit ones, and resolve them with evidence. |
 | `fix-posthog-issues` | user | Triage active PostHog error-tracking issues by root cause, fix the legit ones, and resolve or suppress the rest. |
 | `grill-me` | user | Run a grilling session: the user wants their plan, decision, or idea stress-tested one question at a time. |
-| `grill-with-docs` | user | Run a grilling session with domain-modeling alongside, capturing terms in CONTEXT.md and decisions as ADRs while they land. |
+| `grill-with-docs` | user | Run a grilling session with domain-modeling alongside, capturing terms in GLOSSARY.md and decisions as ADRs while they land. |
 | `grilling` | model | Interview the user one decision at a time until reaching shared understanding, resolving each branch of the decision tree with recommended options and trade-offs. |
 | `handoff` | user | Compact the current conversation into a handoff document for another agent to pick up. |
 | `housekeeper` | user | Run a conservative code-project housekeeping pass. |

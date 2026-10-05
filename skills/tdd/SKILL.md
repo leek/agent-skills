@@ -7,7 +7,7 @@ description: "The red → green loop tuned for Pest/PHPUnit in a Laravel codebas
 
 The red → green loop, tuned for Pest/PHPUnit in a Laravel codebase. Consult before and during the loop, not after.
 
-Read `CONTEXT.md` if it exists so test names and interface vocabulary match the project's domain language, and respect ADRs in the area you're touching.
+Read `GLOSSARY.md` (or the older `CONTEXT.md`) if it exists so test names and interface vocabulary match the project's domain language, and respect ADRs in the area you're touching.
 
 Before writing or reviewing tests, read
 [`references/testing-best-practices.md`](references/testing-best-practices.md)

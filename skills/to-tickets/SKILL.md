@@ -19,7 +19,7 @@ Work from whatever is already in the conversation. If the user passes a referenc
 
 ### 2. Explore the codebase when applicable
 
-When the work targets an existing codebase and you haven't already explored it, inspect the current state. Ticket titles and descriptions use the project's domain vocabulary (`CONTEXT.md`/glossary if present) and respect ADRs in the area. For greenfield or non-code work, continue from the gathered context.
+When the work targets an existing codebase and you haven't already explored it, inspect the current state. Ticket titles and descriptions use the project's domain vocabulary (`GLOSSARY.md`, or the older `CONTEXT.md`, if present) and respect ADRs in the area. For greenfield or non-code work, continue from the gathered context.
 
 Look for opportunities to **prefactor**: restructure first so the feature lands cleanly. "Make the change easy, then make the easy change." Prefactors become the first tickets.
 

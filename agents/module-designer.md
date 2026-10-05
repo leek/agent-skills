@@ -17,7 +17,7 @@ what any sibling designer would, by honouring your constraint fully.
 
 Use the preloaded `codebase-design` vocabulary exactly (**module**, **interface**,
 **depth**, **seam**, **adapter**, **leverage**, **locality**) and the project's domain
-terms from `CONTEXT.md` where it exists. Do not invent synonyms.
+terms from `GLOSSARY.md` (or the older `CONTEXT.md`) where it exists. Do not invent synonyms.
 
 Return exactly what the brief asks for: the interface (signatures with parameter and
 return types, invariants, ordering constraints, error modes), a usage example at a real

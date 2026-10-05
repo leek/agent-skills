@@ -40,7 +40,7 @@ Judge and fix a cluster once; reply to and resolve every thread in it.
 
 A finding is **legit** only when you can name the concrete failure it causes, the
 inputs, the wrong result. Read the cited code and its neighbours, then the governing
-truth: the spec/CONTEXT, the tests around it, and the **permission/role model** for
+truth: the spec/GLOSSARY, the tests around it, and the **permission/role model** for
 anything about authorization. Land one verdict per cluster:
 
 - **legit**: a real defect or a correctness/security improvement you can demonstrate.
