@@ -32,9 +32,28 @@ This loop cleans Git repository state. It is not a source-code housekeeping pass
 4. Classify each item as current, valuable but unfinished, superseded, merged, abandoned, or uncertain.
 5. Record evidence for each classification: upstream status, merge base, PR state, commit reachability, stash contents, worktree dirtiness, owner, and recent activity.
 6. Recover valuable work before cleanup. Move useful commits or stashed changes to the appropriate current branch, preserve patches, or keep a clearly named branch.
-7. Ask before removing anything. Put every removal candidate of the batch (merged branches, stale remote-tracking refs, stashes, worktrees, databases, remote branches, PRs to close) in one list: each item's exact name, the step 5 evidence, its size where known, and `cannot recover` when nothing else holds a copy. Ask the user to pick the items to remove (`AskUserQuestion` with `multiSelect: true` where available, nothing pre-ticked; otherwise a numbered list they answer with numbers). An answer that names no item ("ok", "go ahead") picks nothing.
+7. Ask before removing anything. Show every removal candidate of the batch (merged branches, stale remote-tracking refs, stashes, worktrees, databases, remote branches, PRs to close) in one message: each item's exact name, the step 5 evidence, its size where known, and `cannot recover` when nothing else holds a copy. Then ask the user to pick what to remove, in the shape of Selection Form below. An answer that names no item ("ok", "go ahead") picks nothing.
 8. Remove only the selected items, by their exact names. Everything unselected stays, and the report names it.
 9. Rerun the inventory after cleanup until every remaining branch, pull request, commit, stash, worktree, and database is intentional.
+
+## Selection Form
+
+Where `AskUserQuestion` is available, ask the step 7 selection in one call, one question (one tab) per kind of state, with up to 4 questions:
+
+| Tab (`header`) | Covers |
+|---|---|
+| `Branches` | local branches, stale remote-tracking refs |
+| `Worktrees` | worktrees, with the databases that drop with them |
+| `Stashes` | stashes, orphaned databases |
+| `Remote` | remote branches, PRs to close |
+
+Leave out a tab with no candidates. Every question is `multiSelect: true`, asks "Which <kind> should I remove?", and has 2–4 options with nothing pre-ticked:
+
+- **One option is one batch** of items of the same kind with the same evidence, such as "Merged branches (7)". The label says what the batch is, in 1–5 words. The description gives the exact command and every exact name it covers, so a pick selects those names and nothing else: "`git branch -d` feat/login, fix/typo, … (all merged into main)".
+- **Never batch** a `cannot recover` item, an uncertain item, or a database with anything unlike it. Give it its own option, and say `cannot recover` in the description.
+- **Too many batches** for 4 options: ask the rest in the next round, after this batch is removed and re-inventoried.
+
+Without the tool, show the same tabs as numbered lists in chat, and take the numbers the user answers with.
 
 ## Inventory Commands
 
