@@ -101,6 +101,16 @@ Concrete proof that the change works, as a before and after.
 
 No evidence is a finding, not a blank: say what was not verified and why.
 
+### Screenshots
+
+When you open a PR, put every screenshot taken this session of what the PR builds into Evidence: from `verify`, from a `browser-test` run directory, or saved ad hoc. Leave out screenshots of other work and of failures you later fixed. No screenshots: skip this section and do not take any just for the PR; Evidence uses execution output. GitHub cannot attach a local file to a PR body, so upload them first. From inside the repo, run this skill's script:
+
+```bash
+bash <this skill's directory>/scripts/upload-screenshots.sh <pr-branch> <image>...
+```
+
+It commits the images to the orphan `pr-assets` branch (the PR diff stays clean), pushes it, and prints one `![name](url)` line per image, pinned to that commit. Paste the lines under **After:**, or **Before:** for a screenshot of the old behaviour, each with a one-line caption of what it shows. If the push fails, keep the body, list the local paths under Evidence, and say the upload failed.
+
 ## Merge Danger
 
 **Door.** A two-way door is cheap to walk back: revert and redeploy. A one-way door is not: a destructive migration, a data backfill, a public API or contract change, an email sent, a queue payload shape that in-flight jobs still carry.

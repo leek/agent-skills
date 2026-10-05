@@ -15,7 +15,7 @@ Tests passing is not the finish line. Exercise the actual flow once, in the runn
    - Console: run the artisan command with realistic arguments.
    - Jobs / listeners: dispatch through the real path (`dispatchSync` or trigger the event), then check the side effect where it lands, database rows, storage, logs.
 3. **Check the seams the tests can't see.** Browser console errors, the Laravel log (`storage/logs/` or Boost's `read-log-entries`/`last-error`), a queue that needed a running worker, an unbuilt frontend (a Vite manifest error means run `npm run build`, not that the change is broken).
-4. **Report faithfully.** What you did, what you saw (status codes, redirects, rendered state, rows written), and anything that surprised you: with the evidence. If a step couldn't be exercised (needs credentials, a webhook, a human), say so plainly instead of marking it verified.
+4. **Report faithfully.** What you did, what you saw (status codes, redirects, rendered state, rows written), and anything that surprised you: with the evidence. If a step couldn't be exercised (needs credentials, a webhook, a human), say so plainly instead of marking it verified. List each screenshot's path, so a PR opened later can embed it.
 
 ## Guardrails
 

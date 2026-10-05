@@ -23,7 +23,7 @@ Run it on a spec whose `tickets/` already exist and the user asked to build all 
 
 ## PR delivery: after step 8
 
-1. Push the branch and open the PR with `gh pr create`. Write the body with the `pr` skill's template, its Evidence from the verification pass, then one line per ticket closed.
+1. Push the branch and open the PR with `gh pr create`. Write the body with the `pr` skill's template, its Evidence from the verification pass with the screenshots uploaded as its **Screenshots** section says, then one line per ticket closed.
 2. Read the PR's unresolved review threads once (the GraphQL `reviewThreads` query in `resolve-review-comments`). When any exist, run `resolve-review-comments` on the PR. When review bots are still running, say so in the end block.
 3. Keep the worktree: it holds the PR branch. Name its path in the report; `repository-cleanup` removes it after the merge.
 4. Without a worktree, return the main checkout to the default branch: `git switch <default> && git pull --ff-only`. Say so in the report, so the next request starts on fresh `<default>`.
