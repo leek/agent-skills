@@ -40,6 +40,7 @@
         "./skills/improve-codebase-architecture",
         "./skills/laravel-herd-worktrees",
         "./skills/panel",
+        "./skills/pr",
         "./skills/prototype",
         "./skills/release",
         "./skills/repository-cleanup",

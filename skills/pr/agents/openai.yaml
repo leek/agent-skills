@@ -1,0 +1,5 @@
+interface:
+  display_name: "PR"
+  short_description: "The PR body template: a small visual, before/after evidence, and merge danger"
+policy:
+  allow_implicit_invocation: true

@@ -49,6 +49,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | `improve-codebase-architecture` | user | Scan a codebase for deepening opportunities, present them as a visual HTML report, then grill through whichever one you pick. |
 | `laravel-herd-worktrees` | model | Use when working with Laravel projects served by Laravel Herd alongside git worktrees on macOS. |
 | `panel` | user | Convene a panel of agent CLIs (grok, claude, codex, agy) on a prompt or a code review, each in its own headless subagent, then report one consensus grouped by how much they agree. |
+| `pr` | model | The pull request body format, built for fast human review: the smallest visual of the change, before/after evidence, and a one-way or two-way door call with its blast radius. |
 | `prototype` | model | Build a throwaway prototype to answer a design question. |
 | `release` | user | Commit this session's work, bump the version, tag, push, and publish a GitHub release with grouped notes. |
 | `repository-cleanup` | user | Audit and clean Git repository state, including the local databases old worktrees left behind. |

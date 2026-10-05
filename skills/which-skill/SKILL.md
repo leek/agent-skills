@@ -38,6 +38,7 @@ Most work runs one straight line (**decide → spec → tickets → build**) ove
 - Review the diff → `code-review`. Want four independent models on it instead of one → `panel`.
 - Prove it in the running app → `verify`.
 - Ship the session's work → `commit`.
+- Write or rewrite a PR body → `pr` (the agent also reaches for it on its own).
 - Review comments waiting on a PR → `resolve-review-comments`.
 - A PR to take all the way to merged (reviews, checks, fixes, merge) → `triage-github-pr`.
 - Merge or rebase blocked → `resolving-merge-conflicts`.

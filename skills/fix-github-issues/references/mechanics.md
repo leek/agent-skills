@@ -34,8 +34,8 @@ printf '%s\t%s\t%s\t%s\n' "$(date +%s)" <pgsql|mysql> <database> "<worktree path
 
 - Push: `git push origin HEAD:<default>` (no `--force`). If it is refused because
   `origin/<default>` moved, rebase onto it, re-run the tests, and push again.
-- Pull request: `git push -u origin fix/issues-<run>`, then `gh pr create` with one
-  `fixes #NNN` line per issue in the body. The issues close when it merges.
+- Pull request: `git push -u origin fix/issues-<run>`, then `gh pr create` with a body
+  in the `pr` skill's template, plus one `fixes #NNN` line per issue. The issues close when it merges.
 
 ## Disposition and close
 
