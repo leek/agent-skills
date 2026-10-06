@@ -13,7 +13,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { ScratchEffort, Worker } from '../../types'
-import { isClosed, scan, summary } from './scratch-scan'
+import { isClosed, scan, summary, tally } from './scratch-scan'
 import { KEEP, describeTool, duration, isFailed, mark, ordered } from './workers-model'
 
 const PANE = 'scratch'
@@ -61,9 +61,10 @@ export const register: Register = on => {
     if (result === null) {
       return { text: 'No .scratch/ directory here.' }
     }
-    await $.ui.open({ id: PANE, title: only === '' ? 'Scratch' : `Scratch: ${only}` })
+    const opened = await $.ui.open({ id: PANE, title: only === '' ? 'Scratch' : `Scratch: ${only}` })
 
-    return { text: summary(result) }
+    // The pane carries the board; the text table is only for surfaces that cannot draw it.
+    return { text: opened.isPlaced ? tally(result) : summary(result) }
   })
 
   on('ui.close', { id: PANE }, async ($, e, next) => {

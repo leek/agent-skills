@@ -50,7 +50,7 @@ test('main-loop tool calls are not counted as workers', async ($, on) => {
   expect(await band.find({ type: 'Text', text: /Workers/ })).toBeUndefined()
 })
 
-test('/scratch answers with the table and draws the board', async ($, on) => {
+test('/scratch draws the board and answers with a tally, or the table where no pane draws', async ($, on) => {
   const files: Record<string, string> = {
     '/repo/.scratch/auth/spec.md': '---\ntitle: Auth\nstatus: ready-for-agent\n---\n',
     '/repo/.scratch/auth/tickets/01-login.md': '---\ntitle: Login form\nstatus: ready-for-agent\nblocked-by: []\n---\n',
@@ -70,11 +70,16 @@ test('/scratch answers with the table and draws the board', async ($, on) => {
     const value = [...names].map(([name, kind]) => ({ name, kind, size: 1, mtimeMs: 0, isLink: false }))
     return { value } as never
   })
-  on('ui.open', async () => ({ value: { isPlaced: true } }) as never)
+  let isPlaced = true
+  on('ui.open', async () => ({ value: { isPlaced } }) as never)
 
-  const answer = await $.command.run({ command: 'scratch', args: '' } as never)
-  expect(answer.text).toContain('| `auth` | open |')
-  expect(answer.text).toContain('/implement .scratch/auth/tickets/01-login.md')
+  const drawn = await $.command.run({ command: 'scratch', args: '' } as never)
+  expect(drawn.text).toBe('1 open, 0 stale, 0 mismatched, 0 done. Commit checks: /scratch-status.')
+
+  isPlaced = false
+  const undrawn = await $.command.run({ command: 'scratch', args: '' } as never)
+  expect(undrawn.text).toContain('| `auth` | open |')
+  expect(undrawn.text).toContain('/implement .scratch/auth/tickets/01-login.md')
 
   const pane = await $.ui.mount({ plugin: 'leek-skills', surface: 'terminal', ...PANE } as never)
   expect(await pane.find({ type: 'Text', text: /01 Login form/ })).toBeDefined()

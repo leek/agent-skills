@@ -178,11 +178,25 @@ export async function scan(fs: Reader, root: string, now: number, only = ''): Pr
   return { root, scannedAt: now, efforts }
 }
 
-export function summary(board: ScratchBoard): string {
+// One line of counts: the /scratch reply when the pane is drawn.
+export function tally(board: ScratchBoard): string {
   if (board.efforts.length === 0) {
     return 'No efforts in .scratch/.'
   }
   const count = (fn: (e: ScratchEffort) => boolean) => board.efforts.filter(fn).length
+
+  return (
+    `${count(e => e.state === 'open')} open, ${count(e => e.isStale)} stale, ` +
+    `${count(e => e.state === 'mismatched')} mismatched, ${count(e => e.state === 'done')} done. ` +
+    'Commit checks: /scratch-status.'
+  )
+}
+
+// The whole board as a Markdown table: the /scratch reply where no pane is drawn.
+export function summary(board: ScratchBoard): string {
+  if (board.efforts.length === 0) {
+    return 'No efforts in .scratch/.'
+  }
   const rows = board.efforts.map(e => {
     const open = e.files.filter(f => !isClosed(f)).map(f => f.number || f.path).join(', ')
     return `| \`${e.slug}\` | ${e.state}${e.isStale ? ' (stale)' : ''} | ${open} | ${e.next} |`
@@ -193,8 +207,6 @@ export function summary(board: ScratchBoard): string {
     '|---|---|---|---|',
     ...rows,
     '',
-    `${count(e => e.state === 'open')} open, ${count(e => e.isStale)} stale, ` +
-      `${count(e => e.state === 'mismatched')} mismatched, ${count(e => e.state === 'done')} done. ` +
-      'Commit checks: /scratch-status.',
+    tally(board),
   ].join('\n')
 }
