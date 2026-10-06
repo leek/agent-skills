@@ -51,6 +51,7 @@
         "./skills/scratch-cleanup",
         "./skills/scratch-status",
         "./skills/setup",
+        "./skills/sweep",
         "./skills/tdd",
         "./skills/teach",
         "./skills/to-questionnaire",

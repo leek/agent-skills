@@ -50,6 +50,7 @@ Most work runs one straight line (**decide → spec → tickets → build**) ove
 - A backlog of production or review-bot issues → `fix-nightwatch-issues`, `fix-posthog-issues`, or `fix-github-issues` for the source they come from.
 - The shape of the code is the problem, not one bug → `improve-codebase-architecture` to find the opportunity, `architecture-satisfaction` to run the refactor loop, `codebase-design` for the vocabulary either one uses.
 - Suspect a specific module smells → `code-smells-audit`.
+- Nothing known is wrong, but you want the next unnoticed problem found, proven, and fixed as a PR → `sweep`.
 - Unsure whether a state model or a UI direction holds up → `prototype`.
 
 ## Repo upkeep

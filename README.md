@@ -60,6 +60,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | `scratch-cleanup` | user | Sweep a dusty .scratch/: file research into docs/, remove finished efforts, and report the work still open. |
 | `scratch-status` | user | Report what is still open across `.scratch/`: every effort's open tickets and decisions, what blocks it, how stale it is, and the next skill to run. Read-only. |
 | `setup` | user | Configure this repo for the engineering skills: the markdown issue tracker layout, triage label vocabulary, and domain doc layout. |
+| `sweep` | user | Dig for one problem nobody has noticed yet, prove it, fix it, and open one PR per problem. Every run finds something new: earlier PRs (open, merged, or declined) are excluded, never a reason to stop. |
 | `tdd` | model | The red → green loop for any stack: seams, what a good test is, and the anti-patterns to refuse. |
 | `teach` | user | Teach the user a new skill or concept, within this workspace. |
 | `to-questionnaire` | user | Turn a decision the user can't fully answer into a Markdown questionnaire for someone else to fill in, async or over a meeting. |

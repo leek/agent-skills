@@ -1,0 +1,6 @@
+interface:
+  display_name: "Sweep"
+  short_description: "Dig for one unnoticed problem per run, prove it, fix it, and open a PR; never repeats earlier work"
+  default_prompt: "Use $sweep to find one problem nobody has noticed in this repository, prove it, fix it, and open a PR. Add a cycle count or focus areas to change the scope, e.g. $sweep 3 refactor performance."
+policy:
+  allow_implicit_invocation: false
