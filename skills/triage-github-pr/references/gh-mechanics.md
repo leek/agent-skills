@@ -97,8 +97,10 @@ Never reuse a checkout without proof that it is the PR head. Before the first ch
   maintainer pushes: treat it as false, and offer merge-then-follow-up-PR in the report. Run
   `git worktree add --detach .claude/worktrees/pr-N`, `cd` into it, run
   `gh pr checkout N` there (it tracks the fork's branch), and push with `git push`.
-- **The tree is clean** and no other worktree has the branch: `gh pr checkout N`. If it
-  refuses because a local branch of that name has diverged, use the worktree below.
+- **The tree is clean** and no other worktree has the branch: first record where the
+  main checkout is (`git branch --show-current`, or `git rev-parse HEAD` when that
+  prints nothing), then `gh pr checkout N`. If it refuses because a local branch of
+  that name has diverged, use the worktree below.
 - **Otherwise** (a dirty tree, or the branch checked out in another worktree, which may
   hold someone's unsaved work): `git fetch origin && git worktree add --detach
   .claude/worktrees/pr-N origin/<head>`, always at that path, never a sibling
@@ -106,6 +108,11 @@ Never reuse a checkout without proof that it is the PR head. Before the first ch
   if the push is refused, someone else pushed, so go back to step 3).
 
 A new worktree starts bare (no `vendor/`, no `.env`): make it runnable with `laravel-herd-worktrees`' **Bootstrap a bare worktree** section before running anything in it. Its last check proves `HEAD` equals `headRefOid`, which also catches a helper that branched off the default branch.
+
+**Return the main checkout.** When a PR you checked out in the main checkout is done
+(merged, queued, or stopped), switch it back to what you recorded before the next PR:
+`git switch <branch>`, or `git switch --detach <sha>`. If git refuses, report it, and
+leave the tree as it is.
 
 After the merge, and only after the user says yes at step 7, `cd` back to the main
 checkout and run `git worktree remove .claude/worktrees/pr-N` (no `--force`; if git

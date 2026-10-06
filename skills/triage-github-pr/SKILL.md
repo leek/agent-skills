@@ -155,7 +155,9 @@ and names the blocker, and report. Ping the user with the PR number and blocker
 Completion criterion: `gh pr view N --json state,mergedAt,autoMergeRequest` shows
 merged or a queued auto-merge, or the blocker comment is posted. Report the merge SHA
 (or "queued"), and one line per finding, yours included: fixed in `<sha>`, stale,
-auto-dismiss, hallucination, or minor (not fixed).
+auto-dismiss, hallucination, or minor (not fixed). If step 5 checked out the PR in the
+main checkout, that checkout is back on the branch it started on (see
+[Return the main checkout](references/gh-mechanics.md#check-out-the-head-branch-safely)).
 
 ## 7. Ask once, then clean up
 
