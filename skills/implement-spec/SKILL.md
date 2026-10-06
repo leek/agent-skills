@@ -15,10 +15,14 @@ Reach for the neighbours instead when they fit better: `/implement <spec> all` b
 
 Talk to subagents in **context pointers**: paths to the spec, the ticket, blocker resolutions, notes, commits. Never paste what a pointer already reaches. Ask them for sparse reports.
 
-## Laravel guardrails
+## Guardrails
 
-- **Never** run `migrate:fresh`, `migrate:rollback`, or another destructive database operation on a database this run did not create, without explicit approval. Schema changes go in new migrations.
+- **Never** reset, roll back, drop, or truncate a database this run did not create, or run another destructive data operation on one, without explicit approval. Schema changes go in new migrations.
 - Verify identifiers before using them: route names, config keys, enum values, package APIs.
+
+**Stack references.** Identify the stack from its manifests. If a matching file exists below, read it before step 1 and pass its pointer into every implementer brief: it names that stack's destructive commands, worktree setup, test-config files, and formatter.
+
+- Laravel (`laravel/framework` in `composer.json`): [`references/laravel.md`](references/laravel.md)
 
 ## Process
 
@@ -43,7 +47,7 @@ Make a notes directory outside every worktree: `notes="$(git rev-parse --path-fo
 For each frontier ticket, up to the concurrency limit (default 4: each one runs a test suite):
 
 1. **Claim** it in the integration checkout per the tracker's Claim operation, with `claimed-by: implement-spec-<slug>-<run id>`. Only you write `.scratch/`; claims stay uncommitted until step 7.
-2. **Worktree.** `git worktree add -b <slug>--<NN> .claude/worktrees/<slug>--<NN> <integration tip>`, then make it runnable with `laravel-herd-worktrees`' **Bootstrap a bare worktree** section. When the tests need a real database, give it its own (`<app db>_spec_<slug>_<NN>`, never a name the main checkout's `.env`, `.env.testing`, or `phpunit.xml` uses) and register it the moment you create it:
+2. **Worktree.** `git worktree add -b <slug>--<NN> .claude/worktrees/<slug>--<NN> <integration tip>`, then make it runnable (install dependencies, copy local env config) the way the project's docs say, or as the stack reference says. When the tests need a real database, give it its own (`<app db>_spec_<slug>_<NN>`, never a name the main checkout's env or test config uses) and register it the moment you create it:
 
    ```bash
    printf '%s\t%s\t%s\t%s\n' "$(date +%s)" <pgsql|mysql> <database> "<worktree path>" \
@@ -53,7 +57,7 @@ For each frontier ticket, up to the concurrency limit (default 4: each one runs 
 3. **Implementer subagent**, in the background where the harness allows (Claude Code: the Agent tool with `run_in_background: true`; elsewhere, any sub-agent the harness offers). Its brief gives pointers (worktree path, ticket path, the spec's Build Contract, direct blockers' reports from step 4, the notes directory) and these rules:
    - Work only in that worktree. Confirm `git merge-base --is-ancestor <integration tip> HEAD` before starting.
    - Choose seams with the `tdd` skill's **Seams: where tests go** rules and state them; then call the Skill tool with `tdd` and build the ticket test-first. Focused tests and configured static analysis end green.
-   - Format touched paths (`vendor/bin/pint <paths>`), commit by explicit path. Never touch `.scratch/`, never push, never write another branch.
+   - Format touched paths with the repo's configured formatter, commit by explicit path. Never touch `.scratch/`, never push, never write another branch.
    - Before reporting, merge the current integration tip into the branch and rerun the focused tests.
    - Report in at most ten lines: commit SHAs, touched paths, seams (name any public seam a dependent ticket should reuse), the focused test command and result, deviations from the ticket, and anything blocking.
 
