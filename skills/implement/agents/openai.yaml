@@ -1,5 +1,5 @@
 interface:
   display_name: "Implement"
-  short_description: "Implement one Laravel work item, or every ticket of a spec, end to end: claim, TDD, commit, review, verify, resolve, and open a PR when asked"
+  short_description: "Implement one work item, or every ticket of a spec, end to end: claim, TDD, commit, review, verify, resolve, and open a PR when asked"
 policy:
   allow_implicit_invocation: false

@@ -30,7 +30,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | `chatter-scout` | user | Sweep the web for new chatter on a topic, skip what earlier runs saw, verify the rest in cheap parallel subagents, and write one ranked, cited findings file for a blog post or digest. |
 | `code-review` | model | Review the changes since a fixed point (commit, branch, tag, or merge-base) along three axes: Correctness (would it break: bugs, failure modes, security, missing tests), Standards (does the diff follow this repo's documented conventions, including colocated CLAUDE.md rules?) and Spec (does it implement what the originating ticket/PRD asked?). |
 | `code-smells-audit` | model | Audit a codebase, path, glob, or branch diff for classic code smells using the 56-smell Luzkan catalog, with detection heuristics tuned to PHP/Laravel and TS/React: sweep nine occurrence lenses, adversarially verify every candidate against the smell's card definition, emit a ranked markdown findings report. |
-| `codebase-design` | model | Shared vocabulary for designing deep modules in a PHP/Laravel codebase. |
+| `codebase-design` | model | Shared vocabulary for designing deep modules in any codebase. |
 | `commit` | user | Commit the work done in this session, skipping files a parallel session also touched. |
 | `dependency-audit` | user | Run a Composer or npm dependency audit and propose a safe upgrade plan. |
 | `diagnosing-bugs` | model | Diagnosis loop for hard bugs and performance regressions. |
@@ -44,7 +44,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | `grilling` | model | Interview the user one decision at a time until reaching shared understanding, resolving each branch of the decision tree with recommended options and trade-offs. |
 | `handoff` | user | Compact the current conversation into a handoff document for another agent to pick up. |
 | `housekeeper` | user | Run a conservative code-project housekeeping pass. |
-| `implement` | user | Implement one Laravel work item end to end: scope and claim it when trackable, TDD at agreed seams, commit, review, verify, and resolve it. |
+| `implement` | user | Implement one work item end to end: scope and claim it when trackable, TDD at agreed seams, commit, review, verify, and resolve it. |
 | `implement-spec` | user | Build a whole spec fast: parallel implementer subagents work the ticket frontier, each in its own worktree, merging onto one integration branch; then one review, one verification pass, and one PR. Cuts the tickets first when the spec has none. |
 | `improve-codebase-architecture` | user | Scan a codebase for deepening opportunities, present them as a visual HTML report, then grill through whichever one you pick. |
 | `laravel-herd-worktrees` | model | Use when working with Laravel projects served by Laravel Herd alongside git worktrees on macOS. |
@@ -60,7 +60,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | `scratch-cleanup` | user | Sweep a dusty .scratch/: file research into docs/, remove finished efforts, and report the work still open. |
 | `scratch-status` | user | Report what is still open across `.scratch/`: every effort's open tickets and decisions, what blocks it, how stale it is, and the next skill to run. Read-only. |
 | `setup` | user | Configure this repo for the engineering skills: the markdown issue tracker layout, triage label vocabulary, and domain doc layout. |
-| `tdd` | model | The red → green loop tuned for Pest/PHPUnit in a Laravel codebase: seams, what a good test is, and the anti-patterns to refuse. |
+| `tdd` | model | The red → green loop for any stack: seams, what a good test is, and the anti-patterns to refuse. |
 | `teach` | user | Teach the user a new skill or concept, within this workspace. |
 | `to-questionnaire` | user | Turn a decision the user can't fully answer into a Markdown questionnaire for someone else to fill in, async or over a meeting. |
 | `to-spec` | model | Turn the current conversation into a spec (PRD) and save it as markdown under .scratch/: no interview, just synthesis, with Laravel test seams chosen from the tdd ranking rules rather than asked about. |

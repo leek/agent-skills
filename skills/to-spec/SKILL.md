@@ -27,7 +27,7 @@ Finish exploring only when you can name the domain terms and ADRs that constrain
 
 ### 2. Sketch the test seams
 
-A **seam** is the public boundary the feature will be tested at (`codebase-design` holds the full deep-module vocabulary). Before proposing seams, consult and apply the Laravel ranking and selection rules in the `tdd` skill's **Seams: where tests go** section; it is the single source of truth. While sketching seams, look for a **deepening opportunity** (functionality worth hiding behind a smaller, more stable interface) and record it under Implementation Decisions.
+A **seam** is the public boundary the feature will be tested at (`codebase-design` holds the full deep-module vocabulary). Before proposing seams, consult and apply the ranking and selection rules in the `tdd` skill's **Seams: where tests go** section; it is the single source of truth. While sketching seams, look for a **deepening opportunity** (functionality worth hiding behind a smaller, more stable interface) and record it under Implementation Decisions.
 
 **Decide the seams yourself: don't ask.** Seam placement is test structure, which `grilling`'s **What still earns a question** hands to you: the ranking rules settle it, so apply them and move on. Record the chosen set in the spec with a one-line why per seam; the user reviews them as part of the step 3 draft, which is the only gate this step needs. Ask only on a genuine fork, two placements the rules rank equally that would make materially different work, and then ask just that one.
 

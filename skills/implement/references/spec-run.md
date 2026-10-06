@@ -6,7 +6,7 @@ Two additions to the `implement` process. A **spec run** builds every ticket of 
 
 1. Name the branch after the work: the spec's `<slug>`, or the ticket's.
 2. Create it from the fresh default branch (`git fetch origin` first):
-   - The user asked for a worktree, or the tree is dirty: `git worktree add -b <branch> .claude/worktrees/<branch> origin/<default>`, at that path, never a sibling directory. Make it runnable with `laravel-herd-worktrees`' **Bootstrap a bare worktree** section, then work there.
+   - The user asked for a worktree, or the tree is dirty: `git worktree add -b <branch> .claude/worktrees/<branch> origin/<default>`, at that path, never a sibling directory. Make it runnable (install dependencies, copy local env config) the way the project's docs say, or as the stack reference says, then work there.
    - Otherwise: `git switch -c <branch> origin/<default>`.
 3. When the work comes from `.scratch/<slug>/` and the new branch lacks it or holds an older copy (committed on local `<default>`, not pushed), bring it over: `git checkout <default> -- .scratch/<slug>`, then commit it as `docs(scratch): <slug>`.
 4. Record `base_sha` on the new branch. Claims, resolutions, and code all commit to this branch.

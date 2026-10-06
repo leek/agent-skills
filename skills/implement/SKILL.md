@@ -1,6 +1,6 @@
 ---
 name: implement
-description: "Implement one Laravel work item end to end, or every ticket of a spec in one run: scope and claim it when trackable, TDD at chosen seams, commit, review, verify, resolve it, and open a PR when asked."
+description: "Implement one work item end to end, or every ticket of a spec in one run: scope and claim it when trackable, TDD at chosen seams, commit, review, verify, resolve it, and open a PR when asked."
 disable-model-invocation: true
 argument-hint: "A ticket or spec path; add `all` to build every ticket of the spec on one branch with one PR (omit to use the conversation scope)"
 ---
@@ -13,10 +13,14 @@ Implement exactly one work item per session, test-first and verified end to end.
 
 Pipeline position: `wayfinder` (decide) → `to-spec` (write the spec) → `to-tickets` (break it into tickets) → **`implement` (build one ticket per session, review and verify inside)**.
 
-## Laravel guardrails
+## Guardrails
 
-- **Never** run `migrate:fresh`, `migrate:rollback`, or another destructive database operation without explicit approval. Put schema changes in new migrations; sequence live-table changes expand–contract.
+- **Never** reset, roll back, drop, or truncate a database, or run another destructive data operation, without explicit approval. Put schema changes in new migrations; sequence live-table changes expand–contract.
 - Verify identifiers before using them: route names, config keys, enum values, icon names, and package APIs. A manifest entry alone does not prove registration or use.
+
+**Stack references.** Identify the stack from its manifests. If a matching file exists below, read it before step 1: it names that stack's destructive commands, formatter, test command, and worktree setup.
+
+- Laravel (`laravel/framework` in `composer.json`): [`references/laravel.md`](references/laravel.md)
 
 ## Process
 
@@ -55,7 +59,7 @@ Finish the loop only when every acceptance criterion is covered at a chosen seam
 
 ### 4. Format and commit a reviewable checkpoint
 
-Run the repository's configured formatter on the paths you touched (`vendor/bin/pint <paths>` for Pint), so a parallel session's uncommitted files stay as they are. Check `git status --porcelain`, stage only work-item files by explicit path, and leave foreign changes unstaged. Commit to the current branch (PR delivery created it before step 1); this step creates no branch or worktree. Record the paths you touched; review scopes to them (next step), so a parallel session's commits on the same branch neither get staged here nor reviewed there.
+Run the repository's configured formatter on the paths you touched only (Pint, Prettier, Black, gofmt: whatever it configures), so a parallel session's uncommitted files stay as they are. Check `git status --porcelain`, stage only work-item files by explicit path, and leave foreign changes unstaged. Commit to the current branch (PR delivery created it before step 1); this step creates no branch or worktree. Record the paths you touched; review scopes to them (next step), so a parallel session's commits on the same branch neither get staged here nor reviewed there.
 
 Finish this step with every work-item change committed, every foreign change untouched, and the checkpoint commit SHA recorded.
 
@@ -71,7 +75,7 @@ Finish this step only when review reports no unresolved actionable findings and 
 
 Ask the user first (via `AskUserQuestion` where available, otherwise a plain question in chat) whether to run the full test suite as the final automated gate. If they decline, skip the full run (the focused tests from step 3 stand as the automated evidence) and record the skip so step 8 reports it plainly.
 
-When approved, run the repository's documented full-suite command: its `AGENTS.md` or `CLAUDE.md`, composer scripts, or CI workflow names it; use `php artisan test` only when none does. A run that can outlast the foreground limit goes to the background (Bash `run_in_background` where available). Then end the turn with no reply and let its completion notification wake you; a check-in that only says it is still running costs the user a turn. Fix failures caused by the work. Prove an unrelated failure pre-existing against `base_sha`, then note it plainly instead of expanding scope.
+When approved, run the repository's documented full-suite command: its `AGENTS.md` or `CLAUDE.md`, package scripts (`composer.json`, `package.json`, a `Makefile`), or CI workflow names it; fall back to the stack's default test runner only when none does. A run that can outlast the foreground limit goes to the background (Bash `run_in_background` where available). Then end the turn with no reply and let its completion notification wake you; a check-in that only says it is still running costs the user a turn. Fix failures caused by the work. Prove an unrelated failure pre-existing against `base_sha`, then note it plainly instead of expanding scope.
 
 Any code fix returns to steps 3–5 before this gate runs again. Finish this step when the user declined the full run, or when every caused check passes and every remaining failure has base-SHA evidence.
 

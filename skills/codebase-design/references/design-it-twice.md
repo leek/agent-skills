@@ -32,9 +32,9 @@ Include both the [SKILL.md](../SKILL.md) vocabulary and the project's `GLOSSARY.
 Each sub-agent outputs:
 
 1. Interface (class/method signatures with parameter and return types: plus invariants, ordering constraints, error modes)
-2. Usage example showing how callers use it (controller, job, or command call site)
+2. Usage example showing how callers use it (a controller, job, or command call site)
 3. What the implementation hides behind the seam
-4. Dependency strategy and adapters (see [deepening.md](deepening.md)): including container bindings if ports are involved
+4. Dependency strategy and adapters (see [deepening.md](deepening.md)): including how adapters are wired in if ports are involved
 5. Trade-offs: where leverage is high, where it's thin
 
 ### 3. Present and compare

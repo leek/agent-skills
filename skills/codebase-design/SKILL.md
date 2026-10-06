@@ -1,6 +1,6 @@
 ---
 name: codebase-design
-description: Shared vocabulary for designing deep modules in a PHP/Laravel codebase. Use when the user wants to design or improve a class or module's interface, find deepening opportunities, decide where a seam goes, make code more testable or AI-navigable, or when another skill (to-spec, implement, architecture-satisfaction) needs the deep-module vocabulary.
+description: Shared vocabulary for designing deep modules in any codebase. Use when the user wants to design or improve a class or module's interface, find deepening opportunities, decide where a seam goes, make code more testable or AI-navigable, or when another skill (to-spec, implement, architecture-satisfaction) needs the deep-module vocabulary.
 ---
 
 # Codebase Design
@@ -11,11 +11,11 @@ Design **deep modules**: a lot of behaviour behind a small interface, placed at 
 
 Use these terms exactly: don't substitute "component," "service," "API," or "boundary." Consistent language is the whole point.
 
-**Module**: anything with an interface and an implementation. Deliberately scale-agnostic: a function, class, Laravel action, package, or tier-spanning slice. _Avoid_: unit, component, service.
+**Module**: anything with an interface and an implementation. Deliberately scale-agnostic: a function, class, action, package, or tier-spanning slice. _Avoid_: unit, component, service.
 
 **Interface**: everything a caller must know to use the module correctly: the method signatures, but also invariants, ordering constraints, error modes, required configuration, and performance characteristics. _Avoid_: API, signature (too narrow, they refer only to the type-level surface).
 
-**Implementation**: what's inside a module, its body of code. Distinct from **Adapter**: a thing can be a small adapter with a large implementation (an Eloquent-backed repository) or a large adapter with a small implementation (an in-memory fake). Reach for "adapter" when the seam is the topic; "implementation" otherwise.
+**Implementation**: what's inside a module, its body of code. Distinct from **Adapter**: a thing can be a small adapter with a large implementation (an ORM-backed repository) or a large adapter with a small implementation (an in-memory fake). Reach for "adapter" when the seam is the topic; "implementation" otherwise.
 
 **Depth**: leverage at the interface: the amount of behaviour a caller (or test) can exercise per unit of interface they have to learn. A module is **deep** when a large amount of behaviour sits behind a small interface, **shallow** when the interface is nearly as complex as the implementation.
 
@@ -64,41 +64,26 @@ When designing an interface, ask:
 - **The interface is the test surface.** Callers and tests cross the same seam. If you want to test *past* the interface, the module is probably the wrong shape.
 - **One adapter means a hypothetical seam. Two adapters means a real one.** Don't introduce a seam unless something actually varies across it.
 
-## Laravel mapping
+## Mapping onto a stack
 
-Where these concepts land in a Laravel codebase:
+Where these concepts land in a typical application framework:
 
-- **The container is the seam mechanism**: a PHP interface plus a service-provider binding. Apply the two-adapter rule before reaching for it: an interface with exactly one implementation, bound "for mocking", is a hypothetical seam. Laravel's fakes usually make it unnecessary (next point).
-- **Framework fakes are adapters at framework-owned seams.** `Storage::fake()`, `Queue::fake()`, `Mail::fake()`, `Http::fake()` are the second adapter for filesystem, queue, mail, and HTTP seams: provided free. Prefer them over hand-rolled ports for I/O the framework already owns.
-- **Eloquent models are a wide, shared interface**: every attribute, scope, and relationship is surface area available to every caller. Depth in a Laravel app usually lives *above* them: an action or service class whose small interface (`ReconcileInvoice::run($invoice)`) hides the queries, state transitions, and side effects.
-- **Controllers, commands, jobs, and Livewire/Filament components are entry-point adapters**: thin things that satisfy a transport's interface and delegate to a deep module. If real logic accumulates in one, that's a deepening candidate (the same logic will soon be needed from a second entry point).
+- **Dependency injection is the seam mechanism**: an interface (or protocol, trait, or function type) plus whatever wires the implementation in. Apply the two-adapter rule before reaching for it: an interface with exactly one implementation, wired up "for mocking", is a hypothetical seam. Framework fakes usually make it unnecessary (next point).
+- **Framework fakes are adapters at framework-owned seams.** A test filesystem, queue, mailer, or HTTP stub the framework ships is the second adapter for that seam: provided free. Prefer them over hand-rolled ports for I/O the framework already owns.
+- **ORM models are a wide, shared interface**: every attribute, query, and relationship is surface area available to every caller. Depth usually lives *above* them: an action or service whose small interface (`reconcileInvoice(invoice)`) hides the queries, state transitions, and side effects.
+- **Controllers, route handlers, CLI commands, jobs, and UI components are entry-point adapters**: thin things that satisfy a transport's interface and delegate to a deep module. If real logic accumulates in one, that's a deepening candidate (the same logic will soon be needed from a second entry point).
+
+**Stack references.** Identify the stack from its manifests. If a matching file exists below, read it for these concepts in that stack's terms.
+
+- Laravel (`laravel/framework` in `composer.json`): [`references/laravel.md`](references/laravel.md)
 
 ## Designing for testability
 
 Good interfaces make testing natural:
 
-1. **Accept dependencies, don't create them.**
+1. **Accept dependencies, don't create them.** A payment gateway passed in through the constructor or a parameter can be swapped for a fake in tests. One built inside the method from config (`new StripeGateway(secret)`) cannot.
 
-   ```php
-   // Testable: gateway injected via constructor (container resolves it)
-   public function __construct(private PaymentGateway $gateway) {}
-
-   // Hard to test: hard-wired inside
-   public function process(Order $order): void
-   {
-       $gateway = new StripeGateway(config('services.stripe.secret'));
-   }
-   ```
-
-2. **Return results, don't produce side effects.**
-
-   ```php
-   // Testable: pure calculation, assert on the return value
-   public function calculateDiscount(Cart $cart): Discount
-
-   // Hard to test: mutates and persists as a side effect
-   public function applyDiscount(Cart $cart): void
-   ```
+2. **Return results, don't produce side effects.** `calculateDiscount(cart) → Discount` is a pure calculation you assert on directly. `applyDiscount(cart)`, which mutates and persists, can only be tested by inspecting what it changed.
 
 3. **Small surface area.** Fewer methods = fewer tests needed. Fewer params = simpler test setup.
 
@@ -113,7 +98,7 @@ Good interfaces make testing natural:
 ## Rejected framings
 
 - **Depth as ratio of implementation-lines to interface-lines** (Ousterhout): rewards padding the implementation. We use depth-as-leverage instead.
-- **"Interface" as the PHP `interface` keyword or a class's public methods**: too narrow, interface here includes every fact a caller must know.
+- **"Interface" as a language's `interface` keyword or a class's public methods**: too narrow, interface here includes every fact a caller must know.
 - **"Boundary"**: overloaded with DDD's bounded context. Say **seam** or **interface**.
 
 ## Going deeper

@@ -1,17 +1,21 @@
 ---
 name: tdd
-description: "The red → green loop tuned for Pest/PHPUnit in a Laravel codebase: seams, what a good test is, and the anti-patterns to refuse. Use when building features test-first or when another skill needs the loop."
+description: "The red → green loop for any stack: seams, what a good test is, and the anti-patterns to refuse. Use when building features test-first or when another skill needs the loop."
 ---
 
-# TDD in Laravel
+# TDD
 
-The red → green loop, tuned for Pest/PHPUnit in a Laravel codebase. Consult before and during the loop, not after.
+The red → green loop, for whatever test framework the project already uses. Consult before and during the loop, not after.
 
 Read `GLOSSARY.md` (or the older `CONTEXT.md`) if it exists so test names and interface vocabulary match the project's domain language, and respect ADRs in the area you're touching.
 
 Before writing or reviewing tests, read
 [`references/testing-best-practices.md`](references/testing-best-practices.md)
 and apply its value gate and rejection rules throughout the loop.
+
+**Stack references.** Identify the stack from its manifests (`composer.json`, `package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`, `Gemfile`). If a matching file exists below, read it before the first cycle: it maps the seams and rules here onto that stack's test tooling. Otherwise apply the rules through the suite's existing conventions.
+
+- Laravel (`laravel/framework` in `composer.json`): [`references/laravel.md`](references/laravel.md)
 
 ## Rules of the loop
 
@@ -29,19 +33,18 @@ A **seam** is the public boundary you test at (`codebase-design` holds the full 
 
 Highest first:
 
-1. **HTTP boundary**: feature test: `actingAs($user)->post(route(...))` + response and `assertDatabaseHas` assertions. Default for anything with an endpoint.
-2. **Livewire / Filament component**: `Livewire::test(...)` / Filament testing helpers, when behavior lives in the component.
-3. **Console command**: `$this->artisan('...')->assertExitCode(0)` plus side-effect assertions.
-4. **Queued job / listener**: instantiate and `handle()`, or dispatch with real execution, asserting side effects.
-5. **Action / service class**: direct test at its public API, for logic shared by several entry points.
-6. **Model**: non-trivial scopes, casts, derived attributes only.
+1. **Transport boundary**: send the request an outside caller would (HTTP, RPC, GraphQL) through the app's real routing, as an authenticated user where it matters, and assert the response plus the persisted state. Default for anything with an endpoint.
+2. **UI component**: the framework's component test harness, when behavior lives in the component itself.
+3. **CLI command**: invoke it, assert the exit code plus its side effects.
+4. **Background job / event handler**: run its handler, or dispatch it with real execution, asserting side effects.
+5. **Domain service / action**: a direct test at its public API, for logic shared by several entry points.
+6. **Model / data type**: non-trivial queries, conversions, and derived values only.
 
-## Laravel specifics
+## Rules for any stack
 
-- **Database**: use whichever refresh trait the suite already uses (`RefreshDatabase`/`LazilyRefreshDatabase`), don't introduce a second convention. Never point tests at a real environment's database.
-- **Factories**: all test data via model factories; encode meaningful variants as factory states (`Invoice::factory()->overdue()`), not inline attribute soup repeated across tests.
-- **Side effects via fakes**: `Queue::fake()`, `Mail::fake()`, `Notification::fake()`, `Event::fake()`, `Storage::fake()`, `Http::fake()`: then assert the effect (`Mail::assertQueued`), not the internal call path. Fake the boundary, never mock your own classes' internals.
-- **Time**: `$this->travel(...)` / `travelTo(...)` for anything date-dependent; never `sleep()`.
+- **Database**: reuse the isolation the suite already has (transactions rolled back per test, a database rebuilt per run, a fresh container), don't introduce a second convention. Never point tests at a real environment's database.
+- **Test data**: build it through the suite's factories or builders; encode meaningful variants as named states (an "overdue" invoice), not inline attribute soup repeated across tests.
+- **Side effects via fakes**: replace queues, mail, notifications, storage, and outbound HTTP with the framework's fakes or a faithful in-memory adapter, then assert the effect (a message queued to this address), not the internal call path. Fake the boundary, never mock your own classes' internals.
+- **Time**: freeze or move the clock through the framework's time helpers or an injected clock for anything date-dependent; never sleep.
 - **Authorization is behavior**: for every "user can X" test, write the "user cannot X on someone else's record" test, record-level scoping is the most error-prone rule in a multi-tenant app.
-- **Fast loops with TIA (Pest v5)**: if the project is on Pest v5, use the [Tia engine](https://pestphp.com/docs/tia) so each red → green cycle replays only impacted tests instead of the whole suite, `./vendor/bin/pest --parallel --tia`, or enable it project-wide with `pest()->tia()->locally()` in `tests/Pest.php`. Requires PCOV or Xdebug. Local only, CI still runs the full suite.
-- **Fast loops without TIA (Pest v4, or no coverage driver)**: run the suite with [`--parallel`](https://pestphp.com/docs/optimizing-tests) (`--processes=N` to override the one-per-core default). Tests must be order-independent and not share database state, which the refresh-trait + factories rules above already guarantee.
+- **Fast loops**: run only the focused test, or the impacted set when the runner supports it, each cycle; run the suite in parallel when it supports that. Tests must be order-independent and not share database state, which the isolation and test-data rules above already guarantee. CI still runs the full suite.
