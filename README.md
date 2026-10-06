@@ -112,6 +112,17 @@ Re-run either command to update.
 /plugin install leek-skills@leek-agent-skills
 ```
 
+### Codex (plugin marketplace)
+
+Codex reads the same `.claude-plugin/marketplace.json`:
+
+```bash
+codex plugin marketplace add leek/agent-skills
+codex plugin add leek-skills@leek-agent-skills
+```
+
+Codex lists the model-invoked skills as `leek-skills:<name>` and loads the plugin's `hooks/hooks.json`. It does not load `agents/` or the mod; the skills fall back to Codex's own sub-agents (`spawn_agent`) or run inline. Pick one route per machine: if you already installed with `npx skills`, the plugin lists those skills a second time.
+
 ### Claude Code (manual copy)
 
 ```bash

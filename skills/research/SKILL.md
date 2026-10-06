@@ -16,7 +16,7 @@ Answer one question from **primary sources** and leave a cited Markdown file beh
 
 ## Where this runs
 
-In Claude Code with the plugin installed, the body below runs in the `researcher` subagent and the answer returns to the caller when it finishes. In other harnesses, dispatch it to a sub-agent if one exists (read-only for source sweeps; general-purpose when it must fetch or write) or run it inline and say so. Either way the work must **finish inside this session**: a sub-agent's task handle dies at `/clear`, session end, or compaction, so never leave one running, and in everything durable (tickets, resolution comments, hand-off text) reference the findings **by file path, never by task ID**.
+In Claude Code with the plugin installed, the body below runs in the `researcher` subagent and the answer returns to the caller when it finishes. In other harnesses, dispatch it to a sub-agent if one exists (Codex: `spawn_agent`, then `wait_agent` for the answer; read-only for source sweeps; general-purpose when it must fetch or write) or run it inline and say so. Either way the work must **finish inside this session**: a sub-agent's task handle dies at `/clear`, session end, or compaction, so never leave one running, and in everything durable (tickets, resolution comments, hand-off text) reference the findings **by file path, never by task ID**.
 
 ## The research brief
 

@@ -49,7 +49,8 @@ consensus to form: say which are missing and stop.
 
 Spawn one subagent per present CLI, all in a single message so they run at once (in
 Claude Code with this plugin installed, `subagent_type=leek-skills:panelist`: a small,
-cheap wrapper, since the thinking happens inside the CLI it runs). Give each subagent
+cheap wrapper, since the thinking happens inside the CLI it runs; in Codex, `spawn_agent`
+per CLI, then `wait_agent` on all of them). Give each subagent
 the **same** task string and this brief:
 
 - **Pass the task safely: never inline it.** A prompt with a backtick, `$`, or quote

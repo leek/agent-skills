@@ -63,6 +63,17 @@ CI fails if a skill is missing the file or the two disagree.
 
 **Use what the harness offers; degrade gracefully.** Every skill must *run* in any harness, but that is a floor, not a ceiling: never drop a harness-specific feature (a Claude Code subagent, mod, hook, or tool) just because other harnesses lack it. Name it with a stated fallback ("`AskUserQuestion` where available, otherwise ask in chat"), since an instruction naming a tool the running harness lacks is unfollowable, not merely unused. The fallback is the complete path; the feature is the better one.
 
+Where Codex has its own tool for the same job, name it in the same sentence (verified against Codex CLI 0.160's model-visible tools):
+
+| Job | Claude Code | Codex |
+|---|---|---|
+| Start a sub-agent | `Agent` (typed `leek-skills:<name>` agents) | `spawn_agent`, then `wait_agent` for its result |
+| Follow up with a running one | `SendMessage` to its `name` | `followup_task` (new turn) or `send_message` (no turn) |
+| Stop one | `TaskStop` | `interrupt_agent` |
+| Structured question | `AskUserQuestion` | `request_user_input`, only when listed for that turn (Codex offers it in some modes and for optional questions), so the chat fallback stays the main Codex path |
+
+Codex never loads `agents/` or the mod, so a Codex sub-agent gets the same brief a generic one would.
+
 **Companion files.** Prefer `references/` for material only some runs need. Skill-root `.md` companions (one level deep from `SKILL.md`) are allowed for formats, setup seeds, and short branch docs that every related path may open: e.g. `setup/issue-tracker.md`, `teach/MISSION-FORMAT.md`, `prototype/LOGIC.md`. Do not nest companions more than one level below `SKILL.md`.
 
 ### 3. `SKILL.md` format

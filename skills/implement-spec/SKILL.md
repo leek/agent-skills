@@ -54,7 +54,7 @@ For each frontier ticket, up to the concurrency limit (default 4: each one runs 
      >> "$(git rev-parse --path-format=absolute --git-common-dir)/scratch-databases"
    ```
 
-3. **Implementer subagent**, in the background where the harness allows (Claude Code: subagents run in the background by default and wake you on completion; pass `run_in_background: true` where the Agent tool offers it; give each a `name` of `<slug>--<NN>` so you can address it later; elsewhere, any sub-agent the harness offers). Its brief gives pointers (worktree path, ticket path, the spec's Build Contract, direct blockers' reports from step 4, the notes directory) and these rules:
+3. **Implementer subagent**, in the background where the harness allows (Claude Code: subagents run in the background by default and wake you on completion; pass `run_in_background: true` where the Agent tool offers it; give each a `name` of `<slug>--<NN>` so you can address it later; Codex: `spawn_agent`, keeping each returned agent id against `<slug>--<NN>`, and `wait_agent` to collect reports; elsewhere, any sub-agent the harness offers). Its brief gives pointers (worktree path, ticket path, the spec's Build Contract, direct blockers' reports from step 4, the notes directory) and these rules:
    - Work only in that worktree (enter it with `EnterWorktree({path})` where available, otherwise use absolute paths into it). Confirm `git merge-base --is-ancestor <integration tip> HEAD` before starting.
    - Choose seams with the `tdd` skill's **Seams: where tests go** rules and state them; then call the Skill tool with `tdd` and build the ticket test-first. Focused tests and configured static analysis end green.
    - Format touched paths with the repo's configured formatter, commit by explicit path. Never touch `.scratch/`, never push, never write another branch.
@@ -65,7 +65,7 @@ Then end the turn and let completion notifications wake you; never poll.
 
 ### 4. Merge as each implementer lands
 
-In the integration checkout: `git merge --no-ff <slug>--<NN>`. On a conflict, call the Skill tool with `resolving-merge-conflicts`. Rerun that ticket's focused tests on the integration branch. A failure goes back to the same implementer with the output, so it keeps its worktree and ticket context (`SendMessage` to its name where available; otherwise brief a fresh implementer with the worktree path, the ticket, and the failure output); a ticket that reports itself blocked is released (clear `claimed-by`), and its dependents stay out of this run.
+In the integration checkout: `git merge --no-ff <slug>--<NN>`. On a conflict, call the Skill tool with `resolving-merge-conflicts`. Rerun that ticket's focused tests on the integration branch. A failure goes back to the same implementer with the output, so it keeps its worktree and ticket context (`SendMessage` to its name in Claude Code, `followup_task` to its agent in Codex; otherwise brief a fresh implementer with the worktree path, the ticket, and the failure output); a ticket that reports itself blocked is released (clear `claimed-by`), and its dependents stay out of this run.
 
 Keep each implementer's report in `$notes/<NN>.md`: it feeds dependents' briefs and the ticket's `Resolution`. A merged ticket counts as done for its dependents' `blocked-by`, so recompute the frontier and dispatch what it unblocked (step 3).
 
@@ -73,7 +73,7 @@ Finish when every in-scope ticket is merged or released, and no implementer is r
 
 ### 5. Review once, over the whole branch
 
-Call the Skill tool with `code-review` against `base_sha` on the integration branch, scoped to every path the run touched. Hand all actionable findings to **one** implementer subagent working in the integration checkout, through `tdd`, named `<slug>--fix` so later rounds reach it by `SendMessage` where available (otherwise brief a fresh one with the integration checkout path and the findings); re-run `code-review` after its fix commit. Finish when review reports nothing actionable.
+Call the Skill tool with `code-review` against `base_sha` on the integration branch, scoped to every path the run touched. Hand all actionable findings to **one** implementer subagent working in the integration checkout, through `tdd`, named `<slug>--fix` so later rounds reach it by `SendMessage` in Claude Code or `followup_task` in Codex (otherwise brief a fresh one with the integration checkout path and the findings); re-run `code-review` after its fix commit. Finish when review reports nothing actionable.
 
 ### 6. Final checks and verification
 
@@ -89,7 +89,7 @@ List what the run created: implementer worktrees, their `<slug>--<NN>` branches 
 
 ## Stopping mid-run
 
-Merge what has landed. Ask which running implementers to cancel (`AskUserQuestion` with `multiSelect: true` where available, one option per name; otherwise in chat); stop each chosen one with `TaskStop({task_id: <name>})` where available and release its ticket (clear `claimed-by`), keeping its worktree and branch. Where nothing can stop them, leave them running. Running implementers keep their claims. Report per ticket: merged, in flight (worktree path), stopped (worktree path), released, or not started. A re-run on the same spec resumes: a `<slug>--<NN>` branch with a report in `$notes/<NN>.md` is merged first instead of rebuilt; one without (a stopped implementer) goes to a fresh implementer briefed to finish it in its worktree.
+Merge what has landed. Ask which running implementers to cancel (`AskUserQuestion` with `multiSelect: true` where available, one option per name; otherwise in chat); stop each chosen one with `TaskStop({task_id: <name>})` in Claude Code or `interrupt_agent` in Codex, and release its ticket (clear `claimed-by`), keeping its worktree and branch. Where nothing can stop them, leave them running. Running implementers keep their claims. Report per ticket: merged, in flight (worktree path), stopped (worktree path), released, or not started. A re-run on the same spec resumes: a `<slug>--<NN>` branch with a report in `$notes/<NN>.md` is merged first instead of rebuilt; one without (a stopped implementer) goes to a fresh implementer briefed to finish it in its worktree.
 
 ## When you're done
 

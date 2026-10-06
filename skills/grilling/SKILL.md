@@ -95,7 +95,9 @@ Where `AskUserQuestion` is available, use it: decisions become click-to-answer:
 - `multiSelect: true` only when options legitimately stack.
 - When the options are artifacts to compare side by side (a signature, a schema, a payload, a screen layout), put each one's snippet or ASCII mockup in that option's `preview`. `preview` works only on a single-select question.
 
-Without the tool, ask the same shape in chat (numbered options, recommendation first, trade-off per line, and under each option the fenced block its `preview` would hold) and wait for the answer. Never print fake tool JSON.
+In Codex, when `request_user_input` is listed for the turn, ask through it with the same shape (recommendation first, 2–4 real options); it has no `preview`, so put a short snippet in the option description or fall back to chat for side-by-side artifacts.
+
+Without either tool, ask the same shape in chat (numbered options, recommendation first, trade-off per line, and under each option the fenced block its `preview` would hold) and wait for the answer. Never print fake tool JSON.
 
 A rejected question did not land. Ask the same decision again once, rewritten: the situation first, fewer terms, and each option stated as what will happen. If the user rejects that too, take the recommended option, record it as `implied`, and move on.
 
