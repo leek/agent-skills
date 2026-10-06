@@ -14,7 +14,9 @@ This repo also doubles as a [Claude Code plugin marketplace](https://docs.claude
 .claude-plugin/marketplace.json   # Claude Code plugin manifest
 skills/<skill-name>/SKILL.md      # one folder per skill
 agents/<agent-name>.md            # Claude Code subagents the skills dispatch (see Subagents)
-hooks/hooks.json                  # Claude Code plugin hooks, each keyed to its agent types (see Subagents)
+hooks/hooks.json                  # Claude Code plugin hooks, each keyed to its agent types (see Subagents), plus the mod module (see Mods)
+hooks/mods/register.tsx           # the plugin's one Claude Code mod module, pure helpers and tests beside it (see Mods)
+types/index.d.ts                  # the mod's $.state contract
 hooks/*.py                        # guard scripts shared by more than one skill, with their tests
 template/SKILL.md.example         # starting point; renamed so installers do not treat it as a real skill
 ```
@@ -56,7 +58,9 @@ policy:
   allow_implicit_invocation: false   # must be the inverse of disable-model-invocation
 ```
 
-CI fails if a skill is missing the file or the two disagree. Keep the skill bodies themselves harness-neutral: name a specific tool only with a stated fallback ("`AskUserQuestion` where available, otherwise ask in chat"), since an instruction naming a tool the running harness lacks is unfollowable, not merely unused.
+CI fails if a skill is missing the file or the two disagree.
+
+**Use what the harness offers; degrade gracefully.** Every skill must *run* in any harness, but that is a floor, not a ceiling: never drop a harness-specific feature (a Claude Code subagent, mod, hook, or tool) just because other harnesses lack it. Name it with a stated fallback ("`AskUserQuestion` where available, otherwise ask in chat"), since an instruction naming a tool the running harness lacks is unfollowable, not merely unused. The fallback is the complete path; the feature is the better one.
 
 **Companion files.** Prefer `references/` for material only some runs need. Skill-root `.md` companions (one level deep from `SKILL.md`) are allowed for formats, setup seeds, and short branch docs that every related path may open: e.g. `setup/issue-tracker.md`, `teach/MISSION-FORMAT.md`, `prototype/LOGIC.md`. Do not nest companions more than one level below `SKILL.md`.
 
@@ -119,13 +123,22 @@ Add a short section to `README.md` under **Available Skills**.
 
 Rules:
 
-- **Skills stay the source of truth and stay harness-neutral.** A skill names its agent as the Claude Code branch of an existing "if the harness has sub-agents … otherwise inline" sentence, never as the only path. The verifier fails a skill that names an agent without a fallback clause.
+- **Skills stay the source of truth and degrade gracefully.** A skill names its agent as the Claude Code branch of an existing "if the harness has sub-agents … otherwise inline" sentence, never as the only path. The verifier fails a skill that names an agent without a fallback clause.
 - **Agents carry no procedure of their own.** An agent body states its role, its standing rules (read-only, output shape), and how to use its memory; the brief it receives from the skill is the task. The exception is a skill with `context: fork`, whose SKILL.md body *is* the prompt: keep that body an actionable task, not guidelines.
 - **Reference by scoped name** (`leek-skills:module-designer`), both in `subagent_type` and in a skill's `agent:` field. Preloaded skills are scoped too (`skills: [leek-skills:codebase-design]`), and only model-invoked skills can be preloaded.
 - **`tools:` takes bare tool names**, not permission patterns; scope Bash with the skill's `allowed-tools` instead. Plugin agents cannot set `hooks`, `mcpServers`, or `permissionMode`. A guard an agent needs goes in the plugin's `hooks/hooks.json`, and its script exits 0 unless the hook input's `agent_type` names that agent (verified: the main session sends no `agent_type`, a plugin agent sends `leek-skills:<name>`). The hook runs on every matching tool call in every session, so the non-matching path must stay instant. Two exist: `browser-test`'s guard, and `hooks/guard-review-agents.py`, which holds `finding-verifier` and `pr-reviewer` to read-only commands because both read untrusted review text. Both are Python, not bash, because they parse shell words.
 - **Extra frontmatter is safe** (verified: Codex's `SkillFrontmatter` has no `deny_unknown_fields`, `npx skills` copies SKILL.md verbatim, Grok reads Claude skills as-is). `context: fork` therefore changes only Claude Code, where the body runs in the named agent with `$ARGUMENTS` but without the conversation.
 - **`.claude-plugin/plugin.json` pins the plugin name** so agents namespace as `leek-skills:` under `--plugin-dir` as well as a marketplace install; the version stays in `marketplace.json` only.
 - `memory: project` writes under the *target* repo's `.claude/`; say so in the skill when the agent uses it.
+
+## Mods (`hooks/mods/`)
+
+A [mod](https://code.claude.com/docs/en/plugins/mods/overview) is TypeScript that runs inside Claude Code (terminal and Desktop Code tab): panes, the band above the prompt, instant `/commands`, and observation of tool calls, turns, and subagent spawns. `hooks/hooks.json` names the one module under `modules`; other harnesses never load it.
+
+- **Polish over a skill that already works.** A mod shows or speeds up what a skill does; it never holds the only copy of a rule or a step. `/scratch` is the live, turn-free view of `scratch-status`, which still owns the commit checks; the workers band shows the subagents a fan-out skill dispatched, which still reports their results in chat. Where nothing draws (VS Code chat, `claude -p`), a command answers with text.
+- **One module, every `$` in it.** The engine never follows `$` across an import, so every hook lives in `hooks/mods/register.tsx`; imported files are pure (`scratch-scan.ts`, `workers-model.ts`) and carry the logic worth testing. One `tool.call` hook per module: features share it.
+- **Observers never block.** A hook on a gating event (`tool.call`, `agent.spawn`, `prompt.submit`, `ui.close`) ends with `.catch(($, e, next) => next(e))`, so a mod failure lets the event through.
+- **Check before committing:** `claude plugin validate .` and `claude plugin test .` (tests are `hooks/mods/*.test.ts[x]`). CI has no `claude` CLI and only checks that the module path exists. State keys live in `types/index.d.ts`, named in `.claude-plugin/plugin.json` as `types`.
 
 ## Worktrees
 

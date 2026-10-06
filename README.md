@@ -78,6 +78,15 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 
 Installing the plugin also loads the subagents in [`agents/`](./agents) as `leek-skills:<name>`. The skills dispatch them where they already fan out work: `code-review` → `standards-reviewer` + `spec-reviewer`, `codebase-design` (design-it-twice) → `module-designer`, `improve-codebase-architecture` → `deepening-scout`, `retro` → `session-miner`, `panel` → `panelist`, `browser-test` → `browser-test-planner` + `browser-tester` + `browser-writer`, `chatter-scout` → `chatter-sweeper` + `chatter-verifier`, `code-smells-audit` → `smell-sweeper`, `fix-github-issues` + `triage-github-pr` → `finding-verifier`, `triage-github-pr` → `pr-reviewer`; `research` and `dependency-audit` fork into `researcher` and `dependency-auditor`. The one plugin hook, [`hooks/hooks.json`](./hooks/hooks.json), guards `browser-tester` and `browser-test-planner` so they can only run read-only browser commands. Other harnesses ignore the directory and the skills fall back to inline or generic sub-agents, as before. Conventions in [`AGENTS.md`](./AGENTS.md#subagents-agents).
 
+## Mods (Claude Code)
+
+The plugin also ships a [mod](https://code.claude.com/docs/en/plugins/mods/overview) ([`hooks/mods/`](./hooks/mods)), which loads with the plugin in the Claude Code terminal and Desktop Code tab:
+
+- **`/scratch [effort]`**: a live pane of every `.scratch/` effort (open tickets, blockers, claims, staleness, next command), opened instantly, even mid-turn, and refreshed whenever a tool writes under `.scratch/`. `scratch-status` adds the commit checks.
+- **Workers band**: above the prompt, every subagent a fan-out skill dispatched (`implement-spec`, `autopilot`, `browser-test`, `panel`, `chatter-scout`, `code-review`, ...), with its tool count, latest tool, elapsed time, and outcome.
+
+Other harnesses, and Claude Code surfaces that don't draw, run the same skills without it.
+
 ## Installation
 
 ### `npx skills` (any agent)

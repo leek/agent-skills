@@ -15,6 +15,8 @@ the full sweep (filing research, removing done efforts, judging contradictions),
 
 `$ARGUMENTS` is an effort slug to scope to `.scratch/<slug>/` alone; empty means every effort.
 
+In Claude Code with the leek-skills plugin, `/scratch` shows steps 1–2 live in a pane without a turn; point the user at it for a quick look. Everywhere else, and for the commit checks, run the steps below.
+
 ## 1. Inventory
 
 Read the tracker layout from `.agents/issue-tracker.md` (fallback `docs/agents/issue-tracker.md`,

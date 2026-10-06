@@ -149,13 +149,14 @@ check "skills naming an agent keep a non-Claude fallback" \
     done'
 
 # 12. Plugin hooks: valid JSON, every script they run exists, the browser-test and review-agent guards hold
-check "hooks.json is valid and every script it runs exists" \
+check "hooks.json is valid and every script and mod module it names exists" \
   python3 -c '
 import json, os, re, sys
 h = json.load(open("hooks/hooks.json"))
 cmds = [k["command"] for gs in h["hooks"].values() for g in gs for k in g["hooks"]]
 missing = [p for c in cmds for p in re.findall(r"\$\{CLAUDE_PLUGIN_ROOT\}/([^\"\s]+)", c) if not os.path.isfile(p)]
-sys.exit(f"hooks.json runs missing scripts: {missing}" if missing else 0)
+missing += [m for m in h.get("modules", []) if not os.path.isfile(os.path.join("hooks", m))]
+sys.exit(f"hooks.json names missing files: {missing}" if missing else 0)
 '
 check "browser-test guard tests pass" \
   python3 -m unittest -q skills/browser-test/scripts/test_guard_browser.py

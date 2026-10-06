@@ -4,5 +4,6 @@
   "author": {
     "name": "leek",
     "email": "leeked@gmail.com"
-  }
+  },
+  "types": "./types/index.d.ts"
 }
