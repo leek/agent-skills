@@ -79,6 +79,11 @@ For each one:
    paraphrase the specific sentence of the card's definition the code
    satisfies; that citation becomes the finding's qualification rationale.
    If no sentence of the definition fits, the candidate fails.
+   For a smell that turns on references (Dead Code, Lazy Element, Middle Man,
+   Feature Envy, Shotgun Surgery, Speculative Generality), count the call sites
+   rather than eyeball them: with a language server (in Claude Code, the `LSP`
+   tool's `findReferences` / `incomingCalls`), otherwise `rg` for the symbol,
+   and say in the rationale that the count is approximate.
 4. Drop candidates that fail the definition, **even if the code is ugly**, 
    taste is not a criterion, the card is. Dropped candidates never appear in
    the report; keep only a count of them for the report header.

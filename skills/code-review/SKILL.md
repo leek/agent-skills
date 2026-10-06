@@ -93,6 +93,8 @@ If the spec is missing, skip the Spec axis and note this in the final report.
 
 Present the reports under `## Correctness`, `## Standards` and `## Spec` headings, verbatim or lightly cleaned. Do **not** merge or rerank findings; the axes are deliberately separate (see _Why three axes_).
 
+Invoked standalone, report the findings through the host's findings list where it offers one (in Claude Code, one `ReportFindings` call holding all three axes, `category` set to the axis, axes in the order above and most severe first _within_ each axis; a judgement-call smell is `PLAUSIBLE`), and then print only the summary line below; otherwise print the three headed sections. Invoked by another skill, always print the sections.
+
 End with a one-line summary: total findings per axis, and the worst issue _within each axis_ (if any). Don't pick a single winner across axes, that's the reranking the separation exists to prevent.
 
 ## Why three axes

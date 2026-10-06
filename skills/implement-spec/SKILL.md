@@ -47,15 +47,15 @@ Make a notes directory outside every worktree: `notes="$(git rev-parse --path-fo
 For each frontier ticket, up to the concurrency limit (default 4: each one runs a test suite):
 
 1. **Claim** it in the integration checkout per the tracker's Claim operation, with `claimed-by: implement-spec-<slug>-<run id>`. Only you write `.scratch/`; claims stay uncommitted until step 7.
-2. **Worktree.** `git worktree add -b <slug>--<NN> .claude/worktrees/<slug>--<NN> <integration tip>`, then make it runnable (install dependencies, copy local env config) the way the project's docs say, or as the stack reference says. When the tests need a real database, give it its own (`<app db>_spec_<slug>_<NN>`, never a name the main checkout's env or test config uses) and register it the moment you create it:
+2. **Worktree.** `git worktree add -b <slug>--<NN> <main checkout>/.claude/worktrees/<slug>--<NN> <integration tip>` (the main checkout's `.claude/worktrees/`, never one inside the integration worktree), then make it runnable (install dependencies, copy local env config) the way the project's docs say, or as the stack reference says. When the tests need a real database, give it its own (`<app db>_spec_<slug>_<NN>`, never a name the main checkout's env or test config uses) and register it the moment you create it:
 
    ```bash
    printf '%s\t%s\t%s\t%s\n' "$(date +%s)" <pgsql|mysql> <database> "<worktree path>" \
      >> "$(git rev-parse --path-format=absolute --git-common-dir)/scratch-databases"
    ```
 
-3. **Implementer subagent**, in the background where the harness allows (Claude Code: the Agent tool with `run_in_background: true`; elsewhere, any sub-agent the harness offers). Its brief gives pointers (worktree path, ticket path, the spec's Build Contract, direct blockers' reports from step 4, the notes directory) and these rules:
-   - Work only in that worktree. Confirm `git merge-base --is-ancestor <integration tip> HEAD` before starting.
+3. **Implementer subagent**, in the background where the harness allows (Claude Code: subagents run in the background by default and wake you on completion; pass `run_in_background: true` where the Agent tool offers it; give each a `name` of `<slug>--<NN>` so you can address it later; elsewhere, any sub-agent the harness offers). Its brief gives pointers (worktree path, ticket path, the spec's Build Contract, direct blockers' reports from step 4, the notes directory) and these rules:
+   - Work only in that worktree (enter it with `EnterWorktree({path})` where available, otherwise use absolute paths into it). Confirm `git merge-base --is-ancestor <integration tip> HEAD` before starting.
    - Choose seams with the `tdd` skill's **Seams: where tests go** rules and state them; then call the Skill tool with `tdd` and build the ticket test-first. Focused tests and configured static analysis end green.
    - Format touched paths with the repo's configured formatter, commit by explicit path. Never touch `.scratch/`, never push, never write another branch.
    - Before reporting, merge the current integration tip into the branch and rerun the focused tests.
@@ -65,7 +65,7 @@ Then end the turn and let completion notifications wake you; never poll.
 
 ### 4. Merge as each implementer lands
 
-In the integration checkout: `git merge --no-ff <slug>--<NN>`. On a conflict, call the Skill tool with `resolving-merge-conflicts`. Rerun that ticket's focused tests on the integration branch. A failure goes back to an implementer with the output; a ticket that reports itself blocked is released (clear `claimed-by`), and its dependents stay out of this run.
+In the integration checkout: `git merge --no-ff <slug>--<NN>`. On a conflict, call the Skill tool with `resolving-merge-conflicts`. Rerun that ticket's focused tests on the integration branch. A failure goes back to the same implementer with the output, so it keeps its worktree and ticket context (`SendMessage` to its name where available; otherwise brief a fresh implementer with the worktree path, the ticket, and the failure output); a ticket that reports itself blocked is released (clear `claimed-by`), and its dependents stay out of this run.
 
 Keep each implementer's report in `$notes/<NN>.md`: it feeds dependents' briefs and the ticket's `Resolution`. A merged ticket counts as done for its dependents' `blocked-by`, so recompute the frontier and dispatch what it unblocked (step 3).
 
@@ -73,7 +73,7 @@ Finish when every in-scope ticket is merged or released, and no implementer is r
 
 ### 5. Review once, over the whole branch
 
-Call the Skill tool with `code-review` against `base_sha` on the integration branch, scoped to every path the run touched. Hand all actionable findings to **one** implementer subagent working in the integration checkout, through `tdd`; re-run `code-review` after its fix commit. Finish when review reports nothing actionable.
+Call the Skill tool with `code-review` against `base_sha` on the integration branch, scoped to every path the run touched. Hand all actionable findings to **one** implementer subagent working in the integration checkout, through `tdd`, named `<slug>--fix` so later rounds reach it by `SendMessage` where available (otherwise brief a fresh one with the integration checkout path and the findings); re-run `code-review` after its fix commit. Finish when review reports nothing actionable.
 
 ### 6. Final checks and verification
 
@@ -85,11 +85,11 @@ For each verified ticket: append `## Resolution` (what was built, deviations, ve
 
 ### 8. Clean up
 
-List what the run created: implementer worktrees, their `<slug>--<NN>` branches (all merged), registered databases. Ask one yes/no question before removing any of it. On yes: `git worktree remove <path>` (no `--force`; a refusal means unsaved work, so report it), `git branch -d <branch>`, drop each database and its parallel-testing copies (`<database>_test_<N>`), and delete its `scratch-databases` line. Keep the integration worktree: it holds the PR branch. Anything kept is `repository-cleanup`'s job later.
+List what the run created: implementer worktrees, their `<slug>--<NN>` branches (all merged), registered databases. Ask once what to remove (`AskUserQuestion` where available: a `multiSelect: true` question, one option per kind created, *Worktrees and branches* and *Databases*, each naming its items, nothing pre-ticked, or a yes/no when only one kind exists; otherwise a plain yes/no question in chat). Remove only what the answer selects: `git worktree remove <path>` (no `--force`; a refusal means unsaved work, so report it), `git branch -d <branch>`, drop each database and its parallel-testing copies (`<database>_test_<N>`), and delete its `scratch-databases` line. Keep the integration worktree: it holds the PR branch (leave it with `ExitWorktree({action: "keep"})` if you entered it). Anything kept is `repository-cleanup`'s job later.
 
 ## Stopping mid-run
 
-Merge what has landed, leave running implementers' claims in place, and report per ticket: merged, in flight (worktree path), released, or not started. A re-run on the same spec resumes: a ticket whose `<slug>--<NN>` branch exists is merged first instead of rebuilt.
+Merge what has landed. Ask which running implementers to cancel (`AskUserQuestion` with `multiSelect: true` where available, one option per name; otherwise in chat); stop each chosen one with `TaskStop({task_id: <name>})` where available and release its ticket (clear `claimed-by`), keeping its worktree and branch. Where nothing can stop them, leave them running. Running implementers keep their claims. Report per ticket: merged, in flight (worktree path), stopped (worktree path), released, or not started. A re-run on the same spec resumes: a `<slug>--<NN>` branch with a report in `$notes/<NN>.md` is merged first instead of rebuilt; one without (a stopped implementer) goes to a fresh implementer briefed to finish it in its worktree.
 
 ## When you're done
 

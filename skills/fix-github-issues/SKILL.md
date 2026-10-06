@@ -103,9 +103,10 @@ with a green test where it needs one, and every unfixable one is named.
 
 An issue closes only when its `fixes #NNN` commit reaches `<default>`, so a local
 commit fixes nothing yet. Show the user the commits and the issues each one closes,
-then ask once: push to `<default>`, open a pull request, or keep them local. Act only on
-the answer. Offer a pull request first when branch protection or the repo's rules
-forbid direct pushes. The commands are in [Land](references/mechanics.md#land).
+then ask once, as one single-select question (via `AskUserQuestion` where available,
+otherwise a plain question in chat): push to `<default>`, open a pull request, or keep
+them local. Act only on the answer. Offer a pull request first when branch protection or
+the repo's rules forbid direct pushes. The commands are in [Land](references/mechanics.md#land).
 
 Completion criterion: the commits are on `<default>`, in an open pull request, or kept
 local by the user's choice.
@@ -136,9 +137,12 @@ agrees with it.
 ## 6. Ask once, then clean up
 
 Remove nothing before this step. List every worktree and database you created and ask
-one yes/no question: "Can I delete everything I created for these issues?" On yes,
-remove them all ([Clean up](references/mechanics.md#clean-up)). On no, remove nothing;
-an answer that names items to keep keeps those. A worktree whose fixes are not on
+the user to pick what to delete (`AskUserQuestion` where available: a `multiSelect: true`
+question with one option per item, nothing pre-ticked, at most 4 per question and further
+questions for the rest; otherwise a plain question in chat: "Can I delete everything I
+created for these issues?"). Remove only what the answer selects
+([Clean up](references/mechanics.md#clean-up)); an answer that names no item removes
+nothing, and one that names items to keep keeps those. A worktree whose fixes are not on
 `<default>` yet is not on the list. What stays stays registered, for
 `repository-cleanup`. Skip the question when you created nothing.
 

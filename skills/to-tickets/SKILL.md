@@ -49,7 +49,7 @@ When even batches can't stay green alone, keep the sequence but share an integra
 
 Present the finished breakdown as a numbered list: per ticket: **Title**, **Blocked by**, **What it delivers** (the end-to-end behavior it makes work).
 
-Then ask **exactly one** question, because step 5 writes a file per ticket and renumbering them afterwards isn't cheap: publish as listed (recommended) / adjust first, say what. Make whatever the user names, reprint the list, and don't reopen the parts they left alone.
+Then ask **exactly one** question, because step 5 writes a file per ticket and renumbering them afterwards isn't cheap: publish as listed (recommended) / adjust first, say what (via `AskUserQuestion` where available, with the numbered breakdown in the **Publish as listed** option's `preview`; otherwise a plain question in chat). Make whatever the user names, reprint the list, and don't reopen the parts they left alone.
 
 ### 5. Publish
 

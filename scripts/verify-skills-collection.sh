@@ -162,6 +162,14 @@ check "browser-test guard tests pass" \
   python3 -m unittest -q skills/browser-test/scripts/test_guard_browser.py
 check "review-agent guard tests pass" \
   python3 -m unittest -q hooks/test_guard_review_agents.py
+check "bare-worktree notice speaks only in a bare Laravel worktree" \
+  bash -c '
+    t=$(mktemp -d); trap "rm -rf \"$t\"" EXIT
+    mkdir -p "$t/main/.git" "$t/wt"; echo "gitdir: x" > "$t/wt/.git"
+    touch "$t/main/artisan" "$t/main/composer.json" "$t/wt/artisan" "$t/wt/composer.json"
+    run() { CLAUDE_PROJECT_DIR="$1" bash hooks/bare-worktree-notice.sh </dev/null; }
+    test -z "$(run "$t/main")" && test -n "$(run "$t/wt")" || exit 1
+    mkdir "$t/wt/vendor"; test -z "$(run "$t/wt")"'
 
 if [[ "$fail" -ne 0 ]]; then
   echo "verify-skills-collection: FAILED" >&2

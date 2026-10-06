@@ -79,7 +79,7 @@ Site uses 8.1; sibling worktrees keep their isolated or default version. `herd i
 
 ## Bootstrap a bare worktree
 
-A worktree made with plain `git worktree add` (the PR, issue, and CI recipes in other skills, at `.claude/worktrees/<name>`) has no `vendor/`, `node_modules/`, or `.env`. Make it runnable from inside the worktree, with `main` set to the main checkout (`git worktree list --porcelain | sed -n '1s/^worktree //p'`):
+A worktree made with plain `git worktree add` (the PR, issue, and CI recipes in other skills, at `.claude/worktrees/<name>`) has no `vendor/`, `node_modules/`, or `.env`; nor does one the harness made (`claude --worktree`, a subagent with `isolation: worktree`). With the leek-skills plugin in Claude Code, a session that opens in such a worktree is told so at start; elsewhere, check for `vendor/` yourself before running anything. Make it runnable from inside the worktree, with `main` set to the main checkout (`git worktree list --porcelain | sed -n '1s/^worktree //p'`):
 
 1. **Dependencies.** `cp -Rc "$main/vendor" vendor` (an APFS clone: instant, no extra disk), then `composer install` so it matches this branch's lock. Do the same for `node_modules` when the run builds assets. Each tree owns a real copy: Composer's autoloader resolves `app/` and `tests/` relative to `vendor/`, so a symlinked `vendor/` makes Pest run the main checkout's code.
 2. **Environment.** Copy `.env` (and `.env.testing` when present) from `$main`. When the calling skill gives the run its own database, set `DB_DATABASE` to that name in both.

@@ -36,7 +36,7 @@ When the model is being prototyped for a Laravel codebase, write the module in p
 
 ### 3. Build the shareable HTML file
 
-One file, plain HTML/CSS/JS: no framework, no bundler, no server, everything inline so it opens by double-click and survives being emailed around.
+One file, plain HTML/CSS/JS: no framework, no bundler, no server, everything inline so it opens by double-click and survives being emailed around. Where the harness can publish a page (in Claude Code, the Artifact tool), load the `artifact-design` skill before writing it, so the same file also meets the page contract when published.
 
 Write it for a non-developer. Every label is in **domain language**, not code: buttons and state read like the business, not the reducer. Explain in plain words what's happening.
 
@@ -53,7 +53,7 @@ Keep it beautiful but restrained: clean typography, generous spacing, one accent
 
 ### 4. Hand it over
 
-Send them the file, or open it for them. They'll click through the walkthroughs and free-play whenever they get to it; the interesting moments are when they say "wait, that shouldn't be possible" or "huh, I assumed X would be different"; those are the bugs in the _idea_, which is the whole point. If they want new actions or a new scenario, add them. Prototypes evolve.
+Where the harness can publish a page, publish the file as a private page and give the user the link to pass on (sharing it is their call); the recipient's reactions can come back as comments on the page, which you read with `ArtifactComments`. Otherwise send them the file, or open it for them. They'll click through the walkthroughs and free-play whenever they get to it; the interesting moments are when they say "wait, that shouldn't be possible" or "huh, I assumed X would be different"; those are the bugs in the _idea_, which is the whole point. If they want new actions or a new scenario, add them. Prototypes evolve.
 
 ### 5. Capture the answer and the prototype
 
@@ -65,5 +65,5 @@ Once the prototype has answered its question, capture the answer, then capture t
 - **Don't wire it to the real database.** Use in-memory state unless the question is specifically about persistence.
 - **Don't generalise.** No "what if we wanted to support X later." The prototype answers one question.
 - **Don't blur the logic and the page together.** If the pure module references the DOM, `document`, or button handlers, it's no longer liftable. Keep the page as a thin shell over a pure module.
-- **Don't reach for a framework, bundler, or server.** One file the recipient double-clicks; a React app or a dev server defeats "shareable".
+- **Don't reach for a framework, bundler, or server.** One file the recipient double-clicks or opens from a link; a React app or a dev server defeats "shareable".
 - **Don't ship the HTML shell into production.** The page is optimised for being clicked through by hand. The logic module behind it is the bit worth keeping.

@@ -1,6 +1,8 @@
 # HTML Report Format
 
-The architectural review is rendered as a single self-contained HTML file in the OS temp directory. Tailwind and Mermaid both come from CDNs. Mermaid handles graph-shaped diagrams reliably; hand-built divs and inline SVG handle the more editorial visuals (mass diagrams, cross-sections). Mix the two: don't lean on Mermaid for everything, it'll start to look generic.
+The architectural review is rendered as a single self-contained HTML file outside the repo. Tailwind and Mermaid both come from CDNs.
+
+The same file serves both delivery paths (a published private page, or a local file opened in the browser), so it always meets the page contract: a `<title>` of 2–4 words, every colour a token on `:root` with a dark-mode block, an explicit `body` background, and a layout that works at phone width (16px gutter, no horizontal scroll; before/after columns stack below `md`). The scaffold below already does all four; keep them when you extend it. Mermaid handles graph-shaped diagrams reliably; hand-built divs and inline SVG handle the more editorial visuals (mass diagrams, cross-sections). Mix the two: don't lean on Mermaid for everything, it'll start to look generic.
 
 ## Scaffold
 
@@ -9,22 +11,44 @@ The architectural review is rendered as a single self-contained HTML file in the
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Architecture review, {{repo name}}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{Repo}} architecture review</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module">
       import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
-      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+      const dark = getComputedStyle(document.documentElement).getPropertyValue("--scheme").trim() === "dark";
+      mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral", securityLevel: "loose" });
     </script>
     <style>
+      :root {
+        --scheme: light;
+        --bg: #fafaf9; --surface: #ffffff; --text: #0f172a; --muted: #64748b; --border: #e2e8f0;
+        --accent: #059669; --leak: #dc2626; --warn: #d97706; --deep-from: #0f172a; --deep-to: #1e293b;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --scheme: dark;
+          --bg: #0c0a09; --surface: #1c1917; --text: #f1f5f9; --muted: #94a3b8; --border: #334155;
+          --accent: #34d399; --leak: #f87171; --warn: #fbbf24; --deep-from: #334155; --deep-to: #475569;
+        }
+      }
+      :root[data-theme="dark"] {
+        --scheme: dark;
+        --bg: #0c0a09; --surface: #1c1917; --text: #f1f5f9; --muted: #94a3b8; --border: #334155;
+        --accent: #34d399; --leak: #f87171; --warn: #fbbf24; --deep-from: #334155; --deep-to: #475569;
+      }
+      body { background: var(--bg); color: var(--text); }
+      .card { background: var(--surface); border: 1px solid var(--border); }
+      .muted { color: var(--muted); }
       /* small custom layer for things Tailwind doesn't cover cleanly:
          dashed seam lines, hand-drawn-feeling arrow heads, etc. */
       .seam { stroke-dasharray: 4 4; }
-      .leak { stroke: #dc2626; }
-      .deep { background: linear-gradient(135deg, #0f172a, #1e293b); }
+      .leak { stroke: var(--leak); }
+      .deep { background: linear-gradient(135deg, var(--deep-from), var(--deep-to)); }
     </style>
   </head>
-  <body class="bg-stone-50 text-slate-900 font-sans">
-    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+  <body class="font-sans">
+    <main class="max-w-5xl mx-auto px-4 md:px-6 py-12 space-y-12">
       <header>...</header>
       <section id="candidates" class="space-y-10">...</section>
       <section id="top-recommendation">...</section>
@@ -46,7 +70,7 @@ Each candidate is one `<article>`:
 - **Title**: short, names the deepening (e.g. "Collapse the Order intake pipeline").
 - **Badge row**: recommendation strength (`Strong` = emerald, `Worth exploring` = amber, `Speculative` = slate), plus a tag for the dependency category (`in-process`, `local-substitutable`, `ports & adapters`, `mock`).
 - **Files**: monospaced list, `font-mono text-sm`.
-- **Before / After diagram**: the centrepiece. Two columns, side by side. See patterns below.
+- **Before / After diagram**: the centrepiece. Two columns, side by side (`grid md:grid-cols-2`, so they stack on a phone). See patterns below.
 - **Problem**: one sentence. What hurts.
 - **Solution**: one sentence. What changes.
 - **Wins**: bullets, ≤6 words each. e.g. "Tests hit one interface", "Pricing logic stops leaking", "Delete 4 shallow wrappers".
@@ -63,7 +87,7 @@ Pick the pattern that fits the candidate. Mix them. Don't make every diagram loo
 Use a Mermaid `flowchart` or `graph` when the point is "X calls Y calls Z, and look at the mess." Wrap it in a Tailwind-styled card so it doesn't feel parachuted in. Style with classDef to colour leakage edges red and the deep module dark. Sequence diagrams work well for "before: 6 round-trips; after: 1."
 
 ```html
-<div class="rounded-lg border border-slate-200 bg-white p-4">
+<div class="card rounded-lg p-4">
   <pre class="mermaid">
     flowchart LR
       A[OrderHandler] --> B[OrderValidator]
@@ -94,7 +118,7 @@ Before: a tree of function calls rendered as nested boxes. After: the same tree 
 ## Style guidance
 
 - Lean editorial, not corporate-dashboard. Generous whitespace. Serif optional for headings (`font-serif` works well with stone/slate).
-- Colour sparingly: one accent (emerald or indigo) plus red for leakage and amber for warnings.
+- Colour sparingly: one accent (emerald or indigo) plus red for leakage and amber for warnings, each read from a `:root` token (`var(--accent)`, `var(--leak)`, `var(--warn)`); colour from tokens rather than Tailwind colour classes is what lets dark mode follow.
 - Keep diagrams ~320px tall so before/after sits comfortably side by side without scrolling.
 - Use `text-xs uppercase tracking-wider` for module labels inside diagrams; they should read as schematic, not as UI.
 - The only scripts are the Tailwind CDN and the Mermaid ESM import. The report is otherwise static: no app code, no interactivity beyond Mermaid's own rendering.

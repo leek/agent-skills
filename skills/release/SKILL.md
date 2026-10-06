@@ -27,9 +27,11 @@ session's uncommitted work. One release, one version, one tag, one GitHub releas
    foreign ones is left out and named in the report. Skip this step when there is nothing
    of yours to commit. Done when `git status --porcelain` shows none of your files.
 3. **Choose the version.** `git log <last-tag>..HEAD --format='%h %s'`. No commits means
-   nothing to release. When step 2 left changes out as not this session's, list them and
-   ask once whether to commit them (they are often the user's own earlier work); on yes,
-   commit them as step 2 does and continue. Otherwise say so and stop. Bump from `$0` when given; otherwise from the
+   nothing to release. When step 2 left changes out as not this session's, ask once which
+   to commit (they are often the user's own earlier work): `AskUserQuestion` where
+   available, `multiSelect: true` with one option per file (at most 4 per question, further
+   questions for the rest); otherwise list them in chat and wait. Commit the picked ones as
+   step 2 does and continue. Otherwise say so and stop. Bump from `$0` when given; otherwise from the
    subjects: `!` or `BREAKING CHANGE` → major (minor while still `0.x`), any `feat` → minor,
    anything else → patch. Done when the new version is stated with the rule that chose it.
 4. **Bump the version file.** Find the one file whose version string equals the last tag:
@@ -40,12 +42,16 @@ session's uncommitted work. One release, one version, one tag, one GitHub releas
    matching the style of earlier release commits. A repo with no version file is
    versioned by its tags alone; skip the commit. Done when `HEAD` is the release commit or
    there was nothing to bump.
-5. **Tag and push.** `git tag -a <version> -m "<version>: <summary>"`, then
+5. **Tag and push.** A pushed tag cannot be taken back, so first draft the step 6 notes and
+   ask the user to confirm (`AskUserQuestion` where available: one single-select question,
+   **Tag and publish** first, its `preview` showing the version, the rule that chose the
+   bump, and the drafted notes; otherwise show the same in chat and wait). Act only on a
+   yes. Then `git tag -a <version> -m "<version>: <summary>"`, then
    `git push origin <branch> <version>` in one command. First check that the tag is free
    with `git tag -l <version>` (empty output means free); stop if it already exists. Never
    probe with a bare `git tag <version>`: that creates a lightweight tag instead of
    checking. Done when the push reports both refs.
-6. **Publish.** Write the notes from the diff, not from the subjects: one bullet per
+6. **Publish** the confirmed notes. Write the notes from the diff, not from the subjects: one bullet per
    user-visible change, grouped under `##` headings by area (the scopes in the subjects
    are a good start), the release commit itself omitted, no attribution trailers.
    `--generate-notes` alone is too thin; use it only to append the compare link.

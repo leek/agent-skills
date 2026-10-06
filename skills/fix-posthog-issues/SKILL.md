@@ -102,3 +102,14 @@ transient.
 
 Completion criterion: every issue in scope has its new status confirmed, or stays
 active with a named blocker. Report `N active → M`, with one line per cluster.
+
+## 6. Offer a deploy re-check
+
+If any issue is pending deploy verification, ask once whether to re-check it in 24–48
+hours. On yes, schedule a one-time run where the harness can (in Claude Code, the
+`schedule` skill's cloud routine; failing that, `CronCreate` with `recurring: false`,
+which fires only while this session stays open, so say so). The prompt is plain text,
+since a slash command for this skill cannot run from a schedule: "With the PostHog MCP,
+read last-seen for issues <ids>; set back to active, with a note, any seen after
+<deploy date> beyond the old-bundle tail." Otherwise, or on no, end the report with the
+issue ids and the re-check date.

@@ -2,7 +2,7 @@
 name: commit
 description: Commit the work done in this session, skipping files a parallel session also touched.
 disable-model-invocation: true
-allowed-tools: "Bash(git status *) Bash(git diff *) Bash(git add *) Bash(git commit *) Bash(git show *) Bash(git log *)"
+allowed-tools: "Bash(git status *) Bash(git diff *) Bash(git add *) Bash(git commit *) Bash(git show *) Bash(git log *) Bash(git apply --cached *)"
 model: sonnet
 effort: medium
 ---
@@ -20,14 +20,16 @@ repo at the same time; that is expected, and none of their work is yours to comm
    else, ignore it completely.
 3. **Drop the overlaps.** For each of your files, `git diff -- <path>` (`git diff --cached` too if
    it is already staged). If it contains changes you did not make, leave that file out, the other
-   session will commit it. If a file mixes your hunks with foreign hunks, stage only yours with
-   `git add -p -- <path>`; never include a foreign hunk because it is small. Note which files you
-   skipped.
+   session will commit it. If a file mixes your hunks with foreign hunks, stage only yours: `git add -p -- <path>`
+   needs an interactive terminal, so where the shell has none (Claude Code's Bash, most agent
+   harnesses), write your hunks to a patch (`git diff -- <path> > "$TMPDIR/mine.patch"`, then
+   delete the foreign hunks from it) and `git apply --cached "$TMPDIR/mine.patch"`. Never include a
+   foreign hunk because it is small. Note which files you skipped.
 4. **Commit by path, without touching the index.** Use
    `git commit --only -m "<subject>" -- <path> <path> …` (options before the `--`). `--only` commits exactly the named paths
    and ignores whatever another session has already staged, so a foreign `git add` can never ride
    along. Never `git add -A`, `git add .`, or `commit -a`. For a partially staged file from step 3,
-   `git commit -m "<subject>" -- <path>` after `git add -p` instead.
+   `git commit -m "<subject>" -- <path>` after staging your hunks instead.
    **New files are the exception:** `--only` silently skips untracked paths, so `git add -- <new-path>`
    each file you created first, then include it in the same `--only` list. Check
    `git status --porcelain` afterwards; a `??` line for one of your files means it was skipped.

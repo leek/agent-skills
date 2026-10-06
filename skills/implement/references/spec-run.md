@@ -6,7 +6,7 @@ Two additions to the `implement` process. A **spec run** builds every ticket of 
 
 1. Name the branch after the work: the spec's `<slug>`, or the ticket's.
 2. Create it from the fresh default branch (`git fetch origin` first):
-   - The user asked for a worktree, or the tree is dirty: `git worktree add -b <branch> .claude/worktrees/<branch> origin/<default>`, at that path, never a sibling directory. Make it runnable (install dependencies, copy local env config) the way the project's docs say, or as the stack reference says, then work there.
+   - The user asked for a worktree, or the tree is dirty: `git worktree add -b <branch> .claude/worktrees/<branch> origin/<default>`, at that path, never a sibling directory. Make it runnable (install dependencies, copy local env config) the way the project's docs say, or as the stack reference says, then work there: move the session into it with `EnterWorktree({path: ".claude/worktrees/<branch>"})` where available, otherwise run every command with absolute paths into the worktree.
    - Otherwise: `git switch -c <branch> origin/<default>`.
 3. When the work comes from `.scratch/<slug>/` and the new branch lacks it or holds an older copy (committed on local `<default>`, not pushed), bring it over: `git checkout <default> -- .scratch/<slug>`, then commit it as `docs(scratch): <slug>`.
 4. Record `base_sha` on the new branch. Claims, resolutions, and code all commit to this branch.
@@ -25,7 +25,7 @@ Run it on a spec whose `tickets/` already exist and the user asked to build all 
 
 1. Push the branch and open the PR with `gh pr create`. Write the body with the `pr` skill's template, its Evidence from the verification pass with the screenshots uploaded as its **Screenshots** section says, then one line per ticket closed.
 2. Read the PR's unresolved review threads once (the GraphQL `reviewThreads` query in `resolve-review-comments`). When any exist, run `resolve-review-comments` on the PR. When review bots are still running, say so in the end block.
-3. Keep the worktree: it holds the PR branch. Name its path in the report; `repository-cleanup` removes it after the merge.
+3. Keep the worktree: it holds the PR branch. If you entered it, leave with `ExitWorktree({action: "keep"})`, which never removes it. Name its path in the report; `repository-cleanup` removes it after the merge.
 4. Without a worktree, return the main checkout to the default branch: `git switch <default> && git pull --ff-only`. Say so in the report, so the next request starts on fresh `<default>`.
 
 ## Follow-up on a delivered PR

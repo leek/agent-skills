@@ -41,7 +41,7 @@ You should be careful to split between two types of learning:
 Fluency can give the user an illusory sense of mastery, but storage strength is the real goal. Try to design lessons which build long-term retention by desirable difficulty:
 
 - Using retrieval practice (recall from memory)
-- Spacing (distributing practice over time)
+- Spacing (distributing practice over time): end each lesson by offering a later retrieval quiz, scheduled where the harness can, otherwise as a date for the user to come back (see [LESSON-PUBLISHING.md](./LESSON-PUBLISHING.md))
 - Interleaving (mixing up different but related topics in practice - for skills practice only)
 
 ## Lessons
@@ -52,7 +52,7 @@ A lesson should be **beautiful** (clean, readable typography and layout) since t
 
 The lesson should be short, and completable very quickly. Learners' working memory is very small, and we need to stay within it. But each lesson should give the user a single tangible win that they can build on. It should be directly tied to the mission, and should be in the user's zone of proximal development.
 
-If possible, open the lesson file for the user by running a CLI command.
+Deliver the lesson so its quiz answers come back: where the harness can publish a page with a database (in Claude Code, the Artifact tool, read back with `ArtifactData`), publish it privately as [LESSON-PUBLISHING.md](./LESSON-PUBLISHING.md) describes; otherwise open the lesson file for the user with a CLI command, and ask at the next session how its quiz went.
 
 Each lesson should link via HTML anchors to other lessons and reference documents.
 
@@ -85,6 +85,7 @@ Each lesson, the user should always feel as if they are being challenged 'just e
 The user may specify an exact thing they want to learn. If they don't, figure out their zone of proximal development by:
 
 - Reading their `learning-records`
+- Reading the quiz answers that came back since the last session (or asking how the last quiz went), and turning the misses into learning records per [LESSON-PUBLISHING.md](./LESSON-PUBLISHING.md)
 - Figuring out the right thing to teach them based on their mission
 - Teach the most relevant thing that fits in their zone of proximal development
 
@@ -105,7 +106,7 @@ For skill acquisition, difficulty is the tool. Effortful retrieval is what build
 - Interactive lessons, using quizzes and light in-browser tasks
 - Lessons which guide the user through a list of real-world steps to take (for instance, yoga poses)
 
-Each of these should be based on a **feedback loop**, where the user receives feedback on their performance. This feedback loop should be as tight as possible, giving feedback immediately - and ideally automatically.
+Each of these should be based on a **feedback loop**, where the user receives feedback on their performance. This feedback loop should be as tight as possible, giving feedback immediately - and ideally automatically. It closes twice: on the page for the user, and in the next session for you, through the answers it records.
 
 For quizzes, each answer should be exactly the same number of words (and characters, if possible). Don't give the user any clues about the answer through formatting.
 

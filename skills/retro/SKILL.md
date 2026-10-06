@@ -102,7 +102,7 @@ For each finding, give: the proposal, **the one verbatim (redacted) evidence lin
 - a config or settings change
 - **or nothing**, if it was a genuine one-off
 
-**Do not change anything.** Present the list and let the user choose which to apply. Lead with the cross-cutting themes (patterns that recurred across 3+ sessions are the highest-value to act on).
+**Do not change anything.** Present the list and let the user choose which to apply (`AskUserQuestion` where available: one `multiSelect: true` question per destination, up to 4 questions per call and 4 options each, further rounds for the rest; otherwise the user picks by number in chat). Lead with the cross-cutting themes (patterns that recurred across 3+ sessions are the highest-value to act on).
 
 ## Reference: where a fix belongs
 

@@ -41,4 +41,4 @@ Each sub-agent outputs:
 
 Present designs sequentially so the user can absorb each one, then compare them in prose. Contrast by **depth** (leverage at the interface), **locality** (where change concentrates), and **seam placement**.
 
-After comparing, give your own recommendation: the designs as options, your pick first and marked recommended, each option's description carrying its core trade-off (`AskUserQuestion` where available, otherwise the same shape in chat). If elements from different designs would combine well, propose a hybrid as its own option. Be opinionated, the user wants a strong read, not a menu.
+After comparing, give your own recommendation: the designs as options, your pick first and marked recommended, each option's description carrying its core trade-off and its `preview` holding that design's signatures and caller example (`AskUserQuestion` where available; otherwise show each design in full in chat, then ask the same question). If elements from different designs would combine well, propose a hybrid as its own option. Be opinionated, the user wants a strong read, not a menu.

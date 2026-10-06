@@ -1,9 +1,19 @@
 {
-  "description": "browser-test: block non-read-only browser commands from the browser-tester and browser-test-planner agents. finding-verifier and pr-reviewer: allow only read-only git, gh, rg, and text commands. Every other caller passes through untouched.",
+  "description": "browser-test: block non-read-only browser commands from the browser-tester and browser-test-planner agents. finding-verifier and pr-reviewer: allow only read-only git, gh, rg, and text commands. Every other caller passes through untouched. SessionStart: in a bare Laravel worktree (no vendor/), point the agent at laravel-herd-worktrees' bootstrap; silent everywhere else.",
   "modules": [
     "./mods/register.tsx"
   ],
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/bare-worktree-notice.sh\""
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",

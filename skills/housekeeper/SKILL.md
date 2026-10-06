@@ -34,6 +34,7 @@ This loop cleans source and project structure. It is not a Git branch, pull requ
 6. Run the relevant existing checks: build, tests, lint/type checks, runtime smoke checks, link checks, or project-specific verification.
 7. Review the diff and keep the change only if behavior stays intact and unrelated work is untouched.
 8. Repeat until no proven low-risk cleanup remains, progress stalls, verification is unavailable, or the next candidate needs approval.
+9. When stopping on candidates that need approval, ask the user to pick which to apply, in one question (`AskUserQuestion` where available: `multiSelect: true`, one option per deferred candidate, at most 4 per question and further questions for the rest; otherwise a numbered list in chat). Continue the loop in the same run on every approved candidate, one at a time.
 
 ## Candidate Types
 
@@ -58,7 +59,7 @@ End with:
 - Evidence supporting each retained cleanup.
 - Verification commands run and their results.
 - Deferred candidates and why they were not changed.
-- Any approval needed before continuing.
+- Any approval still needed, and the candidates the user declined.
 
 ## Guardrails
 
@@ -66,4 +67,4 @@ End with:
 - Do not touch unrelated, active, uncommitted, generated, or uncertain work.
 - Do not combine unrelated cleanups into one large change.
 - Do not keep a cleanup if checks fail or behavior cannot be verified.
-- Ask for approval before removing dependencies, deleting broad file sets, or changing public interfaces when risk is unclear.
+- Ask for approval before removing dependencies, deleting broad file sets, or changing public interfaces when risk is unclear (workflow step 9).

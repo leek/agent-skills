@@ -9,7 +9,7 @@ description: Resolve an in-progress git merge or rebase conflict while preservin
 
 2. **Find the primary sources** for each conflict. Understand deeply why each change was made, and what the original intent was. Read the commit messages, check the PRs, check original issues/tickets.
 
-3. **Resolve each hunk.** Preserve both intents where possible. Where incompatible, pick the one matching the merge's stated goal and note the trade-off. Do **not** invent new behaviour. Always resolve; never `--abort` unless the user explicitly asks to abort.
+3. **Resolve each hunk.** Preserve both intents where possible. Where the two intents truly cannot both be kept, ask the user to choose instead of picking silently (`AskUserQuestion` where available: ours and theirs as options, plus a combined one if it makes sense, each hunk in its option's `preview`, the one matching the merge's stated goal first and marked recommended; otherwise quote both hunks in chat and ask). Do **not** invent new behaviour. Always resolve; never `--abort` unless the user explicitly asks to abort.
 
 4. Discover the project's **automated checks** and run them: typically static analysis (Larastan / typecheck), then tests (Pest), then format (Pint). Fix anything the merge broke.
 

@@ -99,3 +99,13 @@ deploy, reopen it and correct its classification.
 
 Completion criterion: every issue in scope is resolved with a comment, or stays open
 with a comment that names its blocker. Report the tally with one line per cluster.
+
+## 6. Offer a deploy re-check
+
+If any issue is pending deploy verification, ask once whether to re-check it in 24–48
+hours. On yes, schedule a one-time run where the harness can (in Claude Code, the
+`schedule` skill's cloud routine; failing that, `CronCreate` with `recurring: false`,
+which fires only while this session stays open, so say so). The prompt is plain text,
+since a slash command for this skill cannot run from a schedule: "With the Nightwatch
+MCP, read last-seen for issues #<ids>; reopen and comment on any seen after <deploy
+date>." Otherwise, or on no, end the report with the issue ids and the re-check date.

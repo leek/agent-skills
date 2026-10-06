@@ -34,9 +34,11 @@ and output format are in
 every PR, even one with no reviews, and while step 2's reviewers are still running.
 
 Run it in a fresh context so the bots cannot frame it. In Claude Code with this plugin
-installed, dispatch `subagent_type=leek-skills:pr-reviewer` with the brief. Elsewhere,
-use any read-only sub-agent on your strongest model, or review inline before you open
-the comment surfaces. Record the head sha it covered.
+installed, dispatch `subagent_type=leek-skills:pr-reviewer` with the brief, in the
+background (pass `run_in_background: true` where the Agent tool offers it), before
+step 2's wait so the two overlap; its completion notification brings the findings. Elsewhere, use any read-only sub-agent on
+your strongest model, or review inline before you open the comment surfaces. Record the
+head sha it covered.
 
 Completion criterion: a `Self N:` line per finding, or `Self: no findings`, against a
 recorded head sha.
@@ -48,7 +50,8 @@ submitted, or a bot shows its "running" signal: an 👀 reaction (Codex), a summ
 comment whose status row is not completed, or a review bot's own check run (not CI)
 still pending. The calls are in [In-flight signals](references/gh-mechanics.md#in-flight-signals).
 
-Wait with a scheduled wakeup where the harness has one, otherwise re-poll these
+Wait with a scheduled wakeup where the harness has one (`ScheduleWakeup`, a few
+minutes out, with a prompt naming the PR and this step), otherwise re-poll these
 signals. Never use `gh pr checks --watch` (it waits on CI) or a `sleep` loop. Stop
 waiting after 30 minutes. Name the reviewer that never finished and go on without it.
 
@@ -146,7 +149,8 @@ in this conversation.
 [stop cases](references/gh-mechanics.md#stop-cases), among them a human
 `CHANGES_REQUESTED` that stands and a missing required approval (your own review is not
 a GitHub approval). Leave the PR open, post one comment that disposes of every finding
-and names the blocker, and report.
+and names the blocker, and report. Ping the user with the PR number and blocker
+(`PushNotification` where available, otherwise the chat report carries it).
 
 Completion criterion: `gh pr view N --json state,mergedAt,autoMergeRequest` shows
 merged or a queued auto-merge, or the blocker comment is posted. Report the merge SHA
@@ -157,9 +161,14 @@ auto-dismiss, hallucination, or minor (not fixed).
 
 Remove nothing while the PRs are in flight. After the last named PR, list every worktree
 (step 5) and database (see [Scratch databases](references/gh-mechanics.md#scratch-databases))
-you created for a PR that now shows merged, and ask one yes/no question: "Can I delete
-everything I created for these PRs?" On yes, remove them all; on no, remove nothing. An
-answer that names items to keep keeps those. Skip the question when the list is empty.
+you created for a PR that now shows merged, and ask once what to delete
+(`AskUserQuestion` where available: `multiSelect: true`, one option per item, nothing
+pre-ticked, at most 4 per question and further questions for the rest; otherwise one
+yes/no question in chat: "Can I delete everything I created for these PRs?"). Remove
+only what the answer selects, or everything on yes; on no, remove nothing. An answer
+that names items to keep keeps those. Skip the question when the list is empty.
+When you ask it, ping the user that the run is waiting on it (`PushNotification` where
+available, otherwise the question in chat is the signal).
 
 A stopped or `--auto`-queued PR's worktree and databases are not on the list, and
 neither is anything you did not create. Name them in the report, so the user's next

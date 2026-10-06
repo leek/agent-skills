@@ -93,8 +93,9 @@ Where `AskUserQuestion` is available, use it: decisions become click-to-answer:
 - Recommended option first, label suffixed ` (Recommended)`, labels 1–5 words, `header` ≤ 12 characters.
 - Describe what each option commits the project to, not just what it is.
 - `multiSelect: true` only when options legitimately stack.
+- When the options are artifacts to compare side by side (a signature, a schema, a payload, a screen layout), put each one's snippet or ASCII mockup in that option's `preview`. `preview` works only on a single-select question.
 
-Without the tool, ask the same shape in chat (numbered options, recommendation first, trade-off per line) and wait for the answer. Never print fake tool JSON.
+Without the tool, ask the same shape in chat (numbered options, recommendation first, trade-off per line, and under each option the fenced block its `preview` would hold) and wait for the answer. Never print fake tool JSON.
 
 A rejected question did not land. Ask the same decision again once, rewritten: the situation first, fewer terms, and each option stated as what will happen. If the user rejects that too, take the recommended option, record it as `implied`, and move on.
 
@@ -112,7 +113,7 @@ Before the plan resolves, sweep the branches grills skip. Each one has forced a 
 
 - **Trigger**: does the behavior run automatically, or does a person start it? Where in the UI do they see and drive it?
 - **Ownership**: who creates, edits, and removes each new entity, and on which screen?
-- **Display**: for an integration, which returned fields the product shows and which it drops, and their order of importance on the screen.
+- **Display**: for an integration, which returned fields the product shows and which it drops, and their order of importance on the screen. Offer competing layouts as ASCII mockups, in each option's `preview` or, without the tool, in a fenced block under each option (see **Asking the question**).
 - **Failure**: what the user sees when a dependency fails or returns partial data.
 
 Settle each off the ladder or ask.

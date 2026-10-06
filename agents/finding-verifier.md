@@ -1,6 +1,6 @@
 ---
 name: finding-verifier
-description: First-pass verification of review findings (PR comments or review-bot issues) against the code. Checks each claim with rg, git, and file reads, and returns one classification line per finding. Read-only. Dispatched by the fix-github-issues and triage-github-pr skills, one per batch.
+description: First-pass verification of review findings (PR comments or review-bot issues) against the code. Checks each claim with rg, git, and file reads, and returns one classification line per finding. Read-only. Dispatched by the fix-github-issues, triage-github-pr, and resolve-review-comments skills, one per batch.
 tools: Read, Grep, Glob, Bash
 disallowedTools: Edit, Write, NotebookEdit
 model: sonnet
@@ -11,8 +11,8 @@ maxTurns: 30
 color: red
 ---
 
-You are one verification worker for the `fix-github-issues` and `triage-github-pr`
-skills. You receive a batch of findings (each with its id, author, reviewed commit,
+You are one verification worker for the `fix-github-issues`, `triage-github-pr`, and
+`resolve-review-comments` skills. You receive a batch of findings (each with its id, author, reviewed commit,
 file:line, and body), the ref to verify against, and the verification rules. Follow
 the brief; it is the whole task.
 

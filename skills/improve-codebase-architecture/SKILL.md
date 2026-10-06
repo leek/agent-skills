@@ -36,7 +36,7 @@ Apply the **deletion test** to anything you suspect is shallow: would deleting i
 
 ### 2. Present candidates as an HTML report
 
-Write a self-contained HTML file to the OS temp directory so nothing lands in the repo. Resolve the temp dir from `$TMPDIR`, falling back to `/tmp` (or `%TEMP%` on Windows), and write to `<tmpdir>/architecture-review-<timestamp>.html` so each run gets a fresh file. Open it for the user (`xdg-open <path>` on Linux, `open <path>` on macOS, `start <path>` on Windows) and tell them the absolute path.
+Write a self-contained HTML file outside the repo: the session scratchpad directory if the harness names one, otherwise the OS temp directory. Resolve the temp dir from `$TMPDIR`, falling back to `/tmp` (or `%TEMP%` on Windows), and write to `<dir>/architecture-review-<timestamp>.html` so each run gets a fresh file. Then show it: where the harness can publish a page (in Claude Code, the Artifact tool, after loading the `artifact-design` skill), publish that file as a private page and give the user the link; otherwise open it for the user (`xdg-open <path>` on Linux, `open <path>` on macOS, `start <path>` on Windows) and tell them the absolute path.
 
 The report uses **Tailwind via CDN** for layout and styling, and **Mermaid via CDN** for diagrams where a graph/flow/sequence reliably communicates the structure. Mix Mermaid with hand-crafted CSS/SVG visuals: use Mermaid when relationships are graph-shaped (call graphs, dependencies, sequences), and hand-built divs/SVG when you want something more editorial (mass diagrams, cross-sections, collapse animations). Each candidate gets a **before/after visualisation**. Be visual.
 
@@ -57,7 +57,7 @@ End the report with a **Top recommendation** section: which candidate you'd tack
 
 See [HTML-REPORT.md](HTML-REPORT.md) for the full HTML scaffold, diagram patterns, and styling guidance.
 
-Do NOT propose interfaces yet. After the file is written, ask the user: "Which of these would you like to explore?"
+Do NOT propose interfaces yet. Once the report is up, ask the user which candidate to explore (`AskUserQuestion` where available: the top recommendation first and marked recommended, then the next strongest up to 4 options, each option's `preview` an ASCII before/after sketch of that candidate's shape, and "Other" reaching the rest; otherwise ask in chat: "Which of these would you like to explore?").
 
 ### 3. Grilling loop
 

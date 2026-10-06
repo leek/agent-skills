@@ -32,7 +32,7 @@ Two task shapes:
   `git diff <fixed-point>...HEAD` (three-dot, against the merge-base), default
   `main` when the user names none. For uncommitted work in progress, drop the `...HEAD`
   so the diff also covers staged and unsaved changes. Confirm the ref resolves
-  (`git rev-parse <fixed-point>`) and the diff is non-empty **before** fanning out, 
+  (`git rev-parse <fixed-point>`), record `git rev-parse HEAD`, and confirm the diff is non-empty **before** fanning out, 
   a bad ref should fail here, not inside four subagents.
 - **Prompt** otherwise; the user's text is the task, passed word for word.
 
@@ -98,12 +98,16 @@ plain words, with **no backticks**, so nothing is left for a shell to expand:
 > files you need. Report concrete findings only, for each, a one-line claim, the
 > file:line, and a one-line reason. Review only; do not modify any file. Be concise.
 
-**Keep review read-only.** Before fanning out, save `git status --porcelain` and
-`git diff` as the baseline. After every subagent returns, compare against it. A path
+**Keep review read-only.** For a committed scope, dispatch each panelist with
+`isolation: "worktree"` where the harness offers it, so a stray write never reaches the
+user's tree; its brief first runs `git checkout --detach <step 1's HEAD sha>`, since the
+worktree may start from another base. A worktree left with uncommitted changes means
+its CLI wrote: name both. For WIP scope, or without isolation, save `git status --porcelain` and `git diff`
+as the baseline before fanning out, and compare after every subagent returns. A path
 the CLIs changed that was clean in the baseline: revert it (`git checkout -- <path>`,
 delete new files) and name that CLI. A path that was already dirty holds the user's
-unsaved work: report it and leave it as it is. This tree
-check (not a per-CLI flag) is what enforces review-only.
+unsaved work: report it and leave it as it is. This isolation or tree check (not a
+per-CLI flag) is what enforces review-only.
 
 Per-CLI notes: read-only options and their traps, structured-output flags,
 absent-vs-errored, auth: live in
@@ -114,7 +118,7 @@ misbehaves or the panel roster changes.
 
 First check the panel had a quorum: at least two CLIs must have **responded**, not just
 been present. With fewer, there is no consensus: report the single result plainly and
-say the panel was short.
+say the panel was short, with the step 5 ping.
 
 Collect the results. Only a returned `{ cli, status, points[] }` object is a result: a
 panelist pauses while its CLI runs, and a notification without that object is interim,
@@ -138,14 +142,22 @@ Print the clusters, most-agreed first, under `## Unanimous`, `## Majority`, `## 
 its **location**, the CLIs that raised it in brackets, e.g. `[claude, codex, grok]`, 
 and its one-line **reason**. For a Conflict, state both sides and who holds each.
 
+In review shape, where the host has `ReportFindings`, report the clusters through it
+instead, in one call, most-agreed first: `summary` the claim, `file`/`line` the location,
+`failure_scenario` the reason plus the CLIs in brackets, `category` the grade, `verdict`
+`CONFIRMED` for Unanimous or Majority and `PLAUSIBLE` below that. Print as markdown only
+what it cannot carry: `general` points and Conflicts. Otherwise print every cluster.
+
 Then a one-line summary: how many points at each grade, the responder count `N`, and any
-CLI that was absent or errored.
+CLI that was absent or errored. Ping the user that it is ready (`PushNotification`
+where available, otherwise the report itself is the signal).
 
 Close with a **Recommended next steps** block:
 
 1. **Fix list**: every point at every grade, Unanimous through Lone, as one checklist. Do not
    curate: a Lone finding is a real finding until verified otherwise. For a Conflict, list both
-   sides and say which one the code supports.
+   sides and say which one the code supports. After `ReportFindings`, the reported
+   findings are the list; name their count instead of repeating them.
 2. **Offer the shortcut**: ask whether to verify and apply the whole list as one commit, naming
    the count, e.g. "Reply *fix all* to verify and apply all 11 points."
 
@@ -158,8 +170,7 @@ to re-adjudicate it. Ask only about a point that conflicts with a recorded decis
 
 Headless mode auto-approves every tool, so each CLI *could* write files even though the
 brief says review only. Two guards, in order: run the panel on a clean working tree, and
-in review shape revert any stray write with the `git status` check in step 3. Per-CLI
-read-only flags exist but behave inconsistently, `codex --sandbox read-only` works,
-`agy --mode plan` hijacks the task into planning, and `grok`'s profile name is
-machine-specific, so the tree check, not a flag, is what enforces read-only. See the
-references file.
+in review shape isolate or revert stray writes per step 3. Per-CLI read-only flags exist
+but behave inconsistently, `codex --sandbox read-only` works, `agy --mode plan` hijacks
+the task into planning, and `grok`'s profile name is machine-specific, so step 3, not a
+flag, is what enforces read-only. See the references file.

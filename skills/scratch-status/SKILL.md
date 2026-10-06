@@ -15,7 +15,7 @@ the full sweep (filing research, removing done efforts, judging contradictions),
 
 `$ARGUMENTS` is an effort slug to scope to `.scratch/<slug>/` alone; empty means every effort.
 
-In Claude Code with the leek-skills plugin, `/scratch` shows steps 1–2 live in a pane without a turn; point the user at it for a quick look. Everywhere else, and for the commit checks, run the steps below.
+In Claude Code with the leek-skills plugin, `/scratch [slug]` shows steps 1–2 live in a pane without a turn; point the user at it for a quick look. You cannot read that board, so always run the steps below: they add the commit-ancestry checks and the table the board lacks.
 
 ## 1. Inventory
 
@@ -54,6 +54,9 @@ Classify the effort exactly as `scratch-cleanup` does:
 
 An open effort is **stale** when its newest file is older than 30 days, the same default
 `scratch-cleanup` uses.
+
+These rules are the source of truth; the `/scratch` board's `hooks/mods/scratch-scan.ts` must
+change with them, so a drift shows as the board and this report disagreeing.
 
 Done when every effort in scope is labelled done, mismatched, or open (with stale marked), and
 every open ticket has its blockers and claim state noted.

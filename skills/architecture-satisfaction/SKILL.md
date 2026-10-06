@@ -37,7 +37,9 @@ Before editing code, write down the target in concrete terms. Include the parts 
 - Tests, smoke checks, or live flows that prove safety.
 - Known risks and rollback points.
 
-If the target is vague, pause and clarify it. A subjective stop condition can otherwise run indefinitely.
+If the target is vague, pause and clarify it: ask the open points as choices (`AskUserQuestion` where available, for example which public interfaces must stay stable; otherwise in chat). A subjective stop condition can otherwise run indefinitely.
+
+Get the target approved before the first edit. Where the harness has plan mode, enter it (`EnterPlanMode`), write the target and verification plan as the plan, present it with `ExitPlanMode` for approval, and copy the approved plan into the progress file; otherwise show the target and plan in chat and wait for an explicit yes.
 
 ## Progress File
 
@@ -63,11 +65,11 @@ The progress file is scratch state for long refactors and handoffs. Do not use i
 ## Workflow
 
 1. Inspect the current repository state: branch, uncommitted work, recent commits, test commands, app startup commands, and relevant architecture docs.
-2. Define the architectural target, constraints, current risks, and verification plan in the progress file.
+2. Define the architectural target, constraints, current risks, and verification plan in the progress file, and get them approved (Define Satisfactory First) before any code edit.
 3. Make one significant, reviewable change at a time.
 4. Live-test the affected behavior after each significant change. Prefer the project's real app/runtime checks when available, not only static checks.
 5. Run the relevant automated checks: tests, type checks, linters, formatters, build, migrations, or focused smoke scripts.
-6. Run an independent review after each significant change. Use a review subagent, code-review tool, existing autoreview command, or a separate review pass that looks for behavior regressions, missed callers, leaky abstractions, and test gaps.
+6. Run an independent review after each significant change. Run the `code-review` skill against the checkpoint's starting commit (its Correctness axis runs as the `leek-skills:pr-reviewer` subagent where the harness has subagents, and inline otherwise), and brief it with the Independent Review Focus below. Where that skill is not installed, use an existing autoreview command or a separate review pass that looks for behavior regressions, missed callers, leaky abstractions, and test gaps.
 7. Fix issues found by live testing, checks, or review before moving to the next architectural step.
 8. Commit each verified checkpoint when the user has asked for commits or the repository workflow expects checkpoint commits. Keep commits small and named after the architectural move.
 9. Update the progress file with the checkpoint, evidence, decisions, and next action.

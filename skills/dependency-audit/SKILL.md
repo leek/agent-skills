@@ -6,7 +6,7 @@ context: fork
 agent: leek-skills:dependency-auditor
 background: false
 argument-hint: "composer | npm (omit to auto-detect)"
-allowed-tools: "Bash(composer outdated *) Bash(composer audit) Bash(composer audit *) Bash(npm outdated *) Bash(npm audit) Bash(npm audit *)"
+allowed-tools: "Bash(composer outdated *) Bash(composer audit) Bash(composer audit *) Bash(npm outdated *) Bash(npm audit) Bash(npm audit *) WebFetch"
 ---
 
 # Dependency Audit
@@ -43,6 +43,10 @@ npm audit || true
 ```
 
 Run security audit when a lockfile makes the result meaningful (`composer.lock`, `package-lock.json`, or `npm-shrinkwrap.json`).
+
+### Major bumps
+
+For each major update, source its breaking changes from the package, not from memory: fetch its `CHANGELOG`, `UPGRADE` guide, or GitHub release notes for the versions crossed where the harness can reach the web (`WebFetch` in Claude Code), and cite the URL; otherwise read the changelog shipped under `vendor/<package>/` or `node_modules/<package>/` and mark the risk *unverified* (it covers only the installed version).
 
 ## Report
 
