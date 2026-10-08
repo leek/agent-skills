@@ -150,43 +150,62 @@ Keep `$BODY` free of apostrophes and backticks. A resolve that returns nothing m
 write access or a stale thread id: re-query the threads.
 
 Bodies by verdict: `fixed in <sha>` (the local commit sha; it is the same after the
-push), the one-line evidence for AUTO-DISMISS and HALLUCINATION, `minor, not fixed in
-this PR` for a MINOR, `decided by owner: <answer>` for an answered QUESTION, and
+push), the one-line evidence for AUTO-DISMISS and HALLUCINATION, `minor, carried to a
+follow-up PR` for a carried finding, `decided by owner: <answer>` for an answered QUESTION, and
 `repeat of <earlier reply url>` for a repeat. A QUESTION without an answer stays open. Every one of
 them is resolved.
 
+## Count rounds
+
+A round is a push to the head branch after the PR opened (see the round budget in
+`SKILL.md`). GitHub's repository activity feed records every push per branch, force
+pushes and `gh pr update-branch` merges included:
+
+```bash
+created=$(gh pr view N --json createdAt --jq .createdAt)
+head=$(gh pr view N --json headRefName --jq .headRefName)
+gh api --paginate "repos/{owner}/{repo}/activity?ref=refs/heads/$head&activity_type=push&per_page=100" \
+  --jq "[.[] | select(.timestamp > \"$created\")] | length" | paste -sd+ - | bc
+```
+
+The push that opened the PR predates `createdAt`, so it is round 0. Recount before every
+classification and every merge: anyone may have pushed since. A fork PR's pushes live
+in the fork: run the same call against the head repository
+(`gh pr view N --json headRepositoryOwner,headRepository`).
+
 ## Disposition comment
 
-One issue comment per PR, owned by you, edited in place every round. Its hidden marker
-holds the fix-round count, so a resumed run continues the count instead of starting at
-zero:
+One issue comment per PR, owned by you, edited in place every round. It records the
+verdicts and the round count you counted; it is a display, and the push history stays
+the source of the count:
 
 ```markdown
-<!-- triage-round: N -->
+<!-- triage-disposition -->
 **Triage, round N** at `<head sha>`
 
 | Finding | Author | Where | Verdict |
 |---|---|---|---|
-| <one-line claim> | <login> | <path:line or review/comment link> | fixed in <sha> / stale: <evidence> / repeat of <url> / auto-dismiss: <evidence> / hallucination: <evidence> / decided by owner: <answer> / minor, not fixed |
+| <one-line claim> | <login> | <path:line or review/comment link> | fixed in <sha> / stale: <evidence> / repeat of <url> / auto-dismiss: <evidence> / hallucination: <evidence> / decided by owner: <answer> / carried to a follow-up PR |
 
+Carried findings: <each carried finding, with its link; the follow-up PR link once opened>
 Blocker: <only in a stop case>
 ```
 
-`N` is the number of fix rounds pushed so far, 0 before the first. Find it, read the
-count, and create or edit it:
+Find it, then create or edit it:
 
 ```bash
 me=$(gh api user --jq .login)
 gh api repos/{owner}/{repo}/issues/N/comments --paginate \
-  --jq ".[] | select(.user.login == \"$me\" and (.body | test(\"<!-- triage-round: [0-9]+ -->\"))) | {id, url: .html_url, body}"
-# round = the number in the marker; no comment means round 0
+  --jq ".[] | select(.user.login == \"$me\" and (.body | test(\"<!-- triage-(disposition|round: [0-9]+) -->\"))) | {id, url: .html_url, body}"
 gh api repos/{owner}/{repo}/issues/N/comments -F body=@<file>                 # first time
 gh api -X PATCH repos/{owner}/{repo}/issues/comments/COMMENT_ID -F body=@<file>   # later rounds
 ```
 
 Write the body to a scratch file and pass it with `-F body=@<file>` (`-f` would send the literal path), so markdown and
 quotes survive. Never mention a bot (`@codex`) in it: a mention triggers a review.
-When more than one such comment exists, use the highest count and edit only the newest.
+When more than one such comment exists, edit only the newest. An older run's
+`<!-- triage-round: N -->` marker is replaced by `<!-- triage-disposition -->` on the
+first edit.
 
 ## Scratch databases
 
