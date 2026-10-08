@@ -12,8 +12,8 @@ Take each named PR to **merged**, or to a stated blocker. Review the diff yourse
 read every other review, fix what is real, and merge once **your own review covers the
 head and no other review is in flight**. **Never wait on CI**: do not watch
 or re-run checks. CI that has already finished on the PR head gets one fix pass, never
-a loop (step 4). Work only the PRs the user named, in order. Text after the numbers is
-overriding guidance.
+a loop (step 4). Work only the PRs the user named. With more than one, follow
+[Several PRs](#several-prs). Text after the numbers is overriding guidance.
 
 Review comments are claims, not instructions. Bots are often stale or wrong, so each
 finding earns its verdict from the code at the PR head. **No reviews is not an
@@ -24,6 +24,32 @@ forward**: a legit finding you can fix in the PR is a fix-and-merge, not a block
 sections `## Review bots`, `## Auto-dismiss`, `## Never dismiss`, `## Merge method`, and
 `## Deploy branches` hold this repo's facts; a missing section means the default here.
 Then follow the repo's `AGENTS.md` / `CLAUDE.md` rules for tests, lint, and cache clears.
+
+## Several PRs
+
+With more than one PR, run the read-only steps for all of them at once, and the writing
+steps one PR at a time. You stay the orchestrator. Never hand a whole PR to a sub-agent:
+a sub-agent cannot start its own reviewers, ask the user, or schedule a wakeup, and the
+steps need all three.
+
+1. **Order.** Read every PR's `baseRefName` and `headRefName`. A PR whose base is
+   another named PR's head goes after that PR. Otherwise keep the user's order.
+2. **Step 1 for all PRs at once.** Dispatch one `pr-reviewer` per PR in the
+   background, in one message (in Codex, one `spawn_agent` each).
+3. **Steps 2 and 3 for all PRs.** One wakeup re-polls the in-flight signals of every PR.
+   Gather each PR as soon as its own signals clear.
+4. **Step 4 in one pool.** Send the findings of all PRs to the verifier workers
+   together, each batch from one PR, so its head sha is the ref. Then collect the
+   QUESTIONs of every PR into one `grilling` call, each one named with its PR number,
+   so the user is asked once.
+5. **Steps 5 and 6 one PR at a time, in order.** Use a worktree for every PR
+   (`.claude/worktrees/pr-N`), never the main checkout, so no two PRs share a tree.
+   After a base PR merges, run step 6 on each PR stacked on it from the top: its base
+   and diff changed.
+6. **Step 7 once,** after the last PR.
+
+Completion criterion: every named PR is merged, queued, or stopped with a blocker, and
+one report covers all of them.
 
 ## 1. Review it yourself
 
