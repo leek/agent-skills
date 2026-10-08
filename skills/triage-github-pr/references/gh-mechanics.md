@@ -16,15 +16,21 @@ gh api repos/{owner}/{repo}/pulls/N/reviews --paginate \
   --jq '.[] | {id, user: .user.login, state, commit: .commit_id[:8], at: .submitted_at, body}'
 # Inline comments: where most actionable findings live
 gh api repos/{owner}/{repo}/pulls/N/comments --paginate \
-  --jq '.[] | {id, user: .user.login, path, line: (.line // .original_line), commit: .commit_id[:8], at: .updated_at, body}'
+  --jq '.[] | {id, user: .user.login, path, line: (.line // .original_line), commit: .commit_id[:8], at: .updated_at, reply_to: .in_reply_to_id, url: .html_url, body}'
 # Issue comments: bot summaries and humans not on a line
 gh api repos/{owner}/{repo}/issues/N/comments --paginate \
-  --jq '.[] | {id, user: .user.login, at: .updated_at, body}'
+  --jq '.[] | {id, user: .user.login, at: .updated_at, url: .html_url, body}'
+gh api user --jq .login   # you: your replies and your disposition comment carry this login
 ```
 
 The snapshot is every `{id, at}` pair from the three comment calls. At step 6, an id
 not in it, or an id whose `at` changed, is new: bots often edit a summary comment in
-place instead of posting another.
+place instead of posting another. Your own replies and your disposition comment are
+never new.
+
+**Earlier answers.** An inline comment by you with a `reply_to` is your answer to the
+thread it replies to; its `url` is the link a repeat cites. The disposition comment's
+table is the rest: the findings that live outside inline threads.
 
 ## In-flight signals
 
@@ -39,13 +45,15 @@ gh pr view N --json statusCheckRollup -q '.statusCheckRollup[]
 
 This lists CI too. Only a review bot's own check counts as in flight; ignore the rest.
 
-Verified bot behaviour (2026-09):
+Verified bot behaviour (2026-10):
 
+- **Both bots review every push.** Each pushed commit buys a full new round from each,
+  and an open thread they already raised is raised again. So resolve before you push
+  (step 5).
 - **Codex** (`chatgpt-codex-connector[bot]`) reacts with `eyes` while a review runs. It
   reacts `+1` when it finishes with no findings, and posts review comments when it has
   some. Its `<!-- codex-pull-request-review-summary -->` issue comment holds a
-  Status/Commit table. It re-reviews on PR open, on ready-for-review, and on an
-  `@codex review` comment, **not on every push**.
+  Status/Commit table whose trigger reads `New commits` on a push re-review.
 - **Copilot** (`copilot-pull-request-reviewer[bot]`) submits a `COMMENTED` review, whose
   `commit_id` is the commit it reviewed.
 
@@ -80,11 +88,12 @@ Stop instead of merging when:
 - a human `CHANGES_REQUESTED` stands. After you push its fix, re-request that reviewer
   (`gh pr edit N --add-reviewer <login>`) and name them as the blocker. Dismiss a
   review only when the guidance or project context says to;
-- a LEGIT finding needs a human or infra decision;
-- the PR is a draft without clear intent to ship, or the guidance says not to merge;
-- the PR is stacked, or its base is a deploy branch (`production`, `staging`, or any
-  branch the project context names), and the user has not approved the merge in this
-  conversation.
+- a QUESTION the user answered with "hold", or a decision that belongs to someone
+  other than the user (an infra or product owner);
+- the guidance says not to merge;
+- a merge question (draft intent, stacked PR, deploy-branch base: `production`,
+  `staging`, or any branch the project context names) that the user answered with
+  "hold" in this conversation.
 
 ## Check out the head branch safely
 
@@ -139,6 +148,45 @@ gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "PRRT_
 
 Keep `$BODY` free of apostrophes and backticks. A resolve that returns nothing means no
 write access or a stale thread id: re-query the threads.
+
+Bodies by verdict: `fixed in <sha>` (the local commit sha; it is the same after the
+push), the one-line evidence for AUTO-DISMISS and HALLUCINATION, `minor, not fixed in
+this PR` for a MINOR, `decided by owner: <answer>` for an answered QUESTION, and
+`repeat of <earlier reply url>` for a repeat. A QUESTION without an answer stays open. Every one of
+them is resolved.
+
+## Disposition comment
+
+One issue comment per PR, owned by you, edited in place every round. Its hidden marker
+holds the fix-round count, so a resumed run continues the count instead of starting at
+zero:
+
+```markdown
+<!-- triage-round: N -->
+**Triage, round N** at `<head sha>`
+
+| Finding | Author | Where | Verdict |
+|---|---|---|---|
+| <one-line claim> | <login> | <path:line or review/comment link> | fixed in <sha> / stale: <evidence> / repeat of <url> / auto-dismiss: <evidence> / hallucination: <evidence> / decided by owner: <answer> / minor, not fixed |
+
+Blocker: <only in a stop case>
+```
+
+`N` is the number of fix rounds pushed so far, 0 before the first. Find it, read the
+count, and create or edit it:
+
+```bash
+me=$(gh api user --jq .login)
+gh api repos/{owner}/{repo}/issues/N/comments --paginate \
+  --jq ".[] | select(.user.login == \"$me\" and (.body | test(\"<!-- triage-round: [0-9]+ -->\"))) | {id, url: .html_url, body}"
+# round = the number in the marker; no comment means round 0
+gh api repos/{owner}/{repo}/issues/N/comments -F body=@<file>                 # first time
+gh api -X PATCH repos/{owner}/{repo}/issues/comments/COMMENT_ID -F body=@<file>   # later rounds
+```
+
+Write the body to a scratch file and pass it with `-F body=@<file>` (`-f` would send the literal path), so markdown and
+quotes survive. Never mention a bot (`@codex`) in it: a mention triggers a review.
+When more than one such comment exists, use the highest count and edit only the newest.
 
 ## Scratch databases
 

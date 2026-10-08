@@ -65,8 +65,14 @@ calls are in [`references/gh-mechanics.md`](references/gh-mechanics.md). Keep th
 **snapshot**: the id and timestamp of every review and comment seen. Step 6 compares
 against it, so a bot that edits its comment in place still shows up as new.
 
+Read your [disposition comment](references/gh-mechanics.md#disposition-comment) if one
+exists. Its `<!-- triage-round: N -->` marker is the fix-round count so far: a resumed
+run continues from N, never from zero. Then list the **earlier answers**: your replies on
+inline threads and the rows of that comment, each with its file, topic, and link.
+
 Completion criterion: every finding listed with its author, reviewed commit, and file:line,
-with the step 1 findings in the list under the author `self`.
+with the step 1 findings in the list under the author `self`; the round count and the
+earlier answers recorded.
 
 ## 4. Classify every finding
 
@@ -74,8 +80,14 @@ Judge each finding on its own, not each review. First re-anchor it to the PR hea
 write one line per finding:
 
 ```
-Finding N: [STALE | AUTO-DISMISS | HALLUCINATION | LEGIT] — <one-line evidence>
+Finding N: [STALE | AUTO-DISMISS | HALLUCINATION | LEGIT | QUESTION] — <one-line evidence>
 ```
+
+**Repeats first.** Bots review every push and raise answered findings again. A bot
+finding on the same file and topic as an earlier answer is STALE with `repeat of <link>`
+to that answer as its evidence. Do not verify it again, and do not send it to a worker.
+Match on file and topic, not line: lines move between commits. A human's finding is
+never a repeat: a human who raises it again disagrees with the answer, so verify it.
 
 Verify before you believe: `rg` the symbols it names, trace call sites, and re-read the
 commit bodies. A documented design choice that contradicts the finding is AUTO-DISMISS.
@@ -103,11 +115,28 @@ not a finding, and you never wait for one. Each failed check is a finding, judge
 triage, separate from the review fix rounds: the first failed run you see, in step 3 or
 step 6. After that pass, ignore every later CI result.
 
-Completion criterion: every finding has a line, and the second pass is done.
+**Open questions.** A finding is QUESTION when its fix, or its dismissal, needs a
+decision only the user can make: the kinds in the `grilling` skill's **What still
+earns a question** section, after its **Settle it yourself first** ladder fails. A human
+reviewer's question that only the author's intent can answer is a QUESTION too. Never
+guess an answer, and never merge past one.
+
+When step 4 ends with any QUESTION, ping the user first (`PushNotification` where
+available), because the run is often unattended. Then call the Skill tool with
+`grilling` and pass every QUESTION for this PR: the finding, its link, and what each
+answer would change. `grilling` asks one question at a time, frames the situation
+first, and leads with a recommendation. Without the Skill tool, follow
+`skills/grilling/SKILL.md` inline. Each answer turns its finding into LEGIT (fix it in
+step 5) or a dismissal. The dismissal's evidence is `decided by owner: <answer>`. An
+answer to hold, or a decision that belongs to someone else, is a stop case.
+
+Completion criterion: every finding has a line, the second pass is done, and no
+QUESTION is left without an answer or a stop.
 
 ## 5. Fix what is real
 
-No LEGIT left: go to step 6.
+No LEGIT left: do only the last paragraph of this step (resolve and record), then go to
+step 6.
 
 Otherwise work on the head branch without disturbing a dirty tree, following
 [Check out the head branch safely](references/gh-mechanics.md#check-out-the-head-branch-safely)
@@ -118,13 +147,21 @@ logic, auth, or data change, run it green, then commit with explicit staging.
 that adds a mechanism (a job, a lock, a claim, a retry, an outbox, a stream) is new
 surface the next round reviews. So run step 1's brief on the unpushed fix range first,
 with its failure-mode probes aimed at each mechanism the fix added. Fix what it finds in
-the same round, then push.
-Then reply to each inline thread whose finding you fixed or dismissed (`fixed in <sha>`,
-or the one-line evidence) and resolve it: see
-[Reply and resolve](references/gh-mechanics.md#reply-and-resolve). Leave MINOR threads open.
+the same round.
 
-Completion criterion: every LEGIT finding has a commit, the branch is pushed, and every
-thread you addressed is replied to and resolved.
+**Resolve and record before you push.** A thread still open when the push lands is
+raised again by every bot. So, before the push, reply to **every** inline thread with a
+verdict, whatever the verdict (fixed, stale, repeat, auto-dismiss, hallucination,
+decided by owner, or minor), and resolve it: see [Reply and resolve](references/gh-mechanics.md#reply-and-resolve).
+Then write the round into the
+[disposition comment](references/gh-mechanics.md#disposition-comment): every finding's
+verdict, and the marker set to the round count plus one when this round pushes. Then
+push. A round with nothing to push still resolves its threads and updates the comment,
+with the count unchanged.
+
+Completion criterion: every inline thread with a verdict is replied to and resolved,
+the disposition comment holds this round's verdicts and count, and then every LEGIT
+finding's commit is pushed.
 
 ## 6. Re-check, then merge
 
@@ -133,9 +170,10 @@ compare them with the snapshot. Then re-run step 1 on only what changed since th
 sha it covered (the re-review range in the brief), so every commit is reviewed, your
 own fixes included. Anything new, or a review still in flight, goes back to step 4 with
 only the new items. While the CI fix pass is unused, also read the finished checks on
-the head, and send any failure to step 4. Allow at most **five** fix rounds. After
-five, stop and report what is still open, because bots often answer each fix with a
-fresh nit.
+the head, and send any failure to step 4. Allow at most **five** fix rounds, counted by
+the disposition comment's marker, so a resumed run cannot reset the count. After five,
+stop and report what is still open, because bots often answer each fix with a fresh
+nit.
 
 Then merge by [Merge](references/gh-mechanics.md#merge) when your own review covers
 the head, nothing is new, and no [gate](references/gh-mechanics.md#merge-gates) blocks.
@@ -145,17 +183,24 @@ fails. **Never delete a branch**, by any route: it closes every PR based on it. 
 stacked PR, or one whose base is a deploy branch, only on the user's explicit approval
 in this conversation.
 
+**Merge questions.** Some gates are the user's decision, not a blocker: a stacked PR or
+a deploy-branch base without approval, a draft with unclear intent to ship, a conflict
+whose resolution changes intent, or a fork you cannot push to (merge now, fix in a
+follow-up PR). Resolve these the same way as step 4's open questions: ping, then call
+the Skill tool with `grilling`. Stop only when the answer is to hold.
+
 **Stop instead of merging** in any of the
 [stop cases](references/gh-mechanics.md#stop-cases), among them a human
 `CHANGES_REQUESTED` that stands and a missing required approval (your own review is not
-a GitHub approval). Leave the PR open, post one comment that disposes of every finding
-and names the blocker, and report. Ping the user with the PR number and blocker
+a GitHub approval). Leave the PR open, update the disposition comment so it disposes of
+every finding and names the blocker, and report. Ping the user with the PR number and blocker
 (`PushNotification` where available, otherwise the chat report carries it).
 
 Completion criterion: `gh pr view N --json state,mergedAt,autoMergeRequest` shows
-merged or a queued auto-merge, or the blocker comment is posted. Report the merge SHA
+merged or a queued auto-merge, or the disposition comment names the blocker. Report the merge SHA
 (or "queued"), and one line per finding, yours included: fixed in `<sha>`, stale,
-auto-dismiss, hallucination, or minor (not fixed). If step 5 checked out the PR in the
+auto-dismiss, hallucination, decided by owner, or minor (not fixed). List every
+question still open after a stop under **Open questions**, at the top of the report. If step 5 checked out the PR in the
 main checkout, that checkout is back on the branch it started on (see
 [Return the main checkout](references/gh-mechanics.md#check-out-the-head-branch-safely)).
 
