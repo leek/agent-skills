@@ -3,7 +3,7 @@ name: chatter-scout
 description: Sweep the web for new chatter on a topic, skip what earlier runs already saw, verify what is left, and write one ranked, cited findings file to feed a blog post or a digest email.
 disable-model-invocation: true
 argument-hint: "A topic or profile slug (omitted: the repo's only profile)"
-allowed-tools: "WebSearch WebFetch Bash(bash *filter-seen.sh *)"
+allowed-tools: "WebSearch WebFetch"
 compatibility: "Needs jq on PATH"
 model: sonnet
 effort: medium
