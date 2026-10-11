@@ -84,6 +84,8 @@ Completion criterion: every finding in the working set has a line, and the secon
 
 Work on a new branch `fix/issues-<run>` from `origin/<default>`, in a worktree when
 the tree is dirty ([Branch or worktree](references/mechanics.md#branch-or-worktree)).
+On a clean tree, record where the user's checkout is before you switch: step 4 puts it
+back there.
 
 Per LEGIT finding: make the minimal change, with no drive-by refactors. Add a test for
 logic, auth, or data changes and run it green. Commit it on its own (Conventional
@@ -108,8 +110,13 @@ otherwise a plain question in chat): push to `<default>`, open a pull request, o
 them local. Act only on the answer. Offer a pull request first when branch protection or
 the repo's rules forbid direct pushes. The commands are in [Land](references/mechanics.md#land).
 
+Once the answer is acted on, switch the user's checkout back to the branch or commit
+recorded in step 3 ([Restore the checkout](references/mechanics.md#restore-the-checkout)).
+Never leave it on `fix/issues-<run>`. Do the same if the run stops early for any reason
+after the switch.
+
 Completion criterion: the commits are on `<default>`, in an open pull request, or kept
-local by the user's choice.
+local by the user's choice, and the checkout is back where it started.
 
 ## 5. Post a disposition
 

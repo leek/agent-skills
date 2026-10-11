@@ -14,7 +14,12 @@ If the list holds exactly as many issues as the limit, raise the limit and list 
 
 ## Branch or worktree
 
-- Clean tree: `git switch -c fix/issues-<run> origin/<default>`.
+- Clean tree: record the starting point, then branch:
+
+  ```bash
+  git branch --show-current    # <start>; empty when detached, then use: git rev-parse HEAD
+  git switch -c fix/issues-<run> origin/<default>
+  ```
 - Dirty tree: `git worktree add -b fix/issues-<run> .claude/worktrees/issues-<run> origin/<default>`,
   always at that path, never a sibling directory. Work there, after you make it runnable with `laravel-herd-worktrees`' **Bootstrap a bare worktree** section before running anything in it.
 
@@ -36,6 +41,17 @@ printf '%s\t%s\t%s\t%s\n' "$(date +%s)" <pgsql|mysql> <database> "<worktree path
   `origin/<default>` moved, rebase onto it, re-run the tests, and push again.
 - Pull request: `git push -u origin fix/issues-<run>`, then `gh pr create` with a body
   in the `pr` skill's template (screenshots per its **Screenshots** section), plus one `fixes #NNN` line per issue. The issues close when it merges.
+
+## Restore the checkout
+
+Clean-tree runs only (a worktree never moved the main checkout):
+
+```bash
+git switch <start>              # a branch name
+git switch --detach <start>     # a sha, when the run started detached
+```
+
+The `fix/issues-<run>` branch stays; it backs the pull request or the local commits.
 
 ## Disposition and close
 
