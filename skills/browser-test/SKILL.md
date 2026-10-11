@@ -3,7 +3,7 @@ name: browser-test
 description: Test a web app from a start URL and a plain-language prompt. A planner splits the prompt into cases, cheap parallel browser workers run them, and you get one verdict table plus any page errors. Read-only unless the prompt asks for a write and you confirm it.
 disable-model-invocation: true
 argument-hint: "<start-url> <what to test> (e.g. https://app.test/invoices filters and pagination work)"
-allowed-tools: "Bash(agent-browser *) Bash(bash *start-run.sh *)"
+allowed-tools: "Bash(agent-browser *)"
 compatibility: "Needs the agent-browser CLI and python3 on PATH"
 model: sonnet
 effort: medium
