@@ -3,7 +3,7 @@ name: upgrade-plan
 description: Plan a library or framework upgrade from the installed version to the latest. Finds what breaks, which local patches and workarounds can go, and what to adopt, sorted into must do, should do, and do later.
 disable-model-invocation: true
 argument-hint: "One or more packages, optionally pinned (laravel/framework, vite@7). Default target: latest stable"
-allowed-tools: "Bash(bash *versions.sh *) Bash(composer why-not *) Bash(composer show *) Bash(composer audit) Bash(composer audit *) Bash(npm view *) Bash(npm ls *) Bash(npm audit) Bash(npm audit *) WebFetch WebSearch"
+allowed-tools: "Bash(composer why-not *) Bash(composer show *) Bash(composer audit) Bash(composer audit *) Bash(npm view *) Bash(npm ls *) Bash(npm audit) Bash(npm audit *) WebFetch WebSearch"
 compatibility: "The version script needs jq and curl, and covers Composer and npm. Other ecosystems resolve the same facts by hand"
 ---
 
