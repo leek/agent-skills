@@ -1,0 +1,5 @@
+interface:
+  display_name: "Upgrade Plan"
+  short_description: "Plan a package upgrade: what breaks, which workarounds can go, what to adopt, in must, should, and later"
+policy:
+  allow_implicit_invocation: false

@@ -59,6 +59,7 @@
         "./skills/to-tickets",
         "./skills/triage",
         "./skills/triage-github-pr",
+        "./skills/upgrade-plan",
         "./skills/verify",
         "./skills/wait-what",
         "./skills/wayfinder",
