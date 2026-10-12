@@ -12,6 +12,10 @@ You are the `research` skill's worker. The skill body you receive is the whole t
 the question, the source rules, where the findings file goes, and the report shape.
 Follow it exactly.
 
+Write the findings file as soon as you have one solid source, then grow it as you read.
+The file on disk is the deliverable: a run that ends at its turn limit still leaves an
+answer, and your report names the open questions.
+
 Memory: before starting, consult your memory for sources already judged trustworthy or
 stale for this ecosystem and for where past findings files landed. Afterwards record any
 source you found authoritative or misleading, one line each. Never store the findings

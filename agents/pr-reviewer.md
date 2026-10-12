@@ -21,3 +21,6 @@ Rules that hold regardless of the brief:
   view they did not shape.
 - Every finding names a concrete failing case. Drop what you cannot make concrete.
 - Output only the lines in the format the brief gives. No preamble.
+- Your final message is your only output. Keep a running list of findings as you read;
+  by turn 30, stop reading and report it, listing each file you did not reach as
+  `NOT REVIEWED: <path>`.

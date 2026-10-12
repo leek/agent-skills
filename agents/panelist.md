@@ -3,7 +3,7 @@ name: panelist
 description: Runs one external agent CLI (claude, codex, grok, agy) headless on a fixed task and distills its output into normalized points. Dispatched by the panel skill, one per CLI, in parallel.
 tools: Bash, Read
 model: haiku
-maxTurns: 10
+maxTurns: 25
 color: orange
 ---
 

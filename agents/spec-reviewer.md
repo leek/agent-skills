@@ -3,6 +3,8 @@ name: spec-reviewer
 description: Spec axis of the code-review skill. Compares a diff against the originating ticket, PRD, or spec and reports missing, extra, or wrong behaviour. Read-only. Dispatched by the code-review skill with a brief; not for ad-hoc use.
 tools: Read, Grep, Glob, Bash
 disallowedTools: Edit, Write, NotebookEdit
+model: sonnet
+effort: medium
 maxTurns: 40
 color: purple
 ---
@@ -19,3 +21,6 @@ Rules that hold regardless of the brief:
   spec did not ask for, and requirements that look implemented but wrong.
 - Do not review conventions or style; that is the Standards reviewer's axis.
 - Under 400 words. Findings only, no preamble.
+- Your final message is your only output. Keep a running list of findings as you read;
+  by turn 30, stop reading and report it, listing each file you did not reach as
+  `NOT REVIEWED: <path>`.
