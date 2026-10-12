@@ -69,6 +69,10 @@ boundary values and consequential unhappy paths, not only the happy path.
   uncovered risk as the target, not uncovered code.
 - Avoid repeating the same claim at several layers unless each layer protects
   a distinct contract.
+- Skip greps over source, imports, or file contents posing as tests; they
+  assert spelling, not behavior.
+- Skip tests whose only job is to keep a test-only export, wrapper, or seam
+  alive; delete the seam with the test.
 
 ## Use a trustworthy boundary
 

@@ -50,6 +50,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | `laravel-herd-worktrees` | model | Use when working with Laravel projects served by Laravel Herd alongside git worktrees on macOS. |
 | `panel` | user | Convene a panel of agent CLIs (grok, claude, codex, agy) on a prompt or a code review, each in its own headless subagent, then report one consensus grouped by how much they agree. |
 | `pr` | model | The pull request body format, built for fast human review: the smallest visual of the change, before/after evidence, and a one-way or two-way door call with its blast radius. |
+| `prune-tests` | user | Delete low-signal tests one test area at a time, keeping coverage within 2%, and open one PR per area. Earlier runs' areas are excluded. |
 | `prototype` | model | Build a throwaway prototype to answer a design question. |
 | `release` | user | Commit this session's work, bump the version, tag, push, and publish a GitHub release with grouped notes. |
 | `repository-cleanup` | user | Audit and clean Git repository state, including the local databases old worktrees left behind. |
@@ -78,7 +79,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 
 ## Subagents (Claude Code)
 
-Installing the plugin also loads the subagents in [`agents/`](./agents) as `leek-skills:<name>`. The skills dispatch them where they already fan out work: `code-review` → `standards-reviewer` + `spec-reviewer`, `codebase-design` (design-it-twice) → `module-designer`, `improve-codebase-architecture` → `deepening-scout`, `retro` → `session-miner`, `panel` → `panelist`, `browser-test` → `browser-test-planner` + `browser-tester` + `browser-writer`, `chatter-scout` → `chatter-sweeper` + `chatter-verifier`, `code-smells-audit` → `smell-sweeper`, `fix-github-issues` + `triage-github-pr` → `finding-verifier`, `triage-github-pr` → `pr-reviewer`, `upgrade-plan` → `release-notes-collector` + `upgrade-impact-scout`; `research` and `dependency-audit` fork into `researcher` and `dependency-auditor`. The one plugin hook, [`hooks/hooks.json`](./hooks/hooks.json), guards `browser-tester` and `browser-test-planner` so they can only run read-only browser commands. Other harnesses ignore the directory and the skills fall back to inline or generic sub-agents, as before. Conventions in [`AGENTS.md`](./AGENTS.md#subagents-agents).
+Installing the plugin also loads the subagents in [`agents/`](./agents) as `leek-skills:<name>`. The skills dispatch them where they already fan out work: `code-review` → `standards-reviewer` + `spec-reviewer`, `codebase-design` (design-it-twice) → `module-designer`, `improve-codebase-architecture` → `deepening-scout`, `retro` → `session-miner`, `panel` → `panelist`, `browser-test` → `browser-test-planner` + `browser-tester` + `browser-writer`, `chatter-scout` → `chatter-sweeper` + `chatter-verifier`, `code-smells-audit` → `smell-sweeper`, `prune-tests` → `test-auditor`, `fix-github-issues` + `triage-github-pr` → `finding-verifier`, `triage-github-pr` → `pr-reviewer`, `upgrade-plan` → `release-notes-collector` + `upgrade-impact-scout`; `research` and `dependency-audit` fork into `researcher` and `dependency-auditor`. The one plugin hook, [`hooks/hooks.json`](./hooks/hooks.json), guards `browser-tester` and `browser-test-planner` so they can only run read-only browser commands. Other harnesses ignore the directory and the skills fall back to inline or generic sub-agents, as before. Conventions in [`AGENTS.md`](./AGENTS.md#subagents-agents).
 
 ## Mods (Claude Code)
 
@@ -107,9 +108,9 @@ npx skills add https://github.com/leek/agent-skills --skill code-review
 
 Re-run either command to update.
 
-### Claude Code (plugin marketplace)
 This copies the skills only. The typed subagents in [`agents/`](./agents) come with the Claude Code plugin below, so in a repo that has the skills from `npx skills` and no plugin, a dispatch to `leek-skills:<name>` fails with `Agent type ... not found` and the skill takes its general sub-agent path. Install the plugin as well to get the cheaper, read-only typed agents.
 
+### Claude Code (plugin marketplace)
 
 ```
 /plugin marketplace add leek/agent-skills

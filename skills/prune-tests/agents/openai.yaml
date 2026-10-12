@@ -1,0 +1,6 @@
+interface:
+  display_name: "Prune Tests"
+  short_description: "Delete low-signal tests one area at a time, keep coverage, and open a PR per area"
+  default_prompt: "Use $prune-tests to delete low-value tests in this repository one area at a time and open a PR per area. Add a cycle count or test paths to change the scope, e.g. $prune-tests 2 tests/Unit."
+policy:
+  allow_implicit_invocation: false

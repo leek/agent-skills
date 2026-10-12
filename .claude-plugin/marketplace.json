@@ -41,6 +41,7 @@
         "./skills/laravel-herd-worktrees",
         "./skills/panel",
         "./skills/pr",
+        "./skills/prune-tests",
         "./skills/prototype",
         "./skills/release",
         "./skills/repository-cleanup",

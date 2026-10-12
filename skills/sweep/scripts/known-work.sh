@@ -5,18 +5,22 @@
 #                    (default 30), and every PR closed unmerged in the last year:
 #                    number, state, title, branch, url, files, and sweep (true
 #                    when the branch starts sweep/ or sweep-)
-#   taken_branches   local and remote branch names starting with sweep
-#   findings         .scratch/sweep/findings/*.md files in the main checkout
+#   taken_branches   local and remote branch names starting with the prefix
+#   findings         .scratch/<prefix>/findings/*.md files in the main checkout
 #
-# Usage: known-work.sh [--days N]
+# Usage: known-work.sh [--days N] [--prefix NAME]
+# --prefix names the skill's branches and findings (default sweep; prune-tests
+# passes its own). The prs[].sweep flag marks branches starting with the prefix.
 # Run from anywhere inside the target repository. Read-only.
 set -e
 
 days=30
+prefix=sweep
 limit=300   # per request; merged PRs are fetched in 5-day windows to keep each one small
 while [ $# -gt 0 ]; do
   case "$1" in
     --days) days="$2"; shift 2 ;;
+    --prefix) prefix="$2"; shift 2 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -49,13 +53,14 @@ for f in "$tmp"/open.json "$tmp"/closed-*.json; do
   [ "$(jq length "$f")" -lt "$limit" ] || echo "warning: a PR window hit $limit results; some PRs are missing" >&2
 done
 
-git -C "$main" for-each-ref --format='%(refname:short)' 'refs/heads/sweep*' 'refs/remotes/*/sweep*' \
-  | sed 's#^[^/]*/\(sweep\)#\1#' | sort -u | jq -R . | jq -s . > "$tmp/branches.json"
+git -C "$main" for-each-ref --format='%(refname:short)' "refs/heads/$prefix*" "refs/remotes/*/$prefix*" \
+  | sed "s#^[^/]*/\($prefix\)#\1#" | sort -u | jq -R . | jq -s . > "$tmp/branches.json"
 
-find "$main/.scratch/sweep/findings" -name '*.md' 2>/dev/null | sort | jq -R . | jq -s . > "$tmp/findings.json"
+find "$main/.scratch/$prefix/findings" -name '*.md' 2>/dev/null | sort | jq -R . | jq -s . > "$tmp/findings.json"
 
 jq -n \
   --arg default "$default" \
+  --arg prefix "$prefix" \
   --slurpfile open "$tmp/open.json" \
   --slurpfile closed "$tmp/closed.json" \
   --slurpfile branches "$tmp/branches.json" \
@@ -65,7 +70,7 @@ jq -n \
     prs: ($open[0] + $closed[0] | unique_by(.number) | sort_by(-.number) | map({
       number, state, title, branch: .headRefName, url,
       files: [.files[].path],
-      sweep: (.headRefName | test("^sweep[-/]"))
+      sweep: (.headRefName | test("^" + $prefix + "[-/]"))
     })),
     taken_branches: $branches[0],
     findings: $findings[0]
