@@ -32,7 +32,7 @@ Read the spec: its **Build Contract** section first, then what the tickets name.
 
 **No `tickets/` yet?** Cut them yourself with `to-tickets`' rules: its step 3 for the slicing, its step 4 for the one green light, its step 5 and [Ticket template](../to-tickets/SKILL.md#ticket-template) to publish and commit. Vertical slices with honest `blocked-by` edges are what make the frontier wide; a chain of tickets each blocked by the last builds no faster than `/implement all`.
 
-Leave out closed tickets and tickets claimed by someone else (name them in the report). A `deploy-gate: true` ticket bounds the run: build up to and including it, then stop at step 7 with a PR; its dependents start after that PR is deployed.
+Leave out closed tickets and tickets claimed by someone else (name them in the report). A `deploy-gate: true` ticket bounds the run: build up to and including it, then stop at step 7 with a PR; its dependents start after that PR is deployed. When dependents would wait behind a gate, ask once, here, before the first dispatch (not after the gate PR opens): stop at the gate, or build the dependents in this run on a second integration branch `<slug>-2` cut from the gate branch's tip. The stacked branch merges the gate branch as it changes, and once the gate PR merges, its own delta moves onto fresh `origin/<default>` for a second PR.
 
 Finish when every in-scope ticket and its edges are known and the first frontier is listed.
 
@@ -57,11 +57,12 @@ For each frontier ticket, up to the concurrency limit (default 4: each one runs 
 3. **Implementer subagent**, in the background where the harness allows (Claude Code: subagents run in the background by default and wake you on completion; pass `run_in_background: true` where the Agent tool offers it; give each a `name` of `<slug>--<NN>` so you can address it later; Codex: `spawn_agent`, keeping each returned agent id against `<slug>--<NN>`, and `wait_agent` to collect reports; elsewhere, any sub-agent the harness offers). Its brief gives pointers (worktree path, ticket path, the spec's Build Contract, direct blockers' reports from step 4, the notes directory) and these rules:
    - Work only in that worktree (enter it with `EnterWorktree({path})` where available, otherwise use absolute paths into it). Confirm `git merge-base --is-ancestor <integration tip> HEAD` before starting.
    - Choose seams with the `tdd` skill's **Seams: where tests go** rules and state them; then call the Skill tool with `tdd` and build the ticket test-first. Focused tests and configured static analysis end green.
+   - Run tests in the foreground and wait for the result. Never send a test run to the background and go idle on it: an idle implementer may not wake when the run ends. A run too long for the tool's timeout is too broad; run fewer files.
    - Format touched paths with the repo's configured formatter, commit by explicit path. Never touch `.scratch/`, never push, never write another branch.
    - Before reporting, merge the current integration tip into the branch and rerun the focused tests.
    - Report in at most ten lines: commit SHAs, touched paths, seams (name any public seam a dependent ticket should reuse), the focused test command and result, deviations from the ticket, and anything blocking.
 
-Then end the turn and let completion notifications wake you; never poll.
+Then end the turn and let completion notifications wake you; never poll. An idle notification with no report and no new commit is a stall, not progress: message that implementer at once (`SendMessage` in Claude Code, `followup_task` in Codex) to finish or say what blocks it.
 
 ### 4. Merge as each implementer lands
 
@@ -73,7 +74,7 @@ Finish when every in-scope ticket is merged or released, and no implementer is r
 
 ### 5. Review once, over the whole branch
 
-Call the Skill tool with `code-review` against `base_sha` on the integration branch, scoped to every path the run touched. Hand all actionable findings to **one** implementer subagent working in the integration checkout, through `tdd`, named `<slug>--fix` so later rounds reach it by `SendMessage` in Claude Code or `followup_task` in Codex (otherwise brief a fresh one with the integration checkout path and the findings); re-run `code-review` after its fix commit. Finish when review reports nothing actionable.
+Call the Skill tool with `code-review` against `base_sha` on the integration branch, scoped to every path the run touched. Hand all actionable findings to **one** implementer subagent working in the integration checkout, through `tdd`, named `<slug>--fix` so later rounds reach it by `SendMessage` in Claude Code or `followup_task` in Codex (otherwise brief a fresh one with the integration checkout path and the findings); re-run `code-review` after its fix commit. A finding that needs the user's decision never holds the round: send every other finding now, ask that one in parallel, and pass the answer on as a follow-up. Finish when review reports nothing actionable.
 
 ### 6. Final checks and verification
 
