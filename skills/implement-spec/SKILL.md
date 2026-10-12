@@ -74,11 +74,11 @@ Finish when every in-scope ticket is merged or released, and no implementer is r
 
 ### 5. Review once, over the whole branch
 
-Call the Skill tool with `code-review` against `base_sha` on the integration branch, scoped to every path the run touched. Hand all actionable findings to **one** implementer subagent working in the integration checkout, through `tdd`, named `<slug>--fix` so later rounds reach it by `SendMessage` in Claude Code or `followup_task` in Codex (otherwise brief a fresh one with the integration checkout path and the findings); re-run `code-review` after its fix commit. A finding that needs the user's decision never holds the round: send every other finding now, ask that one in parallel, and pass the answer on as a follow-up. Finish when review reports nothing actionable.
+Call the Skill tool with `code-review` against `base_sha` on the integration branch, scoped to every path the run touched. Hand all actionable findings to **one** implementer subagent working in the integration checkout, through `tdd`, named `<slug>--fix` so later rounds reach it by `SendMessage` in Claude Code or `followup_task` in Codex (otherwise brief a fresh one with the integration checkout path and the findings); re-run `code-review` after its fix commit as a re-review, passing the previous round's findings and head. A finding that needs the user's decision never holds the round: send every other finding now, ask that one in parallel, and pass the answer on as a follow-up. One re-review is the budget: what it still finds goes into the final report and the PR, not another round. Finish when review reports nothing actionable, or when that one re-review is done.
 
 ### 6. Final checks and verification
 
-Run `implement`'s steps 6 and 7 once over the whole range: ask before the full suite, then call the Skill tool with `verify` and check every ticket's acceptance criteria in one pass. A product failure goes back through step 5's single implementer. Finish when verification passed, or name the exact external blocker and leave those tickets open.
+Run `implement`'s steps 6 and 7 once over the whole range. Skip the full-suite question when the repo's rules or the user's saved preferences already settle it (CI runs the suite, or "do not run the full suite unless asked"); otherwise ask once. A declined full suite is never replaced by a broad sweep of many test files: each ticket's focused tests stand as the evidence. Then call the Skill tool with `verify` and check every ticket's acceptance criteria in one pass. A product failure goes back through step 5's single implementer. Finish when verification passed, or name the exact external blocker and leave those tickets open.
 
 ### 7. Close and deliver
 

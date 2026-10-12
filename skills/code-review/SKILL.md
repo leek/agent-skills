@@ -73,6 +73,10 @@ Each smell reads *what it is* → *how to fix*; match it against the diff:
 
 **If sub-agents are unavailable:** run the reviews inline in this session, Correctness first, then Standards, then Spec (or skip Spec when no source was found). Same briefs, same output shape, only the execution host changes.
 
+**Small diffs run inline too.** When `git diff --shortstat` shows at most 3 files and about 150 changed lines, three fresh contexts each re-reading it cost more than they find: take the inline path above.
+
+**A re-review narrows.** When the caller passes the previous round's findings and its head, review only `<previous head>..HEAD` (the fix commits) and run only the axes that had actionable findings, plus Correctness when a fix added a mechanism (job, lock, claim, retry). Report the axes that did not run as `not re-run`.
+
 **Correctness brief**: hand over the brief in [`triage-github-pr/references/independent-review.md`](../triage-github-pr/references/independent-review.md) in full, failure-mode probes included, with the diff command and commit list as its range, the commit messages as intent, and the repo's `AGENTS.md` / `CLAUDE.md`. Do not pass any PR review comments: this axis is the view they did not shape. Its output is the brief's `Self N: [BLOCKING | MAJOR | MINOR]` lines, each with a concrete failing case.
 
 **Standards brief**: include:
