@@ -108,6 +108,8 @@ npx skills add https://github.com/leek/agent-skills --skill code-review
 Re-run either command to update.
 
 ### Claude Code (plugin marketplace)
+This copies the skills only. The typed subagents in [`agents/`](./agents) come with the Claude Code plugin below, so in a repo that has the skills from `npx skills` and no plugin, a dispatch to `leek-skills:<name>` fails with `Agent type ... not found` and the skill takes its general sub-agent path. Install the plugin as well to get the cheaper, read-only typed agents.
+
 
 ```
 /plugin marketplace add leek/agent-skills
