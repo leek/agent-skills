@@ -43,13 +43,15 @@ gh pr view N --json statusCheckRollup -q '.statusCheckRollup[]
   | (.name // .context)'
 ```
 
-This lists CI too. Only a review bot's own check counts as in flight; ignore the rest.
+This lists CI too. Only a review bot's own check counts as a review in flight; ignore
+the rest for that purpose. These signals use the main skill's recorded optional-wait
+budget, not an unlimited merge gate. Required human approvals are checked separately.
 
 Verified bot behaviour (2026-10):
 
-- **Both bots review every push.** Each pushed commit buys a full new round from each,
-  and an open thread they already raised is raised again. So resolve before you push
-  (step 5).
+- **Both bots review every push.** A new run may start after the push. Resolve completed
+  fixes before pushing (step 5); after the final allowed batch, gather available
+  findings and carry them instead of waiting for that new run and buying another push.
 - **Codex** (`chatgpt-codex-connector[bot]`) reacts with `eyes` while a review runs. It
   reacts `+1` when it finishes with no findings, and posts review comments when it has
   some. Its `<!-- codex-pull-request-review-summary -->` issue comment holds a
@@ -67,11 +69,14 @@ AUTO-DISMISS.
 ## Merge gates
 
 - `mergeable`: `CONFLICTING` means rebase or resolve. `UNKNOWN` means GitHub is still
-  computing, so re-poll.
+  computing: re-poll with the host wait/yield mechanism for at most one minute, then
+  report that gate as unresolved. This does not reset the review or fix budget.
 - `mergeStateStatus`: `CLEAN` or `UNSTABLE` (a non-required check failed) means go.
   `BLOCKED` means an approval or required check is missing: a pending required check is
-  not a reason to wait (see Merge). `BEHIND` means run `gh pr update-branch N`, then
-  run step 6 again from the top on the new head, without waiting for the new CI run.
+  not a reason to wait (see Merge). `BEHIND` means update the branch only within the
+  remaining push budget, combining it with pending fixes when possible, then review
+  the new head without waiting on CI. If no push remains or it is behind again at
+  the retry, report a blocker instead of looping.
   `DIRTY` means conflicts.
 - `reviewDecision`: `CHANGES_REQUESTED` blocks, and pushing a fix does not clear it.
   `REVIEW_REQUIRED` blocks when branch protection requires a review, and your own
@@ -114,7 +119,9 @@ Never reuse a checkout without proof that it is the PR head. Before the first ch
   hold someone's unsaved work): `git fetch origin && git worktree add --detach
   .claude/worktrees/pr-N origin/<head>`, always at that path, never a sibling
   directory. Work there, and push with `git push origin HEAD:<head>` (no `--force`;
-  if the push is refused, someone else pushed, so go back to step 3).
+  if the push is refused, refresh step 3 once within the existing batch and review
+  the changed head. A second concurrent refusal or head movement is a reported
+  concurrency blocker, not a new batch or snapshot).
 
 A new worktree starts bare (no `vendor/`, no `.env`): make it runnable with `laravel-herd-worktrees`' **Bootstrap a bare worktree** section before running anything in it. Its last check proves `HEAD` equals `headRefOid`, which also catches a helper that branched off the default branch.
 
@@ -149,16 +156,29 @@ gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "PRRT_
 Keep `$BODY` free of apostrophes and backticks. A resolve that returns nothing means no
 write access or a stale thread id: re-query the threads.
 
-Bodies by verdict: `fixed in <sha>` (the local commit sha; it is the same after the
-push), the one-line evidence for AUTO-DISMISS and HALLUCINATION, `minor, carried to a
-follow-up PR` for a carried finding, `decided by owner: <answer>` for an answered QUESTION, and
-`repeat of <earlier reply url>` for a repeat. A QUESTION without an answer stays open. Every one of
-them is resolved.
+Bodies and resolution by delivery state:
+
+| State | Reply | Resolve? |
+|---|---|---|
+| Verified LEGIT, eligible for current batch | `<severity>; verified; fixing in current batch` | No |
+| Validated and committed | `fixed in <sha>; validated; push pending` | Yes |
+| Carried LEGIT | `<severity>; carried to a follow-up PR` (add the link after opening it) | Yes |
+| AUTO-DISMISS or HALLUCINATION | One-line evidence | Yes |
+| Answered QUESTION | `decided by owner: <answer>` | Yes |
+| STALE or repeat | `repeat of <earlier reply url>` | Yes |
+| Unanswered QUESTION | The pending owner decision | No |
+
+Publish the classification reply before coding, then reply again when its state
+changes. A local fix SHA is the same after pushing, but is not yet remotely available;
+record the published head in the disposition only after the push succeeds. Re-query
+the unresolved thread count before pushing and merging. An unresolved owner decision
+or accepted-but-unfixed current-batch finding stays visible, not falsely resolved.
 
 ## Count rounds
 
-A round is a push to the head branch after the PR opened (see the round budget in
-`SKILL.md`). GitHub's repository activity feed records every push per branch, force
+A round is a push to the head branch after the PR opened. Reconcile bounded batch
+SHAs against this history; [exhaustive mode](exhaustive-triage.md#round-budget) uses
+the total count as its five-round limit. GitHub's activity feed records every push, force
 pushes and `gh pr update-branch` merges included:
 
 ```bash
@@ -175,19 +195,28 @@ in the fork: run the same call against the head repository
 
 ## Disposition comment
 
-One issue comment per PR, owned by you, edited in place every round. It records the
-verdicts and the round count you counted; it is a display, and the push history stays
-the source of the count:
+One issue comment per PR, owned by you, edited in place as claims are verified and
+delivery states change. Publish it before coding and keep it current during each
+batch. It records the delivery mode, starting SHA, snapshot, batch checkpoint,
+optional wait used, verdicts and push count; GitHub activity owns that count:
 
 ```markdown
 <!-- triage-disposition -->
 **Triage, round N** at `<head sha>`
+Mode: bounded | exhaustive
+Starting head: <sha>; snapshot: <ids and timestamps, or artifact link>
+Batch: <number>; not needed | fixing | validated at <sha>
+Optional review wait used: <total minutes of 20>
+Checkpoint: <initial / after batch 1 / exhaustive round N>; wait used: <minutes of 10>
+Active wait started: <timestamp, or not waiting>
+Published head: <sha, or push pending>
 
-| Finding | Author | Where | Verdict |
-|---|---|---|---|
-| <one-line claim> | <login> | <path:line or review/comment link> | fixed in <sha> / stale: <evidence> / repeat of <url> / auto-dismiss: <evidence> / hallucination: <evidence> / decided by owner: <answer> / carried to a follow-up PR |
+| Finding | Author | Where | Verdict | Delivery state |
+|---|---|---|---|---|
+| <one-line claim> | <login> | <path:line or review/comment link> | LEGIT <severity> / stale / auto-dismiss / hallucination / decided by owner | fixing / validated commit, push pending / fixed at published head / carried / resolved / pending decision |
 
 Carried findings: <each carried finding, with its link; the follow-up PR link once opened>
+Open threads: <live count, separated into fixing and pending decisions>
 Blocker: <only in a stop case>
 ```
 
@@ -233,7 +262,10 @@ gh pr view N --json state,mergedAt,mergeCommit,autoMergeRequest
 ```
 
 `--match-head-commit` makes GitHub refuse the merge when the head moved after your
-re-check. On that refusal, run step 6 again from the top.
+re-check. Refresh, review the changed range and retry this checkpoint once. A second
+head movement is a reported concurrency blocker, not another fix round. For other
+merge failures, inspect the refusal, perform one applicable correction within the
+budget, then report any remaining gate rather than repeating indefinitely.
 
 Never pass `--delete-branch`, and never delete a branch by any other route
 (`git push --delete`, `gh api -X DELETE .../git/refs/...`). Deleting a branch closes

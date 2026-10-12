@@ -68,7 +68,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | `to-spec` | model | Turn the current conversation into a spec (PRD) and save it as markdown under .scratch/: no interview, just synthesis, with Laravel test seams chosen from the tdd ranking rules rather than asked about. |
 | `to-tickets` | user | Break a spec into tracer-bullet vertical-slice tickets with explicit blocking edges, take one green light on the breakdown, and save one markdown file per ticket beside the spec. |
 | `triage` | user | Move issues and external PRs through a state machine of triage roles: categorise, verify, grill if needed, and write agent-ready briefs. |
-| `triage-github-pr` | user | Triage a GitHub pull request end to end, from reviews and checks through fixes to a clean merge. |
+| `triage-github-pr` | user | Review and merge a pull request with up to two fix rounds, carrying later findings into a follow-up PR. |
 | `upgrade-plan` | user | Plan a library or framework upgrade from the installed version to the latest: cheap parallel subagents read the changelogs and scan the code, and one plan sorts what breaks, which local patches and workarounds can go, and what to adopt into must do, should do, and do later. Follows the dependencies that have to move too. |
 | `verify` | model | Exercise a change end to end in the running application (hit the route, run the command, click through the page) and report what actually happened. |
 | `wait-what` | user | Stop; that last message did not land. Re-pitch it. |

@@ -34,6 +34,28 @@ the schema, the tests. A bug often sits in what the diff did not change.
 - **Tests**: changed logic, auth, or data behaviour with no test that would fail if
   the change were reverted.
 
+### Workflow coverage
+
+For each changed invariant (ownership, requiredness, eligibility, completion or
+another shared rule), find every live path that creates, updates or consumes that
+state. Trace callers and registrations; file existence alone is not a live path.
+Build a compact map before judging the hunks:
+
+```text
+invariant -> path -> producer/consumer -> gate or transition -> test/evidence
+```
+
+Check sibling paths together: public versus authenticated submissions, ordinary
+versus imported/uploaded creation, queued versus synchronous completion, and full
+versus partial previews when they exist. Follow persisted defaults and migrated
+state through the same paths. Do not limit the pass to the first class named in a
+finding or to files edited by the fix; report only defects caused by the reviewed
+change, with a reachable failing case.
+
+For a fix range, re-check the affected invariant across its live siblings before
+declaring the fix complete. State which paths were covered and which could not be
+reviewed; keep this scoped to the changed invariants.
+
 ### Failure-mode probes
 
 The categories above are where review bots find the most, one round at a time. Ask
@@ -57,11 +79,9 @@ does:
 - **Twice and at once.** A repeated or concurrent request on the same key: is the check
   and the write under the same lock or unique constraint? A validation that runs before
   the transaction is not a guard.
-- **Every entry path gets every gate.** A new way in (inbound mail, a webhook, a job, an
-  import) enforces the same account gates the login does (disabled, verified, tenant) and
-  the same input bounds as the form (dates not in the future, positive minimums, lengths).
-- **Parallel paths agree.** Two writers of the same fact (manual and AI, seeder and
-  ingest, upload and email) compute keys, hashes and validation the same way.
+- **Every live path preserves the invariant.** Use the workflow map to compare
+  authorization, input bounds, identity resolution, requiredness and completion
+  gates. Two writers of the same fact must also agree on keys, hashes and validation.
 - **The sibling you imitated.** Diff the new module against the existing one it copies
   (an IAM attachment, an adapter, a terraform module). What the sibling does and the copy
   does not is a finding until shown otherwise.
@@ -71,7 +91,7 @@ not findings here.
 
 ## Output
 
-One line per finding, then nothing else:
+One line per finding:
 
 ```
 Self N: [BLOCKING | MAJOR | MINOR] file:line — <defect> — <concrete failing case>
@@ -83,4 +103,6 @@ Self N: [BLOCKING | MAJOR | MINOR] file:line — <defect> — <concrete failing 
 
 Every finding names a concrete failing case: the input or state, and what goes wrong.
 A finding without one is a suspicion; check it until it has one or drop it. When the
-diff is clean, output `Self: no findings` and the areas you checked.
+diff is clean, output `Self: no findings`. Follow either result with one compact
+`Coverage: <invariant> — <live paths checked>` line per changed invariant. List an
+unreached path as `NOT REVIEWED: <path>`; incomplete coverage is not a clean review.
