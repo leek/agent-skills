@@ -33,7 +33,7 @@ A **seam** is the public boundary the feature will be tested at (`codebase-desig
 
 ### 3. Write and publish the spec
 
-Write the spec using the template below. Every decision the draft would make that the conversation did not (a new table, flag, setting, switch, or user-visible behavior) goes into a **Needs decision** list above the draft, one line each with your recommendation, and stays out of the draft body. Show the list and the complete draft, then ask each Needs decision item as its own question, your recommendation first (via `AskUserQuestion` where available, with each option's `preview` showing the draft section that choice changes where that helps; otherwise one numbered question per item in chat), and close with one question: publish, or adjust first. Wait for the user to approve publication or request changes. Publish only when every Needs decision item is accepted or replaced, and write the accepted ones into the body. More than three items, or any that touches an ADR, money, or data loss, means the grill ended early: recommend `/grill-me` on them instead.
+Write the spec using the template below. Every decision the draft would make that the conversation did not (a new table, flag, setting, switch, or user-visible behavior) goes into a **Needs decision** list above the draft, one line each with your recommendation, and stays out of the draft body. Show the list and the complete draft, then ask each Needs decision item as its own question, your recommendation first (via `AskUserQuestion` where available, with each option's `preview` showing the draft section that choice changes where that helps; otherwise one numbered question per item in chat), and close with one question: publish, or adjust first. Wait for the user to approve publication or request changes. Publish only when every Needs decision item is accepted, replaced, or left open. Write the accepted ones into the body. An item the user left open (skipped, declined the question, or said "publish anyway") goes under **Open questions**, never into the body as decided behaviour. Before publishing, reread the body once: anything the conversation did not settle moves to Open questions. More than three items, or any that touches an ADR, money, or data loss, means the grill ended early: recommend `/grill-me` on them instead.
 
 A spec is a markdown file under `.scratch/`: there is no external tracker. Read the layout from `.agents/issue-tracker.md` (written by `/setup`). If it's missing, try `docs/agents/issue-tracker.md` (legacy), then the path below; suggest running `/setup` once to make it durable.
 
@@ -88,6 +88,10 @@ The detailed decisions that were made. Keep Build Contract material in that sect
   (no assertions on copy, layout, or CSS); don't test framework behavior;
   do test business rules, validation, persisted data, record-level
   authorization, and side effects (via Queue/Mail/Storage/Event fakes)
+
+## Open questions
+
+Decisions the conversation did not settle, one line each with the recommendation. Tickets that depend on one are blocked until it is answered. Omit the section when there are none.
 
 ## Out of Scope
 

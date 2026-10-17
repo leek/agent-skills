@@ -73,11 +73,11 @@ Finish this step only when review reports no unresolved actionable findings (or 
 
 ### 6. Run the final automated checks
 
-Ask the user first (via `AskUserQuestion` where available, otherwise a plain question in chat) whether to run the full test suite as the final automated gate. If they decline, skip the full run (the focused tests from step 3 stand as the automated evidence) and record the skip so step 8 reports it plainly.
+Skip the full-suite question when the repo's rules or the user's saved preferences already settle it (CI runs the suite, or "do not run the full suite unless asked"), and follow that answer. Otherwise ask once (via `AskUserQuestion` where available, otherwise a plain question in chat) whether to run the full test suite as the final automated gate. If the answer is no, skip the full run (the focused tests from step 3 stand as the automated evidence) and record the skip so step 8 reports it plainly.
 
 When approved, run the repository's documented full-suite command: its `AGENTS.md` or `CLAUDE.md`, package scripts (`composer.json`, `package.json`, a `Makefile`), or CI workflow names it; fall back to the stack's default test runner only when none does. A run that can outlast the foreground limit goes to the background (Bash `run_in_background` where available). Then end the turn with no reply and let its completion notification wake you; a check-in that only says it is still running costs the user a turn. Fix failures caused by the work. Prove an unrelated failure pre-existing against `base_sha`, then note it plainly instead of expanding scope.
 
-Any code fix returns to steps 3–5 before this gate runs again. Finish this step when the user declined the full run, or when every caused check passes and every remaining failure has base-SHA evidence.
+Any code fix returns to steps 3–5 before this gate runs again. Finish this step when the full run was skipped (declined, or settled by rules or preferences), or when every caused check passes and every remaining failure has base-SHA evidence.
 
 ### 7. Verify end to end
 

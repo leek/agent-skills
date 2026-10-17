@@ -70,6 +70,10 @@ In the integration checkout: `git merge --no-ff <slug>--<NN>`. On a conflict, ca
 
 Keep each implementer's report in `$notes/<NN>.md`: it feeds dependents' briefs and the ticket's `Resolution`. A merged ticket counts as done for its dependents' `blocked-by`, so recompute the frontier and dispatch what it unblocked (step 3).
 
+After each merge, post one progress line so the user never has to ask for status: `<NN> merged (<k> of <M>); running: <NNs>; next: <NNs>`.
+
+**A question never stops the run.** When a ticket needs the user's decision, release that ticket and its dependents, keep building the rest of the frontier, and ask the open questions together at the next merge, or in the final report when nothing else is running. Stop and wait only when every remaining ticket is blocked on an answer.
+
 Finish when every in-scope ticket is merged or released, and no implementer is running.
 
 ### 5. Review once, over the whole branch
