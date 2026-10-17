@@ -104,19 +104,19 @@ with a green test where it needs one, and every unfixable one is named.
 ## 4. Land the fixes
 
 An issue closes only when its `fixes #NNN` commit reaches `<default>`, so a local
-commit fixes nothing yet. Show the user the commits and the issues each one closes,
-then ask once, as one single-select question (via `AskUserQuestion` where available,
-otherwise a plain question in chat): push to `<default>`, open a pull request, or keep
-them local. Act only on the answer. Offer a pull request first when branch protection or
-the repo's rules forbid direct pushes. The commands are in [Land](references/mechanics.md#land).
+commit fixes nothing yet. Show the user the commits and the issues each one closes, say
+where they will go, and land them without asking: push to `<default>` by default; open a
+pull request instead when branch protection or the repo's rules forbid direct pushes. A
+user instruction in the input or the conversation ("open a PR", "keep them local")
+overrides both. The commands are in [Land](references/mechanics.md#land).
 
-Once the answer is acted on, switch the user's checkout back to the branch or commit
+Once they are landed, switch the user's checkout back to the branch or commit
 recorded in step 3 ([Restore the checkout](references/mechanics.md#restore-the-checkout)).
 Never leave it on `fix/issues-<run>`. Do the same if the run stops early for any reason
 after the switch.
 
 Completion criterion: the commits are on `<default>`, in an open pull request, or kept
-local by the user's choice, and the checkout is back where it started.
+local by the user's instruction, and the checkout is back where it started.
 
 ## 5. Post a disposition
 
@@ -141,18 +141,21 @@ If you later find a misclassified finding, reopen the issue with a correction no
 Completion criterion: every issue has its comment, and `gh issue view N --json state`
 agrees with it.
 
-## 6. Ask once, then clean up
+## 6. Clean up
 
-Remove nothing before this step. List every worktree and database you created and ask
-the user to pick what to delete (`AskUserQuestion` where available: a `multiSelect: true`
-question with one option per item, nothing pre-ticked, at most 4 per question and further
-questions for the rest; otherwise a plain question in chat: "Can I delete everything I
-created for these issues?"). Remove only what the answer selects
-([Clean up](references/mechanics.md#clean-up)); an answer that names no item removes
-nothing, and one that names items to keep keeps those. A worktree whose fixes are not on
-`<default>` yet is not on the list. What stays stays registered, for
-`repository-cleanup`. Skip the question when you created nothing.
+Remove nothing before this step. Then remove without asking every worktree and database
+you created whose fixes are on `<default>` (or nothing was fixed in it), and list each
+removal in the report ([Clean up](references/mechanics.md#clean-up)). A worktree git
+refuses to remove without `--force` holds unsaved work: keep it.
 
-Completion criterion: the user answered, or you created nothing. Report the tally:
+Ask once only about what is left that you created: a refused worktree, and one whose
+fixes are in an open pull request or kept local (`AskUserQuestion` where available: a
+`multiSelect: true` question with one option per item, nothing pre-ticked, at most 4 per
+question and further questions for the rest; otherwise a plain question in chat: "Can I
+delete these too?"). Remove only what the answer selects, never with `--force`. What
+stays stays registered, for `repository-cleanup`. Skip the question when nothing is left.
+
+Completion criterion: everything removable is removed, any question is answered, or you
+created nothing. Report the tally:
 fixed, stale, auto-dismiss, hallucination, and blocked. Name each fix not yet on
 `<default>`, and each worktree or database kept.

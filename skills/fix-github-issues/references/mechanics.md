@@ -37,6 +37,10 @@ printf '%s\t%s\t%s\t%s\n' "$(date +%s)" <pgsql|mysql> <database> "<worktree path
 
 ## Land
 
+Push unless the repo's rules require pull requests. A push refused as a protected
+branch (`GH006`, or "changes must be made through a pull request") means open one
+instead; a refusal is not a reason to retry with `--force`.
+
 - Push: `git push origin HEAD:<default>` (no `--force`). If it is refused because
   `origin/<default>` moved, rebase onto it, re-run the tests, and push again.
 - Pull request: `git push -u origin fix/issues-<run>`, then `gh pr create` with a body
@@ -63,7 +67,7 @@ gh issue view N --json state
 
 ## Clean up
 
-On the user's yes: `git worktree remove .claude/worktrees/issues-<run>` (no `--force`;
+At step 6, for each item it removes: `git worktree remove .claude/worktrees/issues-<run>` (no `--force`;
 if git refuses, the tree holds unsaved work, so report it instead). Then drop each
 database and its parallel-testing copies (`<database>_test_<N>`) with the repo's client
 (`DROP DATABASE IF EXISTS`), and delete its line from the `scratch-databases` file.

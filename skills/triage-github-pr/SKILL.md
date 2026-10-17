@@ -254,7 +254,9 @@ unfinished fixes need not delay those resolutions. Keep accepted-but-unfixed thr
 open. Before pushing, every current-batch finding must be fixed or otherwise disposed
 of, and every answered thread resolved: see [Reply and resolve](references/gh-mechanics.md#reply-and-resolve).
 Record the batch number, `validated at <sha>` and predicted push count, then push.
-After success, record the published head and verify the count against GitHub activity. A failed push
+After success, record the published head and verify the count against GitHub activity.
+Then, before any wait, merge, or next PR, re-query the threads: every thread this push
+answers is replied to and resolved now, never held for the end of the run. A failed push
 is not a published fix. A batch with no push still records and resolves dispositions.
 
 Completion criterion: current-batch fixes are validated, committed, replied to and
@@ -314,21 +316,24 @@ question still open after a stop under **Open questions**, at the top of the rep
 main checkout, that checkout is back on the branch it started on (see
 [Return the main checkout](references/gh-mechanics.md#check-out-the-head-branch-safely)).
 
-## 7. Ask once, then clean up
+## 7. Clean up
 
-Remove nothing while the PRs are in flight. After the last named PR, list every worktree
-(step 5) and database (see [Scratch databases](references/gh-mechanics.md#scratch-databases))
-you created for a PR that now shows merged, and ask once what to delete
-(`AskUserQuestion` where available: `multiSelect: true`, one option per item, nothing
-pre-ticked, at most 4 per question and further questions for the rest; otherwise one
-yes/no question in chat: "Can I delete everything I created for these PRs?"). Remove
-only what the answer selects, or everything on yes; on no, remove nothing. An answer
-that names items to keep keeps those. Skip the question when the list is empty.
-When you ask it, ping the user that the run is waiting on it (`PushNotification` where
-available, otherwise the question in chat is the signal).
+Remove nothing while the PRs are in flight. After the last named PR, remove without
+asking every worktree (step 5) and database (see [Scratch databases](references/gh-mechanics.md#scratch-databases))
+you created for a PR that now shows merged, and list each removal in the report. A
+worktree git refuses to remove without `--force` holds unsaved work: it is not removed.
 
-A stopped or `--auto`-queued PR's worktree and databases are not on the list, and
-neither is anything you did not create. Name them in the report, so the user's next
-`repository-cleanup` run offers them once the merge lands.
+Ask once only about what is left that you created: a worktree git refused, and the
+worktree and databases of a stopped or `--auto`-queued PR (`AskUserQuestion` where
+available: `multiSelect: true`, one option per item, nothing pre-ticked, at most 4 per
+question and further questions for the rest; otherwise one yes/no question in chat:
+"Can I delete these too?"). Remove only what the answer selects, never with `--force`;
+on no, remove nothing. Skip the question when nothing is left. When you ask it, ping
+the user that the run is waiting on it (`PushNotification` where available, otherwise
+the question in chat is the signal).
 
-Completion criterion: the user answered, and the report names everything kept.
+Anything you did not create is never touched. Name what stays in the report, so the
+user's next `repository-cleanup` run offers it once the merge lands.
+
+Completion criterion: everything you created for a merged PR is removed or named as
+refused, any question is answered, and the report names everything kept.

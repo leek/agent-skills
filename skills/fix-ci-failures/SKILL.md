@@ -61,30 +61,51 @@ Completion criterion: every failed job has a line.
 
 ## 3. Fix the legit ones
 
-No LEGIT left: go to step 4.
+No LEGIT left: go to step 5.
 
 Work on the branch without disturbing a dirty tree or another worktree's checkout. When
 the tree is dirty or the branch is checked out elsewhere, use
 `git worktree add .claude/worktrees/ci-<branch> origin/B` (at that path, never a sibling
-directory), then make it runnable with `laravel-herd-worktrees`' **Bootstrap a bare worktree** section before running anything in it. Leave it in place until the end of the run: step 4 asks before removing it. Per
+directory), then make it runnable with `laravel-herd-worktrees`' **Bootstrap a bare worktree** section before running anything in it. Leave it in place until step 5. Per
 LEGIT failure: make the minimal change, run the failing command locally until it is
 green, then commit with explicit staging (Conventional Commits, naming the job).
 
-Before pushing, show the commits and the branch, and push only on the user's approval
-in this conversation. The push starts new CI runs. Leave them running and do not come
-back for their result.
-
 Completion criterion: every LEGIT failure has a commit that turned its command green
-locally, and the push is done or declined.
+locally.
 
-## 4. Report
+## 4. Land the fixes
 
-If step 3 created a worktree, ask one yes/no question at the end: "Can I delete the
-worktree I created?" Run `git worktree remove` (no `--force`) only on yes; on no, name it
-in the report as kept.
+A commit on the worktree fixes nothing until it is on `B`. Show the commits, say where
+they will go, and land them without asking:
+
+- **Default:** push to `B` with `git push origin HEAD:B` (no `--force`). If it is
+  refused because `origin/B` moved, `git fetch origin`, rebase onto `origin/B`, re-run
+  each fixed command, and push again.
+- **Direct pushes forbidden** (branch protection, or the repo's rules): push a
+  `fix/ci-<branch>` branch and open a pull request into `B` with a body in the `pr`
+  skill's template.
+- A user instruction in the input or the conversation ("open a PR", "don't push")
+  overrides both.
+
+The push starts new CI runs. Leave them running and do not come back for their result.
+When step 3 worked in the main checkout on a local `B`, it is now in step with
+`origin/B`; when it worked in a worktree, leave the user's local `B` as it is and say
+it is behind.
+
+Completion criterion: every fix commit is on `origin/B`, in an open pull request, or
+kept local by the user's instruction.
+
+## 5. Clean up and report
+
+If step 3 created a worktree and its commits are on `origin/B` (or in the open pull
+request), remove it without asking: `git worktree remove` (no `--force`). If git refuses,
+or the commits are kept local, keep it and ask one yes/no question: "Can I delete the
+worktree I created?" Remove it only on yes, never with `--force`; otherwise name it in
+the report as kept.
 
 One line per failed job: fixed in `<sha>`, stale (`<sha>`), flaky, infra (what it
-needs), or unreproduced. Then say whether the commits are pushed.
+needs), or unreproduced. Then say where the commits landed, and each worktree removed
+or kept.
 
 ## Guardrails
 

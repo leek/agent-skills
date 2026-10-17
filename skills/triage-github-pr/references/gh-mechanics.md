@@ -130,10 +130,10 @@ A new worktree starts bare (no `vendor/`, no `.env`): make it runnable with `lar
 `git switch <branch>`, or `git switch --detach <sha>`. If git refuses, report it, and
 leave the tree as it is.
 
-After the merge, and only after the user says yes at step 7, `cd` back to the main
-checkout and run `git worktree remove .claude/worktrees/pr-N` (no `--force`; if git
-refuses, the tree holds unsaved work, so report it instead). A stopped or
-`--auto`-queued PR keeps its worktree.
+At step 7, once the PR shows merged, `cd` back to the main checkout and run
+`git worktree remove .claude/worktrees/pr-N` (no `--force`; if git refuses, the tree
+holds unsaved work, so report it instead). A stopped or `--auto`-queued PR keeps its
+worktree unless the user selects it at step 7.
 
 ## Reply and resolve
 
@@ -171,7 +171,8 @@ Bodies and resolution by delivery state:
 Publish the classification reply before coding, then reply again when its state
 changes. A local fix SHA is the same after pushing, but is not yet remotely available;
 record the published head in the disposition only after the push succeeds. Re-query
-the unresolved thread count before pushing and merging. An unresolved owner decision
+the unresolved thread count before pushing, right after each push, and before merging:
+a reviewer watching the PR sees each batch's threads close as it lands, not all at the end. An unresolved owner decision
 or accepted-but-unfixed current-batch finding stays visible, not falsely resolved.
 
 ## Count rounds
@@ -248,10 +249,10 @@ printf '%s\t%s\t%s\t%s\n' "$(date +%s)" <pgsql|mysql> <database> "<worktree path
   >> "$(git rev-parse --path-format=absolute --git-common-dir)/scratch-databases"
 ```
 
-After the user says yes at step 7, drop the database and its parallel-testing copies
-(`<database>_test_<N>`) with the repo's client (`DROP DATABASE IF EXISTS`), then delete
-its line from that file. A database the user kept, and a stopped or `--auto`-queued PR's,
-stays registered for `repository-cleanup`.
+At step 7, once the PR shows merged (or the user selected it), drop the database and
+its parallel-testing copies (`<database>_test_<N>`) with the repo's client
+(`DROP DATABASE IF EXISTS`), then delete its line from that file. A database the user
+kept stays registered for `repository-cleanup`.
 
 ## Merge
 
