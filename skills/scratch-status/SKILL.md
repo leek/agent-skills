@@ -42,6 +42,10 @@ status in either dialect: the YAML frontmatter `status:` field, or a legacy `**S
 - **Commit references**: a 7–40 character hex SHA in the status line, `## Resolution`, or
   `## Comments`; check `git merge-base --is-ancestor <sha> <default-branch>` (default branch:
   `git symbolic-ref --short refs/remotes/origin/HEAD` without the remote prefix, else `main`).
+  A squash-merged or rebased commit is not missing. Before counting one as off the branch,
+  check, in order: a merged PR contains it (`gh api repos/{owner}/{repo}/commits/<sha>/pulls`),
+  `git cherry <default-branch> <sha> <sha>~1` prints it with `-`, or a default-branch commit
+  has the same subject. Only a commit that fails all three is missing.
 
 Classify the effort exactly as `scratch-cleanup` does:
 

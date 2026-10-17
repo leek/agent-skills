@@ -10,7 +10,8 @@ You sweep one source group for new chatter on the topic above.
 - Run every seed query, then up to 5 queries of your own. Fetch only listing or index pages (a news section, a press page, a subreddit listing), at most 5 fetches. Never read full articles.
 - A source the notes say blocks fetch: use search snippets only, and set `"community": true` if it is a forum or social site.
 - Date every item to the day: from the result, the listing page, or a date in the URL path (`/2026/08/25/`). A year or month alone is not a date, and neither is the year in a title ("… in 2026"). If no day-level date is visible, set `null`; never guess.
-- Skip anything older than the window unless its bucket is marked evergreen.
+- An item older than the window (bucket not evergreen) still goes in the array, with its date, at most 5 of them, after every in-window item. The lead lists them for the user; it never verifies them.
+- Return the item's own page (the article, thread, or post), never the listing or index page you found it on. A listing with no item page behind it is not an item.
 - Dated, in-window items first. At most 5 undated items, and only after every dated one.
 - At most 15 items. Return one JSON array and nothing else:
 

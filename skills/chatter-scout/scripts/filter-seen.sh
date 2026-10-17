@@ -11,7 +11,8 @@
 #       Never removes an entry. stdout: {"added": N, "total": M}
 #
 # A missing ledger counts as []. Normalizing lowercases the host, drops "www.",
-# the fragment, tracking params (utm_*, fbclid, gclid, mc_*), and a trailing slash.
+# the fragment, tracking and share params (utm_*, fbclid, gclid, mc_*, ref, ref_src,
+# si, igshid), and a trailing slash.
 set -euo pipefail
 
 MODE="${1:-}"
@@ -38,7 +39,7 @@ def norm:
   | if test("\\?") then
       (split("?")) as $p
       | ($p[1:] | join("?") | split("&")
-         | map(select(test("^(utm_[^=]*|fbclid|gclid|mc_[^=]*)(=|$)") | not))
+         | map(select(test("^(utm_[^=]*|fbclid|gclid|mc_[^=]*|ref|ref_src|si|igshid)(=|$)") | not))
          | join("&")) as $q
       | $p[0] + (if $q == "" then "" else "?" + $q end)
     else . end

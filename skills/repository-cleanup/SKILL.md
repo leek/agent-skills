@@ -64,7 +64,7 @@ git status --short --branch
 git stash list
 git stash show --stat stash@{0}
 git remote -v
-git fetch --all
+git fetch --all --no-prune --no-prune-tags
 git remote prune --dry-run origin
 git worktree list --porcelain
 git branch --format='%(refname:short) %(upstream:short) %(committerdate:relative)'
@@ -74,6 +74,8 @@ git log --all --decorate --oneline --graph --date-order -n 80
 gh pr list --state open --json number,title,headRefName,baseRefName,author,updatedAt,url
 gh pr list --state closed --limit 30 --json number,title,headRefName,baseRefName,author,updatedAt,closedAt,mergedAt,url
 ```
+
+Fetch with `--no-prune --no-prune-tags` even when the user's config sets `fetch.prune` or `fetch.pruneTags`: a pruning fetch deletes stale remote-tracking refs and local-only tags (an `archive/*` tag made to preserve work) that nobody selected. `git remote prune --dry-run` shows the stale refs as candidates instead.
 
 Worktrees whose PR merged, and the databases left behind, come from one script. With no arguments it changes nothing and prints the candidates as JSON. It removes only the names you pass, after the user selected them, and it refuses the whole run, changing nothing, if one name is not a candidate:
 
@@ -111,6 +113,7 @@ Uncertain items are not cleanup candidates until more evidence or user approval 
 - Before removing a worktree, verify it has no uncommitted changes and its branch/commits have been classified.
 - Drop a database only when the user selected that exact name. Never drop one the main checkout or a remaining worktree uses.
 - Before deleting a branch with unique commits, preserve the work by merging, cherry-picking, tagging, renaming, or exporting patches.
+- A preserving tag is local until pushed, so no later command in the run may prune tags. Confirm it exists (`git rev-parse -q --verify refs/tags/<tag>`) before deleting the branch it preserves.
 - Before dropping a valuable stash, recover it onto the appropriate branch or preserve it as a patch with enough context to reapply.
 - Prefer small batches. Re-inventory after each batch so the next decision uses current evidence.
 
