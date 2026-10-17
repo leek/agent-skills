@@ -1,7 +1,6 @@
 ---
 name: release
-description: "Commit this session's work, bump the version, tag, push, and publish a GitHub release with grouped notes."
-disable-model-invocation: true
+description: "Commit this session's work, bump the version, tag, push, and publish a GitHub release with grouped notes. Use when the user asks to release, cut, tag, or publish a version."
 argument-hint: "[major|minor|patch] [summary] (both inferred from the commits when omitted)"
 allowed-tools: "Bash(git status *) Bash(git diff *) Bash(git log *) Bash(git describe *) Bash(git tag *) Bash(git show *) Bash(git fetch *) Bash(git rev-list *) Bash(git add *) Bash(git commit *) Bash(git push *) Bash(gh auth status) Bash(gh release *)"
 ---
