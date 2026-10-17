@@ -8,7 +8,7 @@ the alternatives; it does not restate the canonical command.
 Three rules hold for every CLI:
 
 - **No `--model`.** Each CLI must run as its own latest/default model.
-- **Pass the task as `"$TASK"`, never inline.** Build the task with a quoted heredoc and
+- **Pass the task as `"$TASK"`, never inline.** Read the task file into `TASK` and
   pass `"$TASK"`, so the shell never expands a backtick, `$`, or quote inside the prompt.
   Redirect `< /dev/null` so the CLI does not block waiting on stdin.
 - **Headless needs auto-approval.** A headless run cannot answer a permission prompt, so

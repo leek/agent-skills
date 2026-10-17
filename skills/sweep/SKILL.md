@@ -78,10 +78,11 @@ Drop a candidate that is disproven, covered, speculative, or out of scope, then 
 
 ## 3. Isolate, fix, verify
 
-1. **Branch and worktree.** Name the branch `sweep/<topic>` (one or two words). It must not be in `taken_branches`. If it is, choose a different word or add `-2`; a name collision never stops the cycle. Always use a worktree from the fetched base, even when the checkout is clean, so the main checkout stays untouched:
+1. **Branch and worktree.** Name the branch `sweep/<topic>` (one or two words). It must not be in `taken_branches`, and `git ls-remote --heads origin sweep/<topic>` must print nothing (it sees branches pushed since the fetch). If either hits, choose a different word or add `-2`; a name collision never stops the cycle. Always use a worktree from the fetched base, even when the checkout is clean, so the main checkout stays untouched:
    ```bash
    git worktree add -b sweep/<topic> .claude/worktrees/sweep-<topic> origin/<default>
    ```
+   From here on, start every command for this cycle with `cd <worktree path> &&` (or use `git -C <worktree path>`). Some harness shells do not keep the working directory between calls, and a bare `composer install` or `artisan make:*` then lands in the main checkout.
    In a Laravel repo, make it runnable with `laravel-herd-worktrees`' **Bootstrap a bare worktree** section before you run anything in it. A scratch database gets a name no checkout config uses, `<app db>_sweep_<topic>`, and you register it when you create it:
    ```bash
    printf '%s\t%s\t%s\t%s\n' "$(date +%s)" <pgsql|mysql|sqlite> <database> "<worktree path>" \

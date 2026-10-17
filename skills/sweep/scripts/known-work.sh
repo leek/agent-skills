@@ -53,7 +53,9 @@ for f in "$tmp"/open.json "$tmp"/closed-*.json; do
   [ "$(jq length "$f")" -lt "$limit" ] || echo "warning: a PR window hit $limit results; some PRs are missing" >&2
 done
 
-git -C "$main" for-each-ref --format='%(refname:short)' "refs/heads/$prefix*" "refs/remotes/*/$prefix*" \
+# `*` stops at `/`, so the `/**` patterns are what match prefix/<topic> branches.
+git -C "$main" for-each-ref --format='%(refname:short)' \
+  "refs/heads/$prefix*" "refs/heads/$prefix*/**" "refs/remotes/*/$prefix*" "refs/remotes/*/$prefix*/**" \
   | sed "s#^[^/]*/\($prefix\)#\1#" | sort -u | jq -R . | jq -s . > "$tmp/branches.json"
 
 find "$main/.scratch/$prefix/findings" -name '*.md' 2>/dev/null | sort | jq -R . | jq -s . > "$tmp/findings.json"
