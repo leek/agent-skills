@@ -90,7 +90,10 @@ a sub-agent cannot start its own reviewers, ask the user, or schedule a wakeup, 
 steps need all three.
 
 1. **Order.** Read every PR's `baseRefName` and `headRefName`. A PR whose base is
-   another named PR's head goes after that PR. Otherwise keep the user's order.
+   another open PR's head is **stacked**: build its stack and order it bottom-up per
+   [`references/stacked-prs.md`](references/stacked-prs.md), which also owns a stack's
+   merge method, retargets, and fixes that must flow upward. Otherwise keep the user's
+   order.
 2. **Step 1 for all PRs at once.** Dispatch one `pr-reviewer` per PR in the
    background, in one message (in Codex, one `spawn_agent` each).
 3. **Steps 2 and 3 for all PRs.** Gather reviews and review state for every PR.
@@ -101,8 +104,8 @@ steps need all three.
    so the user is asked once.
 5. **Steps 5 and 6 one PR at a time, in order.** Use a worktree for every PR
    (`.claude/worktrees/pr-N`), never the main checkout, so no two PRs share a tree.
-   After a base PR merges, run step 6 on each PR stacked on it from the top: its base
-   and diff changed.
+   After a base PR merges, retarget each PR stacked on it and run step 6 on it, bottom-up:
+   its base and diff changed.
 6. **Step 7 once,** after the last PR.
 
 Completion criterion: every named PR is merged, queued, or stopped with a blocker, and
@@ -291,9 +294,10 @@ An optional in-flight review does not hold bounded delivery. After merging, open
 follow-up described in the shipping budget.
 The merge is pinned to the head sha you reviewed. CI status is not a gate: a pending
 required check queues the merge with `--auto`, and you do not come back if that run
-fails. **Never delete a branch**, by any route: it closes every PR based on it. Merge a
-stacked PR, or one whose base is a deploy branch, only on the user's explicit approval
-in this conversation.
+fails. **Never delete a branch**, by any route. Merge a stacked PR, or one whose base is
+a deploy branch, only on the user's explicit approval in this conversation; a stack
+lands bottom-up with merge commits and retargets per
+[`references/stacked-prs.md`](references/stacked-prs.md).
 
 **Merge questions.** Some gates are the user's decision, not a blocker: a stacked PR or
 a deploy-branch base without approval, a draft with unclear intent to ship, a conflict

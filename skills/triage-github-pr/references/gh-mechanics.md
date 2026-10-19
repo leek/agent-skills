@@ -257,10 +257,14 @@ kept stays registered for `repository-cleanup`.
 ## Merge
 
 ```bash
-gh pr list --base <head> --state open --json number,title,url   # stacked PRs; must be empty
-gh pr merge N --squash --match-head-commit <reviewed head sha>  # or --rebase / --merge; never --delete-branch
+gh pr list --base <head> --state open --json number,title,url   # PRs stacked on this one
+gh pr merge N --squash --match-head-commit <reviewed head sha>  # or the repo's Merge method; never --delete-branch
 gh pr view N --json state,mergedAt,mergeCommit,autoMergeRequest
 ```
+
+A PR in a stack (its base is another PR's head, or the list above is not empty) merges
+with `--merge` instead, bottom-up, and the PRs above it are retargeted after: see
+[Stacked PRs](stacked-prs.md).
 
 `--match-head-commit` makes GitHub refuse the merge when the head moved after your
 re-check. Refresh, review the changed range and retry this checkpoint once. A second
@@ -269,11 +273,13 @@ merge failures, inspect the refusal, perform one applicable correction within th
 budget, then report any remaining gate rather than repeating indefinitely.
 
 Never pass `--delete-branch`, and never delete a branch by any other route
-(`git push --delete`, `gh api -X DELETE .../git/refs/...`). Deleting a branch closes
-every open PR that uses it as its base. If the repo has "automatically delete head
-branches" on (`gh api repos/{owner}/{repo} --jq .delete_branch_on_merge` is `true`),
-the merge itself deletes the head branch, so the stacked-PR check above is what
-protects dependents. Do not change that repo setting yourself.
+(`git push --delete`, `gh api -X DELETE .../git/refs/...`). A branch deleted outside a
+merge closes every open PR that uses it as its base. When the repo has "automatically
+delete head branches" on (`gh api repos/{owner}/{repo} --jq .delete_branch_on_merge`
+is `true`), the merge deletes the head branch and GitHub retargets the PRs based on it
+to the merged PR's base ([changelog, 2020-05](https://github.blog/changelog/2020-05-19-pull-request-retargeting));
+the retarget check in [Stacked PRs](stacked-prs.md) confirms it. Do not change that
+repo setting yourself.
 
 If the merge is refused only because required checks are still pending, re-run it with
 `--auto` (keeping `--match-head-commit`) so GitHub lands it when they pass, and report
