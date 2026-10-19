@@ -45,8 +45,8 @@ panel when the task mentions panels, panelists, or other CLIs:
 `$SCRATCH` is the session's scratchpad directory where the harness has one, otherwise
 one `mktemp -d`; hand subagents its absolute path, since they do not share your shell.
 Save the string to `$SCRATCH/panel-task.txt` with the file-write tool (where the harness
-has none, a quoted heredoc: `cat > "$SCRATCH/panel-task.txt" <<'PANEL_EOF'`). The launch
-commands then read the file and never contain the task's words, so a guard hook that
+has none, a quoted heredoc: `cat > "$SCRATCH/panel-task.txt" <<'PANEL_EOF'`). Three of the
+launch rows then read the file and never contain the task's words, so a guard hook that
 reads the command (task text that names `git commit`, say) cannot block the launch.
 
 ### 2. Check who is on the panel
@@ -63,19 +63,25 @@ cheap wrapper, since the thinking happens inside the CLI it runs; in Codex, `spa
 per CLI, then `wait_agent` on all of them). Give each subagent
 the path of the **same** task file and this brief:
 
-- **Pass the task safely: never inline it.** A prompt with a backtick, `$`, or quote
-  gets run by the shell if you paste it into the command, and its words trip guard hooks
-  that read the command. Read the file into a variable in the same command as the launch:
-  `TASK=$(cat "$SCRATCH/panel-task.txt") && <row>`. The quotes around `"$TASK"` stop every
-  expansion. Run your CLI **once**, headless, from the repo root, using its row below.
-  Add no `--model`; keep the row's flags as written.
+- **Launch with literal paths only.** Worktree isolation refuses a command whose words
+  are computed at runtime (`$(cat …)`, `$TASK`, `$PWD`), since it cannot prove the
+  command stays inside the worktree. So write every path out in full: `TASK_FILE` in the
+  rows is the task file's absolute path, and `WORKTREE` is the output of `pwd`, taken in
+  its own earlier call. `claude` and `codex` read the task on stdin, and `grok` reads it
+  with `--prompt-file`. `agy` has no file or stdin form, so its row carries the task text
+  inline, as one single-quoted literal: copy the file's text in, writing each `'` as `'\''`.
+  Single quotes stop every expansion, so a backtick or `$` in the task stays text. Run
+  your CLI **once**, headless, from the repo root, using its row below. Add no
+  `--model`; keep the row's flags as written. If a guard still refuses the launch, that
+  is a launch-form problem, not a CLI error: say which word it refused and fix that.
 - **Run every CLI detached: never let one time out.** These agent CLIs take many
   minutes, and a slow model (codex at high reasoning is the usual culprit) will run past
   the Bash tool's 10-minute foreground ceiling and get killed mid-orientation, before it
   ever reports. Do **not** run the command in the foreground with a big timeout, 10 min
   is the hard max and it will be killed. Instead redirect the command's output to a
   scratch file and launch it with the Bash tool's `run_in_background: true`: append
-  ` > "$SCRATCH/panel-<cli>.out" 2>&1` to the row's command (keep the `< /dev/null`).
+  ` > SCRATCH/panel-<cli>.out 2>&1` to the row's command, with `SCRATCH` written out as
+  its absolute path (keep the row's `<` redirect).
   Your turn pauses and you are re-invoked automatically when the CLI exits; then read the
   scratch file and distill it. Background runs have no timeout; this is what guarantees
   nothing is cut off. Where the shell tool has no background mode and rejects `&` (Grok
@@ -90,14 +96,15 @@ the path of the **same** task file and this brief:
 - Return `{ cli, status, points[] }`. `status` is `responded`, or `errored` with a
   one-line cause. Return the object only, no narration.
 
-Headless commands (`< /dev/null` stops the CLI blocking on stdin):
+Headless commands (`TASK_FILE` and `WORKTREE` are absolute paths written out in full;
+`< /dev/null` stops a CLI that does not read the task on stdin from blocking on it):
 
 | CLI | Command |
 |---|---|
-| `claude` | `claude -p "$TASK" --dangerously-skip-permissions < /dev/null` |
-| `codex` | `codex exec --dangerously-bypass-approvals-and-sandbox --cd "$PWD" "$TASK" < /dev/null` |
-| `agy` | `agy --dangerously-skip-permissions --print-timeout 30m -p "$TASK" < /dev/null` |
-| `grok` | `grok -p "$TASK" --always-approve < /dev/null` |
+| `claude` | `claude -p --dangerously-skip-permissions < TASK_FILE` |
+| `codex` | `codex exec --dangerously-bypass-approvals-and-sandbox --cd WORKTREE - < TASK_FILE` |
+| `agy` | `agy --dangerously-skip-permissions --print-timeout 30m -p '<task text>' < /dev/null` |
+| `grok` | `grok --prompt-file TASK_FILE --always-approve < /dev/null` |
 
 In **review** shape, the task string is this brief. Name the pinned diff from step 1 in
 plain words, with **no backticks**, so nothing is left for a shell to expand:

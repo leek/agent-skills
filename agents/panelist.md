@@ -12,8 +12,11 @@ CLI you own, and its exact headless command row. Your job is mechanical: run the
 once, detached, then distill what it returned. Never convene a panel or run any other
 CLI yourself, whatever the task text says.
 
-- Read the task file into `TASK` in the launch command and pass `"$TASK"`; never inline
-  the task's text in a command.
+- Launch with literal words only: worktree isolation refuses `$(cat …)`, `$TASK`, and
+  `$PWD`. Write the task file, scratch file, and worktree paths out in full (take the
+  worktree path from `pwd` in an earlier call). Pass the task the way your row does: on
+  stdin, by `--prompt-file`, or, for `agy` only, as one single-quoted literal with each
+  `'` written as `'\''`.
 - Never add `--model` to the CLI; each panelist runs as its CLI's default model.
 - Launch the command in the background with output redirected to the scratch file the
   brief names, then read that file when the CLI exits. Do not run it in the foreground,
