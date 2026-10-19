@@ -1,13 +1,13 @@
 ---
 name: implement-spec
-description: "Build a whole spec fast: parallel implementer subagents work the ticket frontier, each in its own worktree, merging onto one integration branch; then one review, one verification pass, and one PR."
+description: "Build a whole spec fast: parallel implementer subagents work the ticket frontier, each in its own worktree, merging onto one integration branch; then one review, one verification pass, and one PR or a stack of PRs."
 disable-model-invocation: true
 argument-hint: "A spec path (.scratch/<slug>/spec.md); a spec with no tickets gets them cut first. Optionally, how many implementers at once (default 4)"
 ---
 
 # Implement Spec
 
-Build every ticket of one spec in this session by **orchestrating**, not building: implementer subagents do the code, each in its own worktree; you own the tracker, the **integration branch**, the merges, and the final gates. The goal is the whole spec on one integration branch, every ticket closed, one PR.
+Build every ticket of one spec in this session by **orchestrating**, not building: implementer subagents do the code, each in its own worktree; you own the tracker, the **integration branch**, the merges, and the final gates. The goal is the whole spec on one integration branch, every ticket closed, delivered as the user chose: one PR, a stack of PRs (one per ticket), or a pushed branch.
 
 The tickets are not a list of steps. They are a **task graph**: `blocked-by` edges mean there is always a **frontier** of tickets ready to grab, and every ticket on it can be built at once.
 
@@ -34,7 +34,9 @@ Read the spec: its **Build Contract** section first, then what the tickets name.
 
 Leave out closed tickets and tickets claimed by someone else (name them in the report). A `deploy-gate: true` ticket bounds the run: build up to and including it, then stop at step 7 with a PR; its dependents start after that PR is deployed. When dependents would wait behind a gate, ask once, here, before the first dispatch (not after the gate PR opens): stop at the gate, or build the dependents in this run on a second integration branch `<slug>-2` cut from the gate branch's tip. The stacked branch merges the gate branch as it changes, and once the gate PR merges, its own delta moves onto fresh `origin/<default>` for a second PR.
 
-Finish when every in-scope ticket and its edges are known and the first frontier is listed.
+Ask `implement`'s [delivery question](../implement/references/spec-run.md#choose-the-delivery-shape) for a whole spec in the same `AskUserQuestion` call as the deploy-gate question, when both apply. It is the only question before the first dispatch.
+
+Finish when every in-scope ticket and its edges are known, the delivery shape is chosen, and the first frontier is listed.
 
 ### 2. Create the integration branch
 
@@ -86,7 +88,7 @@ Run `implement`'s steps 6 and 7 once over the whole range. Skip the full-suite q
 
 ### 7. Close and deliver
 
-For each verified ticket: append `## Resolution` (what was built, deviations, verification evidence, its implementation commits, seams for successors, from `$notes/<NN>.md`) and set `status: closed`; re-read to confirm. Commit the tracker separately (`docs(scratch): <slug> resolutions`), never folded into code. Then follow [PR delivery: after step 8](../implement/references/spec-run.md#pr-delivery-after-step-8): push, open the PR with the `pr` skill's template, read review threads once.
+For each verified ticket: append `## Resolution` (what was built, deviations, verification evidence, its implementation commits, seams for successors, from `$notes/<NN>.md`) and set `status: closed`; re-read to confirm. Commit the tracker separately (`docs(scratch): <slug> resolutions`), never folded into code. Then follow [PR delivery: after step 8](../implement/references/spec-run.md#pr-delivery-after-step-8) for the chosen shape: push, open the PR (or cut and open the stack per its [Stacked PRs](../implement/references/spec-run.md#stacked-prs)), read review threads once.
 
 ### 8. Clean up
 
@@ -109,6 +111,7 @@ Next:
 ```
 
 - **A PR is open and review bots are still running** → `/resolve-review-comments <PR>` once they post
+- **A stack of PRs is open** → `/triage-github-pr <every PR, bottom-up>` to land it bottom-up with merge commits
 - **Stopped at a deploy gate** → deploy the PR, then `/implement-spec <spec>` for the dependents
 - **Tickets released or left open** → `/implement <ticket>` for each, or `/implement-spec <spec>` again
 - **The build exposed a decision nobody made** → `/grill-me` on it, then re-run `/to-spec`

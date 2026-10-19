@@ -125,7 +125,7 @@ Next:
 Stage-specific **Next** conditions (only those that apply, most likely first):
 
 - **Tickets published with a frontier** → `/implement <frontier ticket>` in one fresh session per ticket; parallelize only independent frontier tickets
-- **The user wants the whole spec built in one go** → `/implement <spec path> all` (one branch, a worktree when asked, one PR at the end)
+- **The user wants the whole spec built in one go** → `/implement <spec path> all` (one branch, a worktree when asked, one PR or a stack at the end)
 - **The frontier is wide and the user wants it fast** → `/implement-spec <spec path>` (parallel implementers, one integration branch, one PR)
 - **Every ticket is blocked by another that is still open** → `/implement <that blocker>` first; name it
 - **A ticket turned out to be a decision, not a build** → `/grill-me` on it (or `/wayfinder` if there are several)

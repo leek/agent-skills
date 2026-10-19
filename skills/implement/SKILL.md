@@ -2,14 +2,14 @@
 name: implement
 description: "Implement one work item end to end, or every ticket of a spec in one run: scope and claim it when trackable, TDD at chosen seams, commit, review, verify, resolve it, and open a PR when asked."
 disable-model-invocation: true
-argument-hint: "A ticket or spec path; add `all` to build every ticket of the spec on one branch with one PR (omit to use the conversation scope)"
+argument-hint: "A ticket or spec path; add `all` to build every ticket of the spec on one branch, delivered as one PR or a stack (omit to use the conversation scope)"
 ---
 
 # Implement
 
 Implement exactly one work item per session, test-first and verified end to end. A work item is a **ticket**, a spec small enough for one session, or an agreed conversation scope. The one exception is a **spec run**, which builds every ticket of a spec in one session.
 
-**Spec runs and PR delivery** live in [`references/spec-run.md`](references/spec-run.md). Read it before step 1 when the user asks to build a whole spec (`all`, "implement all of …"), or asks for a branch, a worktree, or a PR, or asks for a change to work already delivered as a PR.
+**Spec runs and PR delivery** live in [`references/spec-run.md`](references/spec-run.md). Read it before step 1 on every run: its **Choose the delivery shape** question comes first (current branch, a PR, or a stack of PRs for a whole spec). Its spec-run and follow-up sections apply when the user asks to build a whole spec (`all`, "implement all of …") or to change work already delivered as a PR.
 
 Pipeline position: `wayfinder` (decide) → `to-spec` (write the spec) → `to-tickets` (break it into tickets) → **`implement` (build one ticket per session, review and verify inside)**.
 
@@ -114,6 +114,7 @@ Next:
 Stage-specific **Next** conditions (only those that apply, most likely first):
 
 - **A PR is open and review bots are still running** → `/resolve-review-comments <PR>` once they post; name the PR and the worktree path
+- **A stack of PRs is open** → `/triage-github-pr <every PR, bottom-up>` to land it bottom-up with merge commits
 - **More frontier tickets on the parent spec** → `/clear`, then `/implement <next frontier ticket>` (resume your own claimed-but-unfinished ticket first if you stopped mid-work), or `/implement <spec path> all` to build the rest in one run, or `/implement-spec <spec path>` to build them in parallel; name it and how many remain
 - **Every ticket on the spec is closed** → nothing to run; say the spec is complete and name anything deferred out of scope
 - **Remaining tickets are all blocked** → `/implement <the blocker>` first, or `/grill-me` if the blocker is a decision

@@ -1,5 +1,5 @@
 interface:
   display_name: "Implement"
-  short_description: "Implement one work item, or every ticket of a spec, end to end: claim, TDD, commit, review, verify, resolve, and open a PR when asked"
+  short_description: "Implement one work item, or every ticket of a spec, end to end: claim, TDD, commit, review, verify, resolve, and deliver on the current branch, as a PR, or as a stack of PRs"
 policy:
   allow_implicit_invocation: false

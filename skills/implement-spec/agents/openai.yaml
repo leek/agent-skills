@@ -1,5 +1,5 @@
 interface:
   display_name: "Implement Spec"
-  short_description: "Build a whole spec fast with parallel implementer subagents on one integration branch"
+  short_description: "Build a whole spec fast with parallel implementer subagents on one integration branch, delivered as one PR or a stack"
 policy:
   allow_implicit_invocation: false
