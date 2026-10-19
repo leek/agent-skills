@@ -315,7 +315,7 @@ every finding and names the blocker, and report. Ping the user with the PR numbe
 Completion criterion: `gh pr view N --json state,mergedAt,autoMergeRequest` shows
 merged or a queued auto-merge, or the disposition comment names the blocker. Report the merge SHA
 (or "queued"), and one line per finding, yours included: fixed in `<sha>`, stale,
-auto-dismiss, hallucination, decided by owner, or carried to `<follow-up PR link>`; and the round count. List every
+auto-dismiss, hallucination, decided by owner, or carried to `<follow-up PR link>`; and the round count. In the chat report only (never the disposition comment), start each finding line with ✅ fixed, stale, auto-dismiss, or hallucination, or ⚠️ decided by owner or carried to a follow-up. List every
 question still open after a stop under **Open questions**, at the top of the report. If step 5 checked out the PR in the
 main checkout, that checkout is back on the branch it started on (see
 [Return the main checkout](references/gh-mechanics.md#check-out-the-head-branch-safely)).

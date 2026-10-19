@@ -61,6 +61,8 @@ End with:
 - Deferred candidates and why they were not changed.
 - Any approval still needed, and the candidates the user declined.
 
+Start each item that needs the user (a risk, a deferral, an approval) with ⚠️, and each failed check with ❌. No other marks.
+
 ## Guardrails
 
 - Do not delete code merely because its purpose is not immediately obvious.

@@ -101,7 +101,7 @@ it `active` and name what unblocks it. Resolve only issues whose cause is fixed 
 transient.
 
 Completion criterion: every issue in scope has its new status confirmed, or stays
-active with a named blocker. Report `N active → M`, with one line per cluster.
+active with a named blocker. Report `N active → M`, with one line per cluster, starting ✅ resolved or ⚠️ active with a blocker.
 
 ## 6. Offer a deploy re-check
 

@@ -103,6 +103,6 @@ Follow [references/submit.md](references/submit.md): review the diff, rerun the 
 
 Run cycles one after another. Each cycle starts again at [step 1](#1-load-context-and-known-work), from a fresh fetch and a fresh ledger. That ledger includes the PRs earlier cycles opened, so no cycle repeats or builds on another. If a cycle fails after changing code, keep its worktree and stop the run.
 
-At the end, stop the background processes and browser sessions the run started. Then clean up per [references/submit.md#clean-up](references/submit.md#clean-up). Report one entry per cycle: the PR link and labels, the improvement, the verification and check results, and the findings files written. For a cycle with no PR, say what it examined and why nothing qualified. For a failed cycle, say which step failed and what was kept.
+At the end, stop the background processes and browser sessions the run started. Then clean up per [references/submit.md#clean-up](references/submit.md#clean-up). Report one entry per cycle: the PR link and labels, the improvement, the verification and check results, and the findings files written. For a cycle with no PR, say what it examined and why nothing qualified. For a failed cycle, say which step failed and what was kept. Start each entry with ✅ PR opened, ⚠️ no PR, or ❌ failed.
 
 The count bounds the run. To run more, invoke `/sweep` again or put it under `/loop`.

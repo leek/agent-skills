@@ -129,6 +129,8 @@ End with:
 - Remaining intentional repository state, including any kept stashes.
 - Deferred or uncertain items and what approval or evidence is needed.
 
+Start each item that needs the user (a risk, a deferral, an approval) with ⚠️, and each failed check with ❌. No other marks.
+
 ## Guardrails
 
 - Do not discard uncommitted changes, stashes, unpushed commits, or dirty worktrees.

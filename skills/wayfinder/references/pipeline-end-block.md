@@ -21,4 +21,5 @@ Rules:
 1. Bold the current pipeline stage on the `decide → spec → tickets → build` line (or note a supporting role, e.g. review runs inside build).
 2. Fill **Done** from live state: never guess at frontiers; query the markdown tracker when the skill owns one.
 3. List only **Next** conditions that actually apply, most likely first.
-4. On harnesses without slash commands, write the command as plain phrasing (`run <skill> on <ref>`) instead of `/<skill> <ref>`.
+4. Prefix the **Done** line with ✅ (⚠️ on a stop or dead end) and the **Next** line with 👉. No other marks in the block.
+5. On harnesses without slash commands, write the command as plain phrasing (`run <skill> on <ref>`) instead of `/<skill> <ref>`.

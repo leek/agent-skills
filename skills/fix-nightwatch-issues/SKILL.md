@@ -98,7 +98,7 @@ what unblocks it. Resolve only issues whose cause is fixed. If an issue recurs a
 deploy, reopen it and correct its classification.
 
 Completion criterion: every issue in scope is resolved with a comment, or stays open
-with a comment that names its blocker. Report the tally with one line per cluster.
+with a comment that names its blocker. Report the tally with one line per cluster, starting ✅ resolved or ⚠️ open with a blocker.
 
 ## 6. Offer a deploy re-check
 

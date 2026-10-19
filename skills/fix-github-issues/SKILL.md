@@ -158,4 +158,5 @@ stays stays registered, for `repository-cleanup`. Skip the question when nothing
 Completion criterion: everything removable is removed, any question is answered, or you
 created nothing. Report the tally:
 fixed, stale, auto-dismiss, hallucination, and blocked. Name each fix not yet on
-`<default>`, and each worktree or database kept.
+`<default>`, and each worktree or database kept. Mark the blocked count and each kept
+item ⚠️; no other marks.

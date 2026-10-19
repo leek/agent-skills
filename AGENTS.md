@@ -161,6 +161,7 @@ Only four kinds of skill create a worktree: the dirty-tree recipes in `triage-gi
 **How to write one is the `writing-for-agents` skill**: it is model-invoked, so reach for it rather than working from this file. Only what is specific to *this repo* lives here:
 
 - **Where the shared protocols live.** A protocol several skills need has exactly one owner, and the others point at it: the question shape and STE rules in `grilling`, tracker operations in `setup`'s seeds, the end-of-session banner in `wayfinder/references/pipeline-end-block.md`.
+- **Status marks in chat reports.** Four marks, used sparingly so a report scans fast: ✅ done, passed, or fixed · ❌ failed · ⚠️ needs the user (blocked, unsure, a risk, kept for a decision) · 👉 the next step. One mark at the start of a status line or verdict cell, in front of the plain word, which stays (`✅ fixed in abc123`), so nothing that reads the word breaks. No marks in headings, prose, or lines with no status. Chat only: never in files a skill writes, commits, PR bodies, tracker or GitHub comments, `ReportFindings` fields, subagent reports, or script output. Each skill that uses them says which, in one line beside its report format.
 - **Length.** Most skills here are 10–130 lines. Treat anything longer as owing an explanation.
 - **Prefer scripts over inline code.** Script execution does not consume context: only its stdout does.
 - **No dead references.** Every skill a skill mentions must exist in this repo (or be a documented harness built-in). Check before committing.

@@ -112,6 +112,8 @@ End with:
 - Remaining risks or deferred work.
 - Current progress-file path.
 
+Start each item that needs the user (a risk, a deferral, an approval) with ⚠️, and each failed check with ❌. No other marks.
+
 ## Guardrails
 
 - Do not begin a broad refactor without a concrete target and verification plan.

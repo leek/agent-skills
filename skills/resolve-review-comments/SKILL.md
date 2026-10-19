@@ -110,4 +110,4 @@ wait, re-query unresolved threads: new threads or a failed check send you back t
 
 Completion criterion: CI is green and no new thread appeared, the round cap is hit, or
 the user has the rerun instruction. Report the tally: fixed vs rebutted, the commit(s)
-that carried the fixes, and the rounds run.
+that carried the fixes, and the rounds run. Mark a red check, a hit round cap, or a pending rerun ⚠️; no other marks.

@@ -82,5 +82,6 @@ no tickets. A **done** effort's `Next` is `/scratch-cleanup` (nothing else to do
 settle before either skill can act on it.
 
 Below the table, one line for any effort with no readable status file at all, naming the file.
+Write the Stale cell as `⚠️ yes` or `no`, and start a mismatched row's `Next` with ⚠️. No other marks.
 End with a one-line total: `<n> open, <n> stale, <n> mismatched, <n> done`. Stop there: no
 plan, no questions, no approval prompt, no restating the `Next` column in prose.

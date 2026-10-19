@@ -99,7 +99,7 @@ Present the reports under `## Correctness`, `## Standards` and `## Spec` heading
 
 Invoked standalone, report the findings through the host's findings list where it offers one (in Claude Code, one `ReportFindings` call holding all three axes, `category` set to the axis, axes in the order above and most severe first _within_ each axis; a judgement-call smell is `PLAUSIBLE`), and then print only the summary line below; otherwise print the three headed sections. Invoked by another skill, always print the sections.
 
-End with a one-line summary: total findings per axis, and the worst issue _within each axis_ (if any). Don't pick a single winner across axes, that's the reranking the separation exists to prevent.
+End with a one-line summary: total findings per axis, and the worst issue _within each axis_ (if any). Don't pick a single winner across axes, that's the reranking the separation exists to prevent. Mark each axis in that line: ✅ no findings, ⚠️ findings. No marks in the findings themselves.
 
 ## Why three axes
 

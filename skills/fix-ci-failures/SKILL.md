@@ -106,6 +106,7 @@ the report as kept.
 One line per failed job: fixed in `<sha>`, stale (`<sha>`), flaky, infra (what it
 needs), or unreproduced. Then say where the commits landed, and each worktree removed
 or kept.
+Start each job line with a mark: ✅ fixed or stale, ⚠️ flaky, infra, or unreproduced.
 
 ## Guardrails
 

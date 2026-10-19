@@ -74,4 +74,4 @@ Run cycles one after another, each from a fresh fetch and ledger. Clean up per `
 
 At the end, check the repo's `AGENTS.md` for the rules in [references/agents-rules.md](references/agents-rules.md). If no rule of that kind is there and no ledger PR adds one, open one more PR, `prune-tests/agents-rules`, that adds them. It does not count toward the cycle count.
 
-Report one entry per cycle: the PR link, tests removed and kept (with the kept reasons), production lines removed, coverage before and after, checks, findings files, and anything you were unsure about. For a cycle with no PR, say what it examined and why nothing qualified.
+Report one entry per cycle: the PR link, tests removed and kept (with the kept reasons), production lines removed, coverage before and after, checks, findings files, and anything you were unsure about. For a cycle with no PR, say what it examined and why nothing qualified. Start each entry with ✅ PR opened or ⚠️ no PR.

@@ -83,4 +83,5 @@ a breaking change the collector misses is the costliest miss.
    the exact commands. *Done when* the file exists and every bucket item cites a site and
    a source URL.
 7. **Report** in 5–8 lines: the packages and their version jumps, any blockers, the count
-   in each bucket, the three most important Must do items, and the plan path.
+   in each bucket, the three most important Must do items, and the plan path. Start each
+   blocker line with ⚠️; no other marks.

@@ -107,3 +107,6 @@ page and js errors, then 4xx, blank, and slow). Collapse one error seen on sever
 into one row. Omit the table when it has no rows. After the tables, add one line per
 `INCOMPLETE` case saying what it could not reach, and one line per `WRITE CANDIDATE` or
 `UNPLANNABLE` note. No advice and no fixes.
+
+Mark the headline result and each verdict cell, in front of the word: ✅ PASS, ❌ FAIL,
+⚠️ UNSURE or INCOMPLETE. No other marks.
