@@ -130,7 +130,8 @@ A new worktree starts bare (no `vendor/`, no `.env`): make it runnable with `lar
 `git switch <branch>`, or `git switch --detach <sha>`. If git refuses, report it, and
 leave the tree as it is.
 
-At step 7, once the PR shows merged, `cd` back to the main checkout and run
+At step 7, once the PR shows merged, run `herd unlink pr-N` from inside the worktree if
+the bootstrap linked it, then `cd` back to the main checkout and run
 `git worktree remove .claude/worktrees/pr-N` (no `--force`; if git refuses, the tree
 holds unsaved work, so report it instead). A stopped or `--auto`-queued PR keeps its
 worktree unless the user selects it at step 7.

@@ -23,7 +23,7 @@ Every shape runs the same build, review, and verification. Only the branches and
 2. Create it from the fresh default branch (`git fetch origin` first):
    - The user asked for a worktree, or the tree is dirty: `git worktree add -b <branch> .claude/worktrees/<branch> origin/<default>`, at that path, never a sibling directory. Make it runnable (install dependencies, copy local env config) the way the project's docs say, or as the stack reference says, then work there: move the session into it with `EnterWorktree({path: ".claude/worktrees/<branch>"})` where available, otherwise run every command with absolute paths into the worktree.
    - Otherwise: `git switch -c <branch> origin/<default>`.
-3. When the work comes from `.scratch/<slug>/` and the new branch lacks it or holds an older copy (committed on local `<default>`, not pushed), bring it over: `git checkout <default> -- .scratch/<slug>`, then commit it as `docs(scratch): <slug>`.
+3. When the work comes from `.scratch/<slug>/` and the new branch lacks it or holds an older copy, bring it over from where `to-spec` committed it: the branch `docs/<slug>-spec` when it exists (`git rev-parse --verify -q docs/<slug>-spec`), otherwise local `<default>` (committed, not pushed). Run `git checkout <that ref> -- .scratch/<slug>`, then commit it as `docs(scratch): <slug>`.
 4. Record `base_sha` on the new branch. Claims, resolutions, and code all commit to this branch.
 
 ## Spec run

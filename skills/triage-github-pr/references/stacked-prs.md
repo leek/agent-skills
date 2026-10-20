@@ -142,6 +142,9 @@ git rebase --onto origin/<trunk> <lower-head-sha> <M-local-branch>
 git range-diff <lower-head-sha>..<reviewed-M-head-sha> origin/<trunk>..HEAD
 ```
 
+The rebase drops merge commits: a conflict resolved earlier inside a merge of the parent
+into M comes back here as a new conflict, so resolve it the way that merge did (`git show
+<merge-sha>` shows the old resolution), and expect `range-diff` to show the merges gone.
 Resolve conflicts only when intent is clear. Validate and review the resulting delta,
 including conflict resolutions; the old SHA's review does not cover this new head.
 Then push explicitly, with a lease pinned to the reviewed remote head:

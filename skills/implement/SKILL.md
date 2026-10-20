@@ -55,7 +55,7 @@ Finish this step when every acceptance criterion has a seam.
 
 Run the `tdd` skill at the chosen seams. Discover the repository's focused-test and static-analysis commands from its scripts and existing usage; filter every test run during the loop to the single test or file covering the change (`--filter=<test name>` or the exact test file path, never neighboring or demo suites in the same directory), and run static analysis regularly when configured. If the user explicitly asks to skip tests in this session, honor that for the rest of the session and note it in step 8.
 
-Finish the loop only when every acceptance criterion is covered at a chosen seam, every focused test passes, and configured static analysis is green.
+Finish the loop only when every acceptance criterion is covered at a chosen seam, every focused test passes (when the user asked to skip tests, the last focused result stands instead), and configured static analysis is green.
 
 ### 4. Format and commit a reviewable checkpoint
 

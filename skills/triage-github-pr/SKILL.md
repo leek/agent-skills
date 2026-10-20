@@ -36,9 +36,12 @@ fix at a checkpoint, merge there rather than spending the unused budget.
 Test failures and defects found while independently reviewing unpushed fixes are
 corrected in the same batch before its push. Optional bot waits share a **20-minute
 total budget per PR**, at most **10 minutes per checkpoint**, before the initial
-snapshot and after batch 1. Each checkpoint spends that budget as one wakeup
-(`ScheduleWakeup` where the harness has it). A harness that cannot schedule a wakeup
-records zero and continues with the reviews already submitted. After batch 2, gather
+snapshot and after batch 1. Each checkpoint spends that budget as one wait: a
+`ScheduleWakeup` where the harness offers it for this run, otherwise one background
+command that exits when the in-flight signals clear or the checkpoint's budget runs
+out (in Claude Code, Bash with `run_in_background`; the harness wakes you when it
+exits). A harness with neither records zero and continues with the reviews already
+submitted. Never a foreground shell sleep, and never watch CI. After batch 2, gather
 once with no wait. A timeout means proceed with available reviews, not request another
 review or reset the timer.
 
@@ -101,8 +104,8 @@ steps need all three.
 2. **Step 1 for all PRs at once.** Dispatch one `pr-reviewer` per PR in the
    background, in one message (in Codex, one `spawn_agent` each).
 3. **Steps 2 and 3 for all PRs.** Gather reviews and review state for every PR.
-   Where optional waits are allowed, use one wakeup for the queue and each PR's budget.
-   A harness that cannot schedule it gathers what has already arrived.
+   Where optional waits are allowed, use one wait (as the shipping budget says) for the
+   queue and each PR's budget. A harness with no way to wait gathers what has already arrived.
 4. **Step 4 in one pool.** Send the findings of all PRs to the verifier workers
    together, each batch from one PR, so its head sha is the ref. Then collect the
    QUESTIONs of every PR into one `grilling` call, each one named with its PR number,
@@ -145,8 +148,8 @@ comment whose status row is not completed, or a review bot's own check run (not 
 still pending. The calls are in [In-flight signals](references/gh-mechanics.md#in-flight-signals).
 
 Record these signals and gather completed reviews. Before the initial snapshot and
-after bounded batch 1, an in-flight optional review gets that one wakeup for the
-remaining budget. When the harness cannot schedule it, gather the reviews already
+after bounded batch 1, an in-flight optional review gets that one wait for the
+remaining budget. When the harness has no way to wait, gather the reviews already
 submitted and continue. At the timeout or after batch 2, proceed with available
 reviews. An optional review still running is not a merge gate; check required
 human approvals separately. Exhaustive mode follows its reference within the same

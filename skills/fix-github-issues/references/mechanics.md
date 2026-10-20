@@ -67,7 +67,7 @@ gh issue view N --json state
 
 ## Clean up
 
-At step 6, for each item it removes: `git worktree remove .claude/worktrees/issues-<run>` (no `--force`;
+At step 6, for each item it removes: `herd unlink issues-<run>` from inside the worktree if the bootstrap linked it, then `git worktree remove .claude/worktrees/issues-<run>` (no `--force`;
 if git refuses, the tree holds unsaved work, so report it instead). Then drop each
 database and its parallel-testing copies (`<database>_test_<N>`) with the repo's client
 (`DROP DATABASE IF EXISTS`), and delete its line from the `scratch-databases` file.
