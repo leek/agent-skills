@@ -10,7 +10,7 @@ harness has no available logs; report it. Do not rank compressed archives by com
 size or treat filesystem modification time as the conversation date.
 
 ```sh
-find ~/.claude/projects -type f -name '*.jsonl' ! -path '*/subagents/*'
+find ~/.claude/projects -type f -name '*.jsonl' ! -path '*/subagents/*' ! -path '*--claude-worktrees-agent-*'
 find ~/.codex/sessions -type f \( -name 'rollout-*.jsonl' -o -name 'rollout-*.jsonl.zst' \)
 find ~/.grok/sessions -type f -name chat_history.jsonl
 find ~/.gemini/antigravity-cli/conversations -type f -name '*.db'

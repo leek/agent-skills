@@ -97,8 +97,13 @@ order (`#101 → #102 → #103`). Then, for each PR from the bottom up:
 4. **Re-check the retargeted PR** before its own merge, as step 6 does. Its commits on
    top of the trunk must be the ones recorded in step 3: `git fetch origin <trunk>`,
    then `git rev-list origin/<trunk>..<M head sha>` must match that recorded list. An extra
-   commit means the history below M is not what landed (a lower commit was rewritten):
-   stop and report it rather than merging the extra change. The retarget does not move
+   commit means the history below M is not what landed (for example, the lower PR was
+   squash-merged into `<trunk>` before this run, leaving its pre-squash commits on M's
+   branch): when the lower PR shows `MERGED` and its `headRefOid` is an ancestor of M's
+   head, ask once as a merge question whether to restack M's own commits onto
+   `origin/<trunk>` (`git rebase --onto origin/<trunk> <lower headRefOid> <M head>` and
+   `git push --force-with-lease`); otherwise stop and report it rather than merging the
+   extra change. The retarget does not move
    the head, so the review of that head still covers it and `--match-head-commit` pins
    the same sha, unless the repo requires up-to-date branches: then M reads `BEHIND`,
    because the trunk now has the merge commit M lacks. Update it as

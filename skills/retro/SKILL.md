@@ -43,8 +43,8 @@ agent briefs, relayed messages, and quoted earlier corrections from human counts
 jq -rc 'select(.type=="user" and (.message.content|type=="string")) | .message.content' FILE
 # human messages (array form; skip <command-name>/system-reminder noise by eye)
 jq -rc 'select(.type=="user" and (.message.content|type=="array")) | .message.content[]? | select(.type=="text") | .text' FILE
-# messages the user queued while a turn ran: many corrections live only here
-jq -rc 'select(.type=="queue-operation" and .operation=="enqueue") | .content' FILE
+# messages the user queued while a turn ran (excluding subagent <task-notification> blobs): many corrections live only here
+jq -rc 'select(.type=="queue-operation" and .operation=="enqueue") | .content | select(type=="string" and (startswith("<task-notification>") | not))' FILE
 # bash commands the assistant ran
 jq -rc 'select(.type=="assistant") | .message.content[]? | select(.type=="tool_use" and .name=="Bash") | .input.command' FILE
 # tool errors

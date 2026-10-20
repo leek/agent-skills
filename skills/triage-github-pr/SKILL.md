@@ -296,8 +296,9 @@ An optional in-flight review does not hold bounded delivery. After merging, open
 follow-up described in the shipping budget.
 The merge is pinned to the head sha you reviewed. CI status is not a gate: a pending
 required check queues the merge with `--auto`, and you do not come back if that run
-fails. **Never delete a branch**, by any route. Merge a stacked PR, or one whose base is
-a deploy branch, only on the user's explicit approval in this conversation; a stack
+fails. **Never delete a branch**, by any route. Merge a PR whose base is a deploy branch,
+or a stacked PR when the user did not already name every PR in the stack (or pass "all
+open PRs"), only on the user's explicit approval in this conversation; a stack
 lands bottom-up with merge commits and retargets per
 [`references/stacked-prs.md`](references/stacked-prs.md).
 

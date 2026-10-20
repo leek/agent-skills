@@ -103,7 +103,7 @@ No evidence is a finding, not a blank: say what was not verified and why.
 
 ### Screenshots
 
-When you open a PR, put every screenshot taken this session of what the PR builds into Evidence: from `verify`, from a `browser-test` run directory, or saved ad hoc. Leave out screenshots of other work and of failures you later fixed. No screenshots: skip this section and do not take any just for the PR; Evidence uses execution output. GitHub cannot attach a local file to a PR body, so upload them first. From inside the repo, run this skill's script:
+When you open a PR, put every screenshot taken this session of what the PR builds into Evidence: from `verify`, from a `browser-test` run directory, or saved ad hoc. Leave out screenshots of other work and of failures you later fixed. Inspect each screenshot before uploading: never upload one that shows real customer or staff PII (names, emails, phone numbers) or secrets from a local database dump; re-shoot against fake/seeded records or redact first. No screenshots: skip this section and do not take any just for the PR; Evidence uses execution output. GitHub cannot attach a local file to a PR body, so upload them first. From inside the repo, run this skill's script:
 
 ```bash
 bash <this skill's directory>/scripts/upload-screenshots.sh <pr-branch> <image>...

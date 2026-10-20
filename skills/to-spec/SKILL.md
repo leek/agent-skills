@@ -19,7 +19,7 @@ Pipeline position: `grill-with-docs`/`wayfinder` (decide) → **`to-spec`** (wri
 
 ### 1. Explore the repo
 
-Understand the current state of the codebase if you haven't already. Use the project's domain vocabulary throughout the spec (read `GLOSSARY.md`, or the older `CONTEXT.md`, if one exists: `domain-modeling` maintains it) and respect any ADRs in the area being touched.
+Understand the current state of the codebase if you haven't already. Use the project's domain vocabulary throughout the spec (read `GLOSSARY.md`, or the older `CONTEXT.md`, if one exists: `domain-modeling` maintains it) and respect any ADRs in the area being touched (including migration and data-backfill rules in `CLAUDE.md` / `AGENTS.md`). When the conversation relies on a simplifying data or usage claim ("no active subscriptions", "dead table", "zero rows") to drop schema or skip an expand–contract step, verify it against the codebase (`rg` for live callers, admin resources, and seeders) and a read-only count on the configured database before encoding it in the spec.
 
 **Invoked with a `wayfinder` map, read the map and every closed decision ticket's `## Resolution` first**: those resolutions are the authoritative decisions the spec must encode. Don't synthesize from conversation memory alone; a fresh session may not hold what earlier ticket sessions decided.
 

@@ -45,11 +45,11 @@ Run it on a spec whose `tickets/` already exist and the user asked to build all 
 
 ## Stacked PRs
 
-The build is unchanged: one branch `<slug>` whose commits read ticket by ticket. Cut the stack from it after step 8:
+The build is unchanged: one branch `<slug>` whose commits read ticket by ticket. Parallel frontier tickets in `implement-spec` still build in parallel; their `--no-ff` merge order on `<slug>` is the stack order, so never ask the user how to linearize parallel tickets for a stack. Cut the stack from `<slug>` after step 8:
 
 1. **One cut per ticket.** In a spec run, the cut is the ticket's last commit. In `implement-spec`, it is the ticket's `--no-ff` merge commit on `<slug>` (`git log --first-parent --merges <base_sha>..<slug>`), in merge order. Create `git branch <slug>-stack-<NN> <cut>` for every ticket but the last. The last ticket's PR uses `<slug>` itself, so the review fixes and the tracker commit ride in the top PR.
 2. **Push and open bottom-up.** Push all the branches in one `git push origin <branches…>`. Open the bottom PR against `<default>`, and each next PR against the head branch of the PR below it. Each body uses the `pr` skill's template for its own ticket: Evidence from that ticket's acceptance checks in the one verification pass, then its closed-ticket line. Before Merge Danger, add `Stack: <k> of <n>, based on #<below>. Land bottom-up with merge commits.` The top PR's body also names the review-fix commits it carries.
-3. **Report the stack** bottom-up as `#101 → #102 → #103`. To land it, the next step is `triage-github-pr` on all its PRs, which merges a stack bottom-up and retargets each PR above.
+3. **Report the stack** bottom-up as `#101 → #102 → #103` with the exact merge order. To land it, the next step is `triage-github-pr` on all its PRs, which merges a stack bottom-up and retargets each PR above.
 
 A deploy gate ends the stack at the gate ticket, the same as it ends a single PR.
 
