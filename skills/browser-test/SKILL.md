@@ -28,10 +28,7 @@ reads. Sessions are `bt-<run_id>-<tag>`: `plan`, `login`, or the case number.
 ## 2. Plan
 
 Send the planner this brief, with `STATE` set to the `state` path when `state_exists` is
-true, otherwise `none`. Include the scenario-selection and calculated-report checks
-from `verify`'s [Process](../verify/SKILL.md#process) in the brief when relevant to the
-prompt. A planner in any harness must apply them using available records; if suitable
-data is missing, report that limitation or a write candidate rather than claiming coverage:
+true, otherwise `none`:
 
 ```
 START_URL: <start-url>
@@ -41,8 +38,9 @@ STATE: <path | none>
 ```
 
 In Claude Code with this plugin, dispatch `subagent_type=leek-skills:browser-test-planner`.
-Elsewhere, use a sub-agent on a mid-tier model with the rules in that agent's file, or
-plan inline.
+Elsewhere, use a sub-agent on a mid-tier model with the rules in that agent's file (and
+`verify`'s [Process](../verify/SKILL.md#process) for grouped UI, state reversal, and
+calculated reports), or plan inline.
 
 **`NEEDS LOGIN`:** tell the user a browser window will open for them to sign in. Run
 `agent-browser --session bt-<run_id>-login --headed open <start-url>`, and wait for the

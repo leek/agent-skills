@@ -32,7 +32,11 @@ navigation, then `agent-browser --session <SESSION> close`. Do not test anything
   state and would each take many steps. Never more than 5 cases.
 - **Steps** name visible labels ("click the sidebar link *Invoices*"), never refs.
 - **Checks** are mechanical: text visible or absent, URL matches, a count, a field's value,
-  "no 4xx/5xx and no page errors". Never "looks right".
+  "no 4xx/5xx and no page errors". Never "looks right". For grouped/aggregated UI, pick
+  records with distinct values; for interactive state (expand/collapse, filters), check the
+  action and its reversal; for calculated reports, check detail rows, totals, units, and
+  period labels agree (if suitable data is missing, add a `WRITE CANDIDATE` or
+  `UNPLANNABLE` line rather than claiming coverage).
 - **Typing.** A `read` worker can type only into a search box. A step that types into any
   other field makes its case `write`, so the user confirms it first.
 - **Writes.** A case is `write` only when the prompt explicitly asks to create, save,

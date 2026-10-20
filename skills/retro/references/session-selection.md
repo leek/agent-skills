@@ -39,12 +39,11 @@ place. If the reader is missing or a file is corrupt, record that exclusion expl
   and relayed step 101 messages when history is absent or authorship is ambiguous.
   A relayed prompt is not another human correction. Open SQLite with `-readonly`.
 
-For Codex, this query extracts grouping fields from either plain or streamed JSONL:
+For Codex, this query extracts grouping fields from either plain or streamed JSONL (stopping at the first `session_meta` line):
 
 ```sh
-jq -nc 'reduce inputs as $event (null;
-  if . == null and $event.type == "session_meta" then $event.payload else . end) |
-  {id:(.id // .session_id), timestamp, thread_source, source}'
+jq -nc 'first(inputs | select(.type == "session_meta") | .payload) |
+  {id: (.id // .session_id), timestamp, source}'
 ```
 
 Use prompt-history matches and neighboring turns to distinguish human input from
@@ -54,11 +53,12 @@ as unknown and exclude it from claims about human correction frequency.
 
 ## Select and batch
 
-Exclude the current retro and its workers to avoid mining the audit itself. Rank
-eligible roots by their latest conversation-event timestamp (including linked child
-activity), using mtime only as a labeled fallback. Select N roots. If the user asks
-for coverage across harnesses, allocate the sample across available harnesses and
-state the allocation rather than letting the busiest harness consume every slot.
+Exclude the current retro and its workers to avoid mining the audit itself. Pre-filter
+candidates by `mtime` (or filename date on `.zst` archives) so you do not stream every
+historical archive on disk, then rank eligible roots by their timestamp (including
+linked child activity) and select N roots. If the user asks for coverage across
+harnesses, allocate the sample across available harnesses and state the allocation
+rather than letting the busiest harness consume every slot.
 
 Write `parents.jsonl`: one JSON object per root with `harness`, `id`, `path`,
 `timestamp`, and `children` (paths). Dispatch each entire object to one batch so

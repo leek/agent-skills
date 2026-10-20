@@ -176,6 +176,5 @@ Only four kinds of skill create a worktree: the dirty-tree recipes in `triage-gi
 
 ## Distribution Notes
 
-- Each skill folder is self-contained: users can copy a single `skills/<skill-name>/` into their agent's skills directory (e.g. `~/.claude/skills/`, or the equivalent for their harness).
-- **One documented exception:** the pipeline skills (`grill-me`, `wayfinder`, `to-spec`, `to-tickets`, `implement`, `implement-spec`, `to-questionnaire`, `code-review`) are one unit, not eight. They read each other's artifacts under `.scratch/<slug>/` and share the end-of-session banner in `wayfinder/references/pipeline-end-block.md` via a `../` reference. Copying one alone leaves that pointer dangling. Install the set, or accept that nothing depends on the banner and the skill still runs. Duplicating the banner into all eight would cost more than the caveat does; the verifier asserts the shared pointer stays in place.
+- Skills in this repo cross-link freely via `../<skill>/` pointers so shared protocols, templates, and references live in one place. Install the repo as a collection (or copy any linked target along with a standalone skill).
 - Network access for skills running in claude.ai must be allowlisted at `claude.ai/settings/capabilities`.
