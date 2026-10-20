@@ -19,6 +19,7 @@
         "./skills/autopilot",
         "./skills/browser-test",
         "./skills/chatter-scout",
+        "./skills/closeout",
         "./skills/code-review",
         "./skills/code-smells-audit",
         "./skills/codebase-design",
