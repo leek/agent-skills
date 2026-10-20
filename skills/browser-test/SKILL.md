@@ -28,7 +28,10 @@ reads. Sessions are `bt-<run_id>-<tag>`: `plan`, `login`, or the case number.
 ## 2. Plan
 
 Send the planner this brief, with `STATE` set to the `state` path when `state_exists` is
-true, otherwise `none`:
+true, otherwise `none`. Include the scenario-selection and calculated-report checks
+from `verify`'s [Process](../verify/SKILL.md#process) in the brief when relevant to the
+prompt. A planner in any harness must apply them using available records; if suitable
+data is missing, report that limitation or a write candidate rather than claiming coverage:
 
 ```
 START_URL: <start-url>

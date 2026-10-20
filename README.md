@@ -55,7 +55,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | `release` | model | Commit this session's work, bump the version, tag, push, and publish a GitHub release with grouped notes. |
 | `repository-cleanup` | user | Audit and clean Git repository state, including the local databases old worktrees left behind. |
 | `research` | model | Investigate a question against high-trust primary sources and capture the findings as a cited Markdown file. |
-| `retro` | user | Look back over AI-coding sessions (this one, or your recent Claude Code + OpenAI Codex logs) for corrections, errored or retried commands, rediscovered setup, and missing checks or information, then propose where each fix belongs (a deterministic check, a review rule, a CLAUDE.md/AGENTS.md pointer, a skill, a hook, a tool or config fix, or a content idea). |
+| `retro` | user | Mine Claude Code, Codex (including compressed rollouts), Grok, and agy parent sessions for corrections and workflow friction; compare current guidance and loaded versions before proposing fixes. |
 | `resolve-review-comments` | model | Triage, fix or rebut, then reply-and-resolve every review comment on a PR (including AI-review bot findings). |
 | `resolving-merge-conflicts` | model | "Use when you need to resolve an in-progress git merge/rebase conflict." |
 | `scratch-cleanup` | user | Sweep a dusty .scratch/: file research into docs/, remove finished efforts, and report the work still open. |

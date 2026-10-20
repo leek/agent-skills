@@ -14,28 +14,28 @@ Turn sessions into a ranked list of concrete improvements to the agent's **envir
 ## Where the logs live
 
 - **Claude Code:** `~/.claude/projects/<slug>/*.jsonl` (top-level sessions). Per-session subagent transcripts are under `<uuid>/subagents/agent-*.jsonl`: **skip these** when counting "sessions"; they're part of a parent.
-- **Codex:** `~/.codex/sessions/<year>/<month>/<day>/rollout-*.jsonl`.
+- **Codex:** `~/.codex/sessions/<year>/<month>/<day>/rollout-*.jsonl` and `rollout-*.jsonl.zst`. Child-agent rollouts belong to their parent session.
 - **Grok:** `~/.grok/sessions/<url-encoded cwd>/<id>/chat_history.jsonl`. A cwd under `/private/tmp` is usually a headless `panel` run.
 - **agy (Antigravity CLI):** every user prompt is in `~/.gemini/antigravity-cli/history.jsonl` (`display`, `workspace`, `conversationId`); the rest of the conversation is `~/.gemini/antigravity-cli/conversations/<conversationId>.db`, SQLite with protobuf payloads.
 
-The first three are JSONL, one event per line. Open every log read-only.
+The first three are JSONL, one event per line. Stream `.jsonl.zst` through `zstd -dc -- FILE`; keep archives intact. If no Zstandard reader is available, report the excluded archives and the incomplete coverage. Open every log read-only.
 
 ## 1. Pick the N most recent sessions
 
-Default N = 50 unless the user gives a number. `date`/`strftime` may be missing from the shell, use `perl` for timestamps.
-
-```bash
-{ find ~/.claude/projects -name '*.jsonl' -type f | grep -v '/subagents/'; \
-  find ~/.codex/sessions -name 'rollout-*.jsonl' -type f; \
-  find ~/.grok/sessions -name chat_history.jsonl -type f; \
-  find ~/.gemini/antigravity-cli/conversations -name '*.db' -type f; } 2>/dev/null \
-| xargs stat -f '%m %z %N' | sort -rn | head -50 \
-| perl -lane 'use POSIX qw(strftime); my($m,$s,@p)=@F; printf "%s %7dKB %s\n", strftime("%Y-%m-%d %H:%M",localtime($m)), $s/1024, join(" ",@p)'
-```
+Default N = 50 **parent sessions** unless the user gives a number. Follow
+[session selection](references/session-selection.md): discover plain and compressed logs,
+group children under their parents, distinguish human sessions from automated runs,
+then select N. Report parent counts by harness, child logs inspected, exclusions, and
+unreadable files. Selection is complete when each selected parent has a source path
+and its available child paths; children never consume another session slot.
 
 ## 2. Extract signal (use jq: do NOT cat whole files)
 
 Files are large and full of tool-output noise. `jq` is the right tool. Four formats:
+For a compressed Codex file, replace `jq FILTER FILE` below with
+`zstd -dc -- FILE | jq FILTER`. Preserve the archive path and decompressed line number
+in evidence. A user-role message is not proof of human authorship: exclude preambles,
+agent briefs, relayed messages, and quoted earlier corrections from human counts.
 
 **Claude Code**
 ```bash
@@ -86,7 +86,7 @@ Surface corrections fast by grepping extracted human messages:
 
 50 sessions won't fit one context. Split the file list into ~7 round-robin batches (so big files spread out) and dispatch one subagent per batch **in parallel**, on a cheaper model where the harness lets you pick one (extraction, not judgement), each with the cheat-sheet above for the formats in its batch and an identical brief (in Claude Code with this plugin installed, `subagent_type=leek-skills:session-miner`: log-read-only, skips project CLAUDE.md, and remembers patterns from earlier retros so it can mark them recurring; elsewhere, any sub-agent the harness offers). Each subagent returns a structured findings list; the orchestrator dedupes across batches and synthesizes. Round-robin assignment:
 ```bash
-awk '{print $NF}' top.txt | awk '{ b=((NR-1)%7)+1; print > ("batch_" b ".txt") }'
+awk '{ b=((NR-1)%7)+1; print > ("batch_" b ".jsonl") }' parents.jsonl
 ```
 
 ## 4. What to find
@@ -116,7 +116,9 @@ In every quoted evidence line, replace emails, API keys, tokens, secrets, passwo
 
 ## 6. Output: a numbered proposal list
 
-For each finding, give: the proposal, **the one verbatim (redacted) evidence line it came from** (with session basename), the destination, and a one-sentence why. Destinations:
+Before proposing a change, read the current destination and compare the observed behavior with its instructions. Recover the loaded skill version/path from the transcript when possible (including plugin cache versions); otherwise record **version unknown**. Compare the session date/version with the relevant fix's history. Classify each candidate as **missing guidance**, **existing guidance ignored**, **already fixed**, or **outside this skill's control**. Repeated evidence from an old version is not a current regression. Already-fixed and out-of-scope items belong in a brief exclusions note; ignored guidance needs an enforcement or clarity improvement, not a duplicate rule.
+
+For each finding, give: the proposal, **the one verbatim (redacted) evidence line it came from** (source path and line, or SQLite step index), the loaded version or **version unknown**, its disposition above, the current destination passage, and a one-sentence why. Label assistant diagnoses and summaries as such rather than human corrections. Destinations:
 
 - a content idea to draft / add to the idea library
 - a line to add to `CLAUDE.md` / `AGENTS.md` (name the file)

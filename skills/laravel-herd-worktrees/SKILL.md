@@ -44,7 +44,13 @@ If parking the parent is not desired (other non-Laravel dirs live there), use ex
 
 ### 2. Create a new worktree
 
-Use the helper script. It creates the worktree, copies `.env`, rewrites `APP_URL` + `DB_DATABASE` + cache prefixes, installs deps, generates app key, and runs migrations.
+Read the project's setup instructions and Composer hooks first, using the prerequisites
+in [Bootstrap a bare worktree](#bootstrap-a-bare-worktree). When hooks require assets
+that must be built before the normal install, use that ordered bootstrap instead of
+the helper. Otherwise use the helper below: it creates the worktree, copies `.env`,
+rewrites `APP_URL` + `DB_DATABASE` + cache prefixes, installs deps, generates app key,
+and runs migrations. Afterwards complete the bootstrap's generated-asset, fast-test,
+and proof checks; dependency installation alone does not prove the app is runnable.
 
 ```bash
 bash scripts/worktree-new.sh <branch-suffix> <base-branch> [--driver sqlite|mysql|pgsql]
@@ -81,9 +87,11 @@ Site uses 8.1; sibling worktrees keep their isolated or default version. `herd i
 
 A worktree made with plain `git worktree add` (the PR, issue, and CI recipes in other skills, at `.claude/worktrees/<name>`) has no `vendor/`, `node_modules/`, or `.env`; nor does one the harness made (`claude --worktree`, a subagent with `isolation: worktree`). With the leek-skills plugin in Claude Code, a session that opens in such a worktree is told so at start; elsewhere, check for `vendor/` yourself before running anything. Make it runnable from inside the worktree, with `main` set to the main checkout (`git worktree list --porcelain | sed -n '1s/^worktree //p'`):
 
-1. **Dependencies.** `cp -Rc "$main/vendor" vendor` (an APFS clone: instant, no extra disk), then `composer install` so it matches this branch's lock. Do the same for `node_modules` when the run builds assets. Each tree owns a real copy: Composer's autoloader resolves `app/` and `tests/` relative to `vendor/`, so a symlinked `vendor/` makes Pest run the main checkout's code.
-2. **Environment.** Copy `.env` (and `.env.testing` when present) from `$main`. When the calling skill gives the run its own database, set `DB_DATABASE` to that name in both.
-3. **Proof.** `git rev-parse HEAD` equals the commit the run means to test, and `test ! -L vendor` passes. Run nothing until both hold.
+1. **Identity and environment.** Confirm `git rev-parse HEAD` is the commit the run means to test. Copy `.env` (and `.env.testing` when present) from `$main`, applying the isolation rules below before running application commands. When the calling skill gives the run its own database, set `DB_DATABASE` to that name in both.
+2. **Bootstrap prerequisites.** Read the project's worktree setup instructions, Composer scripts, package scripts, and runtime asset registration. Identify generated files needed by Composer hooks or rendered tests, including ignored editor/plugin bundles. Follow the project's build order; when assets require installed dependencies but Composer hooks require assets, install with `--no-scripts`, build the prerequisites, then run the normal install with scripts enabled.
+3. **Dependencies and generated assets.** `cp -Rc "$main/vendor" vendor` (an APFS clone), confirm `test ! -L vendor`, then `composer install` so it matches this branch's lock, using step 2's order when needed. Do the same for `node_modules` when building assets. Each tree owns a real copy: a symlinked `vendor/` makes Pest run the main checkout's code. Build required assets inside this worktree. Clone existing ignored build outputs only after confirming their source inputs, lockfiles, and relevant build configuration match; otherwise rebuild.
+4. **Fast-test setup.** When the project uses test-impact analysis (TIA) or another baseline/cache mechanism, run its documented worktree hydration/setup path. Check how it handles `.git` being a file, baseline identity, and per-worktree cache keys. Reuse only compatible baselines and keep writable caches isolated. Do not invent a project-specific cache path or disable tests to make setup appear successful.
+5. **Proof.** Confirm Composer hooks complete, the assets needed by the selected flow exist, and the project's focused test command starts successfully. If a fast-test baseline is unavailable, report the missing prerequisite and use the project's documented fallback with an explicit test set. Setup is complete only when this worktree can exercise the intended flow.
 
 ## Per-Worktree Isolation Rules
 

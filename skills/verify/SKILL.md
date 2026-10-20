@@ -9,12 +9,13 @@ Tests passing is not the finish line. Exercise the actual flow once, in the runn
 
 ## Process
 
-1. **Pick the flow the change owns.** The route a user would hit, the command an operator would run, the job the system would dispatch, the Filament/Livewire page a back-office user would open. One realistic pass; this is not a test suite.
+1. **Pick the flow the change owns.** The route a user would hit, the command an operator would run, the job the system would dispatch, the Filament/Livewire page a back-office user would open. Select a small scenario that can expose the changed behavior: grouped or aggregated UI needs multiple related records with distinct values; interactive state needs the action and its reversal (for example expand, collapse, expand), checking controls and content agree each time. Use existing suitable records or isolated fixtures under the guardrails below. Keep the pass focused on the change, not a broad test suite.
 2. **Run it for real.**
    - HTTP / UI: the app is served (Herd serves Laravel apps at `https://<dir>.test`: never start a server that's already running). Use the project's browser tooling (`agent-browser`, Boost's `browser-logs`) to load the page, perform the action, and screenshot the result.
    - Console: run the artisan command with realistic arguments.
    - Jobs / listeners: dispatch through the real path (`dispatchSync` or trigger the event), then check the side effect where it lands, database rows, storage, logs.
 3. **Check the seams the tests can't see.** Before driving the flow, watch them under `Monitor` where available: `tail -f storage/logs/laravel.log | grep --line-buffered -E 'ERROR|CRITICAL|Exception'`, plus `php artisan queue:work` when a queued job is involved, so each error arrives tied to the action that caused it. Otherwise read the log tail after each action. Look for browser console errors, the Laravel log (`storage/logs/` or Boost's `read-log-entries`/`last-error`), a queue that needed a running worker, an unbuilt frontend (a Vite manifest error means run `npm run build`, not that the change is broken).
+   - **Calculated reports:** for one nontrivial record, reconcile detail rows, totals, badges/status, units, and the selected period against an independent worked example or source records. When adjacent values intentionally use different periods or populations, confirm the UI makes that difference explicit. Record the scenario and observed values; an unexplained mismatch fails verification.
 4. **Report faithfully.** What you did, what you saw (status codes, redirects, rendered state, rows written), and anything that surprised you: with the evidence. If a step couldn't be exercised (needs credentials, a webhook, a human), say so plainly instead of marking it verified. List each screenshot's path, so a PR opened later can embed it. Start each step's line with ✅ worked as expected, ❌ broke, or ⚠️ surprised you or could not be exercised.
 
 ## Guardrails
