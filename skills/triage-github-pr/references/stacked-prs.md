@@ -18,8 +18,12 @@ Walk down from each named PR: while its `baseRefName` is the head of an open PR 
 `isCrossRepository` false, step to that PR. A fork's branch can share the name (a fork
 PR from its own `main`), but a base is always a branch of this repo, so a cross-repo PR
 is never a parent. Stop on the PR whose base is the trunk: the **bottom**. A base that
-is neither the trunk nor an open PR's head (its PR closed, or a stray branch) is a
-blocker for every PR above it: report it, never merge into it. Walk up the same way for
+is neither the trunk nor an open PR's head normally blocks every PR above it. Before
+stopping, query `gh pr list --head <baseRefName> --state merged` and inspect any
+same-repository candidate's `headRefOid` and base. If its base is the trunk and its
+recorded head is an ancestor of the named PR's reviewed head, follow
+[Recover a rewritten parent](#recover-a-rewritten-parent); a closed-unmerged or
+unverifiable parent remains a blocker. Never merge into that old base. Walk up the same way for
 PRs based on a named PR's head (`gh pr list --base <head> --state open`).
 
 - **An unnamed PR below a named one** gates it: the named PR cannot land before it. Ask
@@ -69,8 +73,12 @@ and continue only after the user says which one they took (re-read
 
 ## Merge in order
 
-The merge approval in step 6 covers the stack as one decision: ask it once, naming the
-order (`#101 → #102 → #103`). Then, for each PR from the bottom up:
+Apply step 6's authorization rule to the stack as one decision. If the user named
+every PR or requested "all open PRs", report the order (`#101 → #102 → #103`) and
+proceed without another stack-approval question. Otherwise ask once for the missing
+scope. Deploy-branch approval, a conflicting requested merge method, native stacks,
+and a force-pushed restack still have their own gates above or below.
+Then, for each PR from the bottom up:
 
 1. **It merges only while its base is the trunk.** A PR whose base is still another
    PR's head is never merged: merging it would land its changes on that branch, not the
@@ -97,13 +105,11 @@ order (`#101 → #102 → #103`). Then, for each PR from the bottom up:
 4. **Re-check the retargeted PR** before its own merge, as step 6 does. Its commits on
    top of the trunk must be the ones recorded in step 3: `git fetch origin <trunk>`,
    then `git rev-list origin/<trunk>..<M head sha>` must match that recorded list. An extra
-   commit means the history below M is not what landed (for example, the lower PR was
-   squash-merged into `<trunk>` before this run, leaving its pre-squash commits on M's
-   branch): when the lower PR shows `MERGED` and its `headRefOid` is an ancestor of M's
-   head, ask once as a merge question whether to restack M's own commits onto
-   `origin/<trunk>` (`git rebase --onto origin/<trunk> <lower headRefOid> <M head>` and
-   `git push --force-with-lease`); otherwise stop and report it rather than merging the
-   extra change. The retarget does not move
+   commit means the history below M is not what landed. Follow
+   [Recover a rewritten parent](#recover-a-rewritten-parent) when the lower PR is
+   verifiably merged; otherwise stop and report the extra change. After recovery,
+   replace the recorded commit list with the reviewed restacked delta and restart
+   this check using the new head. An ordinary retarget does not move
    the head, so the review of that head still covers it and `--match-head-commit` pins
    the same sha, unless the repo requires up-to-date branches: then M reads `BEHIND`,
    because the trunk now has the merge commit M lacks. Update it as
@@ -115,6 +121,40 @@ order (`#101 → #102 → #103`). Then, for each PR from the bottom up:
 Completion criterion: every PR in the chain is merged in order (or the run stopped on a
 named one), and every open PR that was based on a merged head now targets the trunk or
 is named in the report with the retarget it still needs.
+
+## Recover a rewritten parent
+
+For a named PR M left above a squash- or rebase-merged parent, first verify the lower
+PR is `MERGED` into the trunk, is from this repository, and its recorded head is an
+ancestor of M's reviewed head. Record that lower head and M's current head as the
+replay boundary and lease expectation. Inspect the commits above the boundary to
+confirm they are M's own changes. Without that evidence, stop and report the blocker.
+
+Ask once for permission to restack and force-push M, unless the user already approved
+that exact action. Include any open dependents' required restacks in that decision,
+retaining their pre-rewrite boundaries; never force-push an unnamed dependent. Check
+M has a push left in its existing budget before rewriting. In M's isolated worktree,
+use a local branch whose tip equals the recorded reviewed head, then:
+
+```bash
+git fetch origin <trunk>
+git rebase --onto origin/<trunk> <lower-head-sha> <M-local-branch>
+git range-diff <lower-head-sha>..<reviewed-M-head-sha> origin/<trunk>..HEAD
+```
+
+Resolve conflicts only when intent is clear. Validate and review the resulting delta,
+including conflict resolutions; the old SHA's review does not cover this new head.
+Then push explicitly, with a lease pinned to the reviewed remote head:
+
+```bash
+git push --force-with-lease=refs/heads/<M-headRefName>:<reviewed-M-head-sha> origin HEAD:refs/heads/<M-headRefName>
+```
+
+A failed lease stops recovery; fetch and reassess the concurrent changes, never
+override it. Re-read M's remote `headRefOid`, confirm it equals the validated local
+head, retarget M to the trunk if needed, and rerun step 6's gates with that new SHA.
+Record `git rev-list origin/<trunk>..<new-M-head-sha>` as the replacement own-commit
+list. Continue only when that exact head is reviewed and validated; pin it in the merge.
 
 ## Fixes inside a stack
 

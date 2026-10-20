@@ -302,8 +302,8 @@ open PRs"), only on the user's explicit approval in this conversation; a stack
 lands bottom-up with merge commits and retargets per
 [`references/stacked-prs.md`](references/stacked-prs.md).
 
-**Merge questions.** Some gates are the user's decision, not a blocker: a stacked PR or
-a deploy-branch base without approval, a draft with unclear intent to ship, a conflict
+**Merge questions.** Some gates are the user's decision, not a blocker: a stack whose
+scope is not already authorized above, a deploy-branch base without approval, a draft with unclear intent to ship, a conflict
 whose resolution changes intent, or a fork you cannot push to (merge now, fix in a
 follow-up PR). Resolve these the same way as step 4's open questions: ping, then call
 the Skill tool with `grilling`. Stop only when the answer is to hold.
