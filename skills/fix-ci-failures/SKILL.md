@@ -20,19 +20,23 @@ cache clears, and a dirty tree.
 ## 1. Find the latest failures
 
 Run `git fetch origin`. For each workflow, take only its newest **completed** run on the
-branch. An older failure whose workflow has passed since is already fixed, and a run
-still in progress is not evidence yet: skip both.
+branch that was not cancelled, looking back at most 10 runs. An older failure whose
+workflow has passed since is already fixed, and a run still in progress or cancelled is
+not evidence: skip them. A workflow whose last 10 completed runs were all cancelled
+comes back as `all_cancelled`: report it with no verdict, since it has no log to triage.
 
 ```bash
 gh run list --branch B --status completed --limit 100 \
   --json databaseId,workflowName,conclusion,headSha,createdAt,url \
-  --jq 'group_by(.workflowName) | map(max_by(.createdAt)) | .[]
-        | select(.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "startup_failure")'
+  --jq 'group_by(.workflowName) | .[] | sort_by(.createdAt) | reverse | .[:10]
+        | (map(select(.conclusion != "cancelled")) | first)
+          // {workflowName: .[0].workflowName, conclusion: "all_cancelled", url: .[0].url}
+        | select(IN(.conclusion; "failure", "timed_out", "startup_failure", "all_cancelled"))'
 gh run view RUN --json jobs --jq '.jobs[] | select(.conclusion == "failure") | {databaseId, name, url}'
 gh run view --job JOB --log-failed
 ```
 
-No failed workflow: report that the branch's latest completed runs are green, and stop.
+No workflow comes back: report that the branch's latest completed runs are green, and stop.
 
 Completion criterion: every failed job is listed with its workflow, run URL, `headSha`,
 and the first real error from its log (not the trailing `exit code 1`).
