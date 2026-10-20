@@ -68,13 +68,16 @@ jq -rc 'select(.type=="response_item" and (.payload.type=="custom_tool_call_outp
 # human messages (the first one or two carry the system-reminder preamble)
 jq -rc 'select(.type=="user") | .content | if type=="array" then map(.text//"")|join(" ") else tostring end' FILE
 jq -rc 'select(.type=="assistant") | .tool_calls[]? | tostring' FILE
-jq -rc 'select(.type=="tool") | .content|tostring' FILE | grep -iE 'error|not found|failed|denied' | head
+# current logs use tool_result; older logs use tool
+jq -rc 'select(.type=="tool_result" or .type=="tool") | .content|tostring' FILE | grep -iE 'error|not found|failed|denied' | head
 ```
 
 **agy**
 ```bash
 # human messages for one conversation (ID = the .db basename)
 jq -rc --arg id ID 'select(.conversationId==$id) | .display' ~/.gemini/antigravity-cli/history.jsonl
+# when that id is absent from history, the prompt is step 14 in the db
+sqlite3 -readonly FILE "select step_payload from steps where step_type=14" | strings -n 8
 # step types: 14 user prompt, 15 model text, 132 tool call + result, 101 message from another conversation
 sqlite3 -readonly FILE "select step_payload from steps where step_type=132" | strings -n 8 | grep -iE 'error|not found|failed|denied' | head
 ```

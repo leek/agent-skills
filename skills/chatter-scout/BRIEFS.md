@@ -29,7 +29,7 @@ You verify one batch of candidates against the lens above.
 - Check any load-bearing distinction the lens names, and say what the page showed.
 - One search is allowed per item, only to confirm a load-bearing claim from a second source.
 - Candidates marked `community`, or on a site the notes say blocks fetch: do not fetch; judge from the snippet and give verdict `community`.
-- Verdicts: `keep` (on-lens, dated, substantive) · `community` · `off-topic` (matches the ignore list or misses the lens) · `stale` · `thin` (no concrete facts to hang a post or digest line on) · `unreachable` (fetch failed; say how).
+- Verdicts: `keep` (on-lens, dated, substantive) · `community` · `off-topic` (matches the ignore list or misses the lens) · `stale` · `thin` (no concrete facts to hang a post or digest line on) · `unreachable` (fetch failed, or the page has no readable text, such as a PDF or a login wall; say how).
 
 Return one JSON array and nothing else, one object per candidate, in batch order:
 

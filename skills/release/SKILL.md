@@ -57,7 +57,12 @@ session's uncommitted work. One release, one version, one tag, one GitHub releas
    `gh release create <version> --title "<version>: <summary>" --notes "$(cat <<'EOF' … EOF)"`.
    Done when `gh release view <version>` returns a URL.
 7. **Report.** The release URL, the two commit subjects with short SHAs, and any files
-   deliberately left out of step 2 and why.
+   deliberately left out of step 2 and why. When step 4 bumped `.claude-plugin/marketplace.json`,
+   also print the command that refreshes the installed Claude Code plugin, using that file's
+   `name` and the plugin `name`: `claude plugin marketplace update <marketplace>` then
+   `claude plugin update <plugin>@<marketplace>`. For this repo that is
+   `claude plugin marketplace update leek-agent-skills && claude plugin update leek-skills@leek-agent-skills`.
+   The running session keeps the previous plugin until it restarts.
 
 ## Guardrails
 

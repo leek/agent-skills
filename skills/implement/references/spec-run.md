@@ -58,4 +58,4 @@ A deploy gate ends the stack at the gate ticket, the same as it ends a single PR
 A later request that changes the same work ("also fix…", "tweak…") checks the PR first: `gh pr view <branch> --json state -q .state`.
 
 - `OPEN`: commit to the PR branch, in its worktree when it has one, and push. In a stack, commit to the PR that owns the change, then merge its branch into each branch above it, bottom-up, with plain merges and plain pushes (never a rebase or a force push).
-- `MERGED` or `CLOSED`: the branch is finished. Start from fresh `origin/<default>`: a new branch and PR by default, or straight onto `<default>` when the user says main.
+- `MERGED` or `CLOSED`: the branch is finished. Start from fresh `origin/<default>`: a new branch and PR by default, or straight onto `<default>` when the user says main. An open pull request whose base is that finished branch is retargeted first, onto the new branch or onto `<default>` when the new work goes there: `gh pr edit <n> --base <base>`. Merging it on the old base lands the work on that old branch. Landing a stack still follows `triage-github-pr`'s stacked-PR rules.

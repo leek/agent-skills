@@ -7,10 +7,10 @@ exact-head review, merge gates and cleanup.
 
 ## Wait for optional reviews
 
-Use the [in-flight signals](gh-mechanics.md#in-flight-signals). Schedule a wakeup a
-few minutes out where the harness supports it (`ScheduleWakeup`), otherwise re-poll
-with the host's wait/yield mechanism. Keep progress event-driven as the main skill
-allows. Never watch CI or use a shell sleep loop.
+Use the [in-flight signals](gh-mechanics.md#in-flight-signals). Schedule one wakeup
+for the remaining budget where the harness supports it (`ScheduleWakeup`). When it
+cannot, gather the reviews already submitted and continue. Keep progress event-driven
+as the main skill allows.
 
 Optional waits share the main skill's 20-minute total budget per PR, at most 10
 minutes per checkpoint; record time used across rounds and resumes. Once exhausted,
@@ -39,6 +39,6 @@ preserves its severity and is
 replied to, resolved and listed for the follow-up owned by the main skill.
 
 Before each push, update dispositions and independently review the unpushed fixes.
-After it, wait within the limit above, gather changed comment surfaces and classify
-only new claims. Repeat only when this table requires another fix. When clean, return
+After it, take the one wakeup within the limit above, gather changed comment surfaces
+and classify only new claims. Repeat only when this table requires another fix. When clean, return
 to step 6's exact-head merge checkpoint.

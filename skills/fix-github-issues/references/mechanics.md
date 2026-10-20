@@ -14,14 +14,14 @@ If the list holds exactly as many issues as the limit, raise the limit and list 
 
 ## Branch or worktree
 
-- Clean tree: record the starting point, then branch:
+Every run works in a worktree. Record the main checkout, then leave it there, clean tree included:
 
-  ```bash
-  git branch --show-current    # <start>; empty when detached, then use: git rev-parse HEAD
-  git switch -c fix/issues-<run> origin/<default>
-  ```
-- Dirty tree: `git worktree add -b fix/issues-<run> .claude/worktrees/issues-<run> origin/<default>`,
-  always at that path, never a sibling directory. Work there, after you make it runnable with `laravel-herd-worktrees`' **Bootstrap a bare worktree** section before running anything in it.
+```bash
+git branch --show-current    # <start>; empty when detached, then use: git rev-parse HEAD
+git worktree add -b fix/issues-<run> .claude/worktrees/issues-<run> origin/<default>
+```
+
+That path is the only place the fix is checked out, never a sibling directory. In a Laravel repo, make it runnable with `laravel-herd-worktrees`' **Bootstrap a bare worktree** section before running anything in it. Git commands for the fix run in the worktree (`git -C .claude/worktrees/issues-<run>`, or from inside it).
 
 ## Scratch databases
 
@@ -37,7 +37,7 @@ printf '%s\t%s\t%s\t%s\n' "$(date +%s)" <pgsql|mysql> <database> "<worktree path
 
 ## Land
 
-Push unless the repo's rules require pull requests. A push refused as a protected
+Run these git commands in the worktree. Push unless the repo's rules require pull requests. A push refused as a protected
 branch (`GH006`, or "changes must be made through a pull request") means open one
 instead; a refusal is not a reason to retry with `--force`.
 
@@ -46,16 +46,16 @@ instead; a refusal is not a reason to retry with `--force`.
 - Pull request: `git push -u origin fix/issues-<run>`, then `gh pr create` with a body
   in the `pr` skill's template (screenshots per its **Screenshots** section), plus one `fixes #NNN` line per issue. The issues close when it merges.
 
-## Restore the checkout
+## The checkout stays
 
-Clean-tree runs only (a worktree never moved the main checkout):
+The main checkout is still `<start>` at the end, because the run worked in the worktree. If a command moved it, switch it back before the report:
 
 ```bash
 git switch <start>              # a branch name
 git switch --detach <start>     # a sha, when the run started detached
 ```
 
-The `fix/issues-<run>` branch stays; it backs the pull request or the local commits.
+The `fix/issues-<run>` branch stays in the worktree; it backs the pull request or the local commits.
 
 ## Disposition and close
 

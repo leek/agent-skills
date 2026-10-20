@@ -82,17 +82,18 @@ Completion criterion: every finding in the working set has a line, and the secon
 
 ## 3. Fix the legit ones
 
-Work on a new branch `fix/issues-<run>` from `origin/<default>`, in a worktree when
-the tree is dirty ([Branch or worktree](references/mechanics.md#branch-or-worktree)).
-On a clean tree, record where the user's checkout is before you switch: step 4 puts it
-back there.
+Work on a new branch `fix/issues-<run>` from `origin/<default>`, always in a worktree
+([Branch or worktree](references/mechanics.md#branch-or-worktree)). The main checkout
+stays on the branch the run found it on, including when that tree is clean.
 
 Per LEGIT finding: make the minimal change, with no drive-by refactors. Add a test for
-logic, auth, or data changes and run it green. Commit it on its own (Conventional
+logic, auth, or data changes and run that test file green. A user message to stop the
+tests ends test commands for the rest of the run: the last focused result stands, and
+the commits continue. Commit each fix on its own (Conventional
 Commits, explicit staging). Put `fixes #NNN` **only** on the commit that resolves the
 issue's last legit finding, so the issue closes at the right moment.
 
-Run tests against the repo's configured test database when you can. A run that needs
+Run that test file against the repo's configured test database when you can. A run that needs
 its own database names and registers it by [Scratch databases](references/mechanics.md#scratch-databases).
 
 A LEGIT finding you cannot fix (a secret rotation, infra, a human decision) keeps the
@@ -110,13 +111,13 @@ pull request instead when branch protection or the repo's rules forbid direct pu
 user instruction in the input or the conversation ("open a PR", "keep them local")
 overrides both. The commands are in [Land](references/mechanics.md#land).
 
-Once they are landed, switch the user's checkout back to the branch or commit
-recorded in step 3 ([Restore the checkout](references/mechanics.md#restore-the-checkout)).
-Never leave it on `fix/issues-<run>`. Do the same if the run stops early for any reason
-after the switch.
+Once they are landed, the main checkout is still the branch recorded at the start
+([The checkout stays](references/mechanics.md#the-checkout-stays)). The fix branch
+stays in its worktree. Do the same check if the run stops early.
 
 Completion criterion: the commits are on `<default>`, in an open pull request, or kept
-local by the user's instruction, and the checkout is back where it started.
+local by the user's instruction, and `git branch --show-current` in the main checkout
+is still the starting branch.
 
 ## 5. Post a disposition
 
