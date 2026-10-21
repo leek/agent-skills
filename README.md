@@ -73,7 +73,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | `upgrade-plan` | user | Plan a library or framework upgrade from the installed version to the latest: cheap parallel subagents read the changelogs and scan the code, and one plan sorts what breaks, which local patches and workarounds can go, and what to adopt into must do, should do, and do later. Follows the dependencies that have to move too. |
 | `verify` | model | Exercise a change end to end in the running application (hit the route, run the command, click through the page) and report what actually happened. |
 | `wait-what` | user | Stop; that last message did not land. Re-pitch it. |
-| `wayfinder` | user | Plan work too big for one agent session as a map of decision tickets in markdown under .scratch/, then resolve them one per session until the route to the destination is clear. |
+| `wayfinder` | user | Plan work too big for one agent session as a map of decision tickets in markdown under .scratch/, then resolve them one per session, or all in one run with `/wayfinder <map> all`, until the route to the destination is clear. |
 | `which-skill` | user | Not sure which skill to reach for? Name the situation and get routed to one. |
 | `wizard` | model | Generate an interactive bash wizard that walks a human through steps only they can perform: provisioning, dashboard credentials, CI secrets, one-off migrations or cutovers. |
 | `writing-for-agents` | model | Reference for writing documents an agent consumes: skills, AGENTS.md/CLAUDE.md, and reference docs reached by a pointer. |

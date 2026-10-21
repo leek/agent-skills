@@ -1,8 +1,8 @@
 ---
 name: wayfinder
-description: Plan work too big for one agent session as a map of decision tickets in markdown under .scratch/, then resolve them one per session until the route to the destination is clear.
+description: Plan work too big for one agent session as a map of decision tickets in markdown under .scratch/, then resolve them one per session, or all in one run, until the route to the destination is clear.
 disable-model-invocation: true
-argument-hint: "A loose idea, or an existing map under .scratch/"
+argument-hint: "A loose idea, or an existing map under .scratch/; add `all` after a map to work every ticket in one run"
 ---
 
 # Wayfinder
@@ -41,7 +41,7 @@ Decision points that arise outside a full grilling: confirming the destination p
 
 ## Invocation
 
-Two modes. Either way, **never resolve more than one ticket per session**: with the exception of research tickets.
+Two modes. Either way, **never resolve more than one ticket per session**: with the exception of research tickets, and of a **map run**.
 
 ### Chart the map
 
@@ -56,7 +56,7 @@ User invokes with a loose idea.
 
 ### Work through the map
 
-User invokes with a map (its path or title). A ticket is optional, without one, you pick the next.
+User invokes with a map (its path or title). A ticket is optional, without one, you pick the next. With `all` after the map, this is a **map run**: read [references/map-run.md](references/map-run.md) first, it loops the steps below over the whole frontier.
 
 1. Load the **map**: the low-res view, not every ticket body.
 2. Choose the ticket. If the user named one, use it; otherwise take the first frontier ticket. **Claim it** through the tracker's Claim operation before any work.
@@ -83,12 +83,12 @@ Stage-specific **Next** conditions (only those that apply, most likely first):
 
 **After charting:**
 
-- **Map charted with a frontier** → `/clear`, then `/wayfinder <map>` to resolve the first frontier ticket; name it (research tickets already resolved point at their findings files)
+- **Map charted with a frontier** → `/clear`, then `/wayfinder <map>` to resolve the first frontier ticket; name it (research tickets already resolved point at their findings files). Offer `/wayfinder <map> all` beside it to work the whole map in one run
 - **Charting found no unresolved decision tickets** → no map needed: `/to-spec`, or `/to-tickets` if the shape is already clear
 
 **After working a ticket:**
 
-- **Map still has open tickets** → `/clear`, then `/wayfinder <map>` for the next frontier ticket (or **resume your own claimed ticket first** if you stopped mid-ticket, see below); name it and say how many remain
+- **Map still has open tickets** → `/clear`, then `/wayfinder <map>` for the next frontier ticket (or **resume your own claimed ticket first** if you stopped mid-ticket, see below); name it and say how many remain. Offer `/wayfinder <map> all` beside it for the rest
 - **Map is clear** → `/to-spec <map>`, run once; that writes the spec and closes the map
 - **Map is clear and the effort turned out genuinely small** → `/to-tickets <map>`, skipping the spec
 - **Ticket blocked on someone else's knowledge** → `/to-questionnaire`; **on a fact worth reading for** → `/research`
