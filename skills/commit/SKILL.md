@@ -15,7 +15,7 @@ repo at the same time; that is expected, and none of their work is yours to comm
 ## Process
 
 1. **List your files.** From this conversation, write down every file *you* created, edited, or
-   deleted. If you touched nothing, say so and stop.
+   deleted. Changes under `.claude/agent-memory/` are always yours too, whoever wrote them: they are the notes of agents with `memory: project`, not a parallel session's work in progress, so they ride along in your commit (`git add -- .claude/agent-memory`). If you touched nothing, say so and stop.
 2. **Check the tree.** Run `git status --porcelain`. Anything not on your list belongs to someone
    else, ignore it completely.
 3. **Drop the overlaps.** For each of your files, `git diff -- <path>` (`git diff --cached` too if

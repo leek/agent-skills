@@ -20,7 +20,7 @@ session's uncommitted work. One release, one version, one tag, one GitHub releas
    authenticated, hold the last tag, and the branch is not behind.
 2. **Commit this session's work.** Only files *you* created, edited, or deleted in this
    conversation; `git status --porcelain` lines you did not touch belong to a parallel
-   session and stay out. `git add -- <new-path>` each new file, then
+   session and stay out. Changes under `.claude/agent-memory/` are always yours too, whoever wrote them: they are the notes of agents with `memory: project`, not a parallel session's work in progress, so they ride along in your commit (`git add -- .claude/agent-memory`). `git add -- <new-path>` each new file, then
    `git commit --only -m "<type(scope): subject>" -- <path> …` (options before the `--`).
    Never `git add -A`, `git add .`, or `commit -a`. A file that mixes your hunks with
    foreign ones is left out and named in the report. Skip this step when there is nothing

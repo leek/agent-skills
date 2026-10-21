@@ -59,7 +59,7 @@ Finish the loop only when every acceptance criterion is covered at a chosen seam
 
 ### 4. Format and commit a reviewable checkpoint
 
-Run the repository's configured formatter on the paths you touched only (Pint, Prettier, Black, gofmt: whatever it configures), so a parallel session's uncommitted files stay as they are. Check `git status --porcelain`, stage only work-item files by explicit path, and leave foreign changes unstaged. Commit to the current branch (PR delivery created it before step 1); this step creates no branch or worktree. Record the paths you touched; review scopes to them (next step), so a parallel session's commits on the same branch neither get staged here nor reviewed there.
+Run the repository's configured formatter on the paths you touched only (Pint, Prettier, Black, gofmt: whatever it configures), so a parallel session's uncommitted files stay as they are. Check `git status --porcelain`, stage only work-item files by explicit path, and leave foreign changes unstaged. Changes under `.claude/agent-memory/` are always yours too, whoever wrote them: they are the notes of agents with `memory: project`, not a parallel session's work in progress, so they ride along in your commit (`git add -- .claude/agent-memory`). Commit to the current branch (PR delivery created it before step 1); this step creates no branch or worktree. Record the paths you touched; review scopes to them (next step), so a parallel session's commits on the same branch neither get staged here nor reviewed there.
 
 Finish this step with every work-item change committed, every foreign change untouched, and the checkpoint commit SHA recorded.
 
