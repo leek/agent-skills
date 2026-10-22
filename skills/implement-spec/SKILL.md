@@ -24,6 +24,8 @@ Talk to subagents in **context pointers**: paths to the spec, the ticket, blocke
 
 - Laravel (`laravel/framework` in `composer.json`): [`references/laravel.md`](references/laravel.md)
 
+**Ticket board.** Report each ticket's status per [`ticket-board.md`](../wayfinder/references/ticket-board.md), with `kind: "spec"`: `ready` and `blocked` (note: the blockers) from step 1, `skipped` for tickets left out, `running` at dispatch, `fixing` when a failure goes back to its implementer, `merged` (note: the merge SHA), `released` (note: why), and `closed` in step 7.
+
 ## Process
 
 ### 1. Load the task graph
@@ -34,13 +36,17 @@ Read the spec: its **Build Contract** section first, then what the tickets name.
 
 Leave out closed tickets and tickets claimed by someone else (name them in the report). A `deploy-gate: true` ticket bounds the run: build up to and including it, then stop at step 7 with a PR; its dependents start after that PR is deployed. When dependents would wait behind a gate, ask once, here, before the first dispatch (not after the gate PR opens): stop at the gate, or build the dependents in this run on a second integration branch `<slug>-2` cut from the gate branch's tip. Before dispatching the first contract/drop ticket on `<slug>-2`, confirm the gate branch `<slug>` has no remaining writes or reads to the columns or tables `<slug>-2` drops. `<slug>-2` takes changes only by merging `<slug>` (the gate ticket and its review fixes), never by merging or cherry-picking any other branch, and once the gate PR merges, move `<slug>-2`'s delta onto fresh `origin/<default>` for a second PR.
 
-Ask `implement`'s [delivery question](../implement/references/spec-run.md#choose-the-delivery-shape) for a whole spec in the same `AskUserQuestion` call as the deploy-gate question, when both apply. It is the only question before the first dispatch.
+Before the first dispatch, ask these in one `AskUserQuestion` call where available (otherwise one message in chat), and nothing else:
 
-Finish when every in-scope ticket and its edges are known, the delivery shape is chosen, and the first frontier is listed.
+- **Worktree**: build the integration branch in a worktree at `.claude/worktrees/<slug>` (recommended: this checkout stays as it is), or switch this checkout to `<slug>`. Skip it when the tree is dirty (the worktree is the only option; say so) or the request already says. Each implementer gets its own worktree either way: that is what lets them build in parallel.
+- **Delivery**: `implement`'s [delivery question](../implement/references/spec-run.md#choose-the-delivery-shape) for a whole spec: one PR, stacked PRs, or the branch with no PR.
+- **Deploy gate**, when one applies (above).
+
+Finish when every in-scope ticket and its edges are known, the worktree and delivery choices are made, and the first frontier is listed.
 
 ### 2. Create the integration branch
 
-Follow `implement`'s [PR delivery: before step 1](../implement/references/spec-run.md#pr-delivery-before-step-1-claims-anything): branch `<slug>` from fresh `origin/<default>`, in `.claude/worktrees/<slug>` when the tree is dirty or the user asked, with the spec's `.scratch/<slug>/` carried over. This checkout is the **integration checkout**. Record `base_sha`.
+Follow `implement`'s [PR delivery: before step 1](../implement/references/spec-run.md#pr-delivery-before-step-1-claims-anything): branch `<slug>` from fresh `origin/<default>`, in `.claude/worktrees/<slug>` when step 1's worktree answer (or a dirty tree) says so, with the spec's `.scratch/<slug>/` carried over. This checkout is the **integration checkout**. Record `base_sha`.
 
 Make a notes directory outside every worktree: `notes="$(git rev-parse --path-format=absolute --git-common-dir)/implement-spec/<slug>"`. When several tickets need the same exploration (an unfamiliar module, a package's docs), run one read-only **exploration subagent** first that writes its findings there as Markdown, so implementers build instead of explore.
 
@@ -72,7 +78,7 @@ In the integration checkout: `git merge --no-ff <slug>--<NN>`. On a conflict, ca
 
 Keep each implementer's report in `$notes/<NN>.md`: it feeds dependents' briefs and the ticket's `Resolution`. A merged ticket counts as done for its dependents' `blocked-by`, so recompute the frontier and dispatch what it unblocked (step 3).
 
-After each merge, post one progress line so the user never has to ask for status: `<NN> merged (<k> of <M>); running: <NNs>; next: <NNs>`.
+After each merge, update the ticket board, and post one progress line so the user never has to ask for status: `<NN> merged (<k> of <M>); running: <NNs>; next: <NNs>`. Skip the line when the board's pane shows the run.
 
 **A question never stops the run.** When a ticket needs the user's decision, release that ticket and its dependents, keep building the rest of the frontier, and ask the open questions together at the next merge, or in the final report when nothing else is running. Stop and wait only when every remaining ticket is blocked on an answer.
 

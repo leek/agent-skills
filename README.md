@@ -88,6 +88,7 @@ The plugin also ships a [mod](https://code.claude.com/docs/en/plugins/mods/overv
 
 - **`/scratch [effort]`**: a live pane of every `.scratch/` effort (open tickets, blockers, claims, staleness, next command), opened instantly, even mid-turn, and refreshed whenever a tool writes under `.scratch/`. `scratch-status` adds the commit checks.
 - **Workers band**: above the prompt, every subagent a fan-out skill dispatched (`implement-spec`, `autopilot`, `browser-test`, `panel`, `chatter-scout`, `code-review`, ...), with its tool count, latest tool, elapsed time, and outcome.
+- **Ticket board**: while `implement-spec`, `implement <spec> all`, or `wayfinder <map> all` runs, a pane lists every ticket's status (ready, blocked, running, built or merged, resolved, released, closed), beside the live tool count of the sub-agent working it. The skill reports each change through the mod's `ticket_board` tool; without the mod it posts progress lines in chat as before. `/ticket-board` reopens a closed pane.
 
 Other harnesses, and Claude Code surfaces that don't draw, run the same skills without it.
 

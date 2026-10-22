@@ -84,3 +84,43 @@ test('/scratch draws the board and answers with a tally, or the table where no p
   const pane = await $.ui.mount({ plugin: 'leek-skills', surface: 'terminal', ...PANE } as never)
   expect(await pane.find({ type: 'Text', text: /01 Login form/ })).toBeDefined()
 })
+
+test('ticket_board draws each ticket beside its running implementer, or asks for chat lines where no pane draws', async ($, on) => {
+  mock.clock(on, { now: 0 })
+  on('ui.render', async ($, e) => engineDraw($, e))
+  on('agent.spawn', async () => ({ model: 'sonnet', agentId: 'a1' }))
+  on('tool.call', async () => ({ result: 'ok' }) as never)
+  let isPlaced = true
+  on('ui.open', async () => ({ value: { isPlaced } }) as never)
+
+  const list = [
+    { number: '01', title: 'Login form', status: 'running' },
+    { number: '02', title: 'Logout', status: 'blocked', note: 'by 01' },
+  ]
+  const shown = await $.tool.call({ tool: 'mcp__leek-skills__ticket_board', board: 'auth', kind: 'spec', tickets: list, tool_use_id: 's1' } as never)
+  expect(String((shown as { result: unknown }).result)).toContain('Skip the chat progress line')
+
+  await $.agent.spawn({ prompt: 'build', description: 'build 01', subagentType: 'general-purpose', name: 'auth--01' } as never)
+  await $.tool.call({ tool: 'Bash', command: 'php artisan test', tool_use_id: 't1', agentId: 'a1' } as never)
+
+  const pane = await $.ui.mount({
+    plugin: 'leek-skills',
+    surface: 'terminal',
+    component: 'Pane',
+    requestId: 'tickets',
+    props: { title: 'Spec: auth', isFocused: false, bodyColumns: 120, placement: 'dock' },
+  } as never)
+  expect(await pane.find({ type: 'Text', text: /0 of 2 done · 1 running · 1 blocked/ })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: /01 Login form.*running.*1 tools.*Bash: php artisan test/ })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: /02 Logout.*blocked · by 01/ })).toBeDefined()
+
+  isPlaced = false
+  const undrawn = await $.tool.call({
+    tool: 'mcp__leek-skills__ticket_board',
+    board: 'auth',
+    kind: 'spec',
+    tickets: [{ number: '01', status: 'merged' }],
+    tool_use_id: 's2',
+  } as never)
+  expect(String((undrawn as { result: unknown }).result)).toContain('post the progress line in chat')
+})

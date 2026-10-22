@@ -8,18 +8,27 @@
 // Workers band: above the prompt, every subagent a fan-out skill dispatched (implement-spec,
 // autopilot, browser-test, panel, chatter-scout, code-review), with its tool count, last
 // tool, and outcome. Where nothing draws, the skills report their workers as before.
+//
+// Ticket board: implement-spec, implement <spec> all, and wayfinder <map> all report each
+// ticket's status through the ticket_board tool this module registers, and a pane shows
+// the run, joined to each ticket's running worker. The tool's reply says whether a pane
+// drew it; where none did, the skill posts its progress lines in chat as before.
 
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { ScratchEffort, Worker } from '../../types'
+import type { BoardTicket, ScratchEffort, Worker } from '../../types'
 import { isClosed, scan, summary, tally } from './scratch-scan'
+import { SCHEMA, apply, parseUpdate, ticketColor, ticketMark, title, tally as boardTally } from './ticket-board'
 import { KEEP, describeTool, duration, isFailed, mark, ordered } from './workers-model'
 
 const PANE = 'scratch'
 const board = atom({ plugin: 'leek-skills', key: 'scratch' } as const, null)
 const workers = atom({ plugin: 'leek-skills', key: 'workers' } as const, [])
 const isWorkersHidden = atom({ plugin: 'leek-skills', key: 'isWorkersHidden' } as const, false)
+const TICKETS_PANE = 'tickets'
+const TICKETS_TOOL = 'mcp__leek-skills__ticket_board'
+const tickets = atom({ plugin: 'leek-skills', key: 'tickets' } as const, null)
 
 const ago = (ms: number) => {
   const days = Math.floor(ms / 86_400_000)
@@ -30,6 +39,9 @@ const ago = (ms: number) => {
 
 // The slug /scratch was last given; empty means every effort.
 let only = ''
+
+// The person closed the ticket pane; later updates for the same board leave it closed.
+let isTicketsDismissed = false
 
 async function refresh($: EngineInterface) {
   const root = `${await $.session.cwd()}/.scratch`
@@ -51,9 +63,39 @@ export const register: Register = on => {
       argumentHint: '[effort-slug]',
       immediate: true,
     })
+    await $.command.register({
+      name: 'ticket-board',
+      description: 'Reopen the ticket board of an implement-spec, implement all, or wayfinder all run',
+      immediate: true,
+    })
+    await $.tool.register({
+      name: 'ticket_board',
+      description:
+        'For implement-spec, implement <spec> all, and wayfinder <map> all: report ticket status changes so a pane beside the chat shows the run. The reply says whether a pane drew it.',
+      inputSchema: SCHEMA,
+    })
 
     return next(e)
   })
+
+  on('command.run', { command: 'ticket-board' }, async $ => {
+    const run = await read($, tickets)
+    if (run === null) {
+      return { text: 'No ticket board in this session.' }
+    }
+    isTicketsDismissed = false
+    const opened = await $.ui.open({ id: TICKETS_PANE, title: title(run) })
+
+    return { text: opened.isPlaced ? boardTally(run) : boardText(run.tickets) }
+  })
+
+  on('ui.close', { id: TICKETS_PANE }, async ($, e, next) => {
+    if (e.origin.kind === 'person') {
+      isTicketsDismissed = true
+    }
+
+    return next(e)
+  }).catch(($, e, next) => next(e))
 
   on('command.run', { command: 'scratch' }, async ($, e) => {
     only = e.args.trim()
@@ -73,12 +115,31 @@ export const register: Register = on => {
     return next(e)
   }).catch(($, e, next) => next(e))
 
-  // Observe only: count a subagent's tool calls, and rescan the open board after a write
-  // under .scratch/. One tool.call hook serves both features.
+  // Serve ticket_board; otherwise observe only: count a subagent's tool calls, and rescan the
+  // open board after a write under .scratch/. One tool.call hook serves every feature.
   on('tool.call', async ($, e, next) => {
     const tool = String(e.tool)
     // A tool's parameters sit on the event itself (e.command, e.file_path), not under an input key.
     const input = e as unknown as Record<string, unknown>
+    if (tool === TICKETS_TOOL) {
+      const change = parseUpdate(input)
+      if (typeof change === 'string') {
+        return { deny: change }
+      }
+      const before = await read($, tickets)
+      const run = apply(before, change, await $.clock.now())
+      await update($, tickets, () => run)
+      if (before?.slug !== run.slug || before.kind !== run.kind) {
+        isTicketsDismissed = false
+      }
+      const isPlaced = !isTicketsDismissed && (await $.ui.open({ id: TICKETS_PANE, title: title(run) })).isPlaced
+
+      return {
+        result: isPlaced
+          ? `Shown in the ticket pane (${boardTally(run)}). Skip the chat progress line.`
+          : `Recorded (${boardTally(run)}), but no pane shows it: post the progress line in chat.`,
+      }
+    }
     const id = e.agentId
     if (id !== undefined) {
       const line = describeTool(tool, input)
@@ -103,6 +164,7 @@ export const register: Register = on => {
     if (result.agentId !== undefined) {
       const worker: Worker = {
         id: result.agentId,
+        name: e.name ?? '',
         type: e.subagentType,
         description: e.description,
         startedAt: await $.clock.now(),
@@ -230,4 +292,53 @@ export const register: Register = on => {
       </Box>
     )
   })
+
+  on('ui.render', { component: 'Pane', requestId: TICKETS_PANE }, async ($, e) => {
+    const { Box, Text } = $.ui.resolve(e)
+    const run = await read($, tickets)
+    if (run === null) {
+      return <Text dimColor>No ticket board yet.</Text>
+    }
+    const list = await read($, workers)
+    const now = await $.clock.now()
+    // A ticket's live worker: board runs name it <slug>--<NN> (implement-spec's fixer <slug>--fix).
+    const worker = (t: BoardTicket) =>
+      [...list].reverse().find(w => w.name === `${run.slug}--${t.number}` && w.outcome === 'running')
+    const fixer = list.find(w => w.name === `${run.slug}--fix` && w.outcome === 'running')
+
+    return (
+      <Box flexDirection="column" width={e.props.bodyColumns}>
+        <Text bold wrap="truncate-end">
+          {run.slug} <Text dimColor>{boardTally(run)}</Text>
+        </Text>
+        {run.tickets.map(t => {
+          const w = worker(t)
+          const live = w === undefined ? '' : ` · ${w.tools} tools · ${duration(now - w.startedAt)}${w.lastTool === '' ? '' : ` · ${w.lastTool}`}`
+
+          return (
+            <Text key={t.number} wrap="truncate-end" dimColor={t.status === 'skipped' || t.status === 'blocked'}>
+              <Text color={ticketColor(t.status)}>{ticketMark(t.status)} </Text>
+              {t.number} {t.title}
+              <Text dimColor>
+                {'  '}
+                {t.status}
+                {t.note === '' ? '' : ` · ${t.note}`}
+                {live}
+              </Text>
+            </Text>
+          )
+        })}
+        {fixer !== undefined && (
+          <Text color="suggestion" wrap="truncate-end">
+            ◐ review fixes <Text dimColor>· {fixer.tools} tools · {fixer.lastTool}</Text>
+          </Text>
+        )}
+      </Box>
+    )
+  })
+}
+
+// /ticket-board's reply where no pane draws.
+function boardText(list: readonly BoardTicket[]): string {
+  return list.map(t => `${ticketMark(t.status)} ${t.number} ${t.title}: ${t.status}${t.note === '' ? '' : ` (${t.note})`}`).join('\n')
 }

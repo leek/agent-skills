@@ -32,8 +32,40 @@ export type ScratchBoard = {
   efforts: ScratchEffort[]
 }
 
+export type TicketStatus =
+  | 'blocked'
+  | 'ready'
+  | 'running'
+  | 'fixing'
+  | 'built'
+  | 'merged'
+  | 'resolved'
+  | 'released'
+  | 'closed'
+  | 'skipped'
+
+export type BoardKind = 'spec' | 'map'
+
+export type BoardTicket = {
+  /** Leading ticket number, e.g. `03`. */
+  number: string
+  title: string
+  status: TicketStatus
+  note: string
+}
+
+/** A multi-ticket run (implement-spec, implement all, wayfinder all) as the ticket_board tool last reported it. */
+export type TicketBoard = {
+  slug: string
+  kind: BoardKind
+  tickets: BoardTicket[]
+  updatedAt: number
+}
+
 export type Worker = {
   id: string
+  /** The Agent call's `name`, or empty; board runs name a ticket's worker `<slug>--<NN>`. */
+  name: string
   type: string
   description: string
   startedAt: number
@@ -49,6 +81,7 @@ declare module 'claude-code' {
       scratch: ScratchBoard | null
       workers: Worker[]
       isWorkersHidden: boolean
+      tickets: TicketBoard | null
     }
   }
 }
