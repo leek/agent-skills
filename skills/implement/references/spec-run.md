@@ -31,7 +31,7 @@ Every shape runs the same build, review, and verification. Only the branches and
 Run it on a spec whose `tickets/` already exist and the user asked to build all of ("`all`", "implement all of …", "the whole spec"). A spec with no tickets yet goes to `to-tickets` first.
 
 1. **Order.** Read every ticket's frontmatter once. Take the open tickets in number order (numbers are topological, so blockers come first). A ticket claimed by someone else stays out; name it in the report.
-2. **Build each ticket inline, one after another.** Per ticket: claim it (step 1), choose its seams (step 2), run the TDD loop with its focused tests (step 3), and commit it (step 4). Each ticket's commits stand alone, so the PR history reads ticket by ticket. Carry seams a later ticket needs forward in your notes; its `Resolution` is written in step 8.
+2. **Build each ticket inline, one after another.** Per ticket: claim it (step 1), choose its seams (step 2), run the TDD loop with its focused tests (step 3), and commit it (step 4). With **Stacked PRs**, push and open its PR now, per [Stacked PRs](#stacked-prs). Each ticket's commits stand alone, so the PR history reads ticket by ticket. Carry seams a later ticket needs forward in your notes; its `Resolution` is written in step 8.
 3. **Stop at a deploy gate.** After a ticket with `deploy-gate: true` is built, run steps 5–8 for the tickets built so far, open the PR, and stop: its dependents start after that PR is deployed.
 4. **Run steps 5–7 once, over the whole range.** Review `base_sha..HEAD` scoped to every path the run touched. Ask the full-suite question once. Verify each ticket's acceptance criteria in one `verify` pass. A follow-up fix reruns the focused tests for what it touched, never the full suite again.
 5. **Close in step 8.** Write each ticket's `Resolution` and `status: closed`. The spec is complete when every ticket is closed.
@@ -40,18 +40,23 @@ Run it on a spec whose `tickets/` already exist and the user asked to build all 
 
 ## PR delivery: after step 8
 
-1. Push the branch and open the PR with `gh pr create`. Write the body with the `pr` skill's template, its Evidence from the verification pass with the screenshots uploaded as its **Screenshots** section says, then one line per ticket closed. For **Stacked PRs**, open the stack below instead.
+1. Push the branch and open the PR with `gh pr create`. Write the body with the `pr` skill's template, its Evidence from the verification pass with the screenshots uploaded as its **Screenshots** section says, then one line per ticket closed. For **Stacked PRs**, the PRs are already open: finish them per the stack's step 3 below instead.
 2. Read the PR's unresolved review threads once (the GraphQL `reviewThreads` query in `resolve-review-comments`). When any exist, run `resolve-review-comments` on the PR. When review bots are still running, say so in the end block.
 3. Keep the worktree: it holds the PR branch. If you entered it, leave with `ExitWorktree({action: "keep"})`, which never removes it. Name its path in the report; `repository-cleanup` removes it after the merge.
 4. Without a worktree, return the main checkout to the default branch: `git switch <default> && git pull --ff-only`. Say so in the report, so the next request starts on fresh `<default>`.
 
 ## Stacked PRs
 
-The build is unchanged: one branch `<slug>` whose commits read ticket by ticket. Parallel frontier tickets in `implement-spec` still build in parallel; their `--no-ff` merge order on `<slug>` is the stack order, so never ask the user how to linearize parallel tickets for a stack. Cut the stack from `<slug>` after step 8:
+The build is unchanged: one branch `<slug>` whose commits read ticket by ticket. Parallel frontier tickets in `implement-spec` still build in parallel; their `--no-ff` merge order on `<slug>` is the stack order, so never ask the user how to linearize parallel tickets for a stack. Each ticket's PR opens the moment the ticket lands, never in a batch at the end, so reviewers and review bots start on the bottom of the stack while the rest is still building:
 
-1. **One cut per ticket.** In a spec run, the cut is the ticket's last commit. In `implement-spec`, it is the ticket's `--no-ff` merge commit on `<slug>` (`git log --first-parent --merges <base_sha>..<slug>`), in merge order. Create `git branch <slug>-stack-<NN> <cut>` for every ticket but the last. The last ticket's PR uses `<slug>` itself, so the review fixes and the tracker commit ride in the top PR.
-2. **Push and open bottom-up.** Push all the branches in one `git push origin <branches…>`. Open the bottom PR against `<default>`, and each next PR against the head branch of the PR below it. Each body uses the `pr` skill's template for its own ticket: Evidence from that ticket's acceptance checks in the one verification pass, then its closed-ticket line. Before Merge Danger, add `Stack: <k> of <n>, based on #<below>. Land bottom-up with merge commits.` The top PR's body also names the review-fix commits it carries.
-3. **Report the stack** bottom-up as `#101 → #102 → #103` with the exact merge order. To land it, the next step is `triage-github-pr` on all its PRs, which merges a stack bottom-up and retargets each PR above.
+1. **Cut and push at once.** In a spec run, the cut is the ticket's commit, right after step 4. In `implement-spec`, it is the ticket's `--no-ff` merge commit on `<slug>`, right after step 4's merge passes its focused tests. Run `git branch <slug>-stack-<NN> <cut>`, then `git push -u origin <slug>-stack-<NN>`. The ticket landing `k`th is position `k` (the bottom is 1).
+2. **Open its PR.** Base it on `<default>` for position 1, otherwise on the head branch of position `k-1`. Title it `[<slug>#<k>] <ticket title>`, so the whole stack sorts and reads as one group. Write the body with the `pr` skill's template for this ticket. Its Evidence is the ticket's focused test command and result for now. Before Merge Danger, add `Stack: <slug>#<k>, based on #<below>. Land bottom-up with merge commits.` Keep each PR number against its ticket: it goes in the progress line and the next PR's `based on`.
+3. **After the final gates** (review, verification, closing the tickets), update the open stack in place:
+   - Bring the top branch up to `<slug>` with a plain fast-forward push: `git push origin <slug>:<slug>-stack-<top NN>`. That way the review fixes and the tracker commit ride in the top PR. Never force push.
+   - Edit each PR's body (`gh pr edit <n> --body-file <file>`): add Evidence from that ticket's acceptance checks in the one verification pass, then its closed-ticket line. End each `Stack:` line with the whole stack, bottom-up (`#101 → #102 → #103`). The top body also names the review-fix commits it carries.
+4. **Report the stack** bottom-up as `#101 → #102 → #103` with the exact merge order. To land it, the next step is `triage-github-pr` on all its PRs, which merges a stack bottom-up and retargets each PR above.
+
+A run that stops early leaves its open PRs as they are; the report names them.
 
 A deploy gate ends the stack at the gate ticket, the same as it ends a single PR.
 

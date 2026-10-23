@@ -34,6 +34,8 @@ Read the spec: its **Build Contract** section first, then what the tickets name.
 
 **No `tickets/` yet?** Cut them yourself with `to-tickets`' rules: its step 3 for the slicing, its step 4 for the one green light, its step 5 and [Ticket template](../to-tickets/SKILL.md#ticket-template) to publish and commit. Vertical slices with honest `blocked-by` edges are what make the frontier wide; a chain of tickets each blocked by the last builds no faster than `/implement all`.
 
+Open the ticket board now, before anything else in this step: load `mcp__leek-skills__ticket_board` with ToolSearch if it is deferred, and send every in-scope ticket with its `title` as `ready` or `blocked`, and the left-out ones as `skipped`.
+
 Leave out closed tickets and tickets claimed by someone else (name them in the report). A `deploy-gate: true` ticket bounds the run: build up to and including it, then stop at step 7 with a PR; its dependents start after that PR is deployed. When dependents would wait behind a gate, ask once, here, before the first dispatch (not after the gate PR opens): stop at the gate, or build the dependents in this run on a second integration branch `<slug>-2` cut from the gate branch's tip. Before dispatching the first contract/drop ticket on `<slug>-2`, confirm the gate branch `<slug>` has no remaining writes or reads to the columns or tables `<slug>-2` drops. `<slug>-2` takes changes only by merging `<slug>` (the gate ticket and its review fixes), never by merging or cherry-picking any other branch, and once the gate PR merges, move `<slug>-2`'s delta onto fresh `origin/<default>` for a second PR.
 
 Before the first dispatch, ask these in one `AskUserQuestion` call where available (otherwise one message in chat), and nothing else:
@@ -42,7 +44,7 @@ Before the first dispatch, ask these in one `AskUserQuestion` call where availab
 - **Delivery**: `implement`'s [delivery question](../implement/references/spec-run.md#choose-the-delivery-shape) for a whole spec: one PR, stacked PRs, or the branch with no PR.
 - **Deploy gate**, when one applies (above).
 
-Finish when every in-scope ticket and its edges are known, the worktree and delivery choices are made, and the first frontier is listed.
+Finish when every in-scope ticket and its edges are known, the ticket board lists them (where the tool exists), the worktree and delivery choices are made, and the first frontier is listed.
 
 ### 2. Create the integration branch
 
@@ -74,11 +76,11 @@ Then end the turn and let completion notifications wake you; never poll. An idle
 
 ### 4. Merge as each implementer lands
 
-In the integration checkout: `git merge --no-ff <slug>--<NN>`. On a conflict, call the Skill tool with `resolving-merge-conflicts`. Rerun that ticket's focused tests on the integration branch. A failure goes back to the same implementer with the output, so it keeps its worktree and ticket context (`SendMessage` to its name in Claude Code, `followup_task` to its agent in Codex; otherwise brief a fresh implementer with the worktree path, the ticket, and the failure output); a ticket that reports itself blocked is released (clear `claimed-by`), and its dependents stay out of this run.
+In the integration checkout: `git merge --no-ff --no-commit <slug>--<NN>`. On a conflict, call the Skill tool with `resolving-merge-conflicts`. Rerun that ticket's focused tests on the merged tree, then commit the merge; on a failure, `git merge --abort`, so `<slug>` only ever holds green merges. With **Stacked PRs**, push and open the ticket's PR right after its merge commit, per `implement`'s [Stacked PRs](../implement/references/spec-run.md#stacked-prs). A failure goes back to the same implementer with the output, so it keeps its worktree and ticket context (`SendMessage` to its name in Claude Code, `followup_task` to its agent in Codex; otherwise brief a fresh implementer with the worktree path, the ticket, and the failure output); a ticket that reports itself blocked is released (clear `claimed-by`), and its dependents stay out of this run.
 
 Keep each implementer's report in `$notes/<NN>.md`: it feeds dependents' briefs and the ticket's `Resolution`. A merged ticket counts as done for its dependents' `blocked-by`, so recompute the frontier and dispatch what it unblocked (step 3).
 
-After each merge, update the ticket board, and post one progress line so the user never has to ask for status: `<NN> merged (<k> of <M>); running: <NNs>; next: <NNs>`. Skip the line when the board's pane shows the run.
+After each merge, update the ticket board, and post one progress line so the user never has to ask for status: `<NN> merged (<k> of <M>); running: <NNs>; next: <NNs>`, with ` · PR #<n>` after `merged` in a stack. Skip the line when the board's pane shows the run.
 
 **A question never stops the run.** When a ticket needs the user's decision, release that ticket and its dependents, keep building the rest of the frontier, and ask the open questions together at the next merge, or in the final report when nothing else is running. Stop and wait only when every remaining ticket is blocked on an answer.
 
@@ -94,7 +96,7 @@ Run `implement`'s steps 6 and 7 once over the whole range. Skip the full-suite q
 
 ### 7. Close and deliver
 
-For each verified ticket: append `## Resolution` (what was built, deviations, verification evidence, its implementation commits, seams for successors, from `$notes/<NN>.md`) and set `status: closed`; re-read to confirm. Commit the tracker separately (`docs(scratch): <slug> resolutions`), never folded into code. Then follow [PR delivery: after step 8](../implement/references/spec-run.md#pr-delivery-after-step-8) for the chosen shape: push, open the PR (or cut and open the stack per its [Stacked PRs](../implement/references/spec-run.md#stacked-prs)), read review threads once.
+For each verified ticket: append `## Resolution` (what was built, deviations, verification evidence, its implementation commits, seams for successors, from `$notes/<NN>.md`) and set `status: closed`; re-read to confirm. Commit the tracker separately (`docs(scratch): <slug> resolutions`), never folded into code. Then follow [PR delivery: after step 8](../implement/references/spec-run.md#pr-delivery-after-step-8) for the chosen shape: push, open the PR (or, for a stack, whose PRs opened as each ticket merged, finish it per its [Stacked PRs](../implement/references/spec-run.md#stacked-prs) step 3), read review threads once.
 
 ### 8. Clean up
 
@@ -104,7 +106,7 @@ Ask once only about what is left that you created: a refused environment, or the
 
 ## Stopping mid-run
 
-Merge what has landed. Ask which running implementers to cancel (`AskUserQuestion` with `multiSelect: true` where available, one option per name; otherwise in chat); stop each chosen one with `TaskStop({task_id: <name>})` in Claude Code or `interrupt_agent` in Codex, and release its ticket (clear `claimed-by`), keeping its worktree and branch. Where nothing can stop them, leave them running. Running implementers keep their claims. Report per ticket: merged, in flight (worktree path), stopped (worktree path), released, or not started. A re-run on the same spec resumes: a `<slug>--<NN>` branch with a report in `$notes/<NN>.md` is merged first instead of rebuilt; one without (a stopped implementer) goes to a fresh implementer briefed to finish it in its worktree.
+Merge what has landed. Ask which running implementers to cancel (`AskUserQuestion` with `multiSelect: true` where available, one option per name; otherwise in chat); stop each chosen one with `TaskStop({task_id: <name>})` in Claude Code or `interrupt_agent` in Codex, and release its ticket (clear `claimed-by`), keeping its worktree and branch. Where nothing can stop them, leave them running. Running implementers keep their claims. Report per ticket: merged (with its PR in a stack), in flight (worktree path), stopped (worktree path), released, or not started. A re-run on the same spec resumes: a `<slug>--<NN>` branch with a report in `$notes/<NN>.md` is merged first instead of rebuilt; one without (a stopped implementer) goes to a fresh implementer briefed to finish it in its worktree.
 
 ## When you're done
 
