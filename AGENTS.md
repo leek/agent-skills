@@ -19,6 +19,7 @@ hooks/mods/register.tsx           # the plugin's one Claude Code mod module, pur
 types/index.d.ts                  # the mod's $.state contract
 hooks/*.py                        # guard scripts shared by more than one skill, with their tests
 hooks/bare-worktree-notice.sh     # SessionStart notice for a bare Laravel worktree (see Worktrees)
+hooks/terminal-bell.sh            # Ghostty-only bell when Claude asks a question or waits on the user
 template/SKILL.md.example         # starting point; renamed so installers do not treat it as a real skill
 ```
 

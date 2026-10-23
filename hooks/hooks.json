@@ -1,5 +1,5 @@
 {
-  "description": "browser-test: block non-read-only browser commands from the browser-tester and browser-test-planner agents. finding-verifier and pr-reviewer: allow only read-only git, gh, rg, and text commands. Every other caller passes through untouched. SessionStart: in a bare Laravel worktree (no vendor/), point the agent at laravel-herd-worktrees' bootstrap; silent everywhere else.",
+  "description": "browser-test: block non-read-only browser commands from the browser-tester and browser-test-planner agents. finding-verifier and pr-reviewer: allow only read-only git, gh, rg, and text commands. Every other caller passes through untouched. AskUserQuestion and Notification: in Ghostty, ring the bell so the tab shows 🔔 while Claude waits on the user. SessionStart: in a bare Laravel worktree (no vendor/), point the agent at laravel-herd-worktrees' bootstrap; silent everywhere else.",
   "modules": [
     "./mods/register.tsx"
   ],
@@ -25,6 +25,25 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-review-agents.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/terminal-bell.sh\""
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/terminal-bell.sh\""
           }
         ]
       }
