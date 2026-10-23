@@ -11,15 +11,28 @@
 //
 // Ticket board: implement-spec, implement <spec> all, and wayfinder <map> all report each
 // ticket's status through the ticket_board tool this module registers, and a pane shows
-// the run, joined to each ticket's running worker. The tool's reply says whether a pane
+// the run, joined to each ticket's running worker; once the tickets are built, it shows the
+// review stage and each finding's fix the same way. The tool's reply says whether a pane
 // drew it; where none did, the skill posts its progress lines in chat as before.
 
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { BoardTicket, ScratchEffort, Worker } from '../../types'
+import type { BoardTicket, ScratchEffort, TicketBoard, Worker } from '../../types'
 import { isClosed, scan, summary, tally } from './scratch-scan'
-import { SCHEMA, apply, parseUpdate, ticketColor, ticketMark, title, tally as boardTally } from './ticket-board'
+import {
+  SCHEMA,
+  apply,
+  findingColor,
+  findingMark,
+  findingTally,
+  parseUpdate,
+  ticketColor,
+  ticketMark,
+  title,
+  tally as boardTally,
+  summary as boardSummary,
+} from './ticket-board'
 import { KEEP, describeTool, duration, isFailed, mark, ordered } from './workers-model'
 
 const PANE = 'scratch'
@@ -71,7 +84,7 @@ export const register: Register = on => {
     await $.tool.register({
       name: 'ticket_board',
       description:
-        'For implement-spec, implement <spec> all, and wayfinder <map> all: report ticket status changes so a pane beside the chat shows the run. The reply says whether a pane drew it.',
+        'For implement-spec, implement <spec> all, and wayfinder <map> all: report ticket status changes, then the review stage and finding status changes, so a pane beside the chat shows the run. The reply says whether a pane drew it.',
       inputSchema: SCHEMA,
     })
 
@@ -86,7 +99,7 @@ export const register: Register = on => {
     isTicketsDismissed = false
     const opened = await $.ui.open({ id: TICKETS_PANE, title: title(run) })
 
-    return { text: opened.isPlaced ? boardTally(run) : boardText(run.tickets) }
+    return { text: opened.isPlaced ? boardSummary(run) : boardText(run) }
   })
 
   on('ui.close', { id: TICKETS_PANE }, async ($, e, next) => {
@@ -136,8 +149,8 @@ export const register: Register = on => {
 
       return {
         result: isPlaced
-          ? `Shown in the ticket pane (${boardTally(run)}). Skip the chat progress line.`
-          : `Recorded (${boardTally(run)}), but no pane shows it: post the progress line in chat.`,
+          ? `Shown in the ticket pane (${boardSummary(run)}). Skip the chat progress line.`
+          : `Recorded (${boardSummary(run)}), but no pane shows it: post the progress line in chat.`,
       }
     }
     const id = e.agentId
@@ -328,9 +341,28 @@ export const register: Register = on => {
             </Text>
           )
         })}
+        {run.stage !== '' && (
+          <Box marginTop={1}>
+            <Text bold wrap="truncate-end">
+              {run.stage}
+              {run.findings.length > 0 && <Text dimColor> {findingTally(run)}</Text>}
+            </Text>
+          </Box>
+        )}
+        {run.findings.map(f => (
+          <Text key={f.id} wrap="truncate-end" dimColor={f.status === 'deferred'}>
+            <Text color={findingColor(f.status)}>{findingMark(f.status)} </Text>
+            {f.title}
+            <Text dimColor>
+              {'  '}
+              {f.status}
+              {f.note === '' ? '' : ` · ${f.note}`}
+            </Text>
+          </Text>
+        ))}
         {fixer !== undefined && (
           <Text color="suggestion" wrap="truncate-end">
-            ◐ review fixes <Text dimColor>· {fixer.tools} tools · {fixer.lastTool}</Text>
+            ◐ review fixes <Text dimColor>· {fixer.tools} tools · {duration(now - fixer.startedAt)}{fixer.lastTool === '' ? '' : ` · ${fixer.lastTool}`}</Text>
           </Text>
         )}
       </Box>
@@ -339,6 +371,11 @@ export const register: Register = on => {
 }
 
 // /ticket-board's reply where no pane draws.
-function boardText(list: readonly BoardTicket[]): string {
-  return list.map(t => `${ticketMark(t.status)} ${t.number} ${t.title}: ${t.status}${t.note === '' ? '' : ` (${t.note})`}`).join('\n')
+function boardText(run: TicketBoard): string {
+  const note = (n: string) => (n === '' ? '' : ` (${n})`)
+  const lines = run.tickets.map(t => `${ticketMark(t.status)} ${t.number} ${t.title}: ${t.status}${note(t.note)}`)
+  if (run.stage !== '') lines.push('', `${run.stage}${run.findings.length > 0 ? `: ${findingTally(run)}` : ''}`)
+  lines.push(...run.findings.map(f => `${findingMark(f.status)} ${f.title}: ${f.status}${note(f.note)}`))
+
+  return lines.join('\n')
 }

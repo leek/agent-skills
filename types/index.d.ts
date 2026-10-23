@@ -54,11 +54,25 @@ export type BoardTicket = {
   note: string
 }
 
+export type FindingStatus = 'open' | 'fixing' | 'fixed' | 'asking' | 'deferred'
+
+/** One review finding the run is fixing after its tickets merged. */
+export type BoardFinding = {
+  /** A stable key across updates; never shown. */
+  id: string
+  title: string
+  status: FindingStatus
+  note: string
+}
+
 /** A multi-ticket run (implement-spec, implement all, wayfinder all) as the ticket_board tool last reported it. */
 export type TicketBoard = {
   slug: string
   kind: BoardKind
   tickets: BoardTicket[]
+  /** The step after the build, e.g. `review round 1`; empty while tickets build. */
+  stage: string
+  findings: BoardFinding[]
   updatedAt: number
 }
 

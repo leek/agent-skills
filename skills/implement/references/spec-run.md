@@ -36,7 +36,7 @@ Run it on a spec whose `tickets/` already exist and the user asked to build all 
 4. **Run steps 5–7 once, over the whole range.** Review `base_sha..HEAD` scoped to every path the run touched. Ask the full-suite question once. Verify each ticket's acceptance criteria in one `verify` pass. A follow-up fix reruns the focused tests for what it touched, never the full suite again.
 5. **Close in step 8.** Write each ticket's `Resolution` and `status: closed`. The spec is complete when every ticket is closed.
 
-**Ticket board.** Report each ticket's status per [`ticket-board.md`](../../wayfinder/references/ticket-board.md), with `kind: "spec"`: `ready` and `blocked` (note: the blockers) at step 1, `skipped` for tickets left out, `running` at its claim, `built` at its commit (note: the SHA), `released` (note: why), and `closed` in step 8.
+**Ticket board.** Report each ticket's status per [`ticket-board.md`](../../wayfinder/references/ticket-board.md), with `kind: "spec"`: `ready` and `blocked` (note: the blockers) at step 1, `skipped` for tickets left out, `running` at its claim, `built` at its commit (note: the SHA), `released` (note: why), and `closed` in step 8. From the review step on, also send the `stage` at each change and each finding's status.
 
 ## PR delivery: after step 8
 

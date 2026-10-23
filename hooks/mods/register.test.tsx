@@ -124,3 +124,34 @@ test('ticket_board draws each ticket beside its running implementer, or asks for
   } as never)
   expect(String((undrawn as { result: unknown }).result)).toContain('post the progress line in chat')
 })
+
+test('ticket_board shows the review stage and each finding once the tickets are merged', async ($, on) => {
+  mock.clock(on, { now: 0 })
+  on('ui.render', async ($, e) => engineDraw($, e))
+  on('tool.call', async () => ({ result: 'ok' }) as never)
+  on('ui.open', async () => ({ value: { isPlaced: true } }) as never)
+
+  const board = { tool: 'mcp__leek-skills__ticket_board', board: 'auth', kind: 'spec' }
+  await $.tool.call({ ...board, tickets: [{ number: '01', title: 'Login form', status: 'merged' }], tool_use_id: 's1' } as never)
+  await $.tool.call({
+    ...board,
+    stage: 'fix pass',
+    findings: [
+      { id: '1', title: 'Old workers\' runs vanish from the audit list', status: 'fixed', note: 'a1b2c3' },
+      { id: '2', title: 'Notes page checks readiness once per row', status: 'fixing' },
+    ],
+    tool_use_id: 's2',
+  } as never)
+
+  const pane = await $.ui.mount({
+    plugin: 'leek-skills',
+    surface: 'terminal',
+    component: 'Pane',
+    requestId: 'tickets',
+    props: { title: 'Spec: auth', isFocused: false, bodyColumns: 120, placement: 'dock' },
+  } as never)
+  expect(await pane.find({ type: 'Text', text: /fix pass.*1 of 2 fixed · 1 fixing/ })).toBeDefined()
+  // The id is a key only; the row reads as the title.
+  expect(await pane.find({ type: 'Text', text: /✓ Old workers' runs vanish from the audit list {2}fixed · a1b2c3/ })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: /◐ Notes page checks readiness once per row {2}fixing/ })).toBeDefined()
+})
