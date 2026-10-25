@@ -1,5 +1,5 @@
 interface:
   display_name: "Closeout"
-  short_description: "Check whether this session is safe to close, and name the fix for each open item"
+  short_description: "Check whether this session is safe to close, then run the fixes you pick"
 policy:
   allow_implicit_invocation: false

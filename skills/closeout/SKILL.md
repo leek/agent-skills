@@ -1,12 +1,12 @@
 ---
 name: closeout
-description: "Check whether this session is safe to close: unsaved work, running jobs, open PRs, unanswered questions, and steps still to run. Read-only; each open item names its fix."
+description: "Check whether this session is safe to close: unsaved work, running jobs, open PRs, unanswered questions, and steps still to run. Each open item names its fix, and closeout runs the fixes the user picks."
 disable-model-invocation: true
 ---
 
 # Closeout
 
-Answer "can I close this session?" with one verdict and the items behind it. This skill **reports and routes**: it commits, pushes, stops, removes, and answers nothing itself. Each item ends with the command or skill that clears it, and the user runs it.
+Answer "can I close this session?" with one verdict and the items behind it. This skill **reports, then asks**: steps 1–4 change nothing. Each item ends with the command or skill that clears it, and step 5 runs only the fixes the user picks.
 
 **Scope is this session.** An item counts only when this conversation created, edited, started, opened, or asked it. Older branches, worktrees, PRs, and stashes stay out of the report, even when a command below prints them. When the conversation was compacted (an earlier part replaced by a summary), items from before the summary may be missing: say so in the report.
 
@@ -49,7 +49,7 @@ Done when every PR, question, ask, edit, and deploy fact from step 1 is cleared 
 
 ## 4. Report
 
-Print exactly this shape and stop. Each item is one line that ends with its fix.
+Print exactly this shape. Each item is one line that ends with its fix.
 
 ```text
 <verdict>
@@ -71,3 +71,13 @@ The verdict is one line:
 - `✅ Clean, safe to close`: nothing open and nothing not checked.
 
 Leave out an empty section. **Not checked** lists each check that could not run (`gh` not logged in, not a git repo, a tool this harness lacks, a compacted conversation), so a skipped check never reads as passed. Use only the three verdict marks, on the verdict line.
+
+## 5. Offer the fixes
+
+A **runnable** item is one whose fix can run in this session now: a commit, a push, stopping a job, a skill such as `/resolve-review-comments`, `/grill-me`, or `/handoff`. A PR waiting on a reviewer, a not-checked item, and a post-merge or post-deploy step are not runnable; they stay in the report only. With no runnable item, stop after the report.
+
+Ask which fixes to run (`AskUserQuestion` where available: `multiSelect: true`, one option per runnable item labelled with the item and its fix, blockers first, nothing pre-ticked, at most 4 per question and further questions in the same call for the rest; `request_user_input` in Codex when it is listed for the turn; otherwise a numbered list in chat, picked by number). The pick is the user's approval for those fixes and no others. Nothing picked → stop.
+
+Run the picked fixes in dependency order (commit before push, push before a PR fix), quick fixes before interactive skills. A picked skill keeps its own confirmations. When a fix fails, stop: skip every fix that depends on it and report the failure with its output.
+
+Then run steps 2 and 3 again on the same inventory, print a fresh report, and repeat this step. Done when the verdict is clean, nothing runnable is left, or the user picks nothing.
