@@ -62,6 +62,12 @@ Do NOT close or modify the parent spec. Invoked directly on a spec-less map, set
 
 Commit the tickets the same way `to-spec` commits a spec: unless `git check-ignore -q .scratch` says the repo ignores it, `git add -- .scratch/<slug>`, then `git commit --only -m "docs(scratch): <slug> tickets" -- .scratch/<slug>`. `implement` carries a committed but unpushed effort directory onto its PR branch; an uncommitted one it cannot reach from a worktree.
 
+### 6. Settle the build's open decisions
+
+Questions a builder would otherwise raise mid-build belong here, while nothing is waiting on them. Run one read-only subagent (a domain-expert agent type when the harness offers one for the spec's domain) over the spec, the published tickets, and the effort's `decisions/` and `research/`. Its brief: list every choice the build will have to make that these documents leave open, each with the tickets it touches, the line that leaves it open, and a recommended answer. Settled choices and pure implementation detail are not open decisions.
+
+Ask them in `AskUserQuestion` batches of up to 4 where available, recommended answer first (otherwise one message in chat). Write the answers to `decisions/` per the tracker, as one note titled for the build's open decisions, and commit it like the tickets (`docs(scratch): <slug> build decisions`). When the sweep finds nothing open, say so and write nothing. `implement-spec` runs the same sweep before its first dispatch and skips what this one settled.
+
 ## Ticket template
 
 This template is canonical.

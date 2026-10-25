@@ -38,13 +38,16 @@ Open the ticket board now, before anything else in this step: load `mcp__leek-sk
 
 Leave out closed tickets and tickets claimed by someone else (name them in the report). A `deploy-gate: true` ticket bounds the run: build up to and including it, then stop at step 7 with a PR; its dependents start after that PR is deployed. When dependents would wait behind a gate, ask once, here, before the first dispatch (not after the gate PR opens): stop at the gate, or build the dependents in this run on a second integration branch `<slug>-2` cut from the gate branch's tip. Before dispatching the first contract/drop ticket on `<slug>-2`, confirm the gate branch `<slug>` has no remaining writes or reads to the columns or tables `<slug>-2` drops. `<slug>-2` takes changes only by merging `<slug>` (the gate ticket and its review fixes), never by merging or cherry-picking any other branch, and once the gate PR merges, move `<slug>-2`'s delta onto fresh `origin/<default>` for a second PR.
 
+**Sweep for open decisions first.** Run one read-only subagent over the spec, every in-scope ticket, and the spec's `decisions/` and `research/` (a domain-expert agent type when the harness offers one for the spec's domain). Its brief: list every choice the build will have to make that these documents do not settle, each with the tickets it touches, the line that leaves it open, and a recommended answer. Settled choices (including those `to-tickets`' sweep already wrote to `decisions/`) and pure implementation detail are not open decisions. Most questions a run would otherwise raise mid-build come from here, and asking them now keeps the frontier moving.
+
 Before the first dispatch, ask these in one `AskUserQuestion` call where available (otherwise one message in chat), and nothing else:
 
+- **Open decisions** from the sweep, recommended answer first, in as many further `AskUserQuestion` calls as they need (at most 4 questions each). Write the answers to `.scratch/<slug>/decisions/` per the tracker, and pass that pointer in every implementer and review brief so a reviewer never reopens a settled choice.
 - **Worktree**: build the integration branch in a worktree at `.claude/worktrees/<slug>` (recommended: this checkout stays as it is), or switch this checkout to `<slug>`. Skip it when the tree is dirty (the worktree is the only option; say so) or the request already says. Each implementer gets its own worktree either way: that is what lets them build in parallel.
 - **Delivery**: `implement`'s [delivery question](../implement/references/spec-run.md#choose-the-delivery-shape) for a whole spec: one PR, stacked PRs, or the branch with no PR.
 - **Deploy gate**, when one applies (above).
 
-Finish when every in-scope ticket and its edges are known, the ticket board lists them (where the tool exists), the worktree and delivery choices are made, and the first frontier is listed.
+Finish when every in-scope ticket and its edges are known, the ticket board lists them (where the tool exists), the open decisions are answered, the worktree and delivery choices are made, and the first frontier is listed.
 
 ### 2. Create the integration branch
 
@@ -64,13 +67,13 @@ For each frontier ticket, up to the concurrency limit (default 4: each one runs 
      >> "$(git rev-parse --path-format=absolute --git-common-dir)/scratch-databases"
    ```
 
-3. **Implementer subagent**, in the background where the harness allows (Claude Code: subagents run in the background by default and wake you on completion; pass `run_in_background: true` where the Agent tool offers it; give each a `name` of `<slug>--<NN>` so you can address it later; Codex: `spawn_agent`, keeping each returned agent id against `<slug>--<NN>`, and `wait_agent` to collect reports; elsewhere, any sub-agent the harness offers). Its brief gives pointers (worktree path, ticket path, the spec's Build Contract, direct blockers' reports from step 4, the notes directory) and these rules:
+3. **Implementer subagent**, in the background where the harness allows (Claude Code: subagents run in the background by default and wake you on completion; pass `run_in_background: true` where the Agent tool offers it; give each a `name` of `<slug>--<NN>` so you can address it later; Codex: `spawn_agent`, keeping each returned agent id against `<slug>--<NN>`, and `wait_agent` to collect reports; elsewhere, any sub-agent the harness offers). Its brief gives pointers (worktree path, ticket path, the spec's Build Contract, the decisions answered in step 1, direct blockers' reports from step 4, the notes directory) and these rules:
    - Work only in that worktree (enter it with `EnterWorktree({path})` where available, otherwise use absolute paths into it). Confirm `git merge-base --is-ancestor <integration tip> HEAD` before starting.
    - Choose seams with the `tdd` skill's **Seams: where tests go** rules and state them; then call the Skill tool with `tdd` and build the ticket test-first. Focused tests and configured static analysis end green.
    - Run tests in the foreground and wait for the result. Never send a test run to the background and go idle on it: an idle implementer may not wake when the run ends. A run too long for the tool's timeout is too broad; run fewer files.
    - Format touched paths with the repo's configured formatter, commit by explicit path. Never touch `.scratch/`, never push, never write another branch.
    - Before reporting, merge the current integration tip into the branch and rerun the focused tests.
-   - Report in at most ten lines: commit SHAs, touched paths, seams (name any public seam a dependent ticket should reuse), the focused test command and result, deviations from the ticket, and anything blocking.
+   - Report in at most ten lines: commit SHAs, touched paths, seams (name any public seam a dependent ticket should reuse), the focused test command and result, deviations from the ticket, any decision built on an assumed answer, and anything blocking.
 
 Then end the turn and let completion notifications wake you; never poll. An idle notification with no report and no new commit is a stall, not progress: message that implementer at once (`SendMessage` in Claude Code, `followup_task` in Codex) to finish or say what blocks it.
 
@@ -82,7 +85,7 @@ Keep each implementer's report in `$notes/<NN>.md`: it feeds dependents' briefs 
 
 After each merge, update the ticket board, and post one progress line so the user never has to ask for status: `<NN> merged (<k> of <M>); running: <NNs>; next: <NNs>`, with ` · PR #<n>` after `merged` in a stack. Skip the line when the board's pane shows the run.
 
-**A question never stops the run.** When a ticket needs the user's decision, release that ticket and its dependents, keep building the rest of the frontier, and ask the open questions together at the next merge, or in the final report when nothing else is running. Stop and wait only when every remaining ticket is blocked on an answer.
+**A question never stops the run.** A decision the sweep missed (one that only shows once code exists) is built on its recommended answer when that answer is reversible: the implementer or fixer records it as an assumption in its report, and you ask it at the next merge, so a different answer becomes a follow-up fix, not a wait. When the choice is not reversible (a schema shape a later ticket builds on, a data migration), release that ticket and its dependents, keep building the rest of the frontier, and ask the open questions together at the next merge, or in the final report when nothing else is running. Stop and wait only when every remaining ticket is blocked on an answer.
 
 Finish when every in-scope ticket is merged or released, and no implementer is running.
 
