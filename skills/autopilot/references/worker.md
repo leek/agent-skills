@@ -25,7 +25,7 @@ For a wayfinder map, run only an AFK research or task ticket. Return `needs_inpu
 
 For build work, read `implement` completely and follow its full lifecycle for the selected ticket or one-session spec: claim, test at chosen seams, review through its subagents, verify end to end, explicitly stage, commit, and close. Complete no second unit in this process.
 
-A delivery ticket (`delivery: true`) runs only its pass 1, per `to-tickets/DELIVERY-TICKET.md`. When its After deploy list is not `None`, set `status: ready-for-human`, clear the claim, commit the tracker, and return `needs_input` naming the deploy and the after-deploy steps. This is the one case where `needs_input` does not leave the claim in place. A coverage gap is a new ticket per that file: return `needs_input` naming it.
+A delivery ticket (`delivery: true`) runs only its pass 1, per `to-tickets/DELIVERY-TICKET.md`. When its After deploy list is not `None`, set `status: ready-for-human`, clear the claim, commit the tracker, and return `needs_input` naming the deploy and the after-deploy steps. A coverage gap is a new ticket per that file: release this ticket and commit the tracker as that file says, then return `needs_input` naming the new ticket. These are the two cases where `needs_input` does not leave the claim in place.
 
 ## Keep the tracker current
 
@@ -45,7 +45,7 @@ Rules that hold in every branch:
 
 - Re-read the file after writing it and confirm the marker on disk matches what you are about to return. Autopilot reads the same file and fails the run when a `continue` or `complete` result names a unit that is not closed.
 - Leave parents alone: a ticket never closes its spec, and the worker never touches the map (it was closed at the spec/tickets handoff).
-- On `needs_input`, `blocked`, or `failed`, leave the in-progress marker and the `autopilot:<run-id>` claim in place; that marker is how a later process recognizes its own resumable work. Never mark an unfinished unit closed, and never leave a finished unit in progress.
+- On `needs_input` (except a delivery ticket's two cases above), `blocked`, or `failed`, leave the in-progress marker and the `autopilot:<run-id>` claim in place; that marker is how a later process recognizes its own resumable work. Never mark an unfinished unit closed, and never leave a finished unit in progress.
 
 ## Report progress
 

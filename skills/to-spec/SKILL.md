@@ -28,9 +28,9 @@ Check the **constraints** the spec must honour before drafting, since each one f
 - **Data handling**: which vendors may process this data (a PHI or residency rule can fix the AI or email provider).
 - **Launch gating**: anything user-visible that waits on an outside approval, a listing, or a date ships behind a switch.
 - **Deploy safety**: the repo's expand–contract and migration rules, for every drop or rename.
-- **Architecture rules**: the class names and locations the spec names pass the repo's architecture tests and naming rules.
+- **Architecture rules**: the repo's architecture tests and naming rules (suffixes, locations), which every class and location the draft names must pass.
 
-Each constraint goes in the Build Contract; one the conversation did not settle goes in the Needs decision list.
+Each settled constraint goes in the Build Contract. An unsettled one goes in the Needs decision list, and into the Build Contract only once accepted.
 
 Finish exploring only when you can name the domain terms, ADRs, and constraints that bind the spec, the closest existing implementation and tests to imitate (or confirm none exist), and the tracker destination step 3 will use.
 

@@ -63,11 +63,13 @@ Map file format:
 ```markdown
 ---
 title: <map title>
-status: open        # closed once /to-spec (or a spec-less /to-tickets) consumes it
+status: open
 ---
 
 <the map body defined by `wayfinder`>
 ```
+
+A map closes once `/to-spec` (or a spec-less `/to-tickets`) consumes it. Keep comments out of every frontmatter: an empty `claimed-by` means unclaimed, and `blocked-by` lists ticket numbers (`[01, 03]`).
 
 Decision ticket format:
 
@@ -76,8 +78,8 @@ Decision ticket format:
 title: <ticket title>
 type: research | prototype | grilling | task
 status: open | closed
-claimed-by:            # empty = unclaimed
-blocked-by: []         # ticket numbers, e.g. [01, 03]
+claimed-by:
+blocked-by: []
 ---
 
 ## Question
