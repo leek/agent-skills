@@ -6,6 +6,13 @@ branch the project context names), are one **stack**. Each branch carries the co
 of every PR below it, so a stack lands **bottom-up, one PR at a time, with merge
 commits**, and each merge is followed by a **retarget** of the PR above it.
 
+A stack lands on its **landing branch**: the trunk, or, when the stack has an
+**integration PR**, that PR's head branch. The integration PR is a stack's bottom PR
+whose body has a line starting `Integration:` (as `implement`'s stacked delivery writes
+it), or one the user calls the stack's integration branch. It holds no ticket of its
+own: every PR above it lands into its branch, the stack's fixes go there, and it
+merges into the trunk last, so the trunk receives the stack once, verified.
+
 ## Build the stack
 
 ```bash
@@ -32,6 +39,8 @@ PRs based on a named PR's head (`gh pr list --base <head> --state open`).
   like a named one, steps 1–7 with its own fix budget, never merged unreviewed.
 - **An unnamed PR above a named one** is not yours to merge or push to, but it is
   retargeted after the merge below it (step 3), so it stays open on the right base.
+- **An integration PR** counts as named when the user named every PR above it: it
+  carries no code of its own until they land.
 
 A **native GitHub stack** (made with `gh stack`, generally available since
 [2026-10-06](https://github.blog/changelog/2026-10-06-stacked-pull-requests-generally-available))
@@ -74,15 +83,16 @@ and continue only after the user says which one they took (re-read
 ## Merge in order
 
 Apply step 6's authorization rule to the stack as one decision. If the user named
-every PR or requested "all open PRs", report the order (`#101 → #102 → #103`) and
-proceed without another stack-approval question. Otherwise ask once for the missing
-scope. Deploy-branch approval, a conflicting requested merge method, native stacks,
-and a force-pushed restack still have their own gates above or below.
-Then, for each PR from the bottom up:
+every PR or requested "all open PRs", report the order (`#101 → #102 → #103`, then
+`⇒ #100` for an integration PR) and proceed without another stack-approval question.
+Otherwise ask once for the missing scope. Deploy-branch approval, a conflicting
+requested merge method, native stacks, and a force-pushed restack still have their own
+gates above or below. Then, for each PR above the integration PR (every PR when there
+is none), from the bottom up:
 
-1. **It merges only while its base is the trunk.** A PR whose base is still another
-   PR's head is never merged: merging it would land its changes on that branch, not the
-   trunk.
+1. **It merges only while its base is the landing branch.** A PR whose base is still
+   another PR's head is never merged: merging it would land its changes on that branch,
+   not the landing branch.
 2. **Merge** with the pinned head and a merge commit, per
    [Merge](gh-mechanics.md#merge): `gh pr merge N --merge --match-head-commit <sha>`.
    When required checks are pending, `--auto` queues it; the PRs above wait for that
@@ -91,7 +101,7 @@ Then, for each PR from the bottom up:
    `deleteBranchOnMerge` is true and GitHub retargets them itself.
 3. **Retarget** each PR based on its head to the merged PR's base. GitHub does this by
    itself only when the merged head branch is deleted; this skill deletes nothing, so
-   retarget explicitly and skip a PR whose base already reads the trunk. First record
+   retarget explicitly and skip a PR whose base already reads the landing branch. First record
    the commits the PR carries on top of the merged head, so step 4 has something to
    compare against:
 
@@ -99,12 +109,13 @@ Then, for each PR from the bottom up:
    git fetch origin
    git rev-list <merged PR's head sha>..<M head sha> > <scratch file for M>   # before the retarget
    gh pr view M --json baseRefName --jq .baseRefName
-   gh pr edit M --base <trunk>
+   gh pr edit M --base <landing branch>
    ```
 
 4. **Re-check the retargeted PR** before its own merge, as step 6 does. Its commits on
-   top of the trunk must be the ones recorded in step 3: `git fetch origin <trunk>`,
-   then `git rev-list origin/<trunk>..<M head sha>` must match that recorded list. An extra
+   top of the landing branch must be the ones recorded in step 3: `git fetch origin
+   <landing branch>`, then `git rev-list origin/<landing branch>..<M head sha>` must
+   match that recorded list. An extra
    commit means the history below M is not what landed. Follow
    [Recover a rewritten parent](#recover-a-rewritten-parent) when the lower PR is
    verifiably merged; otherwise stop and report the extra change. After recovery,
@@ -112,15 +123,16 @@ Then, for each PR from the bottom up:
    this check using the new head. An ordinary retarget does not move
    the head, so the review of that head still covers it and `--match-head-commit` pins
    the same sha, unless the repo requires up-to-date branches: then M reads `BEHIND`,
-   because the trunk now has the merge commit M lacks. Update it as
+   because the landing branch now has the merge commit M lacks. Update it as
    [Merge gates](gh-mechanics.md#merge-gates) says, inside M's push budget and combined
    with its batch, then review and pin the new head; with no push left it is a blocker.
    `mergeable` reads `UNKNOWN` for a moment after a retarget; re-poll as Merge gates
    says.
 
 Completion criterion: every PR in the chain is merged in order (or the run stopped on a
-named one), and every open PR that was based on a merged head now targets the trunk or
-is named in the report with the retarget it still needs.
+named one), and every open PR that was based on a merged head now targets the landing
+branch or is named in the report with the retarget it still needs. An integration PR
+then merges as [Fixes inside a stack](#fixes-inside-a-stack) says.
 
 ## Recover a rewritten parent
 
@@ -161,9 +173,64 @@ list. Continue only when that exact head is reviewed and validated; pin it in th
 
 ## Fixes inside a stack
 
-A fix pushed to a lower PR reaches the PRs above it through the trunk: it lands in the
-lower PR's merge commit, and the retarget puts each upper PR on that trunk. So no
-merge-up is needed by default, and none costs an upper PR a push.
+A fix landed on a lower PR conflicts with every PR above it that touches the same lines,
+and each of those then pays a merge, a conflict resolution, a re-test and a re-review.
+So a stack lands first and fixes once, wherever its shape allows.
+
+**Fix on the integration PR** when the stack has one:
+
+1. Finish step 4 for every PR above it, then check their hard
+   [gates](gh-mechanics.md#merge-gates) and settle every QUESTION and merge question.
+2. Land every PR above it bottom-up, unchanged, per [Merge in order](#merge-in-order).
+   Each head carries the one below it, so every landing is conflict-free. Reply on each
+   landed PR's open findings `moved to #<integration>'s fix batch` and resolve them.
+3. Give the integration PR its own steps 1–6 now, never in the first parallel round,
+   since before the landings it holds nothing to review. Its step 1 reviews only what the landed
+   PRs did not bring: `git log -p --no-merges <top landed head>..<integration head>`, plus
+   `git show --remerge-diff` for any merge from the trunk. Its batch 1 holds every
+   stack PR's verified current-batch fixes. The landings are not fix pushes and use none
+   of its budget; count them as landings when reconciling pushes.
+4. While it is a draft, push batch 1 first, then `gh pr ready`: its draft state is the
+   stack's layout, not unclear intent, and the bots review the whole stack once, already
+   fixed. Step 6's checkpoint after batch 1 runs here, and the merge into the trunk uses
+   `--merge`, under every gate step 6 names (deploy-branch approval included).
+5. After batch 1, update each landed PR's disposition with `fixed in <sha> on
+   #<integration>`.
+
+The trunk never sees a stack PR's known defect. If the run stops before the integration
+PR merges, everything waits on its branch, and the report says so.
+
+**Fix at the top** when the stack has no integration PR, the user named every PR in it
+(or "all open PRs"), and the trunk is not a deploy branch. The **top** is the
+highest PR you may push to; unnamed PRs above it are only retargeted.
+
+1. Finish step 4 for every PR in the stack, then check every PR's hard
+   [gates](gh-mechanics.md#merge-gates) and settle every QUESTION and merge question
+   before writing any fix.
+2. In the top PR's worktree, make every PR's current-batch fixes, each commit naming the
+   PR and finding it fixes. The top branch carries every lower PR's code, so each fix
+   lands where its finding points.
+3. Test what the fixes touched, run step 5's pre-push review on the whole fix range, and
+   push once. That push is the top PR's batch 1 and the whole stack's; lower PRs push
+   nothing.
+4. Reply on each lower PR's threads with `fixed in <sha> on #<top>`, resolve them, and
+   record the same in its disposition.
+5. Land bottom-up per [Merge in order](#merge-in-order). Each lower PR merges at its
+   reviewed, unchanged head, so every retarget is conflict-free. Step 6's checkpoint after
+   batch 1 runs on the top PR; new findings on any PR in the stack join the top PR's
+   batch 2 or are carried, per the shipping budget.
+
+From the first merge until the top merges, the trunk carries the lower PRs' known
+defects, so a deploy-branch trunk takes the per-PR path below. If the run stops before
+the top merges, the fixes stay on the top PR: the report names each merged PR whose fix
+is waiting there.
+
+**Per-PR fixes** otherwise. A fix pushed to a lower PR reaches the PRs above it through
+the trunk: it lands in the lower PR's merge commit, and the retarget puts each upper PR
+on that trunk. So no merge-up is needed by default, and none costs an upper PR a push.
+Test an upper PR for what its own fixes and its conflict resolution touched; the lower
+PRs' tests already passed on their own heads. Run the tests every PR's fixes touched
+once, on the top PR, before it merges.
 
 Merge a lower branch into an upper one only when that upper PR's own fixes need the
 lower fix (they build on it, or its tests fail without it), and only on a PR the user
@@ -179,4 +246,5 @@ commit>` would show the whole lower PR).
 ## Report
 
 Per PR: its merge commit SHA (or "queued"), each PR it retargeted, and for a queued
-merge each PR above with the retarget it still needs.
+merge each PR above with the retarget it still needs. For an integration PR, its merge
+into the trunk last, or what still waits on its branch.

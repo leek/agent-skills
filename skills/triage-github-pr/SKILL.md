@@ -112,6 +112,8 @@ steps need all three.
    so the user is asked once.
 5. **Steps 5 and 6 one PR at a time, in order.** Use a worktree for every PR
    (`.claude/worktrees/pr-N`), never the main checkout, so no two PRs share a tree.
+   A stack lands first and fixes once, on its integration PR or its top branch, per
+   [Fixes inside a stack](references/stacked-prs.md#fixes-inside-a-stack).
    After a base PR merges, retarget each PR stacked on it, then give that PR its own
    steps 5 and 6 in turn, bottom-up: its step 5 still runs, and its step 6 re-checks
    against the trunk, since its base and diff changed.
@@ -253,6 +255,8 @@ Otherwise work on the head branch without disturbing a dirty tree, following
 [Check out the head branch safely](references/gh-mechanics.md#check-out-the-head-branch-safely)
 (fork PRs included). For each LEGIT finding in the current batch: make the minimal change, add a test for any
 logic, auth, or data change, run it green, then commit with explicit staging.
+A test failing outside your fix runs on the starting SHA first: failing there too, it
+is a finding against the PR, classified in step 4, not a defect of your fix to debug.
 
 **Review before you push.** Every push buys another round from every bot, and a fix
 that adds a mechanism (a job, a lock, a claim, a retry, an outbox, a stream) is new

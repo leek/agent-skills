@@ -99,7 +99,7 @@ Run `implement`'s steps 6 and 7 once over the whole range. Skip the full-suite q
 
 ### 7. Close and deliver
 
-For each verified ticket: append `## Resolution` (what was built, deviations, verification evidence, its implementation commits, seams for successors, from `$notes/<NN>.md`) and set `status: closed`; re-read to confirm. The delivery ticket closes, or goes to `ready-for-human` with its after-deploy steps copied into the PR body, per its file. Commit the tracker separately (`docs(scratch): <slug> resolutions`), never folded into code. Then follow [PR delivery: after step 8](../implement/references/spec-run.md#pr-delivery-after-step-8) for the chosen shape: push, open the PR (or, for a stack, whose ticket PRs opened as each ticket merged, open the closing PR per its [Stacked PRs](../implement/references/spec-run.md#stacked-prs) step 4), read review threads once.
+For each verified ticket: append `## Resolution` (what was built, deviations, verification evidence, its implementation commits, seams for successors, from `$notes/<NN>.md`) and set `status: closed`; re-read to confirm. The delivery ticket closes, or goes to `ready-for-human` with its after-deploy steps copied into the PR body, per its file. Commit the tracker separately (`docs(scratch): <slug> resolutions`), never folded into code. Then follow [PR delivery: after step 8](../implement/references/spec-run.md#pr-delivery-after-step-8) for the chosen shape: push, open the PR (or, for a stack, whose ticket PRs opened as each ticket merged, open the closing and integration PRs per its [Stacked PRs](../implement/references/spec-run.md#stacked-prs) step 4), read review threads once.
 
 ### 8. Clean up
 
