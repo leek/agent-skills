@@ -24,7 +24,7 @@ Talk to subagents in **context pointers**: paths to the spec, the ticket, blocke
 
 - Laravel (`laravel/framework` in `composer.json`): [`references/laravel.md`](references/laravel.md)
 
-**Ticket board.** Report each ticket's status per [`ticket-board.md`](../wayfinder/references/ticket-board.md), with `kind: "spec"`: `ready` and `blocked` (note: the blockers) from step 1, `skipped` for tickets left out, `running` at dispatch, `fixing` when a failure goes back to its implementer, `merged` (note: the merge SHA), `released` (note: why), and `closed` in step 7. From step 5 on, also send the `stage` at each change (`review round 1`, `fix pass 1`, `review round 2`, `fix pass 2`, `final checks`, `verify`, `deliver`) and each finding's status, so the pane never goes quiet after the last merge.
+**Ticket board.** Report each ticket's status per [`ticket-board.md`](../wayfinder/references/ticket-board.md), with `kind: "spec"`: `ready` and `blocked` (note: the blockers) from step 1, `skipped` for tickets left out, `running` at dispatch, `fixing` when a failure goes back to its implementer, `merged` (note: the merge SHA), `released` (note: why), and `closed` in step 7, or `awaiting-deploy` (note: the after-deploy steps, in a few words) for a delivery ticket left at `ready-for-human`. From step 5 on, also send the `stage` at each change (`review round 1`, `fix pass 1`, `review round 2`, `fix pass 2`, `final checks`, `verify`, `deliver`) and each finding's status, so the pane never goes quiet after the last merge.
 
 ## Process
 

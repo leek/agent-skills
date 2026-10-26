@@ -55,6 +55,15 @@ describe('classify', () => {
     expect(effort.next).toBe('/implement .scratch/auth/tickets/02-b.md')
   })
 
+  test('a delivery ticket at ready-for-human waits for the deploy', async () => {
+    const files = [
+      parseFile('spec.md', 'spec', ticket('ready-for-agent')),
+      parseFile('tickets/01-a.md', 'ticket', ticket('closed')),
+      parseFile('tickets/02-delivery.md', 'ticket', ticket('ready-for-human', 'blocked-by: [01]\ndelivery: true\n')),
+    ]
+    expect(classify('auth', files, NOW, NOW).next).toBe('after deploy: /implement .scratch/auth/tickets/02-delivery.md')
+  })
+
   test('all closed is done; an open spec over closed tickets is mismatched', async () => {
     const closed = [parseFile('tickets/01-a.md', 'ticket', ticket('closed'))]
     expect(classify('x', closed, NOW, NOW).state).toBe('done')

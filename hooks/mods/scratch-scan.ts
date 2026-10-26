@@ -41,6 +41,7 @@ export function parseFile(path: string, kind: ScratchKind, text: string): Scratc
     status: (status.trim().replace(/[`*]/g, '').split(/\s/)[0] ?? '').toLowerCase(),
     claimedBy: field('claimed-by'),
     blockedBy: parseList(front, 'blocked-by'),
+    delivery: field('delivery') === 'true',
   }
 }
 
@@ -87,7 +88,11 @@ export function classify(slug: string, files: ScratchFile[], lastChangeMs: numbe
   const decisions = byKind('decision')
   const first = frontier[0]
   let next = ''
-  if (first !== undefined) {
+  const firstFile = files.find(f => f.path === first)
+  if (firstFile?.delivery && firstFile.status === 'ready-for-human') {
+    // The delivery ticket waits at ready-for-human for its after-deploy pass.
+    next = `after deploy: /implement ${at(firstFile.path)}`
+  } else if (first !== undefined) {
     next = first.startsWith('decisions/') ? `/grill-me ${at(first)}` : `/implement ${at(first)}`
   } else if (byKind('request').some(f => !isClosed(f))) {
     next = '/triage'

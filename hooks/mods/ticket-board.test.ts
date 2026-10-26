@@ -25,6 +25,18 @@ describe('apply', () => {
     expect(tally(second)).toBe('1 of 2 done · 1 ready')
   })
 
+  test('a delivery ticket waiting on deploy is not done', async () => {
+    const board = apply(null, {
+      board: 'auth',
+      kind: 'spec',
+      tickets: [
+        { number: '01', title: 'Login', status: 'closed' },
+        { number: '02', title: 'Delivery check', status: 'awaiting-deploy', note: 'migrate, backfill' },
+      ],
+    }, 1)
+    expect(tally(board)).toBe('1 of 2 done · 1 awaiting-deploy')
+  })
+
   test('a different slug or kind starts a new board', async () => {
     const auth = apply(null, { board: 'auth', kind: 'spec', tickets: [{ number: '01', title: 'Login', status: 'running' }] }, 1)
     const map = apply(auth, { board: 'auth', kind: 'map', tickets: [{ number: '01', title: 'Which IdP?', status: 'ready' }] }, 2)

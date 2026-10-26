@@ -13,6 +13,8 @@ export type ScratchFile = {
   status: string
   claimedBy: string
   blockedBy: string[]
+  /** `delivery: true`: the spec's last ticket, which proves the spec shipped. */
+  delivery: boolean
 }
 
 export type ScratchEffort = {
@@ -41,6 +43,7 @@ export type TicketStatus =
   | 'merged'
   | 'resolved'
   | 'released'
+  | 'awaiting-deploy'
   | 'closed'
   | 'skipped'
 

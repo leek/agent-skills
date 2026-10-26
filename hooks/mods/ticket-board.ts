@@ -15,6 +15,7 @@ export const STATUSES: readonly TicketStatus[] = [
   'merged',
   'resolved',
   'released',
+  'awaiting-deploy',
   'closed',
   'skipped',
 ]
@@ -166,7 +167,7 @@ export function tally(board: TicketBoard): string {
   const count = (s: TicketStatus) => board.tickets.filter(t => t.status === s).length
   const done = board.tickets.filter(t => DONE.has(t.status)).length
   const parts = [`${done} of ${board.tickets.length - count('skipped')} done`]
-  for (const s of ['running', 'fixing', 'ready', 'blocked', 'released'] as const) {
+  for (const s of ['running', 'fixing', 'ready', 'blocked', 'released', 'awaiting-deploy'] as const) {
     if (count(s) > 0) parts.push(`${count(s)} ${s}`)
   }
 
@@ -200,11 +201,12 @@ export const ticketMark = (s: TicketStatus) =>
     resolved: '✓',
     closed: '✓',
     released: '⏸',
+    'awaiting-deploy': '◇',
     skipped: '–',
   })[s]
 
 export const ticketColor = (s: TicketStatus) =>
-  s === 'running' ? 'suggestion' : DONE.has(s) ? 'success' : s === 'fixing' || s === 'released' ? 'warning' : undefined
+  s === 'running' ? 'suggestion' : DONE.has(s) ? 'success' : s === 'fixing' || s === 'released' || s === 'awaiting-deploy' ? 'warning' : undefined
 
 export const findingMark = (s: FindingStatus) =>
   ({ open: '○', fixing: '◐', fixed: '✓', asking: '?', deferred: '⏸' })[s]
