@@ -15,7 +15,7 @@ the full sweep (filing research, removing done efforts, judging contradictions),
 
 `$ARGUMENTS` is an effort slug to scope to `.scratch/<slug>/` alone; empty means every effort.
 
-In Claude Code with the leek-skills plugin, `/scratch [slug]` shows steps 1–2 live in a pane without a turn; point the user at it for a quick look. You cannot read that board, so always run the steps below: they add the commit-ancestry checks and the table the board lacks.
+In Claude Code with the leek-skills plugin, `/scratch [slug]` shows steps 1–2 live in a pane without a turn; point the user at it for a quick look. You cannot read that board, so always run the steps below: they add the commit-ancestry checks and the per-artifact report the board lacks.
 
 ## 1. Inventory
 
@@ -37,6 +37,10 @@ For every file in an effort (map, every decision ticket, the spec, every build t
 status in either dialect: the YAML frontmatter `status:` field, or a legacy `**Status:**` /
 `Status:` line near the top of the body. Also read:
 
+- **Info for the report**: every file's `title`; the map's `## Destination` as one line; the
+  spec's `## Problem Statement` as one line and the count of lines under `## Open questions`
+  (zero when the section is absent); each closed decision's `## Resolution` (or `## Closed`
+  reason) as one line.
 - **Blockers**: any `Blocked by` line or explicit dependency reference to another ticket's id.
 - **Claimed-by**: whether the ticket is claimed, and by whom.
 - **Commit references**: a 7–40 character hex SHA in the status line, `## Resolution`, or
@@ -67,21 +71,68 @@ every open ticket has its blockers and claim state noted.
 
 ## 3. Report
 
-Print only this table, one row per effort in scope, most urgent first (unblocked open work,
-then blocked open work, then stale, then mismatched, then done):
+One block per effort in scope, most urgent first (unblocked open work, then blocked open work,
+then stale, then mismatched, then done). A **done** effort collapses to one line:
+`` `.scratch/<slug>/` — done, last change <date>. Next: `/scratch-cleanup` ``. Every other
+effort gets the full block:
 
-| Effort | Open work | Blocked by | Claimed by | Last change | Stale | Next |
-|---|---|---|---|---|---|---|
-| `.scratch/<slug>/` | open ticket/decision ids, by number | open blockers, or empty | claimant, or empty | date | yes/no | the skill that moves it forward |
+```markdown
+### `.scratch/<slug>/`: <open | ⚠️ mismatched> · last change <date><, ⚠️ stale>
 
-`Next` names one concrete command: `/implement <ticket>` for an unclaimed unblocked build
-ticket, `/grill-me <decision>` for an open decision, `/wayfinder <map>` for a map with no
-tickets yet, `/to-spec` for a resolved map with no spec, `/to-tickets <spec>` for a spec with
-no tickets. A **done** effort's `Next` is `/scratch-cleanup` (nothing else to do here). A
-**mismatched** effort's `Next` is the one-line contradiction itself, so the user knows what to
-settle before either skill can act on it.
+**Map**: <title>, <status>. Destination: <one line>.
+**Spec**: <title>, <status>. <problem, one line>. <n> open questions.
 
-Below the table, one line for any effort with no readable status file at all, naming the file.
-Write the Stale cell as `⚠️ yes` or `no`, and start a mismatched row's `Next` with ⚠️. No other marks.
-End with a one-line total: `<n> open, <n> stale, <n> mismatched, <n> done`. Stop there: no
-plan, no questions, no approval prompt, no restating the `Next` column in prose.
+**Decisions**: <n> open of <n>
+| # | Decision | Status | Resolution or blocker |
+|---|---|---|---|
+| 01 | <title> | closed | <resolution, one line> |
+| 02 | <title> | blocked | by 01 |
+
+**Tickets**: <n> open of <n>
+| # | Ticket | Status | Detail |
+|---|---|---|---|
+| 01 | <title> | ready | |
+| 02 | <title> | blocked | by 01 |
+| 03 | <title> | in progress | claimed by <claimant> |
+| 04 | <title> | closed | <short SHA>, on <default-branch> |
+
+**Next**: `<command>`: <why, one line>.
+<Also: up to two alternatives, one line each, only when they exist.>
+```
+
+Section rules:
+
+- An absent artifact gets one line, so its absence is visible: `**Map**: none.`,
+  `**Spec**: none.`, `**Decisions**: none.`, `**Tickets**: none.` Older efforts' `issues/`
+  folder reports as Tickets; a loose triage request file gets its own line,
+  `**Request** <file>: <title>, <status>.`
+- List every decision and ticket, closed ones too, in number order.
+- **Status** is one word, derived, never the raw field: `closed` (status closed or wontfix;
+  say `wontfix` in Detail), `in progress` (claimed, or status `in-progress`), `blocked` (any
+  `blocked-by` entry not closed), `ready` (open, unblocked, unclaimed), or `⚠️ unreadable`.
+- **Detail** for a ticket: the open blockers (`by 01, 03`), the claimant, or for a closed
+  ticket its cited commit and whether it is on the default branch (`⚠️ <sha> missing` when it
+  failed all three checks). Empty when there is nothing to say. A decision's last column is its
+  one-line resolution once closed, its blockers or claimant while open.
+- Mark nothing else with ⚠️: only stale, mismatched, unreadable, and missing commits.
+
+**Next** names the one command that moves the effort forward, then says why in plain words:
+
+| Situation | Next |
+|---|---|
+| An open, unblocked, unclaimed decision | `/grill-me <decision path>`, the lowest number |
+| A map with no decisions yet | `/wayfinder <map path>` |
+| Every decision closed, no spec | `/to-spec` |
+| A spec with open questions and no tickets started | settle them first: `/grill-me <spec path>` |
+| A spec with no tickets | `/to-tickets <spec path>` |
+| An unclaimed, unblocked build ticket | `/implement <ticket path>`, the ready ticket that unblocks the most others (lowest number on a tie) |
+| Only claimed or blocked work left | who to wait on, or which blocker to clear |
+| Mismatched | ⚠️ the contradiction in one line, and what to change to settle it |
+
+The **Also** line gives real alternatives, not repeats: with two or more ready build tickets,
+`/implement-spec <spec path>` builds the frontier in parallel; with several ready decisions,
+`/wayfinder <map path> all` resolves them in one run; the other ready ticket ids by number.
+
+After the last block, one line naming any effort with no readable status file at all, then a
+one-line total: `<n> open, <n> stale, <n> mismatched, <n> done`. Stop there: no plan, no
+questions, no approval prompt.
