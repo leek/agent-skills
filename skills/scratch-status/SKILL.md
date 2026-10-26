@@ -126,6 +126,7 @@ Section rules:
 | A spec with open questions and no tickets started | settle them first: `/grill-me <spec path>` |
 | A spec with no tickets | `/to-tickets <spec path>` |
 | An unclaimed, unblocked build ticket | `/implement <ticket path>`, the ready ticket that unblocks the most others (lowest number on a tie) |
+| Only the delivery ticket left, at `ready-for-human` | after deploy: `/implement <delivery ticket path>` |
 | Only claimed or blocked work left | who to wait on, or which blocker to clear |
 | Mismatched | ⚠️ the contradiction in one line, and what to change to settle it |
 

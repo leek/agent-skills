@@ -42,6 +42,8 @@ Give each ticket its **blocking edges**: the tickets that must complete before i
 
 When even batches can't stay green alone, keep the sequence but share an integration branch, all blocking a final integrate-and-verify ticket: green is promised only there.
 
+**Close every breakdown with a delivery ticket.** The last ticket, blocked by all the others, traces each spec requirement to a ticket and lists the before-merge checks and the after-deploy steps (commands, backfills, flags, smoke checks). A requirement it cannot trace is a gap: add a ticket for it. Draft it per [DELIVERY-TICKET.md](DELIVERY-TICKET.md). On a wide refactor, the integrate-and-verify ticket is this ticket.
+
 ### 4. Green-light publication
 
 **Granularity, blocking edges, and the axis you cut along are yours to settle.** Step 3's rules decide them, so don't run a review round on each: `grilling`'s **What still earns a question** keeps mechanical judgment off the user's plate.
@@ -56,7 +58,7 @@ Publishing creates external artifacts: do it only after step 4's green light.
 
 Write one markdown file per ticket into `.scratch/<slug>/tickets/` (the `tickets/` directory **beside the spec**, created with `mkdir -p` before the first write): there is no external tracker. Read the layout from `.agents/issue-tracker.md` (written by `/setup`) when the repo has one (`docs/agents/issue-tracker.md` is the legacy path); suggest running `/setup` once to make the paths durable. Set each ticket's `status` to `ready-for-agent`, or the AFK-ready role string from `.agents/triage-labels.md` when that mapping differs.
 
-Publish in dependency order (**blockers first**) so each ticket's edges reference real identifiers. Publish idempotently: before writing, read what `tickets/` already holds, if this spec was already broken down, don't mint a second set; a re-run only fills gaps a failed mid-loop run left behind, or adds tickets for what an in-place spec revision introduced, numbered after the existing ones.
+Publish in dependency order (**blockers first**) so each ticket's edges reference real identifiers. Publish idempotently: before writing, read what `tickets/` already holds, if this spec was already broken down, don't mint a second set; a re-run only fills gaps a failed mid-loop run left behind, or adds tickets for what an in-place spec revision introduced, numbered after the existing ones. A re-run adds each new ticket to the delivery ticket's `blocked-by` and its lists, and adds a delivery ticket when an older breakdown has none.
 
 Do NOT close or modify the parent spec. Invoked directly on a spec-less map, set that `map.md`'s frontmatter to `status: closed`: `to-tickets` is then the handoff that ends the map. Invoked on a spec, leave the already-closed map alone.
 
@@ -106,7 +108,7 @@ not a layer-by-layer implementation list.
       ("page shows heading X") or implementation ("uses a repository")
 ```
 
-Blockers live in the `blocked-by` frontmatter (ticket numbers), not a body section.
+Blockers live in the `blocked-by` frontmatter (ticket numbers), not a body section. The delivery ticket has its own template in [DELIVERY-TICKET.md](DELIVERY-TICKET.md).
 
 When the spec sequences deploys (expand/migrate/contract, "ship A, deploy, then B", a command that must exist in production before the enforcement that calls it), set `deploy-gate: true` on every ticket that must be live before its dependents are built. Blockers alone do not express this: a worker can close ticket A and start ticket B on the same branch, collapsing three deploys into one PR. `autopilot` stops with `needs_input` after closing a deploy-gate ticket; a human session should likewise commit, deploy, and only then pick up the dependents.
 

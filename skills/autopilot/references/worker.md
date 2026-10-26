@@ -25,6 +25,8 @@ For a wayfinder map, run only an AFK research or task ticket. Return `needs_inpu
 
 For build work, read `implement` completely and follow its full lifecycle for the selected ticket or one-session spec: claim, test at chosen seams, review through its subagents, verify end to end, explicitly stage, commit, and close. Complete no second unit in this process.
 
+A delivery ticket (`delivery: true`) runs only its pass 1, per `to-tickets/DELIVERY-TICKET.md`. When its After deploy list is not `None`, set `status: ready-for-human`, clear the claim, commit the tracker, and return `needs_input` naming the deploy and the after-deploy steps. This is the one case where `needs_input` does not leave the claim in place. A coverage gap is a new ticket per that file: return `needs_input` naming it.
+
 ## Keep the tracker current
 
 The tracker is the loop's only memory: the next process recomputes the frontier from these files alone. Write the status transition into the work item at both ends of the unit, in the shape its tracker uses.

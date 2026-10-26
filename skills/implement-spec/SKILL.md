@@ -36,7 +36,7 @@ Read the spec: its **Build Contract** section first, then what the tickets name.
 
 Open the ticket board now, before anything else in this step: load `mcp__leek-skills__ticket_board` with ToolSearch if it is deferred, and send every in-scope ticket with its `title` as `ready` or `blocked`, and the left-out ones as `skipped`.
 
-Leave out closed tickets and tickets claimed by someone else (name them in the report). A `deploy-gate: true` ticket bounds the run: build up to and including it, then stop at step 7 with a PR; its dependents start after that PR is deployed. When dependents would wait behind a gate, ask once, here, before the first dispatch (not after the gate PR opens): stop at the gate, or build the dependents in this run on a second integration branch `<slug>-2` cut from the gate branch's tip. Before dispatching the first contract/drop ticket on `<slug>-2`, confirm the gate branch `<slug>` has no remaining writes or reads to the columns or tables `<slug>-2` drops. `<slug>-2` takes changes only by merging `<slug>` (the gate ticket and its review fixes), never by merging or cherry-picking any other branch, and once the gate PR merges, move `<slug>-2`'s delta onto fresh `origin/<default>` for a second PR.
+Leave out closed tickets and tickets claimed by someone else (name them in the report). Never dispatch the delivery ticket (`delivery: true`) to an implementer: you work it in steps 6–7. A `deploy-gate: true` ticket bounds the run: build up to and including it, then stop at step 7 with a PR; its dependents start after that PR is deployed. When dependents would wait behind a gate, ask once, here, before the first dispatch (not after the gate PR opens): stop at the gate, or build the dependents in this run on a second integration branch `<slug>-2` cut from the gate branch's tip. Before dispatching the first contract/drop ticket on `<slug>-2`, confirm the gate branch `<slug>` has no remaining writes or reads to the columns or tables `<slug>-2` drops. `<slug>-2` takes changes only by merging `<slug>` (the gate ticket and its review fixes), never by merging or cherry-picking any other branch, and once the gate PR merges, move `<slug>-2`'s delta onto fresh `origin/<default>` for a second PR.
 
 **Sweep for open decisions first.** Run one read-only subagent over the spec, every in-scope ticket, and the spec's `decisions/` and `research/` (a domain-expert agent type when the harness offers one for the spec's domain). Its brief: list every choice the build will have to make that these documents do not settle, each with the tickets it touches, the line that leaves it open, and a recommended answer. Settled choices (including those `to-tickets`' sweep already wrote to `decisions/`) and pure implementation detail are not open decisions. Most questions a run would otherwise raise mid-build come from here, and asking them now keeps the frontier moving.
 
@@ -87,7 +87,7 @@ After each merge, update the ticket board, and post one progress line so the use
 
 **A question never stops the run.** A decision the sweep missed (one that only shows once code exists) is built on its recommended answer when that answer is reversible: the implementer or fixer records it as an assumption in its report, and you ask it at the next merge, so a different answer becomes a follow-up fix, not a wait. When the choice is not reversible (a schema shape a later ticket builds on, a data migration), release that ticket and its dependents, keep building the rest of the frontier, and ask the open questions together at the next merge, or in the final report when nothing else is running. Stop and wait only when every remaining ticket is blocked on an answer.
 
-Finish when every in-scope ticket is merged or released, and no implementer is running.
+Finish when every in-scope ticket but the delivery ticket is merged or released, and no implementer is running.
 
 ### 5. Review once, over the whole branch
 
@@ -95,11 +95,11 @@ Call the Skill tool with `code-review` against `base_sha` on the integration bra
 
 ### 6. Final checks and verification
 
-Run `implement`'s steps 6 and 7 once over the whole range. Skip the full-suite question when the repo's rules or the user's saved preferences already settle it (CI runs the suite, or "do not run the full suite unless asked"); otherwise ask once. A declined full suite is never replaced by a broad sweep of many test files: each ticket's focused tests stand as the evidence. Then call the Skill tool with `verify` and check every ticket's acceptance criteria in one pass. A product failure goes back through step 5's single implementer. Finish when verification passed, or name the exact external blocker and leave those tickets open.
+Run `implement`'s steps 6 and 7 once over the whole range. Skip the full-suite question when the repo's rules or the user's saved preferences already settle it (CI runs the suite, or "do not run the full suite unless asked"); otherwise ask once. A declined full suite is never replaced by a broad sweep of many test files: each ticket's focused tests stand as the evidence. Then call the Skill tool with `verify` and check every ticket's acceptance criteria in one pass. A product failure goes back through step 5's single implementer. Then run the delivery ticket's pass 1 per [`DELIVERY-TICKET.md`](../to-tickets/DELIVERY-TICKET.md): the full suite and verify pass above count toward its Before merge list, and a coverage gap goes to step 5's single implementer like a product failure. Finish when verification passed and pass 1 is done, or name the exact external blocker and leave those tickets open.
 
 ### 7. Close and deliver
 
-For each verified ticket: append `## Resolution` (what was built, deviations, verification evidence, its implementation commits, seams for successors, from `$notes/<NN>.md`) and set `status: closed`; re-read to confirm. Commit the tracker separately (`docs(scratch): <slug> resolutions`), never folded into code. Then follow [PR delivery: after step 8](../implement/references/spec-run.md#pr-delivery-after-step-8) for the chosen shape: push, open the PR (or, for a stack, whose ticket PRs opened as each ticket merged, open the closing PR per its [Stacked PRs](../implement/references/spec-run.md#stacked-prs) step 4), read review threads once.
+For each verified ticket: append `## Resolution` (what was built, deviations, verification evidence, its implementation commits, seams for successors, from `$notes/<NN>.md`) and set `status: closed`; re-read to confirm. The delivery ticket closes, or goes to `ready-for-human` with its after-deploy steps copied into the PR body, per its file. Commit the tracker separately (`docs(scratch): <slug> resolutions`), never folded into code. Then follow [PR delivery: after step 8](../implement/references/spec-run.md#pr-delivery-after-step-8) for the chosen shape: push, open the PR (or, for a stack, whose ticket PRs opened as each ticket merged, open the closing PR per its [Stacked PRs](../implement/references/spec-run.md#stacked-prs) step 4), read review threads once.
 
 ### 8. Clean up
 
@@ -126,6 +126,7 @@ Next:
 - **A PR is open and review bots are still running** → `/resolve-review-comments <PR>` once they post
 - **A stack of PRs is open** → `/triage-github-pr <every PR, bottom-up>` to land it bottom-up with merge commits
 - **Stopped at a deploy gate** → deploy the PR, then `/implement-spec <spec>` for the dependents
+- **The delivery ticket is at `ready-for-human`** → merge and deploy, then `/implement <delivery ticket>` for its after-deploy steps; list them
 - **Tickets released or left open** → `/implement <ticket>` for each, or `/implement-spec <spec>` again
 - **The build exposed a decision nobody made** → `/grill-me` on it, then re-run `/to-spec`
 - **The run went sideways** → `/retro this` before clearing

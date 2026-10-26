@@ -40,7 +40,7 @@ A **follow-up** is an item that waits, but closing loses nothing.
 - **Unanswered questions**: each question from step 1 that the user did not answer, quoted in a few words. An open grill branch → `/grill-me` on that branch.
 - **Unmet asks**: each ask from step 1 that the session did not finish, or said it would do later.
 - **Untested edits**: code edited after the last passing test run → run the tests. A behavior change never seen in the running app → `/verify`.
-- **Post-merge and post-deploy steps**: each deploy fact from step 1, plus each PR's `merge_danger`, written as the step to run and when (for example "after deploy: `php artisan migrate`").
+- **Post-merge and post-deploy steps**: each deploy fact from step 1, plus each PR's `merge_danger`, written as the step to run and when (for example "after deploy: `php artisan migrate`"). A delivery ticket this session left at `ready-for-human` → after deploy, `/implement <delivery ticket>`.
 - **Open `.scratch/` work** this session touched → `/scratch-status`.
 
 When follow-ups exist and the next session needs this one's context, also name `/handoff`.

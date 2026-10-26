@@ -29,6 +29,7 @@ Pipeline position: `wayfinder` (decide) → `to-spec` (write the spec) → `to-t
 Classify the input and make its acceptance criteria explicit:
 
 - **Ticket**: fetch its full body and comments. From its parent spec, load the **Build Contract** section first when present, then the headings the ticket names or the implementation reaches. Read direct blockers' `Resolution` sections for handed-forward seams; load other closed tickets and the map only on demand. A `wayfinder` decision ticket is eligible only when its type is `task`; stop on the other types because they decide rather than build. A `task` is manual unblocking work, not code, do it yourself where you can, otherwise hand the human the precise checklist from `ticket-types`; get explicit approval before any destructive or irreversible step, record the resulting facts, and Resolve. It skips the seams/TDD/commit/review/verify loop (steps 2–7), which assume code changes. The ticket is the work item.
+- **Delivery ticket** (`delivery: true`): the spec's last ticket, which proves the spec shipped whole. Work it per [`to-tickets/DELIVERY-TICKET.md`](../to-tickets/DELIVERY-TICKET.md): pass 1 before merge, pass 2 after deploy (a `ready-for-human` delivery ticket is waiting for pass 2). It skips steps 2–5; steps 6–8 run per that file.
 - **Spec**: fetch its full body and comments. If it holds more than one independently deliverable ticket or cannot fit one session, it needs tickets: with its `tickets/` published and a spec run asked for, run the spec run; otherwise stop and tell the user to run `to-tickets`. A spec that fits one session is itself the work item.
 - **Conversation**: restate the scope and behavior criteria in a few lines. It has no tracker claim or resolution.
 
@@ -89,7 +90,7 @@ If an external dependency prevents verification, keep the committed implementati
 
 After successful verification, record what was built, any justified deviation, verification evidence, the implementation commit SHA or SHAs, and any public seam a direct successor should reuse; check off every satisfied acceptance criterion. This `Resolution` is the successor handoff, so keep the seam and evidence concrete without retelling the parent spec. Resolve the work item according to its branch:
 
-- **Ticket, or a directly implemented spec**: set its frontmatter `status: closed` and append `## Resolution`. Write `closed` exactly, never an invented value such as `built` or `done`.
+- **Ticket, or a directly implemented spec**: set its frontmatter `status: closed` and append `## Resolution`. Write `closed` exactly, never an invented value such as `built` or `done`. A delivery ticket with after-deploy steps left goes to `ready-for-human` instead, per its file.
 - **`wayfinder` decision ticket**: use the Wayfinding **Resolve** operation.
 - **Conversation**: report the result without touching any file under `.scratch/`.
 
@@ -117,6 +118,7 @@ Stage-specific **Next** conditions (only those that apply, most likely first):
 - **A stack of PRs is open** → `/triage-github-pr <every PR, bottom-up>` to land it bottom-up with merge commits
 - **More frontier tickets on the parent spec** → `/clear`, then `/implement <next frontier ticket>` (resume your own claimed-but-unfinished ticket first if you stopped mid-work), or `/implement <spec path> all` to build the rest in one run, or `/implement-spec <spec path>` to build them in parallel; name it and how many remain
 - **Every ticket on the spec is closed** → nothing to run; say the spec is complete and name anything deferred out of scope
+- **Only the delivery ticket is open, at `ready-for-human`** → deploy, then `/implement <delivery ticket>` for its after-deploy steps; list them
 - **Remaining tickets are all blocked** → `/implement <the blocker>` first, or `/grill-me` if the blocker is a decision
 - **The build exposed a decision nobody made** → `/grill-me` on it, then re-run `/to-spec` if the spec is now wrong
 - **Verification is externally blocked** → keep the work item open and name the exact unblock condition

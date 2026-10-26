@@ -22,6 +22,7 @@ The pipeline runs straight through it: `/wayfinder` writes `map.md` and `decisio
 - `decisions/` holds questions; `tickets/` holds build work. Nothing in `decisions/` is ever built, and nothing in `tickets/` is ever a question
 - There is no `issues/` folder
 - Build tickets are one file each, numbered from `01`; where a dependency is known give the blocker the lower number. Numbers only tie-break the frontier: `blocked-by` is what actually gates work
+- The last build ticket is the **delivery ticket** (`delivery: true`), blocked by every other ticket: it proves the spec shipped whole and holds the after-deploy steps. It sits at `ready-for-human` between merge and those steps (see `to-tickets`' `DELIVERY-TICKET.md`)
 - **Every tracker file carries YAML frontmatter** with at least `title` and `status`; tickets also carry `claimed-by` and `blocked-by`. Status is that frontmatter field, never a `**Status:**` line in the body
 - Comments and conversation history append under a `## Comments` heading
 
