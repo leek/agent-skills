@@ -103,8 +103,8 @@ steps need all three.
    [`references/stacked-prs.md`](references/stacked-prs.md), which also owns a stack's
    merge method, retargets, and fixes that must flow upward. Otherwise keep the user's
    order.
-2. **Step 1 for all PRs at once.** Dispatch one `pr-reviewer` per PR that a
-   `Reviewed:` line does not cover (step 1), in the background, in one message (in Codex, one `spawn_agent` each). A stack's integration
+2. **Step 1 for all PRs at once.** Dispatch one `pr-reviewer` per PR in the
+   background, in one message (in Codex, one `spawn_agent` each). A stack's integration
    PR waits for its own turn after the landings, and steps 2–4 skip it until then.
 3. **Steps 2 and 3 for all PRs.** Gather reviews and review state for every PR.
    Where optional waits are allowed, use one wait (as the shipping budget says) for the
@@ -133,15 +133,9 @@ Before you read anyone else's review, review the diff yourself for what would br
 correctness, security, data, broken contracts, and missing tests. The brief, inputs,
 and output format are in
 [`references/independent-review.md`](references/independent-review.md). Do this on
-every PR, even one with no reviews, unless `implement` already did it. A body line
-`Reviewed: <sha>` covers this step only on a PR the current `gh` user opened
-(`gh pr view <n> --json author` against `gh api user --jq .login`), and only when
-`<sha>` is the head, when `git diff --name-only <sha> <head>` lists only `.scratch/`
-paths, or when the head is a merge whose second parent is `<sha>` and whose
-`git show --remerge-diff <head>` is empty (an `implement-spec` stack cut). Its
-`code-review` ran this brief as the Correctness axis on the same code: record that sha
-as covered, take the findings the PR body lists as left open as `Self N:` lines, and
-dispatch nothing. Include the brief's workflow-coverage pass so a
+every PR, even one with no reviews, and even when `implement` already reviewed it: this
+is the model-independent look, and a PR body's `Left open:` lines are findings to verify
+in step 4, never a substitute for it. Include the brief's workflow-coverage pass so a
 changed invariant is checked across its live sibling paths before the fix batch.
 
 Run it in a fresh context so the bots cannot frame it. In Claude Code with this plugin

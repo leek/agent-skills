@@ -1,6 +1,6 @@
 # Issue tracker: Markdown files
 
-Every map, spec, and ticket for this repo lives as a markdown file in `.scratch/`: there is no external tracker. Whether `.scratch/` is committed or gitignored is the repo's own convention; no skill needs to detect or care which.
+Every map, spec, and ticket for this repo lives as a markdown file in `.scratch/`: there is no external tracker. Whether `.scratch/` is committed or gitignored is the repo's own convention; skills that commit it check `git check-ignore -q .scratch` first. Only committed files reach a worktree.
 
 ## Conventions
 
@@ -9,7 +9,7 @@ Every map, spec, and ticket for this repo lives as a markdown file in `.scratch/
 ```
 .scratch/<slug>/
   map.md            # /wayfinder: decisions only; omit for small work
-  decisions/        # /wayfinder: one file per decision ticket
+  decisions/        # /wayfinder: one file per decision ticket; /to-tickets adds Build decisions
     01-<slug>.md
   spec.md           # /to-spec: exactly one, written once
   tickets/          # /to-tickets: one file per build ticket
@@ -18,7 +18,7 @@ Every map, spec, and ticket for this repo lives as a markdown file in `.scratch/
 
 The pipeline runs straight through it: `/wayfinder` writes `map.md` and `decisions/`, `/to-spec` writes `spec.md` once and closes the map, `/to-tickets` writes `tickets/`, `/implement` works one file in `tickets/` per session.
 
-- Small, already-clear work skips `map.md` and `decisions/` and starts at `spec.md`
+- Small, already-clear work skips `map.md` and starts at `spec.md`; its `decisions/` holds only `to-tickets`' Build decisions ticket
 - `decisions/` holds questions; `tickets/` holds build work. Nothing in `decisions/` is ever built, and nothing in `tickets/` is ever a question
 - There is no `issues/` folder
 - Build tickets are one file each, numbered from `01`; where a dependency is known give the blocker the lower number. Numbers only tie-break the frontier: `blocked-by` is what actually gates work
@@ -48,7 +48,7 @@ Read the file at the referenced path. The user will normally pass the path or th
 
 ## Working in parallel: one checkout, no branches
 
-Unblocked, unclaimed tickets may be worked by concurrent sessions in the **same checkout**. No skill creates a branch or a worktree; isolation comes from three rules:
+Unblocked, unclaimed tickets may be worked by concurrent sessions in the **same checkout**. The tracker operations below never create a branch or a worktree (PR delivery and `implement-spec` do, for code); isolation comes from three rules:
 
 - **One file per unit.** Each ticket and spec is its own file, so sessions on different units never write the same file.
 - **Claim is compare-after-write.** To claim, set `claimed-by` to a value unique to *this session*: your name plus a short session-unique suffix, never the bare name (two of your own sessions would share it). Save, then re-read the file: if `claimed-by` is not your value, another session won the race, pick a different ticket. This is advisory, not a lock; a rare double-claim wastes at most one session and is caught at Resolve, when the second finder sees the ticket already closed.

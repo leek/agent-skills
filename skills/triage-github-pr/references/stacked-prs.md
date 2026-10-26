@@ -8,8 +8,9 @@ commits**, and each merge is followed by a **retarget** of the PR above it.
 
 A stack lands on its **landing branch**: the trunk, or, when the stack has an
 **integration PR**, that PR's head branch. The integration PR is a stack's bottom PR
-whose body has a line starting `Integration:` (as `implement`'s stacked delivery writes
-it), or one the user calls the stack's integration branch. It holds no ticket of its
+whose base is the trunk and whose body has a line starting `Integration: lands` (as
+`implement`'s stacked delivery writes it), or one the user calls the stack's integration
+branch. It holds no ticket of its
 own: every PR above it lands into its branch, the stack's fixes go there, and it
 merges into the trunk last, so the trunk receives the stack once, verified.
 
@@ -225,7 +226,8 @@ highest PR you may push to; unnamed PRs above it are only retargeted.
 
 1. Finish step 4 for every PR in the stack, then check every PR's hard
    [gates](gh-mechanics.md#merge-gates) and settle every QUESTION and merge question
-   before writing any fix.
+   before writing any fix. A lower PR whose gate only a push to it can clear (a required
+   check, or `BEHIND`) takes that fix in its own batch first, as per-PR fixes do.
 2. In the top PR's worktree, make every PR's current-batch fixes, each commit naming the
    PR and finding it fixes. The top branch carries every lower PR's code, so each fix
    lands where its finding points.

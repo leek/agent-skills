@@ -23,7 +23,7 @@ Use `autopilot:<run-id>` as this session's claim identity, written into the sele
 
 For a wayfinder map, run only an AFK research or task ticket. Return `needs_input` for grilling, prototype, or any task requiring a human. When the map has no open tickets but still has fog, return `needs_input`. When it is cleared, return `needs_input` with the exact `to-spec` handoff unless an approved linked spec already exists.
 
-For build work, read `implement` completely and follow its full lifecycle for the selected ticket or one-session spec: claim, test at chosen seams, review through its subagents, verify end to end, explicitly stage, commit, and close. Complete no second unit in this process.
+For build work, read `implement` completely and follow its full lifecycle for the selected ticket or one-session spec: claim, test at chosen seams, review through its subagents, verify end to end, explicitly stage, commit, and close. Complete no second unit in this process. Its delivery shape is **Current branch**: commit on the branch the run started on, and skip `implement`'s delivery question.
 
 A delivery ticket (`delivery: true`) runs only its pass 1, per `to-tickets/DELIVERY-TICKET.md`. When its After deploy list is not `None`, set `status: ready-for-human`, clear the claim, commit the tracker, and return `needs_input` naming the deploy and the after-deploy steps. A coverage gap is a new ticket per that file: release this ticket and commit the tracker as that file says, then return `needs_input` naming the new ticket. These are the two cases where `needs_input` does not leave the claim in place.
 

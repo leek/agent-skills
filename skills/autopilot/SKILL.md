@@ -63,7 +63,7 @@ Use the installed workflow skills as the single source of truth. The script loca
 
 ## Ticket status
 
-Every unit is marked in progress before work starts and closed after it is verified and committed, so the markdown tracker under `.scratch/` always reflects reality. The worker writes the transition into the file's YAML frontmatter (`status: in-progress` plus `claimed-by: autopilot:<run-id>`, then `status: closed` plus `## Resolution`) for build tickets, directly implemented specs, and `wayfinder` decision tickets alike.
+Every unit is marked in progress before work starts and closed after it is verified and committed, so the markdown tracker under `.scratch/` always reflects reality. The worker writes the transition into the file's YAML frontmatter (`status: in-progress` plus `claimed-by: autopilot:<run-id>`, then `status: closed` plus `## Resolution`) for build tickets and directly implemented specs; a `wayfinder` decision ticket gets only the claim, its `status` staying `open` until it closes.
 
 The runner does not take that on trust. It snapshots every work item beside the root before each iteration, announces each status change afterwards (`ticket .scratch/x/tickets/01-y.md: ready-for-agent -> closed`), and fails the run when a successful result names a different unit or one whose file is not closed. It then rereads the tracker itself and replaces the worker's `status` and `next_ref` with the authoritative next frontier, completion, human gate, or blocked state. A unit this run claimed and left open is announced as an open claim.
 
@@ -73,7 +73,7 @@ Stopping at a gate leaves the in-progress marker and the run's claim in place on
 
 A build ticket whose frontmatter says `deploy-gate: true` is a human gate after it closes: the runner stops with `needs_input` instead of continuing to the next ticket, because the unit must be deployed on its own before its dependents are built (expand before migrate before contract; a command before the enforcement that relies on it). Deploy, then rerun the same command; the closed ticket is the resume point.
 
-Headless workers cannot conduct a live interview or approve a new spec or ticket breakdown. Stop with `needs_input` when `wayfinder` reaches a HITL ticket, `to-spec` needs seam or publication approval, `to-tickets` needs breakdown approval, or implementation exposes an undecided product question. After resolving the gate interactively, rerun the same command; tracker state and commits are the resume point.
+Headless workers cannot conduct a live interview or approve a new spec or ticket breakdown. Stop with `needs_input` when `wayfinder` reaches a HITL ticket, `to-spec` needs publication approval or a decision answered, `to-tickets` needs an open build decision answered, or implementation exposes an undecided product question. After resolving the gate interactively, rerun the same command; tracker state and commits are the resume point.
 
 If an interrupted owned claim cannot be safely resumed from the current tracker and worktree state, stop with `needs_input` and identify the claim and unresolved changes. Never clear or take over a differently owned claim automatically.
 

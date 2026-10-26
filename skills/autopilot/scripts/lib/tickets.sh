@@ -348,7 +348,7 @@ read_work_item_blockers() {
   ' "$file" 2>/dev/null)" || true
   raw="$(printf '%s' "$raw" | tr -d '\r' | strip_yaml_comment | tr -d '[]')"
   if [[ -n "$(printf '%s' "$raw" | tr -d '[:space:]')" ]]; then
-    while IFS= read -r token; do
+    while IFS= read -r token || [[ -n "$token" ]]; do
       token="$(printf '%s' "$token" | sed -E 's/^[[:space:]]+//;s/[[:space:]]+$//')"
       [[ -n "$token" ]] && tokens+=("$token")
     done < <(printf '%s' "$raw" | tr ',' '\n')

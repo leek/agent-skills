@@ -66,7 +66,7 @@ Write step 4's answers to `decisions/` as one closed decision ticket titled **Bu
 
 Do NOT close or modify the parent spec. Invoked directly on a spec-less map, set that `map.md`'s frontmatter to `status: closed`: `to-tickets` is then the handoff that ends the map. Invoked on a spec, leave the already-closed map alone.
 
-Commit the tickets where the spec is committed, so `implement` finds both in one place. Unless `git check-ignore -q .scratch` says the repo ignores it: when the branch `docs/<slug>-spec` exists (`git rev-parse --verify -q docs/<slug>-spec`), follow `to-spec`'s worktree steps on that branch, committing with `docs(scratch): <slug> tickets`; otherwise `git add -- .scratch/<slug>`, then `git commit --only -m "docs(scratch): <slug> tickets" -- .scratch/<slug>` on the current branch. `implement` carries a committed but unpushed effort directory onto its PR branch; an uncommitted one it cannot reach from a worktree.
+Commit the tickets where the spec is committed, so `implement` finds both in one place, with `docs(scratch): <slug> tickets`. Unless `git check-ignore -q .scratch` says the repo ignores it: when the branch `docs/<slug>-spec` exists (`git rev-parse --verify -q docs/<slug>-spec`), follow `to-spec`'s worktree steps on that branch; otherwise commit them exactly as `to-spec` commits a spec, its check for commits this session did not make included, so tickets never ride along on an unrelated branch. `implement` carries a committed but unpushed effort directory onto its PR branch; an uncommitted one it cannot reach from a worktree.
 
 ## Ticket template
 
@@ -135,8 +135,8 @@ Next:
 Stage-specific **Next** conditions (only those that apply, most likely first):
 
 - **Tickets published with a frontier** → `/implement <frontier ticket>` in one fresh session per ticket; parallelize only independent frontier tickets
-- **The user wants the whole spec built in one go** → `/implement <spec path> all` (one branch, a worktree when asked, one PR or a stack at the end)
-- **The frontier is wide and the user wants it fast** → `/implement-spec <spec path>` (parallel implementers, one integration branch, one PR)
+- **The user wants the whole spec built in one go** → `/implement <spec path> all` (one branch, a worktree when asked, one PR or a stack of PRs)
+- **The frontier is wide and the user wants it fast** → `/implement-spec <spec path>` (parallel implementers, one integration branch, one PR or a stack of PRs)
 - **Every ticket is blocked by another that is still open** → `/implement <that blocker>` first; name it
 - **A ticket turned out to be a decision, not a build** → `/grill-me` on it (or `/wayfinder` if there are several)
 - **Cutting the tickets exposed a gap the spec never settled** → `/grill-me` on the gap, then re-run `/to-spec`
