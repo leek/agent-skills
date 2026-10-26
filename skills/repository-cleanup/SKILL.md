@@ -28,7 +28,7 @@ This loop cleans Git repository state. It is not a source-code housekeeping pass
 
 1. Inspect the current working tree before changing anything: current branch, uncommitted changes, stashes, remotes, upstreams, and registered worktrees.
 2. Fetch current remote state without pruning. List the stale remote-tracking refs instead (`git remote prune --dry-run <remote>`); they are removal candidates like any other.
-3. Inventory local branches, remote branches, open and recently closed pull requests, unmerged commits, stashes, worktrees, and orphaned databases (see Databases).
+3. Inventory local branches, remote branches, open and recently closed pull requests, unmerged commits, stashes, worktrees, orphaned databases (see Databases), and old `pr-assets` folders (see PR screenshots).
 4. Classify each item as current, valuable but unfinished, superseded, merged, abandoned, or uncertain.
 5. Record evidence for each classification: upstream status, merge base, PR state, commit reachability, stash contents, worktree dirtiness, owner, and recent activity.
 6. Recover valuable work before cleanup. Move useful commits or stashed changes to the appropriate current branch, preserve patches, or keep a clearly named branch.
@@ -45,7 +45,7 @@ Where `AskUserQuestion` is available, ask the step 7 selection in one call, one 
 | `Branches` | local branches, stale remote-tracking refs |
 | `Worktrees` | worktrees, with the databases that drop with them |
 | `Stashes` | stashes, orphaned databases |
-| `Remote` | remote branches, PRs to close |
+| `Remote` | remote branches, PRs to close, `pr-assets` folders |
 
 Leave out a tab with no candidates. Every question is `multiSelect: true`, asks "Which <kind> should I remove?", and has 2–4 options with nothing pre-ticked:
 
@@ -93,6 +93,17 @@ If `gh` is unavailable or the repository is not on GitHub, use the equivalent pr
 Worktrees and one-off test runs leave local databases behind: a per-worktree `DB_DATABASE`, throwaway test databases (`<app>_pr42`, `<app>_triage_<date>`), and Laravel parallel testing's `<db>_test_N` copies of each. The script's `databases` list holds, with sizes, each candidate database by exact name, a parallel-testing copy as an item of its own. Its `source` says why: `worktree` (registered for, or named by, a candidate worktree), `registry` (a registered database whose worktree is gone), or `orphan` (named `<app db>_*` and named by no `.env`, `.env.testing`, or `phpunit.xml` of the main checkout or a remaining worktree). It never lists a database in use, or a parallel-testing copy of one.
 
 Classify each listed database by its name: a PR number, branch, worktree, or date that maps to merged or removed work is **abandoned**; a name that reads as a deliberate copy (`_backup`, `_snapshot`, `_pre_migration`) or maps to nothing is **uncertain**. Show the list grouped that way, with sizes, in the step 7 selection, and drop only the selected names, through the script's `--drop`. Each drop is irreversible: offer a `pg_dump`/`mysqldump` first for anything uncertain.
+
+## PR screenshots
+
+The `pr` skill uploads PR screenshots to the orphan `pr-assets` branch, one folder per PR branch, and nothing else ever removes them: every clone downloads the whole branch. One script lists the folders whose PR merged or closed more than 90 days ago (`--days N` to change it), or, with no PR found, whose last upload is that old. An open PR's folder is never a candidate. With no arguments it changes nothing:
+
+```bash
+bash scripts/prune-pr-assets.sh                                        # plan: tip, candidates, kept, with sizes
+bash scripts/prune-pr-assets.sh --tip <plan tip> --drop <folder>...    # selected folders only
+```
+
+Offer the candidates as one `Remote` option, with their count, total size and folder names, and `cannot recover` in its description: dropping rewrites `pr-assets` as a fresh orphan commit with a force push, leased on the plan's tip, so those images leave every future clone. A kept folder's `…/blob/pr-assets/…` links keep working; links pinned to a commit (`…/blob/<sha>/…`, from older uploads) point at unreachable commits that GitHub may stop serving once it garbage-collects them. A tip that moved since the plan refuses the run; list again.
 
 ## Classification Guide
 

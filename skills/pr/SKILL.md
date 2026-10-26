@@ -109,7 +109,7 @@ When you open a PR, put every screenshot taken this session of what the PR build
 bash <this skill's directory>/scripts/upload-screenshots.sh <pr-branch> <image>...
 ```
 
-It commits the images to the orphan `pr-assets` branch (the PR diff stays clean), pushes it, and prints one `![name](url)` line per image, pinned to that commit. Paste the lines under **After:**, or **Before:** for a screenshot of the old behaviour, each with a one-line caption of what it shows. If the push fails, keep the body, list the local paths under Evidence, and say the upload failed.
+It commits the images to the orphan `pr-assets` branch (the PR diff stays clean), pushes it, and prints one `![name](url)` line per image, linked through the branch path so it stays live until `repository-cleanup` prunes that PR's folder. Paste the lines under **After:**, or **Before:** for a screenshot of the old behaviour, each with a one-line caption of what it shows. If the push fails, keep the body, list the local paths under Evidence, and say the upload failed.
 
 ## Merge Danger
 

@@ -2,7 +2,10 @@
 # Upload screenshots for a PR body to the repo's orphan `pr-assets` branch, without
 # touching the working tree, index, or current branch.
 # Usage: upload-screenshots.sh <pr-branch> <image>...   (run inside the repo)
-# Stdout: one Markdown image line per file, pinned to the pr-assets commit.
+# Stdout: one Markdown image line per file, linked through the pr-assets branch path,
+# so it keeps working until repository-cleanup's prune-pr-assets.sh drops that folder.
+# Each file is stored as <content hash>-<name>, so a re-shot image never replaces an
+# earlier one another PR body still shows.
 set -e
 
 branch="${1:?usage: upload-screenshots.sh <pr-branch> <image>...}"
@@ -27,7 +30,7 @@ for attempt in 1 2 3; do
 
   for f in "$@"; do
     blob="$(git hash-object -w -- "$f")"
-    GIT_INDEX_FILE="$index" git update-index --add --cacheinfo "100644,$blob,$dir/$(basename "$f")"
+    GIT_INDEX_FILE="$index" git update-index --add --cacheinfo "100644,$blob,$dir/${blob:0:8}-$(basename "$f")"
   done
   tree="$(GIT_INDEX_FILE="$index" git write-tree)"
   commit="$(git commit-tree "$tree" ${parent:+-p "$parent"} -m "screenshots: $branch")"
@@ -36,7 +39,8 @@ for attempt in 1 2 3; do
     echo "pushed $# screenshot(s) to pr-assets/$dir" >&2
     for f in "$@"; do
       name="$(basename "$f")"
-      echo "![${name%.*}](https://github.com/$repo/blob/$commit/$dir/$name?raw=true)"
+      blob="$(git hash-object -- "$f")"
+      echo "![${name%.*}](https://github.com/$repo/blob/pr-assets/$dir/${blob:0:8}-$name?raw=true)"
     done
     exit 0
   fi
