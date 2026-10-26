@@ -53,6 +53,8 @@ for the report and reconcile recorded batch SHAs against it. A pending push alre
 belongs to its recorded batch; do not mistake its resume for a fresh batch.
 Each push you trigger, including a base-branch update, consumes a batch; combine
 needed updates with its fixes rather than creating an extra push outside the budget.
+A stack's landings into its integration PR are the one exception: see
+[Fixes inside a stack](references/stacked-prs.md#fixes-inside-a-stack).
 
 **Exhaustive is opt-in.** Only an explicit request such as "exhaustive" or "keep
 iterating until reviews are clean" enables
@@ -102,7 +104,8 @@ steps need all three.
    merge method, retargets, and fixes that must flow upward. Otherwise keep the user's
    order.
 2. **Step 1 for all PRs at once.** Dispatch one `pr-reviewer` per PR in the
-   background, in one message (in Codex, one `spawn_agent` each).
+   background, in one message (in Codex, one `spawn_agent` each). A stack's integration
+   PR waits for its own turn after the landings, and steps 2–4 skip it until then.
 3. **Steps 2 and 3 for all PRs.** Gather reviews and review state for every PR.
    Where optional waits are allowed, use one wait (as the shipping budget says) for the
    queue and each PR's budget. A harness with no way to wait gathers what has already arrived.
@@ -116,7 +119,8 @@ steps need all three.
    [Fixes inside a stack](references/stacked-prs.md#fixes-inside-a-stack).
    After a base PR merges, retarget each PR stacked on it, then give that PR its own
    steps 5 and 6 in turn, bottom-up: its step 5 still runs, and its step 6 re-checks
-   against the trunk, since its base and diff changed.
+   against the stack's landing branch (the trunk, or the integration PR's branch),
+   since its base and diff changed.
 6. **Step 7 once,** after the last PR.
 
 Completion criterion: every named PR is merged, queued, or stopped with a blocker, and
@@ -255,8 +259,11 @@ Otherwise work on the head branch without disturbing a dirty tree, following
 [Check out the head branch safely](references/gh-mechanics.md#check-out-the-head-branch-safely)
 (fork PRs included). For each LEGIT finding in the current batch: make the minimal change, add a test for any
 logic, auth, or data change, run it green, then commit with explicit staging.
-A test failing outside your fix runs on the starting SHA first: failing there too, it
-is a finding against the PR, classified in step 4, not a defect of your fix to debug.
+A test failing outside your fix runs on the starting SHA first: with your work
+committed, `git switch --detach <starting sha>` in the same worktree, run that one test,
+then switch back to your tip. Failing there too, it is a finding against the PR, not a
+defect of your fix to debug: write its step 4 line and publish it now. It joins this
+batch when the shipping budget makes it eligible; otherwise it is carried.
 
 **Review before you push.** Every push buys another round from every bot, and a fix
 that adds a mechanism (a job, a lock, a claim, a retry, an outbox, a stream) is new

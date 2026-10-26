@@ -27,7 +27,7 @@ PR from its own `main`), but a base is always a branch of this repo, so a cross-
 is never a parent. Stop on the PR whose base is the trunk: the **bottom**. A base that
 is neither the trunk nor an open PR's head normally blocks every PR above it. Before
 stopping, query `gh pr list --head <baseRefName> --state merged` and inspect any
-same-repository candidate's `headRefOid` and base. If its base is the trunk and its
+same-repository candidate's `headRefOid` and base. If its base is the landing branch and its
 recorded head is an ancestor of the named PR's reviewed head, follow
 [Recover a rewritten parent](#recover-a-rewritten-parent); a closed-unmerged or
 unverifiable parent remains a blocker. Never merge into that old base. Walk up the same way for
@@ -40,7 +40,9 @@ PRs based on a named PR's head (`gh pr list --base <head> --state open`).
 - **An unnamed PR above a named one** is not yours to merge or push to, but it is
   retargeted after the merge below it (step 3), so it stays open on the right base.
 - **An integration PR** counts as named when the user named every PR above it: it
-  carries no code of its own until they land.
+  carries no code of its own until they land. Naming the integration PR alone names
+  its stack as a merge question: ask once whether to land every PR above it. On no,
+  it is not merged, since the trunk would receive an empty stack.
 
 A **native GitHub stack** (made with `gh stack`, generally available since
 [2026-10-06](https://github.blog/changelog/2026-10-06-stacked-pull-requests-generally-available))
@@ -137,7 +139,7 @@ then merges as [Fixes inside a stack](#fixes-inside-a-stack) says.
 ## Recover a rewritten parent
 
 For a named PR M left above a squash- or rebase-merged parent, first verify the lower
-PR is `MERGED` into the trunk, is from this repository, and its recorded head is an
+PR is `MERGED` into the landing branch, is from this repository, and its recorded head is an
 ancestor of M's reviewed head. Record that lower head and M's current head as the
 replay boundary and lease expectation. Inspect the commits above the boundary to
 confirm they are M's own changes. Without that evidence, stop and report the blocker.
@@ -149,9 +151,9 @@ M has a push left in its existing budget before rewriting. In M's isolated workt
 use a local branch whose tip equals the recorded reviewed head, then:
 
 ```bash
-git fetch origin <trunk>
-git rebase --onto origin/<trunk> <lower-head-sha> <M-local-branch>
-git range-diff <lower-head-sha>..<reviewed-M-head-sha> origin/<trunk>..HEAD
+git fetch origin <landing branch>
+git rebase --onto origin/<landing branch> <lower-head-sha> <M-local-branch>
+git range-diff <lower-head-sha>..<reviewed-M-head-sha> origin/<landing branch>..HEAD
 ```
 
 The rebase drops merge commits: a conflict resolved earlier inside a merge of the parent
@@ -167,8 +169,8 @@ git push --force-with-lease=refs/heads/<M-headRefName>:<reviewed-M-head-sha> ori
 
 A failed lease stops recovery; fetch and reassess the concurrent changes, never
 override it. Re-read M's remote `headRefOid`, confirm it equals the validated local
-head, retarget M to the trunk if needed, and rerun step 6's gates with that new SHA.
-Record `git rev-list origin/<trunk>..<new-M-head-sha>` as the replacement own-commit
+head, retarget M to the landing branch if needed, and rerun step 6's gates with that new SHA.
+Record `git rev-list origin/<landing branch>..<new-M-head-sha>` as the replacement own-commit
 list. Continue only when that exact head is reviewed and validated; pin it in the merge.
 
 ## Fixes inside a stack
@@ -181,24 +183,38 @@ So a stack lands first and fixes once, wherever its shape allows.
 
 1. Finish step 4 for every PR above it, then check their hard
    [gates](gh-mechanics.md#merge-gates) and settle every QUESTION and merge question.
+   A PR whose gate only a push to it can clear (a required check or `BEHIND` under the
+   landing branch's protection) takes that fix in its own batch before it lands, as
+   per-PR fixes below do. A standing human `CHANGES_REQUESTED` stops the stack at that
+   PR, as step 6 says. Either way the trunk is untouched.
 2. Land every PR above it bottom-up, unchanged, per [Merge in order](#merge-in-order).
    Each head carries the one below it, so every landing is conflict-free. Reply on each
-   landed PR's open findings `moved to #<integration>'s fix batch` and resolve them.
-3. Give the integration PR its own steps 1–6 now, never in the first parallel round,
-   since before the landings it holds nothing to review. Its step 1 reviews only what the landed
-   PRs did not bring: `git log -p --no-merges <top landed head>..<integration head>`, plus
-   `git show --remerge-diff` for any merge from the trunk. Its batch 1 holds every
-   stack PR's verified current-batch fixes. The landings are not fix pushes and use none
+   landed PR's current-batch findings `<severity>; verified; fixing on #<integration>`
+   and leave them open. A landing queued with `--auto` stops the stack there, findings
+   still open.
+3. Give the integration PR its own steps 1–6 now, never in the first parallel round.
+   Work it in the detached worktree `.claude/worktrees/pr-<integration>` at
+   `origin/<slug>`; the local `<slug>`, when one exists, is `implement`'s build, never
+   its checkout. Its starting SHA is its head after the landings. The landed PRs'
+   reviews cover that head, since each reviewed its delta over the PRs below it and
+   every landing is conflict-free, so its step 1 covers only what comes after: the fix
+   batch (step 5's pre-push review) and any trunk merge (`git show --remerge-diff`).
+   Re-anchor every landed PR's LEGIT finding to that head first: one a landed PR above
+   it already fixed (the stack's closing review-fixes PR) is STALE, with that PR as its
+   evidence. Its batch 1 holds the rest. The landings are not fix pushes and use none
    of its budget; count them as landings when reconciling pushes.
-4. While it is a draft, push batch 1 first, then `gh pr ready`: its draft state is the
-   stack's layout, not unclear intent, and the bots review the whole stack once, already
-   fixed. Step 6's checkpoint after batch 1 runs here, and the merge into the trunk uses
-   `--merge`, under every gate step 6 names (deploy-branch approval included).
-5. After batch 1, update each landed PR's disposition with `fixed in <sha> on
-   #<integration>`.
+4. While it is a draft, push batch 1 first, then `gh pr ready <integration>`: its draft
+   state is the stack's layout, not unclear intent, and the bots review the whole stack
+   once, already fixed. Step 6's checkpoint after batch 1 runs here, and the merge into
+   the trunk uses `--merge`, under every gate step 6 names (deploy-branch approval
+   included).
+5. Once batch 1 is committed, reply on each landed PR's findings `fixed in <sha> on
+   #<integration>; validated` and resolve them; after the push, record the same in each
+   disposition.
 
 The trunk never sees a stack PR's known defect. If the run stops before the integration
-PR merges, everything waits on its branch, and the report says so.
+PR merges, everything waits on its branch, its findings still open, and the report says
+so.
 
 **Fix at the top** when the stack has no integration PR, the user named every PR in it
 (or "all open PRs"), and the trunk is not a deploy branch. The **top** is the
