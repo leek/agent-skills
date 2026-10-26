@@ -201,7 +201,8 @@ So a stack lands first and fixes once, wherever its shape allows.
    batch (step 5's pre-push review) and any trunk merge (`git show --remerge-diff`).
    Re-anchor every landed PR's LEGIT finding to that head first: one a landed PR above
    it already fixed (the stack's closing review-fixes PR) is STALE, with that PR as its
-   evidence. Its batch 1 holds the rest. The landings are not fix pushes and use none
+   evidence. Its batch 1 holds the rest, usually as a
+   [parallel fix batch](parallel-fixes.md). The landings are not fix pushes and use none
    of its budget; count them as landings when reconciling pushes.
 4. While it is a draft, push batch 1 first, then `gh pr ready <integration>`: its draft
    state is the stack's layout, not unclear intent, and the bots review the whole stack

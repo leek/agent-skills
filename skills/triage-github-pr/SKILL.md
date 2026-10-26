@@ -259,6 +259,8 @@ Otherwise work on the head branch without disturbing a dirty tree, following
 [Check out the head branch safely](references/gh-mechanics.md#check-out-the-head-branch-safely)
 (fork PRs included). For each LEGIT finding in the current batch: make the minimal change, add a test for any
 logic, auth, or data change, run it green, then commit with explicit staging.
+A batch of at least 6 findings whose fixes touch separate files is written in parallel
+instead, per [Parallel fix batch](references/parallel-fixes.md).
 A test failing outside your fix runs on the starting SHA first: with your work
 committed, `git switch --detach <starting sha>` in the same worktree, run that one test,
 then switch back to your tip. Failing there too, it is a finding against the PR, not a
