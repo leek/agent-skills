@@ -1,6 +1,6 @@
 ---
 name: to-tickets
-description: Break a spec into tracer-bullet vertical-slice tickets with explicit blocking edges, take one green light on the breakdown, and save one markdown file per ticket beside the spec. Use when the user asks to break a spec or map into tickets.
+description: Break a spec into tracer-bullet vertical-slice tickets with explicit blocking edges, settle the build's open decisions, and save one markdown file per ticket beside the spec. Use when the user asks to break a spec or map into tickets.
 argument-hint: "[spec path or wayfinder map] (defaults to the conversation)"
 ---
 
@@ -34,6 +34,8 @@ Cut the spec into **tracer bullet** tickets:
 
 Give each ticket its **blocking edges**: the tickets that must complete before it can start. A ticket with no blockers can start immediately.
 
+List the **files** each ticket expects to create or edit, from step 2's exploration. Two tickets with no edge between them that edit the same file conflict when built in parallel, so `implement-spec` builds them one after the other; the list is how it knows. A shared registration line (a route, a provider, a translation key) counts too.
+
 **Wide refactors are the exception to vertical slicing.** A wide refactor is one mechanical change (rename a column, retype a shared value object) whose blast radius fans across the codebase so no vertical slice can land green. Sequence it as **expand–contract**:
 
 1. **Expand**: add the new form beside the old so nothing breaks (new nullable column + dual-write; new method delegating to old).
@@ -44,31 +46,27 @@ When even batches can't stay green alone, keep the sequence but share an integra
 
 **Close every breakdown with a delivery ticket.** The last ticket, blocked by all the others, traces each spec requirement to a ticket and lists the before-merge checks and the after-deploy steps (commands, backfills, flags, smoke checks). A requirement it cannot trace is a gap: add a ticket for it. Draft it per [DELIVERY-TICKET.md](DELIVERY-TICKET.md). On a wide refactor, the integrate-and-verify ticket is this ticket.
 
-### 4. Green-light publication
+### 4. Settle the build's open decisions
 
 **Granularity, blocking edges, and the axis you cut along are yours to settle.** Step 3's rules decide them, so don't run a review round on each: `grilling`'s **What still earns a question** keeps mechanical judgment off the user's plate.
 
-Present the finished breakdown as a numbered list: per ticket: **Title**, **Blocked by**, **What it delivers** (the end-to-end behavior it makes work).
+Questions a builder would otherwise raise mid-build belong here, while nothing is waiting on them. Run one read-only subagent (a domain-expert agent type when the harness offers one for the spec's domain) over the spec, the drafted breakdown, and the effort's `decisions/` and `research/`. Its brief: list every choice the build will have to make that these documents leave open, each with the tickets it touches, the line that leaves it open, and a recommended answer. Settled choices and pure implementation detail are not open decisions.
 
-Then ask **exactly one** question, because step 5 writes a file per ticket and renumbering them afterwards isn't cheap: publish as listed (recommended) / adjust first, say what (via `AskUserQuestion` where available, with the numbered breakdown in the **Publish as listed** option's `preview`; otherwise a plain question in chat). Make whatever the user names, reprint the list, and don't reopen the parts they left alone.
+Ask them in `AskUserQuestion` batches of up to 4 where available, recommended answer first (otherwise one message in chat), and fold each answer into the tickets it touches. When the sweep finds nothing open, say so. This is the effort's last decision pass: `implement-spec` skips its own sweep when this one is newer than the spec and tickets.
 
 ### 5. Publish
 
-Publishing creates external artifacts: do it only after step 4's green light.
+Present the finished breakdown as a numbered list: per ticket: **Title**, **Blocked by**, **What it delivers** (the end-to-end behavior it makes work). Then publish without asking: until a build claims a ticket, the user adjusts the published files, or asks you to, as cheaply as a draft.
 
 Write one markdown file per ticket into `.scratch/<slug>/tickets/` (the `tickets/` directory **beside the spec**, created with `mkdir -p` before the first write): there is no external tracker. Read the layout from `.agents/issue-tracker.md` (written by `/setup`) when the repo has one (`docs/agents/issue-tracker.md` is the legacy path); suggest running `/setup` once to make the paths durable. Set each ticket's `status` to `ready-for-agent`, or the AFK-ready role string from `.agents/triage-labels.md` when that mapping differs.
 
-Publish in dependency order (**blockers first**) so each ticket's edges reference real identifiers. Publish idempotently: before writing, read what `tickets/` already holds, if this spec was already broken down, don't mint a second set; a re-run only fills gaps a failed mid-loop run left behind, or adds tickets for what an in-place spec revision introduced, numbered after the existing ones. A re-run adds each new ticket to the delivery ticket's `blocked-by` and its lists, and adds a delivery ticket when an older breakdown has none.
+Publish in dependency order (**blockers first**) so each ticket's edges reference real identifiers. Publish idempotently: before writing, read what `tickets/` already holds, if this spec was already broken down, don't mint a second set. A re-run fills gaps a failed mid-loop run left behind, or brings the tickets in line with an in-place spec revision: edit each open, unclaimed ticket whose text the revision changes, add tickets for what it introduces, and name each edit and addition in the report (a claimed or closed ticket the revision invalidates gets a new ticket instead). A new ticket takes the delivery ticket's number, and the delivery ticket moves to the next free one (rename its file and its `# <NN>` heading), so it stays the highest. A re-run adds each new ticket to the delivery ticket's `blocked-by` and its lists, sets it back to `ready-for-agent` when it had moved on, and adds a delivery ticket when an older breakdown has none.
+
+Write step 4's answers to `decisions/` as one closed decision ticket per the tracker's format (`type: grilling`, `status: closed`, numbered after the existing decisions, the answers under `## Resolution`), so every file there stays a decision ticket.
 
 Do NOT close or modify the parent spec. Invoked directly on a spec-less map, set that `map.md`'s frontmatter to `status: closed`: `to-tickets` is then the handoff that ends the map. Invoked on a spec, leave the already-closed map alone.
 
-Commit the tickets the same way `to-spec` commits a spec: unless `git check-ignore -q .scratch` says the repo ignores it, `git add -- .scratch/<slug>`, then `git commit --only -m "docs(scratch): <slug> tickets" -- .scratch/<slug>`. `implement` carries a committed but unpushed effort directory onto its PR branch; an uncommitted one it cannot reach from a worktree.
-
-### 6. Settle the build's open decisions
-
-Questions a builder would otherwise raise mid-build belong here, while nothing is waiting on them. Run one read-only subagent (a domain-expert agent type when the harness offers one for the spec's domain) over the spec, the published tickets, and the effort's `decisions/` and `research/`. Its brief: list every choice the build will have to make that these documents leave open, each with the tickets it touches, the line that leaves it open, and a recommended answer. Settled choices and pure implementation detail are not open decisions.
-
-Ask them in `AskUserQuestion` batches of up to 4 where available, recommended answer first (otherwise one message in chat). Write the answers to `decisions/` per the tracker, as one note titled for the build's open decisions, and commit it like the tickets (`docs(scratch): <slug> build decisions`). When the sweep finds nothing open, say so and write nothing. `implement-spec` runs the same sweep before its first dispatch and skips what this one settled.
+Commit the tickets where the spec is committed, so `implement` finds both in one place. Unless `git check-ignore -q .scratch` says the repo ignores it: when the branch `docs/<slug>-spec` exists (`git rev-parse --verify -q docs/<slug>-spec`), follow `to-spec`'s worktree steps on that branch; otherwise `git add -- .scratch/<slug>`, then `git commit --only -m "docs(scratch): <slug> tickets" -- .scratch/<slug>` on the current branch. `implement` carries a committed but unpushed effort directory onto its PR branch; an uncommitted one it cannot reach from a worktree.
 
 ## Ticket template
 
@@ -78,9 +76,9 @@ This template is canonical.
 ---
 title: <Ticket title>
 status: ready-for-agent
-claimed-by:            # empty = unclaimed
-blocked-by: []         # blocker ticket numbers, e.g. [01, 03]; [] = can start immediately
-deploy-gate: false     # true = must be deployed on its own before any dependent ticket is built
+claimed-by:
+blocked-by: []
+deploy-gate: false
 ---
 
 # <NN>: <Ticket title>
@@ -106,9 +104,13 @@ not a layer-by-layer implementation list.
 - [ ] Behavior statements: what a user/caller can now do, what data is
       persisted, what is forbidden (authorization), never presentation
       ("page shows heading X") or implementation ("uses a repository")
+
+## Files
+
+- `<path this ticket expects to create or edit>`
 ```
 
-Blockers live in the `blocked-by` frontmatter (ticket numbers), not a body section. The delivery ticket has its own template in [DELIVERY-TICKET.md](DELIVERY-TICKET.md).
+Keep comments out of the frontmatter: an empty `claimed-by` means unclaimed. Blockers live in the `blocked-by` frontmatter (ticket numbers, `[]` to start at once), not a body section. The delivery ticket has its own template in [DELIVERY-TICKET.md](DELIVERY-TICKET.md).
 
 When the spec sequences deploys (expand/migrate/contract, "ship A, deploy, then B", a command that must exist in production before the enforcement that calls it), set `deploy-gate: true` on every ticket that must be live before its dependents are built. Blockers alone do not express this: a worker can close ticket A and start ticket B on the same branch, collapsing three deploys into one PR. `autopilot` stops with `needs_input` after closing a deploy-gate ticket; a human session should likewise commit, deploy, and only then pick up the dependents.
 

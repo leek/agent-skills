@@ -83,6 +83,11 @@ work_item_is_deploy_gate() {
   [[ "$value" == true || "$value" == yes ]]
 }
 
+# A frontmatter value with its YAML comment (`  # …`) and surrounding blanks removed.
+strip_yaml_comment() {
+  sed -E 's/(^|[[:space:]]+)#.*$//;s/^[[:space:]]+//;s/[[:space:]]+$//'
+}
+
 # Reads status/claim from YAML frontmatter (all pipeline files now use it),
 # falling back to a legacy bold "**Status:**" line for older files.
 read_work_item_state() {
@@ -106,8 +111,8 @@ read_work_item_state() {
     status="$(sed -n -E 's/^\*\*Status:\*\*[[:space:]]*(.*)$/\1/p' "$file" 2>/dev/null | sed -n '1p')" || true
   fi
 
-  WORK_ITEM_STATUS="$(printf '%s' "$status" | tr -d '\r' | sed -E 's/^[[:space:]]+//;s/[[:space:]]+$//')"
-  WORK_ITEM_CLAIM="$(printf '%s' "$claim" | tr -d '\r' | sed -E 's/^[[:space:]]+//;s/[[:space:]]+$//')"
+  WORK_ITEM_STATUS="$(printf '%s' "$status" | tr -d '\r' | strip_yaml_comment)"
+  WORK_ITEM_CLAIM="$(printf '%s' "$claim" | tr -d '\r' | strip_yaml_comment)"
   [[ -n "$WORK_ITEM_STATUS$WORK_ITEM_CLAIM" ]]
 }
 
@@ -120,7 +125,7 @@ read_work_item_type() {
     NR > 1 && /^---[[:space:]]*$/ { exit }
     /^type:[[:space:]]*/ { sub(/^type:[[:space:]]*/, ""); print; exit }
   ' "$file" 2>/dev/null)" || true
-  WORK_ITEM_TYPE="$(printf '%s' "$type" | tr -d '\r' | sed -E 's/^[[:space:]]+//;s/[[:space:]]+$//')"
+  WORK_ITEM_TYPE="$(printf '%s' "$type" | tr -d '\r' | strip_yaml_comment)"
   [[ -n "$WORK_ITEM_TYPE" ]]
 }
 
@@ -341,7 +346,7 @@ read_work_item_blockers() {
     NR > 1 && /^---[[:space:]]*$/ { exit }
     /^blocked-by:[[:space:]]*/ { sub(/^blocked-by:[[:space:]]*/, ""); print; exit }
   ' "$file" 2>/dev/null)" || true
-  raw="$(printf '%s' "$raw" | tr -d '[]')"
+  raw="$(printf '%s' "$raw" | tr -d '\r' | strip_yaml_comment | tr -d '[]')"
   if [[ -n "$(printf '%s' "$raw" | tr -d '[:space:]')" ]]; then
     while IFS= read -r token; do
       token="$(printf '%s' "$token" | sed -E 's/^[[:space:]]+//;s/[[:space:]]+$//')"

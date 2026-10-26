@@ -19,7 +19,7 @@ Fill each list from the source. Do not leave a generic placeholder: write the re
 title: Delivery check: <spec title>
 status: ready-for-agent
 claimed-by:
-blocked-by: [01, 02, …]   # every other ticket
+blocked-by: [01, 02, …]
 deploy-gate: false
 delivery: true
 ---
@@ -55,7 +55,7 @@ The builder (`implement`, a spec run, `implement-spec`, an autopilot worker) wor
 
 **Pass 1: before merge.** Skip the seams and TDD steps; nothing new gets built.
 
-1. Check each **Spec coverage** line against the code and each ticket's `Resolution`. A requirement that is missing or broken is a gap. In a spec run or `implement-spec`, fix it in the run, like a verify failure. In a one-ticket `implement` session, add a ticket for it (numbered after the last one, with `to-tickets`' template), add it to this ticket's `blocked-by`, release this ticket, and stop.
+1. Check each **Spec coverage** line against the code and each ticket's `Resolution`. A requirement that is missing or broken is a gap. In a spec run or `implement-spec`, fix it in the run, like a verify failure. In a one-ticket `implement` session, add a ticket for it with `to-tickets`' template, taking this ticket's number while this ticket moves to the next free one (per `to-tickets`' re-run rule), add it to this ticket's `blocked-by`, release this ticket, and stop.
 2. Run each **Before merge** check, and tick each one that passes.
 3. With **After deploy** at `None`: close the ticket per `implement` step 8. Otherwise: set `status: ready-for-human`, clear `claimed-by`, and append a `## Comments` note with the commit or PR to deploy. Copy the After deploy list into the PR body after Merge Danger, as `After deploy:` lines. `ready-for-human` holds autopilot at this ticket and keeps the spec open in `scratch-status`.
 

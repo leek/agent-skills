@@ -204,7 +204,8 @@ So a stack lands first and fixes once, wherever its shape allows.
    evidence. Its batch 1 holds the rest, usually as a
    [parallel fix batch](parallel-fixes.md). The landings are not fix pushes and use none
    of its budget; count them as landings when reconciling pushes.
-4. While it is a draft, push batch 1 first, then `gh pr ready <integration>`: its draft
+4. While it is a draft, push batch 1 first (with no batch 1, nothing waits), then
+   `gh pr ready <integration>`: its draft
    state is the stack's layout, not unclear intent, and the bots review the whole stack
    once, already fixed. Step 6's checkpoint after batch 1 runs here, and the merge into
    the trunk uses `--merge`, under every gate step 6 names (deploy-branch approval

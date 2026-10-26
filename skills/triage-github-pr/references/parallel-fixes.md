@@ -5,6 +5,8 @@ split into at least 2 **fix groups** is written in parallel instead: one **fixer
 sub-agent per group, each in its own worktree, merged back into the PR worktree before
 the batch's one test run, one pre-push review and one push. A stack's integration PR
 batch is the usual case; a lone PR with a long findings list qualifies the same way.
+`implement-spec` runs its whole-branch fix batch through steps 1–3 too, with its own
+worktree and database names.
 
 You stay the orchestrator. Fixers write code and tests only: verification, every
 GitHub write (replies, resolves, the disposition, the push), the pre-push review and
@@ -24,10 +26,11 @@ names its files, and no file appears in two groups.
 
 ## 2. Dispatch the fixers
 
-Per group `k`, from the PR worktree:
+Per group `k`, in the main checkout's `.claude/worktrees/`, never one inside the PR
+worktree:
 
 ```bash
-git worktree add --detach .claude/worktrees/pr-<N>--fix-<k> <PR worktree HEAD>
+git worktree add --detach <main checkout>/.claude/worktrees/pr-<N>--fix-<k> <PR worktree HEAD>
 ```
 
 Make it runnable the way step 5's worktree was. When its tests need a database of their
@@ -64,10 +67,8 @@ In the PR worktree, `git merge --no-ff <fixer tip>`: the worktrees share one obj
 store, so the SHA is enough, and the fixer's commits keep their SHAs. Its files are its
 own, so a conflict means a fixer touched a file beyond its list: call the Skill tool
 with `resolving-merge-conflicts`, and the pre-push review covers the resolution with
-`git show --remerge-diff`. Reply on each finding with its commit's SHA,
-`validated; push pending`, as step 5 says. A finding the fixer
-reports blocked goes back to step 4 as a QUESTION or is carried, per the shipping
-budget.
+`git show --remerge-diff`. A finding the fixer reports blocked goes back to step 4 as a
+QUESTION or is carried, per the shipping budget.
 
 Completion criterion: every fixer's commits are in the PR worktree, or its findings are
 dispositioned as blocked.
@@ -78,7 +79,8 @@ Run the union of the fixers' focused test commands once on the merged tree, then
 5's pre-push review over the whole fix range. A failure or review defect goes back to
 the fixer that owns the file, with the output (`SendMessage` to its name, `followup_task`
 in Codex), and its new commits are merged as in step 3. Fix inline only what no
-fixer owns. Then record the batch and push, as step 5 says.
+fixer owns. Then reply on each finding with its commit's SHA, `validated; push pending`,
+record the batch and push, as step 5 says.
 
 The fix worktrees and their databases are step 5 worktrees: step 7 removes them with
 the PR's own.

@@ -117,10 +117,10 @@ steps need all three.
    (`.claude/worktrees/pr-N`), never the main checkout, so no two PRs share a tree.
    A stack lands first and fixes once, on its integration PR or its top branch, per
    [Fixes inside a stack](references/stacked-prs.md#fixes-inside-a-stack).
-   After a base PR merges, retarget each PR stacked on it, then give that PR its own
-   steps 5 and 6 in turn, bottom-up: its step 5 still runs, and its step 6 re-checks
+   After a base PR merges, retarget each PR stacked on it; its step 6 re-checks
    against the stack's landing branch (the trunk, or the integration PR's branch),
-   since its base and diff changed.
+   since its base and diff changed. Only a stack on per-PR fixes also gives each PR its
+   own step 5, bottom-up.
 6. **Step 7 once,** after the last PR.
 
 Completion criterion: every named PR is merged, queued, or stopped with a blocker, and
@@ -132,7 +132,11 @@ Before you read anyone else's review, review the diff yourself for what would br
 correctness, security, data, broken contracts, and missing tests. The brief, inputs,
 and output format are in
 [`references/independent-review.md`](references/independent-review.md). Do this on
-every PR, even one with no reviews. Include the brief's workflow-coverage pass so a
+every PR, even one with no reviews, unless `implement` already did it: a body line
+`Reviewed: <sha>` covers this step when `<sha>` is the PR's head, or when
+`git diff --name-only <sha> <head>` lists only `.scratch/` paths. Its `code-review` ran
+this brief as the Correctness axis on the same code; record that sha as covered and
+dispatch nothing. Include the brief's workflow-coverage pass so a
 changed invariant is checked across its live sibling paths before the fix batch.
 
 Run it in a fresh context so the bots cannot frame it. In Claude Code with this plugin
@@ -259,8 +263,8 @@ Otherwise work on the head branch without disturbing a dirty tree, following
 [Check out the head branch safely](references/gh-mechanics.md#check-out-the-head-branch-safely)
 (fork PRs included). For each LEGIT finding in the current batch: make the minimal change, add a test for any
 logic, auth, or data change, run it green, then commit with explicit staging.
-A batch of at least 6 findings whose fixes touch separate files is written in parallel
-instead, per [Parallel fix batch](references/parallel-fixes.md).
+A batch of at least 6 findings that split into at least 2 groups of separate files is
+written in parallel instead, per [Parallel fix batch](references/parallel-fixes.md).
 A test failing outside your fix runs on the starting SHA first: with your work
 committed, `git switch --detach <starting sha>` in the same worktree, run that one test,
 then switch back to your tip. Failing there too, it is a finding against the PR, not a

@@ -23,7 +23,16 @@ Understand the current state of the codebase if you haven't already. Use the pro
 
 **Invoked with a `wayfinder` map, read the map and every closed decision ticket's `## Resolution` first**: those resolutions are the authoritative decisions the spec must encode. Don't synthesize from conversation memory alone; a fresh session may not hold what earlier ticket sessions decided.
 
-Finish exploring only when you can name the domain terms and ADRs that constrain the spec, the closest existing implementation and tests to imitate (or confirm none exist), and the tracker destination step 3 will use.
+Check the **constraints** the spec must honour before drafting, since each one found at build time costs a re-grill:
+
+- **Data handling**: which vendors may process this data (a PHI or residency rule can fix the AI or email provider).
+- **Launch gating**: anything user-visible that waits on an outside approval, a listing, or a date ships behind a switch.
+- **Deploy safety**: the repo's expand–contract and migration rules, for every drop or rename.
+- **Architecture rules**: the class names and locations the spec names pass the repo's architecture tests and naming rules.
+
+Each constraint goes in the Build Contract; one the conversation did not settle goes in the Needs decision list.
+
+Finish exploring only when you can name the domain terms, ADRs, and constraints that bind the spec, the closest existing implementation and tests to imitate (or confirm none exist), and the tracker destination step 3 will use.
 
 ### 2. Sketch the test seams
 
@@ -117,7 +126,7 @@ Next:
 Stage-specific **Next** conditions (only those that apply, most likely first):
 
 - **Spec published, work spans several tickets** → `/to-tickets <spec ref>`
-- **Spec revised after its tickets were published** → `/to-tickets <spec ref>` to add tickets for the change; name which existing tickets the revision touches
+- **Spec revised after its tickets were published** → `/to-tickets <spec ref>` to edit and add tickets for the change; name which existing tickets the revision touches
 - **Spec published, work fits one session** → `/implement <spec ref>`
 - **A load-bearing decision is still open** → `/grill-me` on that decision, naming it; re-run `/to-spec` after
 - **Several decisions open, or the effort is bigger than one spec** → `/wayfinder` to chart it first, on a narrower destination

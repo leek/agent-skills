@@ -1,5 +1,5 @@
 interface:
   display_name: "To Tickets"
-  short_description: "Break a spec into tracer-bullet vertical-slice tickets with explicit blocking edges, take one green light on the breakdown, and save one markdown file per..."
+  short_description: "Break a spec into tracer-bullet vertical-slice tickets with explicit blocking edges, settle the build's open decisions, and save one markdown file per..."
 policy:
   allow_implicit_invocation: true
