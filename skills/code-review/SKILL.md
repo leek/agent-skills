@@ -75,6 +75,8 @@ Each smell reads *what it is* → *how to fix*; match it against the diff:
 
 **Small diffs run inline too.** When `git diff --shortstat` shows at most 3 files and about 150 changed lines, three fresh contexts each re-reading it cost more than they find: take the inline path above.
 
+**Large diffs split Correctness.** When the diff touches more than about 25 files, one Correctness reviewer runs out of turns before it reports. Dispatch two, each given half the changed paths (a file and its tests stay together) and the full commit list, and present both reports under the one `## Correctness` heading.
+
 **A caller may name the axes.** Run only those, and report the rest as `not run`.
 
 **A re-review narrows.** When the caller passes the previous round's findings and its head, review only `<previous head>..HEAD` (the fix commits) and run only the axes that had actionable findings, plus Correctness when a fix added a mechanism (job, lock, claim, retry). Report the axes that did not run as `not re-run`.
