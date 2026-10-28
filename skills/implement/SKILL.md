@@ -119,6 +119,7 @@ Stage-specific **Next** conditions (only those that apply, most likely first):
 - **More frontier tickets on the parent spec** → `/clear`, then `/implement <next frontier ticket>` (resume your own claimed-but-unfinished ticket first if you stopped mid-work), or `/implement <spec path> all` to build the rest in one run, or `/implement-spec <spec path>` to build them in parallel; name it and how many remain
 - **Every ticket on the spec is closed** → nothing to run; say the spec is complete and name anything deferred out of scope
 - **Only the delivery ticket is open, at `ready-for-human`** → deploy, then `/implement <delivery ticket>` for its after-deploy steps; list them
+- **After-deploy items wait on a time** → `/implement <delivery ticket>` after that UTC time; name the items, and offer to schedule it per the end block's rule 6
 - **Remaining tickets are all blocked** → `/implement <the blocker>` first, or `/grill-me` if the blocker is a decision
 - **The build exposed a decision nobody made** → `/grill-me` on it, then re-run `/to-spec` if the spec is now wrong
 - **Verification is externally blocked** → keep the work item open and name the exact unblock condition
