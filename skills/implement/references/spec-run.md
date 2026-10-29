@@ -4,16 +4,26 @@ Two additions to the `implement` process. A **spec run** builds every ticket of 
 
 ## Choose the delivery shape
 
-Ask once, before anything is claimed or branched (`AskUserQuestion` where available, one single-select question, the recommended option first; otherwise a plain question in chat). Skip it when the request already names the shape ("open a PR", "stack it", "just commit"), or when the repo's rules or the user's saved preferences settle it, and follow that answer.
+Before anything is claimed or branched, settle how and where to build. Ask each question below that applies, in one `AskUserQuestion` call where available (single-select, the recommended option first; otherwise one message in chat), and nothing else. Skip a question when the request already answers it ("open a PR", "stack it", "just commit", "in a worktree", `all`), or when the repo's rules or the user's saved preferences settle it, and follow that answer. When every question is settled, ask nothing.
 
-- **One work item:**
+**Scope** comes first, in a call of its own, because its answer picks the delivery options. Ask it when the input is a spec whose `tickets/` are published and the request names neither a ticket nor the whole spec:
+
+- **Next frontier ticket** (recommended when one ticket is ready): build the lowest-numbered open, unblocked ticket as the work item.
+- **Every ticket, here**: a spec run, one ticket after another in this session.
+- **Every ticket, in parallel**: stop, and tell the user to run `/implement-spec <spec path>`.
+
+Then the rest, together:
+
+- **Delivery**, for one work item:
   - **Current branch** (recommended on a feature branch): commit here, no PR.
   - **New branch and PR** (recommended on the default branch): PR delivery below.
   - **Worktree and PR**: PR delivery in `.claude/worktrees/<branch>`.
-- **A whole spec** (more than one ticket; with one ticket, ask the one-item question):
+- **Delivery**, for a whole spec (more than one ticket; with one ticket, ask the one-item question):
   - **One PR** (recommended): every ticket on one branch.
   - **Stacked PRs**: one PR per ticket, each based on the one below, over an integration branch that reaches `<default>` in one merge, so each review holds one ticket. Before offering it, run `gh repo view --json mergeCommitAllowed`: a stack must land with merge commits (`triage-github-pr`'s stacked-PR rules), so when it reads `false`, say so in the option.
   - **Branch, no PR**: deliver as **One PR**, but push the branch and stop before `gh pr create`.
+- **Worktree**, for a whole spec: build the branch in a worktree at `.claude/worktrees/<slug>` (recommended: this checkout stays as it is), or switch this checkout to it. Skip it when the tree is dirty (the worktree is the only option; say so).
+- **Local `<default>`**, when the spec's `.scratch/<slug>` will come from local `<default>` and that is all `<default>` holds ahead of `origin/<default>` (`git log --format=%h origin/<default>..<default> -- . ':!.scratch/<slug>'` prints nothing, and `git rev-list --count origin/<default>..<default>` is not `0`): move `<default>` back to `origin/<default>` once the new branch carries the spec (recommended), or leave it. This is the question PR delivery's step 3 would otherwise ask mid-run.
 
 Every shape runs the same build, review, and verification. Only the branches and PRs differ.
 
@@ -33,7 +43,7 @@ Every shape runs the same build, review, and verification. Only the branches and
 
 ## Spec run
 
-Run it on a spec whose `tickets/` already exist and the user asked to build all of ("`all`", "implement all of …", "the whole spec"). A spec with no tickets yet goes to `to-tickets` first.
+Run it on a spec whose `tickets/` already exist and the user asked to build all of ("`all`", "implement all of …", "the whole spec", or **Every ticket, here** in the scope question). A spec with no tickets yet goes to `to-tickets` first.
 
 1. **Order.** Read every ticket's frontmatter once. Take the open tickets in number order (numbers are topological, so blockers come first). A ticket claimed by someone else stays out; name it in the report. The delivery ticket (`delivery: true`) is not built in step 2; it runs in step 4.
 2. **Build each ticket inline, one after another.** Per ticket: claim it (step 1, keeping the run's one `base_sha`), choose its seams (step 2), run the TDD loop with its focused tests (step 3), and commit it (step 4). With **Stacked PRs**, review the ticket, then push and open its PR, per [Stacked PRs](#stacked-prs). Each ticket's commits stand alone, so the PR history reads ticket by ticket. Carry seams a later ticket needs forward in your notes; its `Resolution` is written in step 8.
