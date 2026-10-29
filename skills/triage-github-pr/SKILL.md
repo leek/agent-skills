@@ -24,6 +24,12 @@ approval**: your own review must cover the exact head, including your fixes.
 queue pending required checks with `--auto`. Required approvals, a standing human
 `CHANGES_REQUESTED`, unresolved owner decisions and merge conflicts remain gates.
 
+**Never reverse a decision without asking.** What the PR deliberately does (its title,
+body, commits, Merge Danger, or linked ticket) is the author's decision. A fix that
+removes, defers, splits off, or narrows any of it is a QUESTION, however right the
+finding is: dropping a migration, holding back a schema change, cutting a feature or
+behaviour the PR adds. Ask first; never push it and explain afterwards.
+
 ## Shipping budget
 
 **Bounded is the default: at most two fix pushes.** Freeze the initial finding
@@ -239,8 +245,9 @@ round budget. Never watch or re-run CI.
 **Open questions.** A finding is QUESTION when its fix, or its dismissal, needs a
 decision only the user can make: the kinds in the `grilling` skill's **What still
 earns a question** section, after its **Settle it yourself first** ladder fails. A human
-reviewer's question that only the author's intent can answer is a QUESTION too. Never
-guess an answer, and never merge past one.
+reviewer's question that only the author's intent can answer is a QUESTION too. So is
+every finding whose fix would reverse a decision the PR made (**Never reverse a
+decision without asking**, at the top); the ladder never settles those. Never guess an answer, and never merge past one.
 
 When step 4 ends with any QUESTION, ping the user first (`PushNotification` where
 available), because the run is often unattended. Then call the Skill tool with
