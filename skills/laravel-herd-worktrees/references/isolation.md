@@ -1,67 +1,37 @@
-# Per-Worktree Isolation: Why & How
+# Per-Worktree Isolation
 
-Worktrees share the `.git` object store but have independent working trees. Anything **outside the working tree** (caches, OS-level state, server-side data) needs explicit isolation or branches will silently corrupt each other's state.
+Worktrees share the `.git` object store but nothing outside the working tree. `herd workspace` isolates the URL, PHP version, dependencies and (with `--database=clone|empty`) the database. The rest is the project's to configure.
 
-## `vendor/` and `node_modules/`
+## What `herd.yml` can add
 
-**Rule:** never symlink these between worktrees.
+A committed `herd.yml` (overridden by an uncommitted `herd.local.yml`) sets defaults for every workspace of the project:
 
-Why:
-- `composer.lock` and `package-lock.json` differ by branch. Shared `vendor/` means one branch's autoload class map points at code that doesn't exist on disk for the other branch.
-- Node native modules (`sharp`, `bcrypt`, `better-sqlite3`) bind to specific Node versions and platforms. Mixed versions across worktrees → `Error: NODE_MODULE_VERSION mismatch`.
-- Composer post-install scripts patch files in `vendor/` differently per project state.
-
-Fast install instead:
-- Composer cache is global (`~/Library/Caches/composer`). Subsequent installs are mostly hardlinks. A typical Laravel install on a warm cache is < 10 s.
-- `pnpm` uses a global content-addressable store: installs are symlinks into that store, ~3 s for a typical Laravel + Inertia app.
-- `npm ci` with a warm npm cache is faster than `npm install`. Use it in scripts.
-
-## `.env`
-
-`.env` is gitignored, so a fresh worktree has none. The skill's `worktree-new.sh` copies `.env` from the main checkout, then **rewrites**:
-
-| Key | Per-worktree value | Reason |
-|---|---|---|
-| `APP_URL` | `http://<app>-<suffix>.test` | Generated links and signed routes embed this. |
-| `DB_DATABASE` | per-worktree DB or sqlite file | Shared DB → migrations from one branch break others. |
-| `SESSION_COOKIE` | unique name | Cookies on `.test` parent domain leak otherwise. |
-| `CACHE_PREFIX` | unique | File/Redis cache key collisions. |
-| `REDIS_PREFIX` | unique | Same Redis DB across worktrees → cache pollution. |
-
-You can also bump `REDIS_DB` to a different integer index instead of using a prefix.
-
-## `APP_KEY`
-
-Two worktrees with the same `APP_KEY` will decrypt each other's session cookies on the shared `.test` parent. This sounds harmless until two branches set incompatible session payload shapes: then logging into one logs you out of the other and throws `DecryptException` on the way.
-
-Run `php artisan key:generate` after copying `.env`. The skill's script does this.
-
-## `storage/` and `bootstrap/cache/`
-
-Both contain runtime artifacts: compiled views, route/config caches, logs, session files. Always per-worktree, always regenerated:
-
-```bash
-php artisan optimize:clear
+```yaml
+workspaces:
+  database: empty                 # default mode when --database is not passed
+  copy: [.env.testing]            # extra gitignored paths to copy from the main checkout
+  env:                            # written into the workspace .env
+    CACHE_PREFIX: "{{branch}}_cache_"
+    REDIS_PREFIX: "{{branch}}_database_"
+    SESSION_COOKIE: "{{branch}}_session"
+  hooks:
+    after_create: composer install   # runs inside the workspace; a failing line only warns
+    before_delete: ...
 ```
 
-## `public/storage` symlink
+Placeholders: `{{domain}}`, `{{scheme}}`, `{{branch}}`, `{{parent}}`, `{{parent_domain}}`, `{{database}}`.
 
-`php artisan storage:link` creates a symlink from `public/storage` → `storage/app/public`. The link is **inside the worktree** and points to a path inside the same worktree, so it's already isolated, but it must be re-created in each new worktree if your app uses public storage. The skill's script does this when `storage/app` exists.
+## Shared state that still collides
+
+- **Redis**: worktrees on one Redis database share keys unless `CACHE_PREFIX` / `REDIS_PREFIX` (or `REDIS_DB`) differ. Two Horizons on the same queue connection fight over jobs; run one, or give each its own `HORIZON_PREFIX`.
+- **`APP_KEY`**: the copied `.env` keeps the main checkout's key. Run `php artisan key:generate` in the worktree only when it must not read the main checkout's encrypted data; data it shares (a `shared` or `clone` database) needs the same key.
+- **`vendor/` and `node_modules/`**: never symlink them between worktrees. The autoloader resolves `app/` relative to `vendor/`, and native Node modules bind to one Node version.
 
 ## Database
 
-See [db-strategies.md](./db-strategies.md) for the full decision tree. Summary:
+- **`shared`**: migrations in the worktree change the main checkout's schema. Fine for read-only verification; anything that migrates or seeds needs its own database.
+- **`clone`**: a copy of the main database (`mysqldump` / `pg_dump` when Herd has them, a SQL copy otherwise; SQLite copies the file).
+- **`empty`**: a fresh database, migrated unless `--no-migrate`.
+- **Tests** read `.env.testing` and `phpunit.xml`, which Herd never rewrites: an in-memory SQLite test database needs nothing; a server one needs its own name per worktree.
 
-- **SQLite**: simplest. Per-worktree file at `database/database.sqlite`. Migrate from scratch.
-- **MySQL/Postgres via Herd Pro**: one server, per-worktree DB name `<app>_<suffix>`. Migrate from scratch, or `mysqldump` the main DB and restore.
-
-## Redis / Horizon / queues
-
-- Use unique `REDIS_PREFIX` so cache keys don't collide.
-- Horizon supervisors keyed by `HORIZON_PREFIX`: set unique per worktree if running multiple Horizons.
-- Don't run Horizon in two worktrees against the same queue connection, they'll fight over jobs.
-
-## Mail / Telescope
-
-- `MAIL_FROM_ADDRESS` can stay shared; mailpit/log driver doesn't care.
-- Telescope writes to the main DB connection, handled by per-worktree DB isolation.
+A worktree whose branch drops or renames a migration leaves its database ahead of the code: `php artisan migrate:status` shows the orphan. `migrate:fresh` rebuilds it and destroys its data.

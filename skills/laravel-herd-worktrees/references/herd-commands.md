@@ -1,58 +1,42 @@
 # Herd CLI Reference (worktree-relevant subset)
 
-Full docs: https://herd.laravel.com/docs
+Verified against Herd 2.0.3. `herd help <command>` has every flag.
 
-## Site routing
+## Workspaces
 
 | Command | Purpose |
 |---|---|
-| `herd park` | Park the current directory. Every immediate subdir resolves as `<name>.test`. |
-| `herd parked` | List parked directories. |
-| `herd forget` | Unpark current directory. |
-| `herd link [name]` | Serve current directory as `<name>.test` (or dir name if omitted). Use when you don't want to park the parent. |
-| `herd unlink [name]` | Remove a manual link. |
-| `herd links` | List manual links. |
-| `herd open` | Open current site's `.test` URL. |
+| `herd workspace [name]` | Inside a git worktree: serve it as a workspace of the main checkout's site (`name` is ignored; the branch names it). In the main checkout: make a copy-on-write clone on a new branch. |
+| `herd workspace --database=shared\|clone\|empty` | Database mode. `shared` (default) keeps the main database; `clone` copies it; `empty` creates one and runs `migrate` (skip with `--no-migrate`). |
+| `herd workspace --secure` / `--no-secure` | Override the HTTPS setting inherited from the main site. |
+| `herd workspace --json` | Print the workspace record (`url`, `path`, `branch`, `database_name`, ...). |
+| `herd workspaces [--all] [--json]` | List this site's workspaces and the git worktrees not served yet. Also forgets workspaces whose checkout is gone. |
+| `herd workspace:delete [name] --force --keep-files` | Stop serving it without a prompt, keep the checkout for `git worktree remove`. Drops a `clone`/`empty` database unless `--keep-database`. Needs the Herd app running. |
+| `herd workspace:open [name]` | Open it in the browser. |
+| `herd workspace:merge [name]` | Merge its branch into the main checkout's base branch (`--push`, `--delete`). |
 
-For worktrees: **prefer `herd park` on the parent**: zero per-worktree work. Use `herd link` only if siblings include non-Laravel projects you don't want exposed.
+A git worktree not served yet is also served (with the `shared` database) the first time its URL, `<branch>.<site>.test`, is visited.
+
+## Site and database
+
+| Command | Purpose |
+|---|---|
+| `herd site:info` | URL, PHP and Node versions, what `.env` points at, and the site's workspaces. |
+| `herd db:connection` | The database this checkout's `.env` reaches, as a connection URL. |
+| `herd db:create [name]` | Create a database on the server `.env` points at (for SQLite, the file). |
 
 ## PHP version per site
 
 | Command | Purpose |
 |---|---|
-| `herd use php@8.3` | Set global default PHP. |
-| `herd isolate php@8.1` | Override PHP version for the current site only. Persists across `herd restart`. |
-| `herd unisolate` | Remove the per-site override. |
-| `herd isolated` | List all per-site overrides. |
-| `herd which-php` | Show which PHP binary Herd resolves for the current dir. |
+| `herd isolate php@8.1` | Pin the current site's PHP version. A workspace inherits the main site's pin. |
+| `herd unisolate` | Remove the pin. |
+| `herd isolated` | List all pins. |
+| `herd which-php` | The PHP binary Herd resolves for the current directory. |
 
-Use case: a legacy worktree on PHP 8.1 alongside a `main` worktree on 8.3.
+## Troubleshooting a `.test` URL
 
-## Services (Pro)
-
-`herd services` lists managed MySQL/Postgres/Redis/Meilisearch instances. They listen on standard ports, so all worktrees share one server: isolation comes from per-worktree DB names and Redis prefixes, not separate servers.
-
-## Secure (HTTPS)
-
-| Command | Purpose |
-|---|---|
-| `herd secure` | Generate a trusted cert for current site → `https://<name>.test`. |
-| `herd unsecure` | Revert to HTTP. |
-
-If you secure one worktree, secure them all (or none): mixed HTTP/HTTPS confuses cookies on the shared `.test` parent domain.
-
-## Other useful commands
-
-| Command | Purpose |
-|---|---|
-| `herd restart` | Restart Herd's PHP/Nginx/dnsmasq. Run after editing `~/.config/herd/...` config. |
-| `herd log` | Tail Nginx/PHP-FPM logs. |
-| `herd debug` | Toggle Xdebug for current site's PHP. |
-| `herd tinker` | Open Tinker bound to current site's PHP version. |
-
-## Troubleshooting `*.test` not resolving
-
-1. `herd parked`: confirm parent is in the list.
-2. `dscacheutil -flushcache && sudo killall -HUP mDNSResponder`: flush macOS DNS.
-3. Directory name must be lowercase, no spaces, no dots beyond what becomes the subdomain.
-4. `herd restart` if you just upgraded Herd.
+1. `herd workspaces --json`: the worktree is listed with `"served": true` and the URL you are loading.
+2. `herd site:info` inside the worktree: the PHP version and database are the ones you expect.
+3. `php artisan route:list` works inside the worktree.
+4. `dscacheutil -flushcache && sudo killall -HUP mDNSResponder` flushes macOS DNS; `herd restart` after a Herd upgrade.

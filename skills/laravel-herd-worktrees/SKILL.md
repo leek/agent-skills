@@ -1,129 +1,55 @@
 ---
 name: laravel-herd-worktrees
-description: Create, list, or remove git worktrees for Laravel projects served by Laravel Herd on macOS. Use when the user needs a branch worktree, .test URL, or per-worktree PHP/composer isolation.
-compatibility: "macOS with Laravel Herd installed"
+description: Create, serve, or remove git worktrees for Laravel projects served by Laravel Herd on macOS. Use when the user needs a branch worktree, a .test URL for one, or per-worktree database isolation.
+compatibility: "macOS with Laravel Herd 2.0+ (the `herd workspace` command)"
 ---
 
 # Laravel Herd + Git Worktrees
 
-Run multiple branches of a Laravel project in parallel, each reachable at its own `*.test` URL through Laravel Herd, with isolated dependencies, env, database, and caches.
+Run several branches of a Laravel project side by side, each a git worktree that Herd serves at its own `*.test` URL. `herd workspace` run inside a worktree does the setup; this skill owns the recipe around it.
 
 ## Mental Model
 
-- A **worktree** is a sibling directory of the main checkout with its own `HEAD`. Composer/Node deps, `vendor/`, `node_modules/`, `storage/`, and `bootstrap/cache/` are **per-worktree**: never share via symlink.
-- Herd's **parked directory** auto-serves every immediate subdirectory as `<dir>.test`. Park the *parent* of all worktrees once and every new worktree gets a URL for free.
-- `.env` is **untracked**, so it must be re-created in each worktree. `APP_URL`, `DB_DATABASE`, cache prefixes must differ per worktree to prevent cross-branch bleed.
+- A **worktree** has its own `HEAD`, and none of the main checkout's untracked state: no `vendor/`, `node_modules/`, `.env`, or built assets.
+- **`herd workspace` inside a git worktree** serves that checkout as a workspace of the main checkout's site, at `<branch>.<site>.test` (a detached worktree is named after its commit). It copies `.env`; clones `vendor/`, `node_modules/` and `public/build` from the main checkout (only while the lockfile matches); links the host with the main site's HTTPS and PHP version; rewrites `APP_URL`, `SESSION_DOMAIN` and `SANCTUM_STATEFUL_DOMAINS`; clears the config and route caches. Run in the main checkout instead, it makes a copy-on-write clone outside git's worktree list, which no recipe here uses.
+- **Database**: `--database=shared` (the default) keeps the main checkout's database; `clone` and `empty` create `<main db>_<branch>` on the same server (`empty` also migrates), which `herd workspace:delete` drops again.
+- What Herd leaves alone: `composer install` when the lockfile differs, `storage:link`, `.env.testing`, `APP_KEY`, cache and Redis prefixes. A project can cover the last three in a committed `herd.yml`: see [references/isolation.md](./references/isolation.md).
 
-## When to Use This Skill
+## Create a worktree for the user
 
-- User asks to create a worktree for a Laravel app served by Herd.
-- User reports `vendor/`, migrations, cache, or `.env` problems after switching worktrees.
-- User wants per-branch URL like `myapp-feat.test` without manual Nginx/Valet config.
-- User wants the same Laravel project on multiple PHP versions simultaneously.
+1. `git worktree add -b <branch> .claude/worktrees/<name> <base>` (or the path the user names).
+2. Make it runnable with [Bootstrap a bare worktree](#bootstrap-a-bare-worktree), passing `--database=empty` (a fresh migrated database) or `--database=clone` (a copy of the main one) instead of `shared` when the user wants the worktree's data kept apart.
+3. Give the user the `url` and the database Herd reported.
 
-## Workflow
-
-### 1. One-time setup
-
-Park the **parent** directory that holds the main checkout (worktrees become siblings of the main checkout, so they land in the same parked dir):
-
-```bash
-cd ~/Code           # parent of your laravel project
-herd park
-```
-
-Verify:
-
-```bash
-herd parked
-```
-
-Each immediate subdir is now `<name>.test`. Adding a worktree at `~/Code/myapp-feat` makes `myapp-feat.test` resolve immediately.
-
-If parking the parent is not desired (other non-Laravel dirs live there), use explicit `herd link` per worktree instead: see [references/herd-commands.md](./references/herd-commands.md).
-
-### 2. Create a new worktree
-
-Use the helper script. It creates the worktree, copies `.env`, rewrites `APP_URL` + `DB_DATABASE` + cache prefixes, installs deps, generates app key, and runs migrations (when Composer hooks require assets built before `composer install`, follow step 1 of [Bootstrap a bare worktree](#bootstrap-a-bare-worktree)):
-
-```bash
-bash scripts/worktree-new.sh <branch-suffix> <base-branch> [--driver sqlite|mysql|pgsql]
-```
-
-Example:
-
-```bash
-bash scripts/worktree-new.sh feat-billing main --driver sqlite
-```
-
-Result: `../myapp-feat-billing/` exists, `myapp-feat-billing.test` works, isolated DB.
-
-See [scripts/worktree-new.sh](./scripts/worktree-new.sh) for the exact transformations applied to `.env`.
-
-### 3. Remove a worktree
-
-```bash
-bash scripts/worktree-rm.sh <branch-suffix> [--drop-db]
-```
-
-Runs `git worktree remove`, optionally drops the per-worktree DB, and `herd unlink`s if a manual link exists.
-
-### 4. Switch PHP version per worktree (optional)
-
-```bash
-cd ../myapp-legacy
-herd isolate php@8.1
-```
-
-Site uses 8.1; sibling worktrees keep their isolated or default version. `herd isolated` lists all overrides. `herd unisolate` reverts.
+Remove it with [Remove a served worktree](#remove-a-served-worktree).
 
 ## Bootstrap a bare worktree
 
-A worktree made with plain `git worktree add` (the PR, issue, and CI recipes in other skills, at `.claude/worktrees/<name>`) has no `vendor/`, `node_modules/`, or `.env`; nor does one the harness made (`claude --worktree`, a subagent with `isolation: worktree`). With the leek-skills plugin in Claude Code, a session that opens in such a worktree is told so at start; elsewhere, check for `vendor/` yourself before running anything. Make it runnable from inside the worktree, with `main` set to the main checkout (`git worktree list --porcelain | sed -n '1s/^worktree //p'`):
+A worktree made with plain `git worktree add` (the PR, issue, and CI recipes in other skills, at `.claude/worktrees/<name>`) starts bare; so does one the harness made (`claude --worktree`, a subagent with `isolation: worktree`). With the leek-skills plugin in Claude Code, a session that opens in such a worktree is told so at start; elsewhere, check for `vendor/` yourself before running anything. Make it runnable from inside the worktree, with `main` set to the main checkout (`git worktree list --porcelain | sed -n '1s/^worktree //p'`):
 
-1. **Dependencies and assets.** `cp -Rc "$main/vendor" vendor` (an APFS clone: instant, no extra disk), then `composer install` so it matches this branch's lock. Do the same for `node_modules` when the run builds assets. When Composer hooks require generated assets that do not exist yet (such as `@php artisan filament:assets` needing an editor bundle from `npm run build`), run `composer install --no-scripts`, build the assets, then run `composer install`. Each tree owns a real copy: Composer's autoloader resolves `app/` and `tests/` relative to `vendor/`, so a symlinked `vendor/` makes Pest run the main checkout's code.
-2. **Environment.** Copy `.env` (and `.env.testing` when present) from `$main`. When the calling skill gives the run its own database, set `DB_DATABASE` to that name in both. When the worktree lives under `.claude/worktrees/<name>` (not an immediate subdirectory of Herd's parked parent) and the run needs a `.test` URL for HTTP verification, run `herd link <name>` (and `herd secure <name>` when `APP_URL` uses `https://`), then `herd unlink <name>` from inside the worktree before removing it (each skill's worktree removal step says so).
-3. **Proof.** `git rev-parse HEAD` equals the commit the run means to test, and `test ! -L vendor` passes. Run nothing until both hold.
+1. **Serve it.** `herd workspace --database=shared --json`. Keep the `url` it prints: that is the worktree's address for `verify`. `shared` leaves `DB_DATABASE` naming the main checkout's database (for SQLite, its file), so the calling skill's own database (step 3) is the only one created, and the only one its cleanup tracks.
+2. **Dependencies and assets.** `composer install`, so `vendor/` matches this branch's lock (Herd cloned the main checkout's only when the lockfiles were equal). Do the same for `node_modules` when the run builds assets. When Composer hooks require generated assets that do not exist yet (such as `@php artisan filament:assets` needing an editor bundle from `npm run build`), run `composer install --no-scripts`, build the assets, then run `composer install`. Run `php artisan storage:link` when the main checkout has `public/storage` (Herd repoints that link only in its own clones). Each tree owns a real `vendor/`: Composer's autoloader resolves `app/` and `tests/` relative to it, so a symlinked `vendor/` makes Pest run the main checkout's code.
+3. **Test environment and database.** Copy `.env.testing` from `$main` when it exists there and not here. When the calling skill gives the run its own database, set `DB_DATABASE` to that name in `.env` and `.env.testing` before any migration or test.
+4. **Proof.** `git rev-parse HEAD` equals the commit the run means to test, and `test ! -L vendor` passes. Run nothing until both hold.
 
-## Per-Worktree Isolation Rules
+## Remove a served worktree
 
-| Concern | Rule |
-|---|---|
-| `vendor/` | Always per-worktree. Never symlink. |
-| `node_modules/` | Always per-worktree. Never symlink. Use `pnpm` for fastest installs (content-addressable store). |
-| `.env` | Copy from main, rewrite `APP_URL`, `DB_DATABASE`, `CACHE_PREFIX`, `SESSION_COOKIE`, `REDIS_PREFIX`. |
-| `APP_KEY` | Run `php artisan key:generate` in each worktree. |
-| Database | SQLite: per-worktree file. MySQL/Postgres: per-worktree DB name `<app>_<suffix>`. |
-| Redis | Set unique `REDIS_PREFIX` (or different `REDIS_DB` index). |
-| `storage/`, `bootstrap/cache/` | Per-worktree. Run `php artisan optimize:clear` after install. |
-| `storage/app/public` symlink | Re-run `php artisan storage:link` in the new worktree. |
+1. From inside the worktree: `herd workspace:delete --force --keep-files`. `--force` only skips Herd's confirmation; `--keep-files` leaves the checkout for git, since without it Herd runs `git worktree remove --force`. It unlinks the host, removes its certificate and PHP pin, and drops a database Herd created (`clone` or `empty`).
+2. From the main checkout: `git worktree remove <path>`, never with `--force`. When git refuses, the worktree stays for the user; visiting its URL serves it again.
 
-Full rationale: [references/isolation.md](./references/isolation.md).
-DB strategy details (sharing seeds, schema dumps, fresh vs. migrate): [references/db-strategies.md](./references/db-strategies.md).
+When step 1 fails because the Herd app is not running, do step 2, then `herd workspaces --all >/dev/null`: Herd drops the link, certificate and PHP pin of any workspace whose checkout is gone (but not a database it created).
 
-## Common Pitfalls
-
-- **Sharing `vendor/` via symlink**: breaks when branches have different package versions; autoload class maps drift.
-- **Forgetting `php artisan key:generate`**: encrypted cookies/sessions fail silently across worktrees that share `APP_KEY`.
-- **Same `SESSION_COOKIE` across `*.test` siblings**: cookies leak between branches because they share the `.test` parent domain. Set a unique `SESSION_COOKIE` per worktree.
-- **Same Redis DB without prefix**: cache keys collide; one branch invalidates another's cache.
-- **Running `composer install` against a stale `composer.lock`** after rebasing: always re-run install after switching base branches inside a worktree.
-- **Herd not picking up new worktree**: happens if the parent isn't parked or if the worktree directory name contains characters Herd rejects (stick to `[a-z0-9-]`).
-
-## Quick Diagnostics
+## Diagnostics
 
 ```bash
-herd parked              # confirm parent is parked
-herd isolated            # list per-site PHP overrides
-herd which-php           # PHP version Herd resolves for current dir
-git worktree list        # all worktrees + branches
-ls -1 ../ | grep <app>   # worktree dirs as Herd sees them
+herd workspaces --json   # this site's workspaces and unserved worktrees, with URLs
+herd site:info           # URL, PHP version, and what .env points at
+herd db:connection       # the database this checkout's .env reaches
+git worktree list
 ```
 
-If a `.test` URL 404s: check `herd parked` includes the parent, dir name is lowercase, and `php artisan route:list` works inside the worktree.
+Command reference: [references/herd-commands.md](./references/herd-commands.md).
 
 ## Out of Scope
 
-- **Valet**: different tool. Herd-only here.
-- **Linux Herd**: paths and CLI differ; this skill assumes macOS Herd.
-- **Docker / Sail**: covered by other workflows. Worktrees still work but routing is via Docker, not Herd.
+- **Valet**, **Linux**, **Docker / Sail**: this skill assumes Herd on macOS.

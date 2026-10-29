@@ -1,5 +1,5 @@
 interface:
   display_name: "Laravel Herd Worktrees"
-  short_description: "Create, list, or remove git worktrees for Laravel projects served by Laravel Herd on macOS"
+  short_description: "Create, serve, or remove git worktrees for Laravel projects served by Laravel Herd on macOS"
 policy:
   allow_implicit_invocation: true
