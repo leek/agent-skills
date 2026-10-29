@@ -13,6 +13,8 @@ The user does not know which skill fits. Read their situation, then **name one s
 
 If the situation is genuinely ambiguous, ask one question that separates the branches, not a menu of everything.
 
+The rows below are for orientation only. Before saying what a skill does beyond its row, or that a step of it can be skipped, read that installed skill's `SKILL.md`.
+
 ## The pipeline
 
 Most work runs one straight line (**decide → spec → tickets → build**) over `.scratch/<slug>/`. Route by where the user actually is:

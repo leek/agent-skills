@@ -37,7 +37,7 @@ Make it runnable the way step 5's worktree was. When its tests need a database o
 own, name it `<app db>_pr<N>_fix<k>` and register it per
 [Scratch databases](gh-mechanics.md#scratch-databases). Then start one fixer per group
 in one message, in the background (Claude Code: `Agent`, `run_in_background: true`,
-`name: pr-<N>--fix-<k>`; Codex: `spawn_agent` per group, keeping each id, then
+`name: pr-<N>--fix-<k>`; Codex: `spawn_agent` with `fork_turns: "none"` per group, keeping each id, then
 `wait_agent`; elsewhere, any sub-agent the harness offers). Its brief gives the worktree
 path, its findings' step 4 lines with links, its file list, the repo's `AGENTS.md` /
 `CLAUDE.md`, and these rules:

@@ -53,7 +53,7 @@ The baseline is done when you have the test count, the pass/fail list, and the c
 
 Give every test in the area a disposition from the value gate: **Keep**, **Rewrite**, **Move**, or **Delete**, with one line of evidence. A Delete names its reason. When it duplicates a stronger test, it names that test by `file:line`. Read each test and its production owner. A test's name is not evidence. Before you mark a test Delete because it asserts presentation, run `git log` on it: a test that a fix commit added guards that bug, and it stays.
 
-Fan the audit out when the area has more than about 10 files. In Claude Code, dispatch the `leek-skills:test-auditor` agent, one per batch of about 8 files, in parallel. In Codex, use `spawn_agent` with the same brief, then `wait_agent`. Otherwise audit inline. The brief: the batch, the area's other test layers to search for stronger tests, and the value gate file. Check each returned Delete yourself before acting on it. A Delete whose stronger test you cannot find becomes a Keep.
+Fan the audit out when the area has more than about 10 files. In Claude Code, dispatch the `leek-skills:test-auditor` agent, one per batch of about 8 files, in parallel. In Codex, use `spawn_agent` with `fork_turns: "none"` and the same brief, then `wait_agent`. Otherwise audit inline. The brief: the batch, the area's other test layers to search for stronger tests, and the value gate file. Check each returned Delete yourself before acting on it. A Delete whose stronger test you cannot find becomes a Keep.
 
 The audit is done when every test in the area has a checked disposition.
 

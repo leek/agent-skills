@@ -260,3 +260,46 @@ This makes the next action decidable: take the correctness patch first, then cho
 ### Applied, 2026-10-05
 
 All four landed, plus two changes to the recommendation: `distill-sessions` was renamed to `retro` (with a `this` scope for the current session), and `implement-spec` was adopted after all. `autopilot` drives ticketed work through fresh sessions and `implement <spec> all` builds sequentially; neither runs the frontier in parallel. The local version keeps the tracker in the orchestrator, gives each implementer a bootstrapped worktree and its own test database, and cuts tickets first when the spec has none.
+
+---
+
+## Delta check, 2026-10-29
+
+- Upstream `main` now at `a496f5513d4a4cf889bc48e189e579f4b0bdf6aa` (2026-10-29). 37 non-merge commits since `4588b32`; 43 files changed outside `docs/`. No skill added or removed; upstream is now at plugin version 1.3.2 and stops taking new-skill proposals (`SCOPE.md`, `.out-of-scope/`).
+- Local `main` at `2dcc8f0`.
+
+### Worth pulling
+
+1. **Codex sub-agents fork the whole conversation by default.** Upstream now tells every dispatching skill to start each sub-agent "with a fresh context window" ([`7739eae`](https://github.com/mattpocock/skills/commit/7739eaed7f8f3915437a8def198a6d0d7206dbc7)). Verified locally against codex-cli 0.165.0: `spawn_agent` takes `fork_turns` (`"none"` or `"all"`), and an omitted `fork_turns` is a full-history fork. The local `AGENTS.md` Codex column says only `spawn_agent`, so every local Codex dispatch (`code-review`, `implement-spec`, `panel`, `research`, `retro`, the triage skills) currently hands its sub-agent the parent's whole transcript, which defeats the reason the sub-agent exists (an independent read). Fix in one place: the `AGENTS.md` table row becomes `spawn_agent` with `fork_turns: "none"`, then `wait_agent`; the table's "verified against Codex CLI 0.160" note moves to 0.165. Skills that name `spawn_agent` inline (`code-review/SKILL.md:72`, `implement-spec/SKILL.md:77`) get the same flag.
+2. **`wizard/template.sh` fixes** ([`868c4cf`](https://github.com/mattpocock/skills/commit/868c4cf20cb7e08bc805c388ff1f305dbedd261a), [`49dd158`](https://github.com/mattpocock/skills/commit/49dd158d1076134a641b33efb035946536778336)). The local template has none of them. The ones that matter: `write_env` writes values unquoted, so a secret with a space, `#` or `$` breaks `source .env`; a new `.env` is created at the default umask (world-readable) instead of `0600`; `mv` replaces a symlinked `.env` instead of writing through it; `open_url`'s warning is inside the `>/dev/null` group, so the user never sees it; stages run at top level, so editing the script mid-run can break it (`run_wizard` wrapper). Quoting forces the `_existing` decode fix, or re-runs prefill the quotes. Merge by hand: keep the local `ask KEY "Prompt" DEFAULT` prefill (bash 4+ `read -e -i`, plain fallback for macOS bash 3.2) and add upstream's fail-at-EOF.
+3. **`diagnosing-bugs` Phase 5**: after "Watch it fail", when the red was forced by mutating code or a fixture, `diff` against a pristine copy to prove the mutation landed ([`f3fc563`](https://github.com/mattpocock/skills/commit/f3fc5632f401156837ee3872f14fe33ccf1024ea)). Local `skills/diagnosing-bugs/SKILL.md:127` lacks it. One sentence.
+4. **`handoff` temp dir**: name it (`$TMPDIR`, else `/tmp`; `%TEMP%` on Windows) ([`4f4e943`](https://github.com/mattpocock/skills/commit/4f4e9433bbb7c4957ef33b1ea26686fb7c2a4cf4)). Local `skills/handoff/SKILL.md:8` is the old wording; `improve-codebase-architecture` already uses the new one.
+5. **`teach`**: workspace paths resolve from the directory `/teach` ran in, only `*-FORMAT.md` links from the skill folder; and vary which position holds the correct quiz answer ([`ad5400b`](https://github.com/mattpocock/skills/commit/ad5400b930b297b0c0cb231ff1ffe42a7da666aa)). Local `skills/teach/SKILL.md:12` has neither.
+6. **`which-skill`**: read a skill's `SKILL.md` before stating what it does or advising a step be skipped; the route summaries are orientation only ([`954ee7f`](https://github.com/mattpocock/skills/commit/954ee7f)). Local runs on `sonnet`/`low`, which makes stale one-line summaries more likely to be trusted, not less.
+
+### Optional
+
+7. **`tdd` seams**: each proposed seam gets a one-line note on what it catches and what it misses ([`3f59913`](https://github.com/mattpocock/skills/commit/3f599139104dfceabc7754eeb91319802f85e042)). Local already states seams with a one-line *why* (`implement`, `to-spec`); swapping "why" for "catches / misses" is a cheap sharpening.
+8. **`setup` legacy rename**: offer to `git mv` a legacy `CONTEXT.md` / `CONTEXT-MAP.md` to its `GLOSSARY` name ([`ed0de59`](https://github.com/mattpocock/skills/commit/ed0de59eb5de8c2730a650cc69f588ffa64c1040)). *Correction on applying: local `setup/SKILL.md` Section C already drafts this rename; nothing to do.*
+
+### Already covered or not applicable
+
+- `code-review` standards search and foreground sub-agents: local already lists `AGENTS.md`, `CONTRIBUTING.md`, `CODING_STANDARDS.md` and colocated rule files (`code-review/SKILL.md:40-47`) and launches foreground sub-agents.
+- `implement-spec` "a fresh implementer per ticket": local already runs one named implementer per ticket (`<slug>--<NN>`); only the Codex fork default (item 1) applies.
+- `grilling` "word each question so yes accepts the recommendation": local asks through `AskUserQuestion` with the recommendation as the first option, and numbered options in chat; there is no yes/no to misread.
+- GitHub/GitLab tracker template fixes, `to-tickets` sub-issues, `wayfinder` label and placeholder-id rules, `implement` ticket fetch: tracker-backend changes; local is Markdown-only under `.scratch/`.
+- `chief-of-staff` (still in-progress): now keeps memory in a dated, commit-cited wiki ("write history, not the present"). No local equivalent and no action; the dated-claim rule is worth remembering if a local long-running coordinator appears.
+- Repo governance (`SCOPE.md`, `.out-of-scope/`, issue forms, triage workflows, changesets, `install-block`): public-project process. One record conflicts with local by design: upstream refuses the harness's native question tool for grilling; local uses `AskUserQuestion` deliberately. Keep local.
+
+### Recommended pull
+
+One correctness patch: items 1–6. Item 1 first, since it silently changes the behaviour of every Codex sub-agent dispatch. Items 7–8 only if wanted.
+
+### Applied, 2026-10-29
+
+Items 1–7 landed; item 8 was already in place.
+
+- **Codex fork default**: `fork_turns: "none"` is in the `AGENTS.md` table row, with the rule beside it (the verified version is now Codex CLI 0.165), and at all nine `spawn_agent` dispatch sites: `code-review`, `implement-spec`, `panel`, `prune-tests`, `research`, `triage-github-pr` (and its `parallel-fixes.md`), and `wayfinder/references/map-run.md` (two). `closeout` only names `spawn_agent` in a list of jobs, so it is unchanged.
+- **`wizard/template.sh`**: all of upstream's library fixes, merged with the local prefilled `DEFAULT`. `ask` reads with Readline at a terminal on bash 3.2 too, and the prefill still needs bash 4+. Two local deviations from upstream: `RED` stays for stage authors, and `_existing` replaces the escaped quote through a variable, because upstream's `\'` replacement keeps the backslash on macOS `/bin/bash` 3.2. Checked on bash 5 and 3.2: a value with `'`, `#`, `$`, spaces and `"` survives `source .env` and the re-run prefill; a new `.env` is `0600`; writes go through a symlink; `ask` and `ask_secret` return 1 at EOF; `open_url` with no opener shows its warning; the example wizard runs end to end; shellcheck is clean (a file-wide `SC2329` disable covers the helpers a given wizard never calls, now that they sit beside `run_wizard`).
+- **`diagnosing-bugs`, `handoff`, `teach`, `which-skill`**: ported as upstream worded them, adapted to local wording.
+- **Seams**: `tdd`, `implement` and `to-spec` now state each seam with what it catches and what it misses, instead of a one-line why.

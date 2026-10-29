@@ -110,7 +110,7 @@ steps need all three.
    merge method, retargets, and fixes that must flow upward. Otherwise keep the user's
    order.
 2. **Step 1 for all PRs at once.** Dispatch one `pr-reviewer` per PR in the
-   background, in one message (in Codex, one `spawn_agent` each). A stack's integration
+   background, in one message (in Codex, one `spawn_agent` with `fork_turns: "none"` each). A stack's integration
    PR waits for its own turn after the landings, and steps 2–4 skip it until then.
 3. **Steps 2 and 3 for all PRs.** Gather reviews and review state for every PR.
    Where optional waits are allowed, use one wait (as the shipping budget says) for the

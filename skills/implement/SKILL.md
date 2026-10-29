@@ -48,7 +48,7 @@ Finish this step only when the work fits one session, its acceptance criteria ar
 
 ### 2. Choose the seams
 
-Use the ranking and selection rules in the `tdd` skill's **Seams: where tests go** section. Reuse seams already recorded in the spec; otherwise **choose them yourself and state the choice**: one line per seam, no approval round. Seam placement is test structure, which `grilling`'s **What still earns a question** hands to you, and the rules are the single source of truth. Ask only on a genuine fork the rules rank equally where the two placements would make materially different work.
+Use the ranking and selection rules in the `tdd` skill's **Seams: where tests go** section. Reuse seams already recorded in the spec; otherwise **choose them yourself and state the choice**: one line per seam naming what it catches and what it misses, no approval round. Seam placement is test structure, which `grilling`'s **What still earns a question** hands to you, and the rules are the single source of truth. Ask only on a genuine fork the rules rank equally where the two placements would make materially different work.
 
 Finish this step when every acceptance criterion has a seam.
 
