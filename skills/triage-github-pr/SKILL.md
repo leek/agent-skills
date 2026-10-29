@@ -147,7 +147,7 @@ changed invariant is checked across its live sibling paths before the fix batch.
 Run it in a fresh context so the bots cannot frame it. In Claude Code with this plugin
 installed, dispatch `subagent_type=leek-skills:pr-reviewer` with the brief, in the
 background (pass `run_in_background: true` where the Agent tool offers it), while
-gathering review state; its completion notification brings the findings. Elsewhere, use any read-only sub-agent on
+gathering review state; its completion notification brings the findings. In Codex, use `spawn_agent` with `fork_turns: "none"`. Elsewhere, use any read-only sub-agent on
 your strongest model, or review inline before you open the comment surfaces. Record the
 head sha it covered.
 
@@ -214,7 +214,7 @@ the PR head sha as the ref, the line format above, and the checks in this paragr
 In Claude Code with this plugin installed, dispatch
 `subagent_type=leek-skills:finding-verifier` for each batch in parallel; it keeps the
 bots' recurring false premises in project memory, under this repo's `.claude/`.
-Elsewhere, use any read-only sub-agent on a cheaper model, or classify inline. Re-verify
+In Codex, use `spawn_agent` with `fork_turns: "none"`. Elsewhere, use any read-only sub-agent on a cheaper model, or classify inline. Re-verify
 yourself every line that comes back LEGIT or UNSURE.
 
 Then do a second pass: check every LEGIT against the project's auto-dismiss list, and

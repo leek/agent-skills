@@ -43,7 +43,8 @@ For a whole-repo sweep, fan out sub-agents by codebase size:
 Each sub-agent gets the target list, this workflow's sweep instructions, and
 the index section(s) for the lens or lenses it will sweep, nothing more. In Claude
 Code with this plugin installed, dispatch `subagent_type=leek-skills:smell-sweeper`
-(read-only, no project CLAUDE.md, a cheaper model); elsewhere, any read-only
+(read-only, no project CLAUDE.md, a cheaper model); in Codex, `spawn_agent` with `fork_turns: "none"`;
+elsewhere, any read-only
 sub-agent, on the cheapest model the harness lets you pick: the sweep is recall
 only, and verification runs here on the main model.
 

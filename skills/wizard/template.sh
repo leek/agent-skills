@@ -29,6 +29,12 @@ ENV_FILE="${ENV_FILE:-.env}"
 WRITTEN_ENV=()    # KEYs written to ENV_FILE this run
 WRITTEN_SECRET=() # secret NAMEs set this run
 SKIPPED=()        # things we couldn't do (e.g. gh missing)
+_KEPT=" "         # KEYs whose unreadable .env value Enter kept as is
+_WIZ_TMP=""       # write_env's in-flight temp file, removed on any exit
+
+trap '[[ -z "$_WIZ_TMP" ]] || rm -f "$_WIZ_TMP"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # _clear wipes the terminal so only the current step is on screen. No-op when
 # output isn't a terminal, so piped logs stay readable.
@@ -93,18 +99,38 @@ confirm() {
   [[ "$reply" =~ ^[Yy] ]]
 }
 
-# _existing KEY: current value of KEY in ENV_FILE, if any, with write_env's single
-# quotes or a plain dotenv double-quoted value undone.
+# _existing KEY prints KEY's value from ENV_FILE. Returns 1 when KEY is absent,
+# and 2 when it is present but can't be read back safely (escapes, $, quotes, a
+# comment): the caller then keeps that line as is rather than guess at it.
 _existing() {
   [[ -f "$ENV_FILE" ]] || return 1
-  local line value q="'" sq="'\\''"; line=$(grep -E "^${1}=" "$ENV_FILE" | tail -n1) || return 1
+  local line value; line=$(grep -E "^${1}=" "$ENV_FILE" | tail -n1) || return 1
   value="${line#*=}"
-  if [[ "$value" == \'*\' ]]; then value="${value:1:${#value}-2}"; value="${value//"$sq"/$q}"
-  elif [[ "$value" == \"*\" ]]; then
+  if (( ${#value} >= 2 )) && [[ "$value" == \'*\' ]]; then
     value="${value:1:${#value}-2}"
-    [[ "$value" == *[\\\$\"]* ]] && return 1   # escapes, $ or ": can't decode safely; ask again
+    [[ "$value" == *\'* ]] && return 2
+  elif (( ${#value} >= 2 )) && [[ "$value" == \"*\" ]]; then
+    value="${value:1:${#value}-2}"
+    [[ "$value" == *[\\\$\"\`]* ]] && return 2
+  elif [[ "$value" == *[[:space:]\#\\\$\"\'\`]* ]]; then
+    return 2
   fi
   printf '%s' "$value"
+}
+
+# _keep KEY records that Enter kept KEY's unreadable .env line; _unkeep undoes it.
+_keep()   { [[ "$_KEPT" == *" $1 "* ]] || _KEPT+="$1 "; }
+_unkeep() { _KEPT="${_KEPT/ $1 / }"; }
+
+# _dotenv_line KEY VALUE prints the KEY=VALUE line every common dotenv reader
+# (phpdotenv, Node, Docker Compose) and bash `source` read back as VALUE: single
+# quotes, or double quotes when VALUE holds a ' but nothing a double-quoted
+# value would expand or unescape. Returns 1 when no such quoting exists.
+_dotenv_line() {
+  local key="$1" value="$2"
+  if [[ "$value" != *\'* ]]; then printf "%s='%s'" "$key" "$value"
+  elif [[ "$value" != *[\\\$\"\`]* ]]; then printf '%s="%s"' "$key" "$value"
+  else return 1; fi
 }
 
 # ask KEY "Prompt" [DEFAULT] reads a value into $KEY. Visible input
@@ -112,33 +138,38 @@ _existing() {
 # existing .env value on re-runs, else DEFAULT; Enter accepts it. On bash 4+ at
 # a terminal it is prefilled on the input line, editable in place; otherwise it
 # is shown in [brackets]. Fails at EOF with no input.
+#
+# When the existing value can't be read back, Enter keeps that line in ENV_FILE
+# untouched: $KEY is left empty and write_env skips it.
 ask() {
-  local key="$1" prompt="$2" suggested input rc=0 s=$'\001' e=$'\002' p
-  suggested=$(_existing "$key" || true)
-  [[ -n "$suggested" ]] || suggested="${3:-}"
+  local key="$1" prompt="$2" suggested="" hint input rc=0 found=0 s=$'\001' e=$'\002' p
+  suggested=$(_existing "$key") || found=$?
+  if (( found == 2 )); then hint="Enter keeps current"
+  else [[ -n "$suggested" ]] || suggested="${3:-}"; hint="$suggested"; fi
   # \001 / \002 tell Readline the colour codes take no width.
   p="  $s$BOLD$e$prompt$s$RESET$e "
   if [[ -n "$suggested" && -t 0 && "${BASH_VERSINFO[0]}" -ge 4 ]]; then
     read -r -e -i "$suggested" -p "$p" input || rc=1
   else
-    [[ -n "$suggested" ]] && p+="$s$DIM${e}[$suggested]$s$RESET$e "
+    [[ -n "$hint" ]] && p+="$s$DIM${e}[$hint]$s$RESET$e "
     if [[ -t 0 ]]; then
       read -r -e -p "$p" input || rc=1
     else
-      printf '  %s%s%s ' "$BOLD" "$prompt" "$RESET"
+      printf '%s' "${p//[$s$e]/}"
       read -r input || rc=1
     fi
   fi
   if (( rc )) && [[ -z "$input" ]]; then return 1; fi
+  if [[ -z "$input" && found -eq 2 ]]; then _keep "$key"; else _unkeep "$key"; fi
   [[ -z "$input" ]] && input="$suggested"
   printf -v "$key" '%s' "$input"
 }
 
 # ask_secret KEY "Prompt" is like ask, but input is hidden.
 ask_secret() {
-  local key="$1" prompt="$2" current input rc=0
-  current=$(_existing "$key" || true)
-  if [[ -n "$current" ]]; then
+  local key="$1" prompt="$2" current="" input rc=0 found=0
+  current=$(_existing "$key") || found=$?
+  if [[ -n "$current" ]] || (( found == 2 )); then
     printf '  %s%s%s %s[Enter keeps current]%s ' "$BOLD" "$prompt" "$RESET" "$DIM" "$RESET"
   else
     printf '  %s%s%s ' "$BOLD" "$prompt" "$RESET"
@@ -146,23 +177,40 @@ ask_secret() {
   read -rs input || rc=1
   printf '\n'
   if (( rc )) && [[ -z "$input" ]]; then return 1; fi
+  if [[ -z "$input" && found -eq 2 ]]; then _keep "$key"; else _unkeep "$key"; fi
   [[ -z "$input" && -n "$current" ]] && input="$current"
   printf -v "$key" '%s' "$input"
 }
 
-# write_env KEY VALUE upserts KEY='VALUE' into ENV_FILE (replaces any existing
-# line) and sets $KEY. Idempotent. Writes through a symlink, and leaves the
-# file owner-only (0600 on create; group and other access removed on update),
-# since it holds secrets.
+# write_env KEY VALUE upserts KEY into ENV_FILE (replaces any existing line,
+# quoted per _dotenv_line) and sets $KEY. Idempotent. Atomic: it builds the new
+# file beside the real one (following a symlinked ENV_FILE) and renames it into
+# place, so the file is owner-only (0600) and never half-written. A KEY that
+# ask/ask_secret kept as is, or a VALUE no quoting can carry, is left for the
+# human and listed at the end.
 write_env() {
-  local key="$1" value="$2" tmp sq="'\\''"
-  [[ -e "$ENV_FILE" ]] || (umask 077 && : > "$ENV_FILE")
-  tmp=$(mktemp)
-  grep -vE "^${key}=" "$ENV_FILE" > "$tmp" || true
-  printf "%s='%s'\n" "$key" "${value//\'/$sq}" >> "$tmp"
-  chmod go-rwx "$ENV_FILE"
-  cat "$tmp" > "$ENV_FILE"
-  rm -f "$tmp"
+  local key="$1" value="$2" line target link rc=0
+  if [[ -z "$value" && "$_KEPT" == *" $key "* ]]; then
+    note "kept $key in $ENV_FILE as it was"; return 0
+  fi
+  if ! line=$(_dotenv_line "$key" "$value"); then
+    SKIPPED+=("$key in $ENV_FILE (its value holds ' plus \", \\, \$ or a backtick: add it by hand)")
+    warn "skipped $key: no .env quoting carries this value safely; add it by hand"
+    return 0
+  fi
+  target="$ENV_FILE"
+  while [[ -L "$target" ]]; do
+    link=$(readlink "$target")
+    if [[ "$link" == /* ]]; then target="$link"; else target="$(dirname "$target")/$link"; fi
+  done
+  _WIZ_TMP=$(mktemp "$(dirname "$target")/.wizard-env.XXXXXX")
+  if [[ -e "$target" ]]; then grep -vE "^${key}=" "$target" > "$_WIZ_TMP" || rc=$?; fi
+  if (( rc > 1 )) || ! printf '%s\n' "$line" >> "$_WIZ_TMP" || ! mv -f "$_WIZ_TMP" "$target"; then
+    rm -f "$_WIZ_TMP"; _WIZ_TMP=""
+    warn "couldn't write $key to $ENV_FILE; it is unchanged"
+    return 1
+  fi
+  _WIZ_TMP=""
   printf -v "$key" '%s' "$value"
   WRITTEN_ENV+=("$key")
   printf '  %s✓ wrote%s %s → %s\n' "$GREEN" "$RESET" "$key" "$ENV_FILE"
@@ -172,6 +220,11 @@ write_env() {
 # to a warning (and records it) if gh is unavailable or unauthenticated.
 set_secret() {
   local name="$1" value="$2"
+  if [[ -z "$value" ]]; then
+    SKIPPED+=("GitHub secret $name (no value this run: gh secret set $name)")
+    warn "skipped GitHub secret $name: no value to set"
+    return
+  fi
   if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
     if printf '%s' "$value" | gh secret set "$name" >/dev/null 2>&1; then
       WRITTEN_SECRET+=("$name")

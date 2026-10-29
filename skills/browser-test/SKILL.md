@@ -38,7 +38,7 @@ STATE: <path | none>
 ```
 
 In Claude Code with this plugin, dispatch `subagent_type=leek-skills:browser-test-planner`.
-Elsewhere, use a sub-agent on a mid-tier model with the rules in that agent's file (and
+In Codex, use `spawn_agent` with `fork_turns: "none"`. Elsewhere, use a sub-agent on a mid-tier model with the rules in that agent's file (and
 `verify`'s [Process](../verify/SKILL.md#process) for grouped UI, state reversal, and
 calculated reports), or plan inline.
 
@@ -73,7 +73,8 @@ SHOT_DIR: <run_dir>
 
 In Claude Code with this plugin, dispatch `subagent_type=leek-skills:browser-tester` for
 `read` cases and `subagent_type=leek-skills:browser-writer` for confirmed `write` cases.
-A plugin hook blocks every non-read-only command from `browser-tester`. Elsewhere there
+A plugin hook blocks every non-read-only command from `browser-tester`. In Codex, use
+`spawn_agent` with `fork_turns: "none"`. Elsewhere there
 is no hook: use sub-agents on the cheapest model with the rules from those agent files,
 or run the cases inline one by one, and hold them to the read-only rules yourself.
 

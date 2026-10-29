@@ -51,7 +51,8 @@ a breaking change the collector misses is the costliest miss.
    **Inventory**). In Claude Code with this plugin installed, use
    `subagent_type=leek-skills:release-notes-collector` and
    `leek-skills:upgrade-impact-scout`. In plain Claude Code, use `general-purpose` with
-   `model: haiku` for collectors and `model: sonnet` for scouts. Elsewhere, use any
+   `model: haiku` for collectors and `model: sonnet` for scouts. In Codex, use
+   `spawn_agent` with `fork_turns: "none"`. Elsewhere, use any
    sub-agent on the cheapest model for collectors and a mid-tier one for scouts, or run
    them inline one after another. While they run, fetch the official upgrade guide for
    each major version crossed, and run `composer audit` or `npm audit` for advisories

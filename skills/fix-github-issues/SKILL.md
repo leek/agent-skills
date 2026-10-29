@@ -70,7 +70,7 @@ reviewed commit, file:line, body), the ref `origin/<default>`, the line format a
 and the verification rules. In Claude Code with this plugin installed, dispatch
 `subagent_type=leek-skills:finding-verifier` for each batch in parallel; it keeps the
 bots' recurring false premises in project memory, under this repo's `.claude/`.
-Elsewhere, use any read-only sub-agent on a cheaper model, or classify inline when the
+In Codex, use `spawn_agent` with `fork_turns: "none"`. Elsewhere, use any read-only sub-agent on a cheaper model, or classify inline when the
 harness has none. Then re-verify yourself every line that came back LEGIT or UNSURE.
 You read that code for the fix anyway.
 
