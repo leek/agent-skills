@@ -102,8 +102,8 @@ kept local by the user's instruction.
 ## 5. Clean up and report
 
 If step 3 created a worktree and its commits are on `origin/B` (or in the open pull
-request), remove it without asking: `herd workspace:delete --force --keep-files` from inside it if the bootstrap
-served it (per `laravel-herd-worktrees`' **Remove a served worktree**), then `git worktree remove` (no `--force`). If git refuses,
+request), remove it without asking, from the main checkout, by `laravel-herd-worktrees`' **Remove a served worktree**
+(it never forces). If it refuses,
 or the commits are kept local, keep it and ask one yes/no question: "Can I delete the
 worktree I created?" Remove it only on yes, never with `--force`; otherwise name it in
 the report as kept.

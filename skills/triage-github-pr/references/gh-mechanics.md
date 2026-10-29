@@ -130,8 +130,8 @@ A new worktree starts bare (no `vendor/`, no `.env`): make it runnable with `lar
 `git switch <branch>`, or `git switch --detach <sha>`. If git refuses, report it, and
 leave the tree as it is.
 
-At step 7, once the PR shows merged, run `herd workspace:delete --force --keep-files` from inside the worktree if the bootstrap served it (per `laravel-herd-worktrees`' **Remove a served worktree**), then `cd` back to the main checkout and run
-`git worktree remove .claude/worktrees/pr-N` (no `--force`; if git refuses, the tree
+At step 7, once the PR shows merged, `cd` back to the main checkout and remove
+`.claude/worktrees/pr-N` by `laravel-herd-worktrees`' **Remove a served worktree** (it never forces; if it refuses, the tree
 holds unsaved work, so report it instead). A stopped or `--auto`-queued PR keeps its
 worktree unless the user selects it at step 7.
 

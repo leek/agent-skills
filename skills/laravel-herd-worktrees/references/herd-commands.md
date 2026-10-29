@@ -11,7 +11,7 @@ Verified against Herd 2.0.3. `herd help <command>` has every flag.
 | `herd workspace --secure` / `--no-secure` | Override the HTTPS setting inherited from the main site. |
 | `herd workspace --json` | Print the workspace record (`url`, `path`, `branch`, `database_name`, ...). |
 | `herd workspaces [--all] [--json]` | List this site's workspaces and the git worktrees not served yet. Also forgets workspaces whose checkout is gone. |
-| `herd workspace:delete [name] --force --keep-files` | Stop serving it without a prompt, keep the checkout for `git worktree remove`. Drops a `clone`/`empty` database unless `--keep-database`. Needs the Herd app running. |
+| `herd workspace:delete [name] --force --keep-files` | Stop serving it without a prompt, keep the checkout for `git worktree remove`. Drops a `clone`/`empty` database unless `--keep-database`. `name` takes the workspace name or its host (`site`, unique across sites); without it, the current directory must be the checkout root. Needs the Herd app running. |
 | `herd workspace:open [name]` | Open it in the browser. |
 | `herd workspace:merge [name]` | Merge its branch into the main checkout's base branch (`--push`, `--delete`). |
 

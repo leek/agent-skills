@@ -15,7 +15,8 @@
 #     and node_modules/ go with it). `git worktree remove` runs without --force, so git
 #     refuses a dirty tree a second time.
 #   - it is not locked, and it is not the checkout this script runs from.
-# Local branches stay; only the directory goes.
+# Local branches stay; only the directory goes. A Herd-served worktree's link and certificate
+# go too (Herd forgets workspaces whose checkout is gone).
 #
 # Candidate databases (pgsql and mysql, local hosts only), each listed by its exact name,
 # parallel-testing copies (<database>_test_<N>) included as names of their own:
@@ -308,7 +309,13 @@ for p in ${remove_args[@]+"${remove_args[@]}"}; do
     keep "$p" "git worktree remove refused"; failed_wts+=("$p")
   fi
 done
-[ ${#removed[@]} -eq 0 ] || git -C "$main" worktree prune
+if [ ${#removed[@]} -gt 0 ]; then
+  git -C "$main" worktree prune
+  # A worktree Herd served (`herd workspace`) leaves a link, certificate and PHP pin behind;
+  # listing workspaces makes Herd forget the ones whose checkout is gone. Its database, if
+  # Herd created one, is a "worktree" candidate (the worktree's .env names it) for --drop.
+  if command -v herd >/dev/null 2>&1; then herd workspaces --all >/dev/null 2>&1 || true; fi
+fi
 
 for c in ${selected_dbs[@]+"${selected_dbs[@]}"}; do
   IFS=$'\t' read -r conn d w src size host port user pass <<< "$c"

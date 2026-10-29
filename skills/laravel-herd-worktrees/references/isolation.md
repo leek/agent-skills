@@ -30,7 +30,7 @@ Placeholders: `{{domain}}`, `{{scheme}}`, `{{branch}}`, `{{parent}}`, `{{parent_
 ## Database
 
 - **`shared`**: migrations in the worktree change the main checkout's schema. Fine for read-only verification; anything that migrates or seeds needs its own database.
-- **`clone`**: a copy of the main database (`mysqldump` / `pg_dump` when Herd has them, a SQL copy otherwise; SQLite copies the file).
+- **`clone`**: a copy of the main database. PostgreSQL: `CREATE DATABASE ... TEMPLATE`, falling back to `pg_dump` while the main database has other connections. MySQL: `mysqldump` when Herd has it, a table-by-table SQL copy otherwise. SQLite: a copy of the file.
 - **`empty`**: a fresh database, migrated unless `--no-migrate`.
 - **Tests** read `.env.testing` and `phpunit.xml`, which Herd never rewrites: an in-memory SQLite test database needs nothing; a server one needs its own name per worktree.
 
