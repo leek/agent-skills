@@ -264,6 +264,12 @@ first, and leads with a recommendation. Without the Skill tool, follow
 step 5) or a dismissal. The dismissal's evidence is `decided by owner: <answer>`. An
 answer to hold, or a decision that belongs to someone else, is a stop case.
 
+**A hold carries its reason.** When a run stops on a hold, the disposition comment
+records the question, the answer, and what is still undecided, in plain words. A later
+run reads that before asking again. If it asks, the question restates what was held,
+why, and what would release it; a bare "keep the hold on #N?" makes the user ask what
+the hold was.
+
 Completion criterion: every finding has a published verdict and delivery state, the
 second pass is done, and no QUESTION is left without an answer or a stop.
 
