@@ -156,16 +156,11 @@ check "skills naming an agent keep a non-Claude fallback" \
       rg -qi "elsewhere|inline|other harness|plain Claude Code" "$f" || { echo "$f: names an agent without a fallback clause" >&2; exit 1; }
     done'
 
-# 12. Plugin hooks: valid JSON, every script they run exists, the browser-test and review-agent guards hold
-check "hooks.json is valid and every script and mod module it names exists" \
-  python3 -c '
-import json, os, re, sys
-h = json.load(open("hooks/hooks.json"))
-cmds = [k["command"] for gs in h["hooks"].values() for g in gs for k in g["hooks"]]
-missing = [p for c in cmds for p in re.findall(r"\$\{CLAUDE_PLUGIN_ROOT\}/([^\"\s]+)", c) if not os.path.isfile(p)]
-missing += [m for m in h.get("modules", []) if not os.path.isfile(os.path.join("hooks", m))]
-sys.exit(f"hooks.json names missing files: {missing}" if missing else 0)
-'
+# 12. Plugin manifests and hooks pass Claude Code's own validator (valid JSON, mod modules exist),
+#     and the browser-test and review-agent guards hold. This script never names a mod file itself:
+#     the plugin directory holds any command that names one for manual review.
+check "claude plugin validate passes the directory profile" \
+  claude plugin validate . --profile directory
 check "browser-test guard tests pass" \
   python3 -m unittest -q skills/browser-test/scripts/test_guard_browser.py
 check "review-agent guard tests pass" \

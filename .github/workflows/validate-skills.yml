@@ -127,4 +127,5 @@ jobs:
       - name: Run the collection verifier
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq ripgrep
+          npm install -g --silent @anthropic-ai/claude-code
           bash scripts/verify-skills-collection.sh
