@@ -33,10 +33,13 @@ session's uncommitted work. One release, one version, one tag, one GitHub releas
    step 2 does and continue. Otherwise say so and stop. Bump from `$0` when given; otherwise from the
    subjects: `!` or `BREAKING CHANGE` → major (minor while still `0.x`), any `feat` → minor,
    anything else → patch. Done when the new version is stated with the rule that chose it.
-4. **Bump the version file.** Find the one file whose version string equals the last tag:
-   `.claude-plugin/marketplace.json`, `package.json`, `pyproject.toml`, `Cargo.toml`,
-   `VERSION`, or whatever the repo uses. Replace exactly that string; assert it matched once.
-   Commit it alone: `git commit --only -m "chore(release): <version>: <summary>" -- <file>`.
+4. **Bump the version files.** Find every file whose version string equals the last tag:
+   `.claude-plugin/marketplace.json`, `.claude-plugin/plugin.json`, `package.json`,
+   `pyproject.toml`, `Cargo.toml`, `VERSION`, or whatever the repo uses. A repo can keep
+   the same version in more than one (this one keeps it in both `.claude-plugin` files), and
+   a file left behind stops installs from updating. In each, replace exactly that string;
+   assert it matched once. Commit them alone, in one commit:
+   `git commit --only -m "chore(release): <version>: <summary>" -- <file> …`.
    The summary is `$1` when given, otherwise the headline change in six words or fewer,
    matching the style of earlier release commits. A repo with no version file is
    versioned by its tags alone; skip the commit. Done when `HEAD` is the release commit or

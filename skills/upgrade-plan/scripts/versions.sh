@@ -81,7 +81,10 @@ else
   latest=$(jq -r '."dist-tags".latest' "$tmp/meta.json")
   [[ -n "$target" ]] || target="$latest"
   jq -r '.versions | keys[]' "$tmp/meta.json" | stable | between "$installed" "$target" > "$tmp/between"
-  repo=$(curl -sfL "https://registry.npmjs.org/$pkg/$target" | jq -r '.repository.url // .repository // empty' || true)
+  repo=""
+  if curl -sfL "https://registry.npmjs.org/$pkg/$target" -o "$tmp/target.json"; then
+    repo=$(jq -r '.repository.url // .repository // empty' "$tmp/target.json" || true)
+  fi
   requires=$(jq --arg t "$target" '.versions[$t] | (.dependencies // {}) + {engines: (.engines // {})}' "$tmp/meta.json")
   peers=$(jq --arg t "$target" '.versions[$t].peerDependencies // {}' "$tmp/meta.json")
   have='{}'

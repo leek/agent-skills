@@ -102,6 +102,14 @@ if skills != disk:
     sys.exit(1)
 PY
   '
+check "plugin.json and marketplace.json versions match" \
+  python3 -c '
+import json, sys
+p = json.load(open(".claude-plugin/plugin.json")).get("version")
+m = json.load(open(".claude-plugin/marketplace.json"))["metadata"]["version"]
+if p != m:
+    sys.exit(f"plugin.json {p} != marketplace.json {m}")
+'
 
 # 10. AGENTS no phantom spec/ dir; multi-agent wording
 check "AGENTS has no dangling spec/ layout" \
