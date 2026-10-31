@@ -26,6 +26,13 @@ production environment. `list_issues` (status `open`, sorted by last seen) is th
 working set. `get_issue` returns the stack trace, code context, occurrence stats, and
 execution context.
 
+A `get_issue` that errors ("Server Error") or is too large to read is a problem with
+that one issue's payload, not with the environment. Retry it once at most. Do not walk
+the `list_environments` ids through `environment_id`: an issue lives only in the
+environments its own `get_issue` lists, and any other id returns "Environment … not
+found for this issue". Work from its `list_issues` summary and the other issues in its
+cluster, and name it as unread in the report.
+
 An empty application list or issue list can mean collection is off, not that production
 is healthy. Check the project context (or the infra config) and report "collection is
 off" when that is the cause.
