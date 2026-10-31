@@ -83,12 +83,12 @@ Stage-specific **Next** conditions (only those that apply, most likely first):
 
 **After charting:**
 
-- **Map charted with a frontier** → `/clear`, then `/wayfinder <map>` to resolve the first frontier ticket; name it (research tickets already resolved point at their findings files). Offer `/wayfinder <map> all` beside it to work the whole map in one run
+- **Map charted with a frontier** → `/wayfinder <map>` to resolve the first frontier ticket; name it (research tickets already resolved point at their findings files). Offer `/wayfinder <map> all` beside it to work the whole map in one run
 - **Charting found no unresolved decision tickets** → no map needed: `/to-spec`, or `/to-tickets` if the shape is already clear
 
 **After working a ticket:**
 
-- **Map still has open tickets** → `/clear`, then `/wayfinder <map>` for the next frontier ticket (or **resume your own claimed ticket first** if you stopped mid-ticket, see below); name it and say how many remain. Offer `/wayfinder <map> all` beside it for the rest
+- **Map still has open tickets** → `/wayfinder <map>` for the next frontier ticket (or **resume your own claimed ticket first** if you stopped mid-ticket, see below); name it and say how many remain. Offer `/wayfinder <map> all` beside it for the rest
 - **Map is clear** → `/to-spec <map>`, run once; that writes the spec and closes the map
 - **Map is clear and the effort turned out genuinely small** → `/to-tickets <map>`, skipping the spec
 - **Ticket blocked on someone else's knowledge** → `/to-questionnaire`; **on a fact worth reading for** → `/research`

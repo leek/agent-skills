@@ -20,7 +20,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
   tickets/      # /to-tickets: one file per build ticket
 ```
 
-`/implement` then builds one file from `tickets/` per fresh session. `triage` is the other on-ramp. There is no external issue tracker; every artifact is a markdown file.
+`/implement` then builds one file from `tickets/` per run. `triage` is the other on-ramp. There is no external issue tracker; every artifact is a markdown file.
 
 | Skill | Invocation | What it does |
 |---|---|---|

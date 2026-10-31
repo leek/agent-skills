@@ -1,6 +1,6 @@
 # Map run
 
-A **map run** (`/wayfinder <map> all`) works every ticket of one map in this session, in frontier order, until the map is clear. Each ticket still gets its own claim, its own resolution, and the same steps as **Work through the map**: the run only removes the `/clear` and re-invoke between them. Use it when most tickets need one or two answers from the user; a map whose tickets each need a long grilling or a prototype still reads better one per session.
+A **map run** (`/wayfinder <map> all`) works every ticket of one map in this session, in frontier order, until the map is clear. Each ticket still gets its own claim, its own resolution, and the same steps as **Work through the map**: the run only removes the re-invoke between them. Use it when most tickets need one or two answers from the user; a map whose tickets each need a long grilling or a prototype still reads better one per session.
 
 The tracker is the run's memory. A closed ticket's `## Resolution` holds everything later tickets need, so nothing about it has to stay in context: fetch it again when a later ticket depends on it, the same as a fresh session would.
 

@@ -98,7 +98,7 @@ Leave every parent open; a ticket never closes its spec, and `implement` never t
 
 For trackable work, re-read the markdown file after writing it and verify its frontmatter reads `status: closed` with a `## Resolution` section.
 
-Finish when the implementation commits and any separate resolution commit are recorded and the tracker's final state is verified, or the conversation-only result is reported. Then stop; any next work item gets a fresh session with a clean context.
+Finish when the implementation commits and any separate resolution commit are recorded and the tracker's final state is verified, or the conversation-only result is reported. Then stop; the next work item is a new `implement` run, never a continuation of this one.
 
 ## When you're done
 
@@ -116,10 +116,10 @@ Stage-specific **Next** conditions (only those that apply, most likely first):
 
 - **A PR is open and review bots are still running** → `/resolve-review-comments <PR>` once they post; name the PR and the worktree path
 - **A stack of PRs is open** → `/triage-github-pr <every PR, bottom-up>` to land it bottom-up with merge commits
-- **More frontier tickets on the parent spec** → `/clear`, then `/implement <next frontier ticket>` (resume your own claimed-but-unfinished ticket first if you stopped mid-work), or `/implement <spec path> all` to build the rest in one run, or `/implement-spec <spec path>` to build them in parallel; name it and how many remain
+- **More frontier tickets on the parent spec** → `/implement <next frontier ticket>` (resume your own claimed-but-unfinished ticket first if you stopped mid-work), or `/implement <spec path> all` to build the rest in one run, or `/implement-spec <spec path>` to build them in parallel; name it and how many remain
 - **Every ticket on the spec is closed** → nothing to run; say the spec is complete and name anything deferred out of scope
 - **Only the delivery ticket is open, at `ready-for-human`** → deploy, then `/implement <delivery ticket>` for its after-deploy steps; list them
-- **After-deploy items wait on a time** → `/implement <delivery ticket>` after that UTC time; name the items, and offer to schedule it per the end block's rule 6
+- **After-deploy items wait on a time** → `/implement <delivery ticket>` after that UTC time; name the items, and offer to schedule it per the end block's rule 7
 - **Remaining tickets are all blocked** → `/implement <the blocker>` first, or `/grill-me` if the blocker is a decision
 - **The build exposed a decision nobody made** → `/grill-me` on it, then re-run `/to-spec` if the spec is now wrong
 - **Verification is externally blocked** → keep the work item open and name the exact unblock condition
