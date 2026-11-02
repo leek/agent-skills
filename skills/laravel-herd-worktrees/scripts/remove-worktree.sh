@@ -41,16 +41,26 @@ removed=0; reason=""; branch_deleted=0; branch_reason=""; herd_failed=null
 if [ -n "$(git -C "$wt" status --porcelain)" ]; then
   reason="uncommitted or untracked changes"
 else
+  # The site comes from Herd's own state for this exact path, never from the checkout:
+  # a branch could commit a .herd-workspace.json naming another site. The database
+  # name from that file is used only when it is untracked and registered for this path.
+  site=""; mode=shared; hdb=""
+  if command -v herd >/dev/null 2>&1; then
+    site=$(herd workspaces --all --json 2>/dev/null | jq -r --arg p "$wt" '[.[]? | select(.path == $p and .served == true) | .site] | first // empty' 2>/dev/null) || site=""
+  fi
   meta="$wt/.herd-workspace.json"
-  if [ -f "$meta" ] && command -v herd >/dev/null 2>&1; then
-    site=$(jq -r .site "$meta")
-    mode=$(jq -r '.database_mode // "shared"' "$meta")
-    hdb=$(jq -r '.database_name // empty' "$meta")
-    if herd workspace:delete "$site" --force --keep-files >&2; then
+  if [ -n "$site" ] && [ -f "$meta" ] && ! git -C "$wt" ls-files --error-unmatch .herd-workspace.json >/dev/null 2>&1; then
+    mode=$(jq -r '.database_mode // "shared"' "$meta" 2>/dev/null || echo shared)
+    hdb=$(jq -r '.database_name // empty' "$meta" 2>/dev/null || true)
+    registered=$(bash "$here/scratch-db.sh" list "$wt" | jq -r --arg d "$hdb" 'map(select(.database == $d)) | length')
+    [ "$registered" -gt 0 ] || hdb=""
+  fi
+  if [ -n "$site" ]; then
+    if herd workspace:delete --force --keep-files -- "$site" >&2; then
       echo ">> unserved $site" >&2
       case "$mode" in clone|empty) [ -n "$hdb" ] && bash "$here/scratch-db.sh" unregister "$hdb" ;; esac
     else
-      echo ">> herd workspace:delete failed; a $mode database $hdb, if any, still needs dropping" >&2
+      echo ">> herd workspace:delete failed for $site" >&2
       herd_failed="{\"database_mode\":$(json_str "$mode"),\"database_name\":$(json_str "$hdb")}"
     fi
   fi

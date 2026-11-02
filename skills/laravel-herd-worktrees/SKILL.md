@@ -38,7 +38,7 @@ A worktree made with plain `git worktree add` (the PR, issue, and CI recipes in 
 From the main checkout (or, for `implement-spec`, the integration checkout `git branch -d` checks against), run [`scripts/remove-worktree.sh`](scripts/remove-worktree.sh) `<path>`, adding `--branch <name>` when the run's branch goes too. It works in the safe order and prints one JSON line:
 
 1. **Clean check.** A worktree with any `git status --porcelain` output stays, with its branch and databases: `removed: false` and the reason. The calling skill's rule for a refused removal applies.
-2. **Unserve.** With `.herd-workspace.json`, `herd workspace:delete <site> --force --keep-files` (Herd's `--force` only skips a prompt; `--keep-files` leaves the checkout for git). Herd drops a database it created (`clone` or `empty`), and the script unregisters it.
+2. **Unserve.** When Herd's own `herd workspaces --all --json` serves this exact path, `herd workspace:delete --force --keep-files -- <site>` with that site (never a site read from the checkout, which a branch could plant) (Herd's `--force` only skips a prompt; `--keep-files` leaves the checkout for git). Herd drops a database it created (`clone` or `empty`), and the script unregisters it.
 3. **Remove.** `git worktree remove <path>`, never with `--force`. When git refuses, everything stays; visiting its URL serves it again.
 4. **Branch.** `git branch -d <name>` only after a removal; a refusal keeps the branch, named in `branch_reason`. Git's `-D` hint is not a go-ahead.
 
