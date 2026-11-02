@@ -102,3 +102,16 @@ test('scan finds efforts, skips research/ and status-less notes, ranks ready wor
   const one = await scan(fs, '/r/.scratch', NOW, 'done')
   expect(one.efforts.map(e => e.slug)).toEqual(['done'])
 })
+
+test('scan counts every closed word, and the repo\'s custom wontfix string, as closed', async () => {
+  const fs = reader({
+    '/r/.agents/triage-labels.md': '| Role | Status | Meaning |\n| `wontfix` | `not-planned` | Will not be actioned |\n',
+    '/r/.scratch/a/tickets/01-a.md': ticket('done'),
+    '/r/.scratch/a/tickets/02-b.md': ticket('resolved'),
+    '/r/.scratch/a/tickets/03-c.md': ticket('duplicate'),
+    '/r/.scratch/a/tickets/04-d.md': ticket('declined'),
+    '/r/.scratch/a/tickets/05-e.md': ticket('not-planned'),
+  })
+  const board = await scan(fs, '/r/.scratch', NOW)
+  expect(board.efforts[0]?.state).toBe('done')
+})

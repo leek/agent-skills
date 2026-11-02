@@ -207,7 +207,9 @@ files = sorted(glob.glob("skills/**/*.md", recursive=True)) + ["README.md", "AGE
 for root_file in files:
     content = open(root_file, encoding="utf-8").read()
     content = re.sub(r"```.*?```", "", content, flags=re.S)
-    content = re.sub(r"`[^`\n]+`", "", content)
+    # Blank inline code to a placeholder, not to nothing, so a link whose label is code,
+    # [`path`](path), keeps a non-empty label and is still checked.
+    content = re.sub(r"`[^`\n]+`", "code", content)
     base = os.path.dirname(root_file)
     for m in re.finditer(r"\[[^\]]+\]\(([^)#\s]+)(?:#[^)]*)?\)", content):
         target = m.group(1).strip()
@@ -224,6 +226,30 @@ if bad:
 # 6. Junk
 check "no skills/.DS_Store" test ! -e skills/.DS_Store
 check "no skills/.gitkeep" test ! -e skills/.gitkeep
+
+# 6b. Earlier audit regressions: each once shipped, so each stays pinned
+check "tracker dialect clean" \
+  bash -c "! rg -q 'AFK-ready label|publish it to the project.s issue tracker|shared map.*issue tracker|create the label if it doesn' skills/to-spec skills/triage skills/wayfinder"
+check "merge-conflicts has title" \
+  grep -q '^# Resolving Merge Conflicts' skills/resolving-merge-conflicts/SKILL.md
+check "merge-conflicts description unquoted" \
+  bash -c "! grep -q '^description: \"' skills/resolving-merge-conflicts/SKILL.md"
+check "dependency-audit exists" test -d skills/dependency-audit
+check "weekly-composer removed" test ! -d skills/weekly-composer-dependency-audit
+check "weekly-npm removed" test ! -d skills/weekly-npm-dependency-audit
+check "marketplace lists dependency-audit once" \
+  bash -c 'n=$(rg -c "dependency-audit" .claude-plugin/marketplace.json); test "$n" -eq 1'
+check "marketplace omits old weekly names" \
+  bash -c '! rg -q "weekly-composer-dependency-audit|weekly-npm-dependency-audit" .claude-plugin/marketplace.json'
+check "wayfinder SKILL.md <= 120 lines" \
+  bash -c 'n=$(wc -l < skills/wayfinder/SKILL.md | tr -d " "); test "$n" -le 120'
+check "wayfinder map-and-tickets ref" test -f skills/wayfinder/references/map-and-tickets.md
+check "wayfinder ticket-types ref" test -f skills/wayfinder/references/ticket-types.md
+check "wayfinder fog-and-scope ref" test -f skills/wayfinder/references/fog-and-scope.md
+check "AGENTS has no dangling spec/ layout" \
+  bash -c '! rg -q "^spec/" AGENTS.md'
+check "marketplace description not Claude-only product claim" \
+  bash -c '! rg -q "for Claude\"" .claude-plugin/marketplace.json'
 
 # 7. Pipeline end-block SSOT and code-review portability
 check "pipeline-end-block reference exists" \
@@ -373,9 +399,14 @@ check "scratch-state.sh classifies open, mismatched, and done efforts" \
       printf -- "---\ntitle: S\nstatus: closed\n---\n" > .scratch/bad/spec.md
       printf -- "---\ntitle: T\nstatus: closed\n---\n## Resolution\ndeadbeef1\n" > .scratch/bad/tickets/01-a.md
       printf -- "---\ntitle: T\nstatus: ready-for-agent\n---\n" > .scratch/open/tickets/01-a.md
+      mkdir -p .agents .scratch/shut/tickets sub
+      printf -- "| Role | Status | Meaning |\n| \`wontfix\` | \`not-planned\` | Will not be actioned |\n" > .agents/triage-labels.md
+      printf -- "---\ntitle: T\nstatus: duplicate\n---\n" > .scratch/shut/tickets/01-a.md
+      printf -- "---\ntitle: T\nstatus: not-planned\n---\n" > .scratch/shut/tickets/02-b.md
+      printf -- "---\ntitle: T\nstatus: closed\n---\n## Comments\nCI run 18234567890 green\n" > .scratch/shut/tickets/03-c.md
     )
-    out=$(cd "$t" && bash "$ROOT/skills/scratch-status/scripts/scratch-state.sh")
-    python3 -c "import json, sys; d = json.loads(sys.argv[1]); assert d[\"counts\"] == {\"open\": 1, \"stale\": 0, \"mismatched\": 1, \"done\": 1}, d[\"counts\"]" "$out"'
+    out=$(cd "$t/sub" && bash "$ROOT/skills/scratch-status/scripts/scratch-state.sh")
+    python3 -c "import json, sys; d = json.loads(sys.argv[1]); assert d[\"counts\"] == {\"open\": 1, \"stale\": 0, \"mismatched\": 1, \"done\": 2}, d[\"counts\"]; assert \"⚠\" not in sys.argv[1]" "$out"'
 
 if [[ "$fail" -ne 0 ]]; then
   echo "verify-skills-collection: FAILED" >&2

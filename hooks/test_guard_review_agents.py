@@ -4,12 +4,11 @@ import sys
 import unittest
 from pathlib import Path
 
-GUARD = Path(__file__).with_name("guard-review-agents.py")
 DISPATCHER = Path(__file__).with_name("shell_guard.py")
 
 
 class GuardReviewAgentsTest(unittest.TestCase):
-    def guard(self, command, agent="leek-skills:finding-verifier", script=GUARD):
+    def guard(self, command, agent="leek-skills:finding-verifier", script=DISPATCHER):
         payload = {"tool_name": "Bash", "tool_input": {"command": command}}
         if agent:
             payload["agent_type"] = agent
@@ -27,7 +26,7 @@ class GuardReviewAgentsTest(unittest.TestCase):
 
     def test_other_callers_pass_through(self):
         self.assertAllowed("rm -rf build", agent=None)
-        self.assertAllowed("git commit -m x", agent="leek-skills:browser-tester")
+        self.assertAllowed("git commit -m x", agent="leek-skills:browser-writer")
 
     def test_read_only_commands_pass(self):
         for agent in ("leek-skills:finding-verifier", "leek-skills:pr-reviewer"):
@@ -40,6 +39,24 @@ class GuardReviewAgentsTest(unittest.TestCase):
             self.assertAllowed("gh api graphql -f query='query { viewer { login } }'", agent=agent)
             self.assertAllowed("gh api -X GET search/code -f q=Foo", agent=agent)
             self.assertAllowed("find app -name '*.php' | wc -l", agent=agent)
+
+    def test_quoted_and_escaped_operators_are_data(self):
+        self.assertAllowed(r"find . \( -name '*.py' -o -name '*.sh' \) -type f")
+        self.assertAllowed("rg -F '(' app")
+        self.assertAllowed("grep -c ')' app/Foo.php")
+        self.assertAllowed("rg -n 'files=(' scripts/")
+        self.assertAllowed("grep '>' notes.md | head -3")
+        self.assertAllowed('rg -n "a|b;c&d" app')
+        self.assertAllowed("git log \\\n  --oneline -5")
+        self.assertAllowed("gh api graphql -f query='\nquery {\n  viewer { login }\n}'")
+        self.assertAllowed("sort -u -k2 notes.txt | uniq -c")
+
+    def test_substitution_inside_double_quotes_is_blocked(self):
+        self.assertBlocked('echo "$(rm -rf x)"', "command substitution")
+        self.assertBlocked('echo "`rm -rf x`"', "command substitution")
+        self.assertBlocked('echo "${(e):-\\$(rm x)}"', "command substitution")
+        self.assertBlocked("echo $'\\x41'", "quoting is not allowed")
+        self.assertBlocked("echo 'unterminated", "no closing quotation")
 
     def test_writes_are_blocked(self):
         self.assertBlocked("git commit -m x", "not a read-only git command")
@@ -60,6 +77,12 @@ class GuardReviewAgentsTest(unittest.TestCase):
         self.assertBlocked("echo *(e:'rm -rf /':)", "subshells and glob qualifiers")
         self.assertBlocked("curl https://example.com", "`curl` is not allowed")
         self.assertBlocked("bash -c 'rm x'", "`bash` is not allowed")
+        self.assertBlocked("sort -o out.txt notes.txt", "write files")
+        self.assertBlocked("sort -uo out.txt notes.txt", "write files")
+        self.assertBlocked("sort --compress-program=sh notes.txt", "run a program")
+        self.assertBlocked("uniq notes.txt out.txt", "writes a file")
+        self.assertBlocked("git grep -Ovim foo", "runs a program")
+        self.assertBlocked("git grep --open-files-in-pager=sh foo", "runs a program")
 
     def test_dispatcher_routes_review_and_browser_agents(self):
         self.assertAllowed("rm -rf build", agent=None, script=DISPATCHER)

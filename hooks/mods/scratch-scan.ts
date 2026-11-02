@@ -10,7 +10,9 @@ export type Reader = {
   read: (path: string) => Promise<string>
 }
 
-const CLOSED = new Set(['closed', 'wontfix'])
+// Mirrors load_closed_vocabulary in skills/scratch-status/scripts/scratch-state.sh.
+const WONTFIX = ['wontfix', 'declined', 'duplicate']
+const CLOSED = new Set(['closed', 'done', 'resolved', ...WONTFIX])
 const STALE_MS = 30 * 24 * 60 * 60 * 1000
 const TICKET_DIRS: Record<string, ScratchKind> = {
   decisions: 'decision',
@@ -141,8 +143,30 @@ function rank(effort: ScratchEffort): number {
   return effort.frontier.length > 0 ? 0 : 1
 }
 
+// The repo's own wontfix status string, from the setup table row | `wontfix` | `<string>` | … |.
+export function wontfixLabels(labelsText: string): string[] {
+  return [...labelsText.matchAll(/^\|\s*`wontfix`\s*\|\s*`([^`]+)`/gim)].map(m => (m[1] ?? '').trim().toLowerCase())
+}
+
+async function readLabels(fs: Reader, root: string): Promise<string[]> {
+  const repo = root.replace(/\/\.scratch\/?$/, '')
+  for (const candidate of ['.agents/triage-labels.md', 'docs/agents/triage-labels.md']) {
+    try {
+      const text = await fs.read(`${repo}/${candidate}`)
+      if (text !== '') {
+        return wontfixLabels(text)
+      }
+    } catch {
+      // Missing file: try the next location.
+    }
+  }
+
+  return []
+}
+
 export async function scan(fs: Reader, root: string, now: number, only = ''): Promise<ScratchBoard> {
   const efforts: ScratchEffort[] = []
+  const customWontfix = new Set((await readLabels(fs, root)).filter(label => !CLOSED.has(label)))
   const dirs = (await fs.list(root)).filter(
     d => d.kind === 'dir' && d.name !== 'research' && !d.name.startsWith('.') && (only === '' || d.name === only),
   )
@@ -167,6 +191,10 @@ export async function scan(fs: Reader, root: string, now: number, only = ''): Pr
     const files: ScratchFile[] = []
     for (const f of found) {
       const parsed = parseFile(f.path, f.kind, await fs.read(`${base}/${f.path}`))
+      if (customWontfix.has(parsed.status)) {
+        // The repo's custom wontfix string plays the wontfix role.
+        parsed.status = 'wontfix'
+      }
       // A loose markdown file with no status is a note, not a triage request.
       if (f.kind !== 'request' || parsed.status !== '') {
         files.push(parsed)

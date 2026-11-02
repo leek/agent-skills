@@ -8,6 +8,7 @@ import unittest
 from pathlib import Path
 
 GUARD = Path(__file__).with_name("guard-browser.py")
+DISPATCHER = Path(__file__).resolve().parents[3] / "hooks" / "shell_guard.py"
 PROBE = runpy.run_path(str(GUARD))["PROBE"]
 RUN = "20260927-120000"
 S = f"agent-browser --session bt-{RUN}-1"
@@ -30,7 +31,7 @@ class GuardBrowserTest(unittest.TestCase):
         payload = {"tool_name": "Bash", "tool_input": {"command": command}, "cwd": str(self.cwd)}
         if agent:
             payload["agent_type"] = agent
-        return subprocess.run([sys.executable, str(GUARD)], input=json.dumps(payload),
+        return subprocess.run([sys.executable, str(DISPATCHER)], input=json.dumps(payload),
                               text=True, capture_output=True)
 
     def assertAllowed(self, command, **kw):
@@ -103,6 +104,8 @@ class GuardBrowserTest(unittest.TestCase):
             (f"{S} snapshot\rrm x", "multi-line"),
             (f"{S} snapshot *(e:'rm x':)", "subshells and glob qualifiers"),
             (f"{S} snapshot | tee out.txt", "`tee` is not allowed"),
+            (f"{S} snapshot | sort -o out.txt", "write files"),
+            (f"{S} snapshot | uniq - out.txt", "writes a file"),
         ]:
             with self.subTest(cmd=cmd):
                 self.assertBlocked(cmd, reason)

@@ -2,20 +2,18 @@
 """PreToolUse guard for the PR-review agents (finding-verifier, pr-reviewer).
 
 Both agents read untrusted text: review comments, bot findings, and the PR diff.
-Their bodies say read-only; this hook enforces it. Dispatched via
-hooks/shell_guard.py (or directly), it exits 0 at once unless the caller's
-agent_type is one of GUARDED. For those, every segment of the command (split on
-&&, ||, ;, |) must be a read-only git, gh, rg, find, or text command under both
-bash and zsh rules. Anything else exits 2, which blocks the call and shows
-stderr to the agent.
+Their bodies say read-only; this hook enforces it. hooks/shell_guard.py calls
+run_payload only for those agents' shell calls. Every segment of the command
+(split on &&, ||, ;, |) must be a read-only git, gh, rg, find, or text command
+under both bash and zsh rules. Anything else returns 2, which blocks the call and
+shows stderr to the agent.
 """
 
-import json
 from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from shell_guard import Blocked, REVIEW_GUARDED as GUARDED, parse_command, segments  # noqa: E402
+from shell_guard import Blocked, check_filter, parse_command  # noqa: E402
 
 FILTERS = {"cat", "head", "tail", "wc", "sort", "uniq", "cut", "tr", "echo", "ls", "jq",
            "grep", "egrep", "cd", "pwd", "basename", "dirname", "true"}
@@ -32,6 +30,10 @@ def check_git(args: list[str]) -> None:
         args = args[2:] if args[0] == "-C" else args[1:]
     if not args or args[0] not in GIT_READ:
         raise Blocked(f"`git {args[0] if args else ''}` is not a read-only git command")
+    if args[0] == "grep" and any(
+            a.startswith("--open-files-in-pager") or (a.startswith("-") and not a.startswith("--") and "O" in a)
+            for a in args[1:]):
+        raise Blocked("`git grep -O` runs a program")
     for a in args[1:]:
         if a.startswith(("--output", "--upload-pack", "--ext-diff", "--exec")):
             raise Blocked(f"`git {args[0]} {a}` writes files or runs a program")
@@ -88,6 +90,7 @@ def check(command: str) -> None:
     for seg in parts:
         name, args = seg[0], seg[1:]
         if name in FILTERS:
+            check_filter(name, args)
             continue
         if name == "git":
             check_git(args)
@@ -102,9 +105,6 @@ def check(command: str) -> None:
 
 
 def run_payload(payload: dict) -> int:
-    agent = (payload.get("agent_type") or "").rsplit(":", 1)[-1]
-    if agent not in GUARDED or payload.get("tool_name", "Bash") != "Bash":
-        return 0
     command = (payload.get("tool_input") or {}).get("command", "")
     try:
         check(command)
@@ -114,11 +114,3 @@ def run_payload(payload: dict) -> int:
               file=sys.stderr)
         return 2
     return 0
-
-
-def main() -> int:
-    return run_payload(json.load(sys.stdin))
-
-
-if __name__ == "__main__":
-    sys.exit(main())

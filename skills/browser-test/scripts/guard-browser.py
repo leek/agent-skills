@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """PreToolUse guard for the browser-test read-only agents.
 
-Dispatched via hooks/shell_guard.py (or directly), it exits 0 at once unless the
-caller's agent_type is one of GUARDED. For those, every segment of the command
-(split on &&, ||, ;, |) must be an allowed read-only agent-browser call or a
-read-only text filter under both bash and zsh rules. Anything else exits 2,
-which blocks the call and shows stderr to the agent.
+hooks/shell_guard.py calls run_payload only for those agents' shell calls. Every
+segment of the command (split on &&, ||, ;, |) must be an allowed read-only
+agent-browser call or a read-only text filter under both bash and zsh rules.
+Anything else returns 2, which blocks the call and shows stderr to the agent.
 
 Per-run scope comes from .scratch/browser-test/<run-id>/scope.json, written by
 start-run.sh. The run id is read from the session name, bt-<run-id>-<tag>.
@@ -19,7 +18,7 @@ import sys
 from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "hooks"))
-from shell_guard import Blocked, BROWSER_GUARDED as GUARDED, parse_command, segments  # noqa: E402
+from shell_guard import Blocked, check_filter, parse_command  # noqa: E402
 
 PROBE = (
     "(() => { const t = document.body.innerText; "
@@ -135,8 +134,8 @@ def check_browser(args: list[str], scope: dict | None, run_dir: str | None) -> N
     raise Blocked(f"`{verb}` is not an allowed verb for a read-only browser test")
 
 
-def load_scope(cwd: str, segments_: list[list[str]]) -> tuple[dict | None, str | None]:
-    for seg in segments_:
+def load_scope(cwd: str, parts: list[list[str]]) -> tuple[dict | None, str | None]:
+    for seg in parts:
         if seg[:2] == ["agent-browser", "--session"] and len(seg) > 2:
             m = SESSION.match(seg[2])
             if m:
@@ -154,6 +153,7 @@ def check(command: str, cwd: str) -> None:
     scope, run_dir = load_scope(cwd, parts)
     for seg in parts:
         if seg[0] in FILTERS:
+            check_filter(seg[0], seg[1:])
             continue
         if seg[0] != "agent-browser":
             raise Blocked(f"`{seg[0]}` is not allowed — only agent-browser and read-only filters")
@@ -161,9 +161,6 @@ def check(command: str, cwd: str) -> None:
 
 
 def run_payload(payload: dict) -> int:
-    agent = (payload.get("agent_type") or "").rsplit(":", 1)[-1]
-    if agent not in GUARDED or payload.get("tool_name", "Bash") != "Bash":
-        return 0
     command = (payload.get("tool_input") or {}).get("command", "")
     cwd = payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
     try:
@@ -173,11 +170,3 @@ def run_payload(payload: dict) -> int:
               "another way. Record what you could not do and move on.", file=sys.stderr)
         return 2
     return 0
-
-
-def main() -> int:
-    return run_payload(json.load(sys.stdin))
-
-
-if __name__ == "__main__":
-    sys.exit(main())

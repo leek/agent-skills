@@ -80,13 +80,15 @@ Section rules:
   `**Request** <file>: <title>, <status>.`
 - List every decision and ticket, closed ones too, in number order.
 - **Status** uses `derived_status` (`closed`, `in progress`, `blocked`, `ready`, or
-  `⚠️ unreadable`; when `wontfix` is true, say `wontfix` in Detail).
+  `unreadable`, which you print as `⚠️ unreadable`; when `wontfix` is true, say `wontfix` in
+  Detail).
 - **Detail** for a ticket: `open_blockers` (`by 01, 03`), `claimed_by`, or for a closed
   ticket its cited `commits` (`<sha>, on <default_branch>` or `⚠️ <sha> missing`). Empty when
   there is nothing to say. A decision's last column is its `resolution` once closed, its
   `open_blockers` or `claimed_by` while open.
 - Mark nothing else with ⚠️: only stale, mismatched, unreadable, and missing commits.
-- **Next** uses `next` and `next_why` (or the contradiction in `mismatch` when mismatched);
+- **Next** uses `next` and `next_why`; when mismatched, `next` is the contradiction, printed
+  as `⚠️ <mismatch>`;
   **Also** prints the entries in `also` when non-empty.
 
 After the last block, one line naming any path in `unreadable_efforts`, then a one-line total

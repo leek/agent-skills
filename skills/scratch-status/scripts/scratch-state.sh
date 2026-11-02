@@ -37,8 +37,8 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT
+# Resolve .scratch/ against the repository root, so a run from a subdirectory still finds it.
+top=$(git rev-parse --show-toplevel 2>/dev/null) && cd "$top"
 
 python3 - "$days" "$slug" <<'PY'
 from datetime import datetime, timezone
@@ -84,15 +84,17 @@ def detect_default_branch() -> str:
 
 
 def load_closed_vocabulary() -> tuple[set[str], set[str]]:
-    closed = {"closed", "wontfix", "done", "resolved"}
     wontfix = {"wontfix", "declined", "duplicate"}
+    closed = {"closed", "done", "resolved"} | wontfix
     for candidate in (Path(".agents/triage-labels.md"), Path("docs/agents/triage-labels.md")):
         if candidate.is_file():
             text = candidate.read_text(encoding="utf-8", errors="replace")
-            for m in re.finditer(r"wontfix[^\n`]*`([a-z0-9_-]+)`", text, re.I):
-                label = m.group(1).lower()
+            # The setup table's wontfix row: | `wontfix` | `<status string>` | <meaning> |
+            for m in re.finditer(r"^\|\s*`wontfix`\s*\|\s*`([^`]+)`", text, re.M | re.I):
+                label = m.group(1).strip().lower()
                 closed.add(label)
                 wontfix.add(label)
+            break
     return closed, wontfix
 
 
@@ -213,8 +215,9 @@ def extract_commits(status_raw: str, body: str) -> list[dict]:
         cand = m.group(1)
         if cand in seen:
             continue
-        has_digit = any(c.isdigit() for c in cand)
-        if not has_digit:
+        # A real abbreviated SHA mixes letters and digits; an all-letter word ("defaced") or
+        # an all-digit number (a CI run id) only counts when it resolves to a commit.
+        if cand.isdigit() or not any(c.isdigit() for c in cand):
             rc, _ = run_cmd(["git", "rev-parse", "--verify", "--quiet", f"{cand}^{{commit}}"])
             if rc != 0:
                 continue
@@ -344,7 +347,7 @@ def analyze_effort(slug_name: str, effort_dir: Path) -> dict | None:
     # Resolve open blockers and derived_status for decisions and tickets
     for f in files:
         if f["status"] == "":
-            f["derived_status"] = "⚠️ unreadable"
+            f["derived_status"] = "unreadable"
             f["open_blockers"] = []
             f["wontfix"] = False
             continue
@@ -425,7 +428,7 @@ def analyze_effort(slug_name: str, effort_dir: Path) -> dict | None:
     at = lambda p: f".scratch/{slug_name}/{p}"
     also: list[str] = []
     if state == "mismatched":
-        next_cmd = f"⚠️ {mismatch}"
+        next_cmd = mismatch
         next_why = "settle the contradiction before removing or advancing"
     elif state == "done":
         next_cmd = "/scratch-cleanup"
