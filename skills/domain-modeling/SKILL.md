@@ -49,7 +49,7 @@ When the user uses a term that conflicts with the existing language in `GLOSSARY
 
 ### Sharpen fuzzy language
 
-When the user uses vague or overloaded terms, propose a precise canonical term. Where `AskUserQuestion` is available, put the candidates as options: your recommendation first, each option's description saying what choosing it commits the model to; otherwise ask the same shape in chat. "You're saying 'account', is that the Customer or the User?" is a click-to-answer decision, not an open-ended essay prompt.
+When the user uses vague or overloaded terms, propose a precise canonical term. Where `AskUserQuestion` (Claude Code) or `ask_user_question` (Grok) is available, put the candidates as options: your recommendation first, each option's description saying what choosing it commits the model to; otherwise ask the same shape in chat. "You're saying 'account', is that the Customer or the User?" is a click-to-answer decision, not an open-ended essay prompt.
 
 ### Discuss concrete scenarios
 

@@ -86,7 +86,7 @@ These rules govern the text shown to the user. They do not govern the code, the 
 
 ## Asking the question
 
-Where `AskUserQuestion` is available, use it: decisions become click-to-answer:
+Where `AskUserQuestion` (Claude Code) or `ask_user_question` (Grok) is available, use it: decisions become click-to-answer:
 
 - One question per call.
 - 2–4 options, every one real: no filler choices, no explicit `Other` (the tool provides free-form input).
@@ -97,7 +97,7 @@ Where `AskUserQuestion` is available, use it: decisions become click-to-answer:
 
 In Codex, when `request_user_input` is listed for the turn, ask through it with the same shape (recommendation first, 2–4 real options); it has no `preview`, so put a short snippet in the option description or fall back to chat for side-by-side artifacts.
 
-Without either tool, ask the same shape in chat (numbered options, recommendation first, trade-off per line, and under each option the fenced block its `preview` would hold) and wait for the answer. Never print fake tool JSON.
+Without one of these tools, ask the same shape in chat (numbered options, recommendation first, trade-off per line, and under each option the fenced block its `preview` would hold) and wait for the answer. Never print fake tool JSON.
 
 A rejected question did not land. Ask the same decision again once, rewritten: the situation first, fewer terms, and each option stated as what will happen. If the user rejects that too, take the recommended option, record it as `implied`, and move on.
 

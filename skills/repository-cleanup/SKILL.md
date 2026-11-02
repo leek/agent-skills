@@ -38,7 +38,7 @@ This loop cleans Git repository state. It is not a source-code housekeeping pass
 
 ## Selection Form
 
-Where `AskUserQuestion` is available, ask the step 7 selection in one call, one question (one tab) per kind of state, with up to 4 questions:
+Where `AskUserQuestion` (Claude Code) or `ask_user_question` (Grok) is available, ask the step 7 selection in one call, one question (one tab) per kind of state, with up to 4 questions:
 
 | Tab (`header`) | Covers |
 |---|---|
@@ -53,7 +53,7 @@ Leave out a tab with no candidates. Every question is `multiSelect: true`, asks 
 - **Never batch** a `cannot recover` item, an uncertain item, or a database with anything unlike it. Give it its own option, and say `cannot recover` in the description.
 - **Too many batches** for 4 options: ask the rest in the next round, after this batch is removed and re-inventoried.
 
-Without the tool, show the same tabs as numbered lists in chat, and take the numbers the user answers with.
+Without those tools, show the same tabs as numbered lists in chat, and take the numbers the user answers with.
 
 ## Inventory Commands
 

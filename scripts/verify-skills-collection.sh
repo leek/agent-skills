@@ -156,11 +156,76 @@ check "skills naming an agent keep a non-Claude fallback" \
       rg -qi "elsewhere|inline|other harness|plain Claude Code" "$f" || { echo "$f: names an agent without a fallback clause" >&2; exit 1; }
     done'
 
-# 12. Plugin manifests and hooks pass Claude Code's own validator (valid JSON, mod modules exist),
-#     and the browser-test and review-agent guards hold. This script never names a mod file itself:
-#     the plugin directory holds any command that names one for manual review.
+# 12. which-skill names every user-invoked skill, and harness tool names stay paired.
+#     Hyphen-aware: \b treats "-" as a boundary, so "implement" would match "implement-spec".
+check "which-skill names every user-invoked skill" \
+  bash -c '
+    python3 - <<'"'"'PY'"'"'
+import os, re, sys
+router = open("skills/which-skill/SKILL.md").read()
+missing = []
+for d in sorted(os.listdir("skills")):
+    if d == "which-skill":
+        continue
+    f = f"skills/{d}/SKILL.md"
+    if not os.path.isfile(f):
+        continue
+    parts = open(f).read().split("---")
+    if len(parts) < 3:
+        continue
+    if not re.search(r"^disable-model-invocation:\s*true\b", parts[1], re.M):
+        continue
+    if not re.search(rf"(?<![a-z0-9-]){re.escape(d)}(?![a-z0-9-])", router):
+        missing.append(d)
+if missing:
+    print("which-skill omits:", ", ".join(missing), file=sys.stderr)
+    sys.exit(1)
+PY
+  '
+check "spawn_agent sites also name spawn_subagent" \
+  bash -c '
+    python3 - <<'"'"'PY'"'"'
+import os, sys
+bad = []
+for root, dirs, files in os.walk("skills"):
+    for name in files:
+        if not name.endswith(".md"):
+            continue
+        p = os.path.join(root, name)
+        text = open(p).read()
+        if "spawn_agent" in text and "spawn_subagent" not in text:
+            bad.append(p)
+if bad:
+    print("spawn_agent without spawn_subagent:", ", ".join(bad), file=sys.stderr)
+    sys.exit(1)
+PY
+  '
+check "AskUserQuestion sites also name ask_user_question" \
+  bash -c '
+    python3 - <<'"'"'PY'"'"'
+import os, sys
+bad = []
+for root, dirs, files in os.walk("skills"):
+    for name in files:
+        if not name.endswith(".md"):
+            continue
+        p = os.path.join(root, name)
+        text = open(p).read()
+        if "AskUserQuestion" in text and "ask_user_question" not in text:
+            bad.append(p)
+if bad:
+    print("AskUserQuestion without ask_user_question:", ", ".join(bad), file=sys.stderr)
+    sys.exit(1)
+PY
+  '
+
+# 13. Plugin manifests and hooks pass Claude Code's own validator (valid JSON, mod modules exist)
+#     and its mod tests, and the browser-test and review-agent guards hold. This script never names
+#     a mod file itself: the plugin directory holds any command that names one for manual review.
 check "claude plugin validate passes the directory profile" \
   claude plugin validate . --profile directory
+check "claude plugin test passes" \
+  claude plugin test .
 check "browser-test guard tests pass" \
   python3 -m unittest -q skills/browser-test/scripts/test_guard_browser.py
 check "review-agent guard tests pass" \

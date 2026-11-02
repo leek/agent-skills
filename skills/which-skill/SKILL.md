@@ -24,6 +24,7 @@ Most work runs one straight line (**decide → spec → tickets → build**) ove
 | a vague idea | it stress-tested | `grill-with-docs` (default in an existing codebase), or `grill-me` for a plain interview |
 | work too big for one session | a map of the decisions | `wayfinder` |
 | an open question needing sources | cited findings | `research` |
+| sources to watch | new chatter written up | `chatter-scout` |
 | a question only someone else can answer | a document to send them | `to-questionnaire` |
 | a settled conversation | it written down | `to-spec` |
 | a spec | build ticket files | `to-tickets` |
@@ -40,6 +41,7 @@ Most work runs one straight line (**decide → spec → tickets → build**) ove
 
 - Review the diff → `code-review`. Want four independent models on it instead of one → `panel`.
 - Prove it in the running app → `verify`.
+- Test a web app from a URL and a prompt → `browser-test`.
 - Ship the session's work → `commit`.
 - Write or rewrite a PR body → `pr` (the agent also reaches for it on its own).
 - Review comments waiting on a PR → `resolve-review-comments`.
@@ -50,6 +52,7 @@ Most work runs one straight line (**decide → spec → tickets → build**) ove
 ## Something is wrong
 
 - Broken, throwing, failing, or slow → `diagnosing-bugs`.
+- A branch's CI is red → `fix-ci-failures`.
 - A backlog of production or review-bot issues → `fix-nightwatch-issues`, `fix-posthog-issues`, or `fix-github-issues` for the source they come from.
 - The shape of the code is the problem, not one bug → `improve-codebase-architecture` to find the opportunity, `architecture-satisfaction` to run the refactor loop, `codebase-design` for the vocabulary either one uses.
 - Suspect a specific module smells → `code-smells-audit`.
@@ -58,7 +61,7 @@ Most work runs one straight line (**decide → spec → tickets → build**) ove
 
 ## Repo upkeep
 
-`housekeeper` (low-risk cleanup), `repository-cleanup` (branches, PRs, stashes, worktrees), `scratch-cleanup` (file research, remove finished efforts, report open work in `.scratch/`), `dependency-audit` (upgrade plan), `retro` (look back over this session or recent logs for environment improvements), `domain-modeling` (terms and ADRs), `laravel-herd-worktrees` (worktree plus `.test` URL).
+`housekeeper` (low-risk cleanup), `repository-cleanup` (branches, PRs, stashes, worktrees), `scratch-status` (what is still open in `.scratch/`, read-only), `scratch-cleanup` (file research into docs/, remove finished efforts), `dependency-audit` (Composer or npm audit), `upgrade-plan` (plan one library or framework upgrade), `prune-tests` (delete low-signal tests, one PR per area), `retro` (look back over this session or recent logs for environment improvements), `domain-modeling` (terms and ADRs), `laravel-herd-worktrees` (worktree plus `.test` URL).
 
 ## Running out of context
 

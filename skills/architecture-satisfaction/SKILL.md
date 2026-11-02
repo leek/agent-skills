@@ -37,7 +37,7 @@ Before editing code, write down the target in concrete terms. Include the parts 
 - Tests, smoke checks, or live flows that prove safety.
 - Known risks and rollback points.
 
-If the target is vague, pause and clarify it: ask the open points as choices (`AskUserQuestion` where available, for example which public interfaces must stay stable; otherwise in chat). A subjective stop condition can otherwise run indefinitely.
+If the target is vague, pause and clarify it: ask the open points as choices (`AskUserQuestion` in Claude Code or `ask_user_question` in Grok, for example which public interfaces must stay stable; otherwise in chat). A subjective stop condition can otherwise run indefinitely.
 
 Get the target approved before the first edit. Where the harness has plan mode, enter it (`EnterPlanMode`), write the target and verification plan as the plan, present it with `ExitPlanMode` for approval, and copy the approved plan into the progress file; otherwise show the target and plan in chat and wait for an explicit yes.
 

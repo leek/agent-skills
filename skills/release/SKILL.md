@@ -27,8 +27,8 @@ session's uncommitted work. One release, one version, one tag, one GitHub releas
    of yours to commit. Done when `git status --porcelain` shows none of your files.
 3. **Choose the version.** `git log <last-tag>..HEAD --format='%h %s'`. No commits means
    nothing to release. When step 2 left changes out as not this session's, ask once which
-   to commit (they are often the user's own earlier work): `AskUserQuestion` where
-   available, `multiSelect: true` with one option per file (at most 4 per question, further
+   to commit (they are often the user's own earlier work): `AskUserQuestion` in Claude Code or `ask_user_question` in Grok,
+   `multiSelect: true` with one option per file (at most 4 per question, further
    questions for the rest); otherwise list them in chat and wait. Commit the picked ones as
    step 2 does and continue. Otherwise say so and stop. Bump from `$0` when given; otherwise from the
    subjects: `!` or `BREAKING CHANGE` → major (minor while still `0.x`), any `feat` → minor,
@@ -45,7 +45,7 @@ session's uncommitted work. One release, one version, one tag, one GitHub releas
    versioned by its tags alone; skip the commit. Done when `HEAD` is the release commit or
    there was nothing to bump.
 5. **Tag and push.** A pushed tag cannot be taken back, so first draft the step 6 notes and
-   ask the user to confirm (`AskUserQuestion` where available: one single-select question,
+   ask the user to confirm (`AskUserQuestion` in Claude Code or `ask_user_question` in Grok: one single-select question,
    **Tag and publish** first, its `preview` showing the version, the rule that chose the
    bump, and the drafted notes; otherwise show the same in chat and wait). Act only on a
    yes. Then `git tag -a <version> -m "<version>: <summary>"`, then

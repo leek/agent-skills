@@ -115,7 +115,7 @@ steps need all three.
    upward. A PR merges only after every PR before it on an edge shows `MERGED`; a
    stopped or queued one holds its dependents. Independent PRs keep the user's order.
 2. **Step 1 for all PRs at once.** Dispatch one `pr-reviewer` per PR in the
-   background, in one message (in Codex, one `spawn_agent` with `fork_turns: "none"` each). A stack's integration
+   background, in one message (in Codex, one `spawn_agent` with `fork_turns: "none"` each; in Grok, one `spawn_subagent`, `subagent_type` `leek-skills:pr-reviewer` when this plugin is installed). A stack's integration
    PR waits for its own turn after the landings, and steps 2–4 skip it until then.
 3. **Steps 2 and 3 for all PRs.** Gather reviews and review state for every PR.
    Where optional waits are allowed, use one wait (as the shipping budget says) for the
@@ -153,7 +153,7 @@ changed invariant is checked across its live sibling paths before the fix batch.
 Run it in a fresh context so the bots cannot frame it. In Claude Code with this plugin
 installed, dispatch `subagent_type=leek-skills:pr-reviewer` with the brief, in the
 background (pass `run_in_background: true` where the Agent tool offers it), while
-gathering review state; its completion notification brings the findings. In Codex, use `spawn_agent` with `fork_turns: "none"`. Elsewhere, use any read-only sub-agent on
+gathering review state; its completion notification brings the findings. In Codex, use `spawn_agent` with `fork_turns: "none"`. In Grok, use `spawn_subagent` (`subagent_type` `leek-skills:pr-reviewer` when this plugin is installed). Elsewhere, use any read-only sub-agent on
 your strongest model, or review inline before you open the comment surfaces. Record the
 head sha it covered.
 
@@ -220,7 +220,7 @@ the PR head sha as the ref, the line format above, and the checks in this paragr
 In Claude Code with this plugin installed, dispatch
 `subagent_type=leek-skills:finding-verifier` for each batch in parallel; it keeps the
 bots' recurring false premises in project memory, under this repo's `.claude/`.
-In Codex, use `spawn_agent` with `fork_turns: "none"`. Elsewhere, use any read-only sub-agent on a cheaper model, or classify inline. Re-verify
+In Codex, use `spawn_agent` with `fork_turns: "none"`. In Grok, use `spawn_subagent` (`subagent_type` `leek-skills:finding-verifier` when this plugin is installed). Elsewhere, use any read-only sub-agent on a cheaper model, or classify inline. Re-verify
 yourself every line that comes back LEGIT or UNSURE.
 
 Then do a second pass: check every LEGIT against the project's auto-dismiss list, and
@@ -373,8 +373,8 @@ you created for a PR that now shows merged, and list each removal in the report.
 worktree git refuses to remove without `--force` holds unsaved work: it is not removed.
 
 Ask once only about what is left that you created: a worktree git refused, and the
-worktree and databases of a stopped or `--auto`-queued PR (`AskUserQuestion` where
-available: `multiSelect: true`, one option per item, nothing pre-ticked, at most 4 per
+worktree and databases of a stopped or `--auto`-queued PR (`AskUserQuestion` in Claude Code or `ask_user_question` in Grok:
+`multiSelect: true`, one option per item, nothing pre-ticked, at most 4 per
 question and further questions for the rest; otherwise one yes/no question in chat:
 "Can I delete these too?"). Remove only what the answer selects, never with `--force`;
 on no, remove nothing. Skip the question when nothing is left. When you ask it, ping

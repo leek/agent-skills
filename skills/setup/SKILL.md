@@ -29,7 +29,7 @@ Read whatever exists; don't assume:
 
 ### 2. Present findings and ask
 
-Summarise what's present and missing, then take the sections in order; one section, one answer. Lead each with the recommended answer so the user can accept it in a word. Use `AskUserQuestion` where available; otherwise ask in chat and wait.
+Summarise what's present and missing, then take the sections in order; one section, one answer. Lead each with the recommended answer so the user can accept it in a word. Use `AskUserQuestion` in Claude Code or `ask_user_question` in Grok; otherwise ask in chat and wait.
 
 **Section A: Issue tracker.** Markdown files under `.scratch/` are the only tracker these skills use: it needs no auth and keeps every map, spec, and ticket greppable next to the code. There is no choice to make here, so ask nothing: write `.agents/issue-tracker.md` from this skill's `issue-tracker.md` seed. Ask one question only if the repo already keeps this work somewhere other than `.scratch/`, and then only to confirm that path.
 

@@ -60,7 +60,7 @@ carries the batch (thread ids, author, reviewed commit, file:line, body), `HEAD`
 ref, the line format `Cluster N: [LEGIT | NOT A BUG | UNSURE] — <one-line evidence>`, and
 the checks in this step. In Claude Code with this plugin installed, dispatch
 `subagent_type=leek-skills:finding-verifier` for each batch in parallel. In Codex, use
-`spawn_agent` with `fork_turns: "none"`. Elsewhere, use any read-only sub-agent, or triage inline when the harness has none. Re-verify yourself
+`spawn_agent` with `fork_turns: "none"`. In Grok, use `spawn_subagent` (`subagent_type` `leek-skills:finding-verifier` when this plugin is installed). Elsewhere, use any read-only sub-agent, or triage inline when the harness has none. Re-verify yourself
 every line that comes back LEGIT or UNSURE.
 
 ## 4. Fix the legit ones

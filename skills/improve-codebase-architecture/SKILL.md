@@ -24,7 +24,7 @@ This command is _informed_ by the project's domain model and built on a shared d
 
 Read the project's domain glossary (`GLOSSARY.md`, or the older `CONTEXT.md`) and any ADRs in the area you're touching first.
 
-Then walk the codebase in a **read-only sub-agent** where the harness has one (in Claude Code with this plugin installed, the Agent tool with `subagent_type=leek-skills:deepening-scout`, which has the codebase-design vocabulary preloaded and remembers what this project already deepened; plain Claude Code, `subagent_type=Explore`; Codex, `spawn_agent` with `fork_turns: "none"`; elsewhere, whatever read-only sweep it offers), so the sweep's file dumps stay out of this context and only the findings come back. Without sub-agents, walk it inline. Don't follow rigid heuristics: explore organically and note where you experience friction:
+Then walk the codebase in a **read-only sub-agent** where the harness has one (in Claude Code with this plugin installed, the Agent tool with `subagent_type=leek-skills:deepening-scout`, which has the codebase-design vocabulary preloaded and remembers what this project already deepened; plain Claude Code, `subagent_type=Explore`; Codex, `spawn_agent` with `fork_turns: "none"`; Grok, `spawn_subagent` (`subagent_type` `leek-skills:deepening-scout` when this plugin is installed); elsewhere, whatever read-only sweep it offers), so the sweep's file dumps stay out of this context and only the findings come back. Without sub-agents, walk it inline. Don't follow rigid heuristics: explore organically and note where you experience friction:
 
 - Where does understanding one concept require bouncing between many small modules?
 - Where are modules **shallow**: interface nearly as complex as the implementation?
@@ -57,7 +57,7 @@ End the report with a **Top recommendation** section: which candidate you'd tack
 
 See [HTML-REPORT.md](HTML-REPORT.md) for the full HTML scaffold, diagram patterns, and styling guidance.
 
-Do NOT propose interfaces yet. Once the report is up, ask the user which candidate to explore (`AskUserQuestion` where available: the top recommendation first and marked recommended, then the next strongest up to 4 options, each option's `preview` an ASCII before/after sketch of that candidate's shape, and "Other" reaching the rest; otherwise ask in chat: "Which of these would you like to explore?").
+Do NOT propose interfaces yet. Once the report is up, ask the user which candidate to explore (`AskUserQuestion` in Claude Code or `ask_user_question` in Grok: the top recommendation first and marked recommended, then the next strongest up to 4 options, each option's `preview` an ASCII before/after sketch of that candidate's shape, and "Other" reaching the rest; otherwise ask in chat: "Which of these would you like to explore?").
 
 ### 3. Grilling loop
 

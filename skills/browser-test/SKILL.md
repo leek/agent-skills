@@ -38,7 +38,7 @@ STATE: <path | none>
 ```
 
 In Claude Code with this plugin, dispatch `subagent_type=leek-skills:browser-test-planner`.
-In Codex, use `spawn_agent` with `fork_turns: "none"`. Elsewhere, use a sub-agent on a mid-tier model with the rules in that agent's file (and
+In Codex, use `spawn_agent` with `fork_turns: "none"`. In Grok, use `spawn_subagent` (`subagent_type` `leek-skills:browser-test-planner` when this plugin is installed). Elsewhere, use a sub-agent on a mid-tier model with the rules in that agent's file (and
 `verify`'s [Process](../verify/SKILL.md#process) for grouped UI, state reversal, and
 calculated reports), or plan inline.
 
@@ -53,7 +53,7 @@ auth file lives outside the repo and never goes in a report. If the re-plan stil
 
 If no case is `MODE: write`, go straight to step 4; read-only runs never pause.
 Otherwise show the user each write case with its `WRITES` lines verbatim, and ask
-(`AskUserQuestion` where available, otherwise in chat): **Run with these writes**, **Run
+(`AskUserQuestion` in Claude Code or `ask_user_question` in Grok, otherwise in chat): **Run with these writes**, **Run
 read-only** (every case becomes `read`; its writes are dropped), or **Cancel**. Only an
 explicit yes in this run allows a write. A `WRITE CANDIDATE` line is never run; it goes
 in the report.
@@ -74,7 +74,7 @@ SHOT_DIR: <run_dir>
 In Claude Code with this plugin, dispatch `subagent_type=leek-skills:browser-tester` for
 `read` cases and `subagent_type=leek-skills:browser-writer` for confirmed `write` cases.
 A plugin hook blocks every non-read-only command from `browser-tester`. In Codex, use
-`spawn_agent` with `fork_turns: "none"`. Elsewhere there
+`spawn_agent` with `fork_turns: "none"`. In Grok, use `spawn_subagent` (`subagent_type` `leek-skills:browser-tester` or `leek-skills:browser-writer` when this plugin is installed). Elsewhere there
 is no hook: use sub-agents on the cheapest model with the rules from those agent files,
 or run the cases inline one by one, and hold them to the read-only rules yourself.
 

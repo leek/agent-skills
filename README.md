@@ -78,9 +78,9 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | `wizard` | model | Generate an interactive bash wizard that walks a human through steps only they can perform: provisioning, dashboard credentials, CI secrets, one-off migrations or cutovers. |
 | `writing-for-agents` | model | Reference for writing documents an agent consumes: skills, AGENTS.md/CLAUDE.md, and reference docs reached by a pointer. |
 
-## Subagents (Claude Code)
+## Subagents
 
-Installing the plugin also loads the subagents in [`agents/`](./agents) as `leek-skills:<name>`. The skills dispatch them where they already fan out work: `code-review` → `standards-reviewer` + `spec-reviewer`, `codebase-design` (design-it-twice) → `module-designer`, `improve-codebase-architecture` → `deepening-scout`, `retro` → `session-miner`, `panel` → `panelist`, `browser-test` → `browser-test-planner` + `browser-tester` + `browser-writer`, `chatter-scout` → `chatter-sweeper` + `chatter-verifier`, `code-smells-audit` → `smell-sweeper`, `prune-tests` → `test-auditor`, `fix-github-issues` + `triage-github-pr` → `finding-verifier`, `triage-github-pr` → `pr-reviewer`, `upgrade-plan` → `release-notes-collector` + `upgrade-impact-scout`; `research` and `dependency-audit` fork into `researcher` and `dependency-auditor`. The one plugin hook, [`hooks/hooks.json`](./hooks/hooks.json), guards `browser-tester` and `browser-test-planner` so they can only run read-only browser commands. Other harnesses ignore the directory and the skills fall back to inline or generic sub-agents, as before. Conventions in [`AGENTS.md`](./AGENTS.md#subagents-agents).
+Installing the Claude Code or Grok plugin also loads the subagents in [`agents/`](./agents) as `leek-skills:<name>`. The skills dispatch them where they already fan out work: `code-review` → `standards-reviewer` + `spec-reviewer`, `codebase-design` (design-it-twice) → `module-designer`, `improve-codebase-architecture` → `deepening-scout`, `retro` → `session-miner`, `panel` → `panelist`, `browser-test` → `browser-test-planner` + `browser-tester` + `browser-writer`, `chatter-scout` → `chatter-sweeper` + `chatter-verifier`, `code-smells-audit` → `smell-sweeper`, `prune-tests` → `test-auditor`, `fix-github-issues` + `triage-github-pr` → `finding-verifier`, `triage-github-pr` → `pr-reviewer`, `upgrade-plan` → `release-notes-collector` + `upgrade-impact-scout`; `research` and `dependency-audit` fork into `researcher` and `dependency-auditor`. The one plugin hook, [`hooks/hooks.json`](./hooks/hooks.json), guards `browser-tester` and `browser-test-planner` so they can only run read-only browser commands. Codex does not load the directory; its skills fall back to inline or generic sub-agents. Conventions in [`AGENTS.md`](./AGENTS.md#subagents-agents).
 
 ## Mods (Claude Code)
 
@@ -110,7 +110,7 @@ npx skills add https://github.com/leek/agent-skills --skill code-review
 
 Re-run either command to update.
 
-This copies the skills only. The typed subagents in [`agents/`](./agents) come with the Claude Code plugin below, so in a repo that has the skills from `npx skills` and no plugin, a dispatch to `leek-skills:<name>` fails with `Agent type ... not found` and the skill takes its general sub-agent path. Install the plugin as well to get the cheaper, read-only typed agents.
+This copies the skills only. The typed subagents in [`agents/`](./agents) come with the Claude Code or Grok plugin, so in a repo that has the skills from `npx skills` and no plugin, a dispatch to `leek-skills:<name>` has no such agent and the skill takes its general sub-agent path. Install the plugin as well to get the cheaper, read-only typed agents. Codex's plugin does not load `agents/`.
 
 ### Claude Code (plugin marketplace)
 
@@ -129,6 +129,17 @@ codex plugin add leek-skills@leek-agent-skills
 ```
 
 Codex lists the model-invoked skills as `leek-skills:<name>` and loads the plugin's `hooks/hooks.json`. It does not load `agents/` or the mod; the skills fall back to Codex's own sub-agents (`spawn_agent`) or run inline. Pick one route per machine: if you already installed with `npx skills`, the plugin lists those skills a second time.
+
+### Grok (plugin marketplace)
+
+Grok reads the same `.claude-plugin/marketplace.json`:
+
+```bash
+grok plugin marketplace add leek/agent-skills
+grok plugin install leek-skills --trust
+```
+
+Grok loads the plugin's skills, `agents/` as `leek-skills:<name>`, and `hooks/hooks.json`. It does not load the mod. A dispatch uses `spawn_subagent`. See [`AGENTS.md`](./AGENTS.md).
 
 ### Claude Code (manual copy)
 
