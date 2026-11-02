@@ -165,7 +165,28 @@ Autopilot writes raw provider events and a human-readable log under the target
 repository's Git directory. Heartbeats default to every five minutes. Set
 AUTOPILOT_HEARTBEAT_SECONDS to a positive number of seconds to change them.
 AUTOPILOT_MODEL and AUTOPILOT_EFFORT are the environment equivalents of --model
-and --effort. Every run reports the model and effort its worker sessions use.
+and --effort. Every run reports the model and effort its worker sessions use: at
+run start, per iteration, in each heartbeat, and in --status (model, model_source,
+effort, effort_source, reported_model). A source is "requested" (flag or env),
+"settings" (Claude Code settings chain: model, effortLevel; honors CLAUDE_CONFIG_DIR),
+"config" ($CODEX_HOME/config.toml: model, model_reasoning_effort; $GROK_HOME/config.toml:
+[models].default, [models].default_reasoning_effort), or "provider default". Claude
+and Grok workers also report the model the session resolved (reported_model),
+announced when it differs from the requested one.
+
+Output:
+  run        progress on stderr; one terminal result object on stdout
+  --status   one state object ({"status":"none",...} and exit 1 when no run exists)
+  --history  an array of retained states for the root
+  --tmux     one launch object (status, follow and tmux attach commands); read the
+             exact terminal result from the result_file in --status
+  --follow   the human-readable log ("<timestamp> Autopilot: <message>") until the
+             run ends
+  --wait     the final state object once the run leaves "running"
+
+Exit codes: 0 complete, 2 needs input, 3 blocked, 4 worker failure,
+  5 runner/configuration failure, 129 hangup, 130 interrupted, 143 terminated.
+  --wait exits with the run's terminal code.
 EOF
 }
 

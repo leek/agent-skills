@@ -1,67 +1,44 @@
 # Session selection
 
-Select human parent sessions before applying the requested count. Open every source
-read-only. Store inventories and batch files in the session scratchpad, never beside logs.
+`scripts/select-sessions.sh` does discovery, grouping, ranking, and batching. This file
+holds what it cannot decide: who wrote a session.
 
-## Discover candidates
+## What the script already does
 
-These commands list candidates, not the final sample. A missing directory means that
-harness has no available logs; report it. Do not rank compressed archives by compressed
-size or treat filesystem modification time as the conversation date.
+- Pre-filters each harness to its newest files by mtime, so old archives are never
+  streamed, then ranks roots by the conversation's own timestamp, not the file's.
+- **Claude:** `<uuid>.jsonl` owns `<uuid>/subagents/agent-*.jsonl`; harness agent
+  worktrees are skipped.
+- **Codex:** identity from the first `session_meta` (`id`, else `session_id`), a plain
+  and compressed copy deduplicated; a child (`thread_source: subagent` or a
+  `source.subagent` object) is followed up its `parent_thread_id` chain to its root. A
+  child whose root is not available is excluded as an orphan.
+- **Grok:** `summary.json` gives the kind (`subagent*` children attach to the root whose
+  history names their id) and the last-active time; `<user_query>` holds the human text.
+- **agy:** `history.jsonl` joins `conversationId` to the `.db` basename.
+- Hints that exclude a root unless `--keep-automated`: a headless entrypoint (`sdk-cli`,
+  `sdk-py`, `codex exec`, Grok `headless`), a panelist brief, an agy conversation absent
+  from history with no step 14 prompt in its `.db` (relayed or headless). A `/private/tmp`
+  cwd, or an agy prompt found only as step 14, sets `clue`.
+- Roots rank by their latest activity, linked children included.
 
-```sh
-find ~/.claude/projects -type f -name '*.jsonl' ! -path '*/subagents/*' ! -path '*--claude-worktrees-agent-*'
-find ~/.codex/sessions -type f \( -name 'rollout-*.jsonl' -o -name 'rollout-*.jsonl.zst' \)
-find ~/.grok/sessions -type f -name chat_history.jsonl
-find ~/.gemini/antigravity-cli/conversations -type f -name '*.db'
-```
+## Decide authorship
 
-Pass paths as quoted arguments; preserve spaces. Read plain JSONL directly. For an
-archive, stream `zstd -dc -- "$file"` into the same JSONL parser. Never decompress in
-place. If the reader is missing or a file is corrupt, record that exclusion explicitly.
+Read each selected root's `first_prompt`, and, when that is ambiguous, its first few
+`user` events from `extract-signal.sh`.
 
-## Group and identify authorship
+- A `/private/tmp` cwd or a panelist-shaped brief is a clue, not proof; classify from the
+  actual task. Keep an automated panelist's log as linked evidence when its human parent
+  is identifiable.
+- An agy prompt that is not in history is step 14 or a relayed step 101 in the `.db`. A
+  relayed prompt is not another human correction.
+- Prompt history can miss queued corrections; the transcript's `queued` events hold them.
+- Mark unresolved authorship as unknown and exclude it from claims about human
+  correction frequency.
+- A root that is not a human session: rerun with `--exclude <id>`, so the count stays N.
 
-- **Claude:** a top-level `<uuid>.jsonl` owns `<uuid>/subagents/agent-*.jsonl`.
-  Also inspect its initial prompt: top-level files can be automated review/panel runs.
-- **Codex:** inspect the first `session_meta` payload in each file; later metadata
-  can be inherited parent context, not another session. Use `id` (or `session_id`) as the
-  identity; deduplicate a plain and compressed copy with the same identity. A
-  `thread_source` of `subagent`, or a `source.subagent` object, identifies a child.
-  Follow `source.subagent.thread_spawn.parent_thread_id` recursively to its root.
-  Keep children as evidence for that root, including children in other date directories.
-  A child with an unavailable parent is an orphan exclusion, not a human session.
-- **Grok:** use the session directory ID and inspect the prompt history plus initial
-  conversation turns. `/private/tmp` and panelist briefs are automation clues, not
-  proof by themselves; classify from the actual task. Keep automated panelist logs
-  as linked evidence when their human parent can be identified.
-- **agy:** join history `conversationId` to the database basename. Inspect step 14
-  and relayed step 101 messages when history is absent or authorship is ambiguous.
-  A relayed prompt is not another human correction. Open SQLite with `-readonly`.
+## Report
 
-For Codex, this query extracts grouping fields from either plain or streamed JSONL (stopping at the first `session_meta` line):
-
-```sh
-jq -nc 'first(inputs | select(.type == "session_meta") | .payload) |
-  {id: (.id // .session_id), timestamp, source}'
-```
-
-Use prompt-history matches and neighboring turns to distinguish human input from
-agent briefs, preambles, summaries, and quoted earlier conversations. History can
-miss queued corrections, so inspect the transcript too. Mark unresolved authorship
-as unknown and exclude it from claims about human correction frequency.
-
-## Select and batch
-
-Exclude the current retro and its workers to avoid mining the audit itself. Pre-filter
-candidates by `mtime` (or filename date on `.zst` archives) so you do not stream every
-historical archive on disk, then rank eligible roots by their timestamp (including
-linked child activity) and select N roots. If the user asks for coverage across
-harnesses, allocate the sample across available harnesses and state the allocation
-rather than letting the busiest harness consume every slot.
-
-Write `parents.jsonl`: one JSON object per root with `harness`, `id`, `path`,
-`timestamp`, and `children` (paths). Dispatch each entire object to one batch so
-children stay with their parent. Report counts of selected roots by harness, linked
-children inspected, automated/orphan/unknown exclusions, and unreadable files.
-The batch manifest and coverage totals must agree before synthesis.
+Selected roots by harness, linked children, exclusions by reason (automated, orphan,
+unknown, caller), unreadable files, and missing harnesses. The batch files and these
+totals must agree before synthesis.

@@ -13,84 +13,26 @@ Turn sessions into a ranked list of concrete improvements to the agent's **envir
 
 ## Where the logs live
 
-- **Claude Code:** `~/.claude/projects/<slug>/*.jsonl` (top-level sessions). Per-session subagent transcripts are under `<uuid>/subagents/agent-*.jsonl`: **skip these** when counting "sessions"; they're part of a parent.
-- **Codex:** `~/.codex/sessions/<year>/<month>/<day>/rollout-*.jsonl` and `rollout-*.jsonl.zst`. Child-agent rollouts belong to their parent session.
-- **Grok:** `~/.grok/sessions/<url-encoded cwd>/<id>/chat_history.jsonl`. A cwd under `/private/tmp` is usually a headless `panel` run.
-- **agy (Antigravity CLI):** every user prompt is in `~/.gemini/antigravity-cli/history.jsonl` (`display`, `workspace`, `conversationId`); the rest of the conversation is `~/.gemini/antigravity-cli/conversations/<conversationId>.db`, SQLite with protobuf payloads.
-
-The first three are JSONL, one event per line. Stream `.jsonl.zst` through `zstd -dc -- FILE`; keep archives intact. If no Zstandard reader is available, report the excluded archives and the incomplete coverage. Open every log read-only.
+Claude Code (`~/.claude/projects`), Codex (`~/.codex/sessions`, plain and `.jsonl.zst`), Grok (`~/.grok/sessions`), and agy (`~/.gemini/antigravity-cli`: `history.jsonl` plus one SQLite `.db` per conversation). Two scripts in `<this-skill-dir>/scripts/` read them, read-only: they stream archives without decompressing in place and open SQLite read-only. Store their output in the session scratchpad, never beside the logs.
 
 ## 1. Pick the N most recent sessions
 
-Default N = 50 **parent sessions** unless the user gives a number. Follow
-[session selection](references/session-selection.md): discover plain and compressed logs,
-group children under their parents, distinguish human sessions from automated runs,
-then select N. Report parent counts by harness, child logs inspected, exclusions, and
-unreadable files. Selection is complete when each selected parent has a source path
-and its available child paths; children never consume another session slot.
+Default N = 50 **parent sessions** unless the user gives a number. Run once:
 
-## 2. Extract signal (use jq: do NOT cat whole files)
-
-Files are large and full of tool-output noise. `jq` is the right tool. Four formats:
-For a compressed Codex file, replace `jq FILTER FILE` below with
-`zstd -dc -- FILE | jq FILTER`. Preserve the archive path and decompressed line number
-in evidence. A user-role message is not proof of human authorship: exclude preambles,
-agent briefs, relayed messages, and quoted earlier corrections from human counts.
-
-**Claude Code**
 ```bash
-# human-typed messages (string form)
-jq -rc 'select(.type=="user" and (.message.content|type=="string")) | .message.content' FILE
-# human messages (array form; skip <command-name>/system-reminder noise by eye)
-jq -rc 'select(.type=="user" and (.message.content|type=="array")) | .message.content[]? | select(.type=="text") | .text' FILE
-# messages the user queued while a turn ran (excluding subagent <task-notification> blobs): many corrections live only here
-jq -rc 'select(.type=="queue-operation" and .operation=="enqueue") | .content | select(type=="string" and (startswith("<task-notification>") | not))' FILE
-# bash commands the assistant ran
-jq -rc 'select(.type=="assistant") | .message.content[]? | select(.type=="tool_use" and .name=="Bash") | .input.command' FILE
-# tool errors
-jq -rc 'select(.type=="user") | .message.content[]? | select(.type=="tool_result" and .is_error==true) | (.content|if type=="array" then (map(.text//"")|join(" ")) else tostring end)' FILE
+bash <this-skill-dir>/scripts/select-sessions.sh --out <scratch>/retro --count N --exclude <this session's id>
 ```
 
-**Codex** (current rollouts have no `user_message` events; that query only works on older logs)
-```bash
-# human messages (the FIRST one or two are the AGENTS.md / environment preamble: ignore them)
-jq -rc 'select(.type=="response_item" and .payload.type=="message" and .payload.role=="user") | .payload.content[]?.text' FILE
-# older logs only
-jq -rc 'select(.type=="event_msg" and .payload.type=="user_message") | .payload.message' FILE
-# tool calls (shell runs inside custom_tool_call "exec")
-jq -rc 'select(.type=="response_item" and (.payload.type=="custom_tool_call" or .payload.type=="function_call")) | (.payload.input // .payload.arguments)' FILE
-# tool outputs (grep for errors)
-jq -rc 'select(.type=="response_item" and (.payload.type=="custom_tool_call_output" or .payload.type=="function_call_output")) | (.payload.output|tostring)' FILE | grep -iE 'error|not found|exception|fatal|denied' | head
-```
+It discovers every harness's logs, groups child logs under their parents (children never take a session slot), excludes sessions with an automation hint (headless runs, panelist briefs, orphan children) into `exclusions.jsonl`, and writes `parents.jsonl` and 7 round-robin `batch_<k>.jsonl` files. Its JSON summary gives counts by harness, children, exclusions by reason, unreadable files, and missing harnesses. Then apply [session selection](references/session-selection.md)'s authorship rules to each selected root's `first_prompt`, and rerun with `--exclude` for any root that is not a human session (`--keep-automated` keeps the hinted ones; `--harness` limits harnesses, for example to spread the sample when the user asks for coverage across them: run once per harness with its share of N and its own `--out` directory, and state the allocation). Selection is complete when the summary's counts match `parents.jsonl` and the exclusions, and you report them.
 
-**Grok**
-```bash
-# human messages (the first one or two carry the system-reminder preamble)
-jq -rc 'select(.type=="user") | .content | if type=="array" then map(.text//"")|join(" ") else tostring end' FILE
-jq -rc 'select(.type=="assistant") | .tool_calls[]? | tostring' FILE
-# current logs use tool_result; older logs use tool
-jq -rc 'select(.type=="tool_result" or .type=="tool") | .content|tostring' FILE | grep -iE 'error|not found|failed|denied' | head
-```
+## 2. Extract signal
 
-**agy**
-```bash
-# human messages for one conversation (ID = the .db basename)
-jq -rc --arg id ID 'select(.conversationId==$id) | .display' ~/.gemini/antigravity-cli/history.jsonl
-# when that id is absent from history, the prompt is step 14 in the db
-sqlite3 -readonly FILE "select step_payload from steps where step_type=14" | strings -n 8
-# step types: 14 user prompt, 15 model text, 132 tool call + result, 101 message from another conversation
-sqlite3 -readonly FILE "select step_payload from steps where step_type=132" | strings -n 8 | grep -iE 'error|not found|failed|denied' | head
-```
-
-Surface corrections fast by grepping extracted human messages:
+Never `cat` a whole log. `bash <this-skill-dir>/scripts/extract-signal.sh <path>` prints one JSONL event per user-role message, queued message, shell command, tool call, and failed tool result, each with its source path and line (SQLite step index for agy). A user-role message is not proof of human authorship: exclude preambles, agent briefs, relayed messages, and quoted earlier corrections from human counts. Surface corrections fast by grepping the `user` and `queued` texts:
 `grep -iE "no,|actually|that.?s wrong|don.?t |stop |instead|you should have|i told you|revert|why did you|wrong"`
 
 ## 3. Fan out: one subagent per batch
 
-50 sessions won't fit one context. Split the file list into ~7 round-robin batches (so big files spread out) and dispatch one subagent per batch **in parallel**, on a cheaper model where the harness lets you pick one (extraction, not judgement), each with the cheat-sheet above for the formats in its batch and an identical brief (in Claude Code with this plugin installed, `subagent_type=leek-skills:session-miner`: log-read-only, skips project CLAUDE.md, and remembers patterns from earlier retros so it can mark them recurring; in other harnesses, dispatch in the background per [harness-tools](../harness-tools/SKILL.md)). Each subagent returns a structured findings list; the orchestrator dedupes across batches and synthesizes. Round-robin assignment:
-```bash
-awk '{ b=((NR-1)%7)+1; print > ("batch_" b ".jsonl") }' parents.jsonl
-```
+50 sessions won't fit one context. Dispatch one subagent per `batch_<k>.jsonl` **in parallel**, on a cheaper model where the harness lets you pick one (extraction, not judgement), each with an identical brief: its batch file path, the `extract-signal.sh` path, and the lenses in step 4 (in Claude Code with this plugin installed, `subagent_type=leek-skills:session-miner`: log-read-only, skips project CLAUDE.md, and remembers patterns from earlier retros so it can mark them recurring; in other harnesses, dispatch in the background per [harness-tools](../harness-tools/SKILL.md)). Each subagent returns a structured findings list; the orchestrator dedupes across batches and synthesizes.
 
 ## 4. What to find
 

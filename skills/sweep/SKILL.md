@@ -1,6 +1,6 @@
 ---
 name: sweep
-description: Dig for one problem nobody has noticed yet (a latent bug, silent production error, slow path, or test gap), prove it, fix it, and open one PR per problem. Every run finds something new and never repeats earlier work.
+description: Find, prove, and fix one unnoticed problem per cycle, one PR each.
 disable-model-invocation: true
 argument-hint: "[count 1-10] [focus areas, e.g. 3 refactor performance]; defaults to one cycle over every category"
 ---
@@ -17,7 +17,7 @@ The skill runs again and again on the same repo. Its PRs from earlier runs stay 
 
 - **Earlier work removes candidates. It never ends the run.** An open PR, a kept `sweep/*` branch, a leftover worktree, or a dirty main checkout is not a reason to stop or to reuse anything. Drop the candidates that earlier work covers, and keep looking.
 - **Widen before you give up.** When the top candidates are all covered, go down the priority list and into code that no recent PR touched. Look again at production signals over a longer time range.
-- **Never invent.** Pressure to find something new never lowers the evidence bar in [Prove one issue](#prove-one-issue). Do not reword a covered issue, split one fix into two PRs, or promote a style preference or a hypothetical risk. A run that searched widely and found nothing provable ends with no PR and a report of what it examined. That is a correct result.
+- **Never invent.** Pressure to find something new never lowers the evidence bar in [Prove one issue](#2-prove-one-issue). Do not reword a covered issue, split one fix into two PRs, or promote a style preference or a hypothetical risk. A run that searched widely and found nothing provable ends with no PR and a report of what it examined. That is a correct result.
 
 ## Arguments
 
@@ -83,11 +83,7 @@ Drop a candidate that is disproven, covered, speculative, or out of scope, then 
    git worktree add -b sweep/<topic> .claude/worktrees/sweep-<topic> origin/<default>
    ```
    From here on, start every command for this cycle with `cd <worktree path> &&` (or use `git -C <worktree path>`). Some harness shells do not keep the working directory between calls, and a bare `composer install` or `artisan make:*` then lands in the main checkout.
-   In a Laravel repo, make it runnable with `laravel-herd-worktrees`' **Bootstrap a bare worktree** section before you run anything in it. A scratch database gets a name no checkout config uses, `<app db>_sweep_<topic>`, and you register it when you create it:
-   ```bash
-   printf '%s\t%s\t%s\t%s\n' "$(date +%s)" <pgsql|mysql|sqlite> <database> "<worktree path>" \
-     >> "$(git rev-parse --path-format=absolute --git-common-dir)/scratch-databases"
-   ```
+   In a Laravel repo, make it runnable with `laravel-herd-worktrees`' **Bootstrap a bare worktree** section before you run anything in it. A scratch database gets a name no checkout config uses, `<app db>_sweep_<topic>`, and you register it when you create it: `bash <this-skill-dir>/../laravel-herd-worktrees/scripts/scratch-db.sh register <pgsql|mysql|sqlite> <database> <worktree path>` (see its [Scratch database registry](../laravel-herd-worktrees/SKILL.md#scratch-database-registry)).
    Record each resource the cycle creates (worktree, database, browser session, background process) for [Finish the run](#5-finish-the-run).
 2. **Fix.** Look for an existing abstraction first, and reuse or extend it. Make the smallest change that fully fixes the root cause. Keep every edit tied to the one issue.
 3. **Prove it.** For a bug, write the regression test first, through the real entry point (HTTP, Livewire, Filament, job, command, observer). It must fail before the fix and pass after; follow the `tdd` loop. For performance, compare measured query counts or timings. For UX, show the interaction on the worktree's running site with `verify`. For refactors and coverage, protect the behavior with tests. Never change production to reproduce.

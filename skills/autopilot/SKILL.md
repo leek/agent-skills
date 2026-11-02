@@ -19,35 +19,15 @@ Run approved pipeline work until it is complete or reaches a genuine human gate.
 bash <autopilot-skill-dir>/scripts/autopilot.sh --provider <claude|codex|grok> --root <ref>
 ```
 
-Pass `--repo <path>` when the target is not the current repository, `--max-iterations <n>` to replace the default limit of 50, and `--log-file <path>` to mirror the per-run log to another path.
+`bash <autopilot-skill-dir>/scripts/autopilot.sh --help` is the reference for every flag (`--repo`, `--max-iterations`, `--model`, `--effort`, `--log-file`, `--tmux`), the observer modes and what each prints, the model and effort sources, and the exit codes.
 
 Run the script as a background task: one iteration is a full build lifecycle and routinely outlasts a foreground shell-command timeout. Its exit is the completion signal (for a `--tmux` run, one background `--wait`). Immediately report the run ID, worker session model and effort, log path, and printed observer commands. Then report worker milestones and five-minute heartbeats as they arrive; leave routine tool events in the log. Stream them by running `--follow 2>&1 | grep --line-buffered -E 'Autopilot: (iteration |selected |next |worker(:| alive)|ticket )|quiet threshold|gate|failed|invalid|interrupted|stopped'` under `Monitor` where available (re-arm when it expires; every `--follow` line is `<timestamp> Autopilot: <message>`); otherwise read `--status` and the log tail each time the turn resumes, and when the run exits. On exit `2` (needs input), `3` (blocked), `4`, or `5` (failure), ping the user (`PushNotification` where available, otherwise in the chat report) with the status and reason.
 
-Foreground run mode prints progress to stderr and one terminal result object to stdout; completion is exit code `0` with `status: complete`. Observer modes keep their operational messages on stderr: `--status` prints one state object, `--history` prints an array of retained states, `--tmux` prints one launch object, and `--follow` streams the human-readable run log to stdout, and `--wait` blocks until the run leaves `running`, prints the final state object, and exits with the run's terminal code (below). To wait on a run you did not start in this shell, prefer one `--wait` call with `run_in_background` over any sleep or `/loop` polling of `--status`. With no run for the root, `--status` prints `{"status":"none",…}` and exits 1.
-
-Use the printed commands to inspect a run independently:
-
-```bash
-bash <autopilot-skill-dir>/scripts/autopilot.sh --status --root <ref> [--repo <path>]
-bash <autopilot-skill-dir>/scripts/autopilot.sh --follow --root <ref> [--repo <path>]
-bash <autopilot-skill-dir>/scripts/autopilot.sh --history --root <ref> [--repo <path>]
-```
-
-`--follow` exits when the run does; `--history` returns every retained run for the root. For a detached terminal-owned run, add `--tmux`. Its stdout is a launch object rather than the eventual worker result. Report the printed `status`, `follow`, and `tmux attach` commands; continue monitoring through `--status` until the run reaches a terminal state. Read the exact terminal result from the `result_file` in status.
+To wait on a run you did not start in this shell, prefer one `--wait` call with `run_in_background` over any sleep or `/loop` polling of `--status`. Inspect a run independently with `--status`, `--follow`, or `--history`, each with `--root <ref> [--repo <path>]`. For a detached terminal-owned run, add `--tmux`: report the printed `status`, `follow`, and `tmux attach` commands, and continue monitoring through `--status` until the run reaches a terminal state.
 
 ## Worker model and effort
 
-Every worker session is one sub-session of the run, and every run reports which model and reasoning effort those sub-sessions use. The report appears in four places: the `worker session model <model> (<source>), effort <level> (<source>)` line at run start, the per-iteration line, each heartbeat, and `--status` (as the `model`, `model_source`, `effort`, `effort_source`, and `reported_model` state fields). A `--tmux` launch object carries the same values.
-
-Set them explicitly to pin every sub-session:
-
-```bash
-bash <autopilot-skill-dir>/scripts/autopilot.sh --provider <claude|codex|grok> --root <ref> --model <name> --effort <level>
-```
-
-`AUTOPILOT_MODEL` and `AUTOPILOT_EFFORT` are the environment equivalents. Valid effort levels are `low|medium|high|xhigh|max` for `claude` and `none|minimal|low|medium|high|xhigh|max` for `codex` and `grok`; the runner rejects anything else before starting a worker.
-
-The `source` names where each value came from: `requested` for a flag or environment variable, `settings` for the resolved Claude Code settings chain (`model` and `effortLevel`, honoring `CLAUDE_CONFIG_DIR`), `config` for `$CODEX_HOME/config.toml` (`model` and `model_reasoning_effort`) or `$GROK_HOME/config.toml` (`[models].default` and `[models].default_reasoning_effort`), and `provider default` when neither is set and the provider chooses. Claude and Grok workers also report the model the session actually resolved; that authoritative value is announced when it differs from the requested one (an alias like `opus` resolving to a dated model ID) and is kept in state as `reported_model`.
+Every worker session is one sub-session of the run, and every run reports which model and reasoning effort those sub-sessions use, and where each came from. Report both at start. Pin every sub-session with `--model <name> --effort <level>` (or `AUTOPILOT_MODEL` / `AUTOPILOT_EFFORT`); the runner rejects an effort level its provider does not take before starting a worker.
 
 ## Fresh-process contract
 
@@ -57,7 +37,7 @@ Before launching it, the runner parses current statuses, claims, and blocking ed
 
 The runner keeps durable state, a human-readable log, and raw provider events under the target repository's Git directory. Claims made by that run include the ID, so a later invocation of the same command can recognize and resume its own interrupted work item without taking over another session's work. A per-root lock prevents concurrent runner processes from sharing that identity. Terminal state remains inspectable; rerunning a completed root starts a new run, while failures and human gates resume the existing run.
 
-A heartbeat proves that the worker process is alive. It defaults to five minutes; set `AUTOPILOT_HEARTBEAT_SECONDS` to a positive number of seconds when a different cadence is needed. `quiet threshold reached` means it has emitted no provider event for two heartbeat intervals; treat that as a prompt to inspect the log or attach, not proof that the worker is hung. The runner never kills quiet work automatically.
+A heartbeat proves that the worker process is alive (`AUTOPILOT_HEARTBEAT_SECONDS`, default five minutes). `quiet threshold reached` means it has emitted no provider event for two heartbeat intervals; treat that as a prompt to inspect the log or attach, not proof that the worker is hung. The runner never kills quiet work automatically.
 
 Use the installed workflow skills as the single source of truth. The script locates them all to validate the installation, then passes only the selected mode's workflow to the worker: `wayfinder` for a decision ticket, `implement` for build work. If the pipeline skills are absent, install this repository's complete skill collection before retrying.
 
@@ -76,5 +56,3 @@ A build ticket whose frontmatter says `deploy-gate: true` is a human gate after 
 Headless workers cannot conduct a live interview or approve a new spec or ticket breakdown. Stop with `needs_input` when `wayfinder` reaches a HITL ticket, `to-spec` needs publication approval or a decision answered, `to-tickets` needs an open build decision answered, or implementation exposes an undecided product question. After resolving the gate interactively, rerun the same command; tracker state and commits are the resume point.
 
 If an interrupted owned claim cannot be safely resumed from the current tracker and worktree state, stop with `needs_input` and identify the claim and unresolved changes. Never clear or take over a differently owned claim automatically.
-
-Exit codes are `0` complete, `2` needs input, `3` blocked, `4` worker failure, `5` runner/configuration failure, `129` hangup, `130` interrupted, and `143` terminated.

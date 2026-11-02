@@ -3,7 +3,7 @@ name: fix-ci-failures
 description: Read a branch's latest failed CI runs, triage each failure from its existing logs, and fix the real ones.
 disable-model-invocation: true
 argument-hint: "Branch name (defaults to main), then optional guidance (\"skip lint\", \"only the test job\")"
-allowed-tools: "Bash(gh run list *) Bash(gh run view *)"
+allowed-tools: "Bash(gh run list *) Bash(gh run view *) Bash(bash *fix-ci-failures/scripts/failed-jobs.sh *)"
 ---
 
 # Fix CI Failures
@@ -19,24 +19,15 @@ cache clears, and a dirty tree.
 
 ## 1. Find the latest failures
 
-Run `git fetch origin`. For each workflow, take only its newest **completed** run on the
-branch that was not cancelled, looking back at most 10 runs. An older failure whose
-workflow has passed since is already fixed, and a run still in progress or cancelled is
-not evidence: skip them. A workflow whose last 10 completed runs were all cancelled
-comes back as `all_cancelled`: report it with no verdict, since it has no log to triage.
+Run `git fetch origin`, then one script, which reads existing runs and logs and never triggers CI:
 
 ```bash
-gh run list --branch B --status completed --limit 100 \
-  --json databaseId,workflowName,conclusion,headSha,createdAt,url \
-  --jq 'group_by(.workflowName) | .[] | sort_by(.createdAt) | reverse | .[:10]
-        | (map(select(.conclusion != "cancelled")) | first)
-          // {workflowName: .[0].workflowName, conclusion: "all_cancelled", url: .[0].url}
-        | select(IN(.conclusion; "failure", "timed_out", "startup_failure", "all_cancelled"))'
-gh run view RUN --json jobs --jq '.jobs[] | select(.conclusion == "failure") | {databaseId, name, url}'
-gh run view --job JOB --log-failed
+bash <this-skill-dir>/scripts/failed-jobs.sh B --out <scratch>/ci-logs
 ```
 
-No workflow comes back: report that the branch's latest completed runs are green, and stop.
+For each workflow it takes only the newest **completed** run on the branch that was not cancelled, looking back at most 10 runs: an older failure whose workflow has passed since is already fixed, and a run still in progress or cancelled is not evidence. It prints one JSON entry per failing workflow (`workflow`, `run_id`, `url`, `head_sha`, `conclusion`) with each failed job's `name`, `url`, `first_errors` (the runner's `##[error]` annotations, then test-runner and compiler failure lines; never the trailing `exit code 1`), and `log`, the full failed-job log on disk. Read the log around an error when the first lines do not settle it. A workflow whose last 10 completed runs were all cancelled comes back as `all_cancelled` with no jobs: report it with no verdict, since it has no log to triage.
+
+`[]` means the branch's latest completed runs are green: report that, and stop.
 
 Completion criterion: every failed job is listed with its workflow, run URL, `headSha`,
 and the first real error from its log (not the trailing `exit code 1`).
