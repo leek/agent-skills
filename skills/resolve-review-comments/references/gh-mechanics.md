@@ -5,47 +5,24 @@ pull-request number.
 
 ## Read the three comment surfaces
 
-Review comments live in three different places, pull all three. `--paginate` matters: without it
-REST returns only the first 30 of each.
+Review comments live in three places (reviews, inline review threads, issue comments),
+and REST cannot resolve a thread. One read-only script pulls all three, paginated, with
+each inline comment's GraphQL thread id (`thread`, the `PRRT_…` that resolves it) and
+`resolved` flag. `<triage-dir>` is the `triage-github-pr` skill's directory, beside this
+one:
 
 ```bash
-# 1. Reviews (top-level bodies + state; identifies which bot reviewed which commit)
-gh api repos/OWNER/REPO/pulls/PR/reviews --paginate \
-  --jq '.[] | {id, user: .user.login, state, commit: .commit_id[:10], body}'
-
-# 2. Inline review comments (the threads you resolve): the reviewed commit is commit_id
-gh api repos/OWNER/REPO/pulls/PR/comments --paginate \
-  --jq '.[] | "=== #\(.id) | \(.user.login) | \(.path):\(.line // .original_line) | commit \(.commit_id[:10]) ===\n\(.body)\n"'
-
-# 3. General issue comments (not attached to a line)
-gh api repos/OWNER/REPO/issues/PR/comments --paginate --jq '.[] | {id, user: .user.login, body}'
+bash <triage-dir>/scripts/pr-comments.sh PR            # reviews, inline, issue, threads_open
+bash <triage-dir>/scripts/pr-comments.sh PR --count    # {threads_open}: the confirm step
 ```
+
+Its header names every field ([`pr-comments.sh`](../../triage-github-pr/scripts/pr-comments.sh)).
 
 The PR's commit range, to compare a reviewed commit against HEAD:
 
 ```bash
 gh pr view PR --json headRefOid,commits
 git log --oneline BASE..HEAD      # what the reviewer had vs what exists now
-```
-
-## Map inline comments to resolvable thread ids
-
-REST exposes comment ids but cannot resolve threads. GraphQL `reviewThreads` gives the
-thread id (`PRRT_…`) and its member comments' `databaseId` (== the REST comment id):
-
-```bash
-gh api graphql --paginate -F pr=PR -f query='
-query($pr: Int!, $endCursor: String) {
-  repository(owner:"OWNER", name:"REPO") {
-    pullRequest(number: $pr) {
-      reviewThreads(first:100, after: $endCursor) {
-        pageInfo { hasNextPage endCursor }
-        nodes { id isResolved comments(first:1){ nodes { databaseId path } } }
-      }
-    }
-  }
-}' --jq '.data.repository.pullRequest.reviewThreads.nodes[]
-  | {thread: .id, resolved: .isResolved, comment: .comments.nodes[0].databaseId, path: .comments.nodes[0].path}'
 ```
 
 ## Reply to a thread, then resolve it
@@ -85,18 +62,13 @@ reply_and_resolve 3790734406 PRRT_kwDO…0Y "$NOT_BUG_Y"
 
 ## Confirm
 
-```bash
-gh api graphql --paginate -F pr=PR -f query='query($pr: Int!, $endCursor: String) {
-  repository(owner:"OWNER", name:"REPO"){ pullRequest(number:$pr){
-    reviewThreads(first:100, after: $endCursor){ pageInfo { hasNextPage endCursor } nodes { isResolved } } } } }' \
-  --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved==false) | 1' | wc -l
-# 0 == every thread resolved, across every page
-```
+`pr-comments.sh PR --count` prints `threads_open`; 0 means every thread is resolved,
+across every page.
 
 ## Notes
 
 - A reply from a bot's own account is not needed; your reply + resolve is the record.
 - If a resolve mutation returns nothing, you likely lack write access or the thread id is
-  stale, re-query `reviewThreads`.
+  stale, run `pr-comments.sh PR` again.
 - Outdated comments (the code moved) still resolve the same way; resolving marks the
   conversation done regardless of the diff position.

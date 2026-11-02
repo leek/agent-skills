@@ -28,12 +28,9 @@ That path is the only place the fix is checked out, never a sibling directory. I
 Run tests against the repo's configured test database when you can. When the run needs
 its own (a worktree `.env`, a throwaway test database), name it `<app db>_issues_<run>`,
 never a name the main checkout's `.env`, `.env.testing`, or `phpunit.xml` uses, and
-register it the moment you create it:
-
-```bash
-printf '%s\t%s\t%s\t%s\n' "$(date +%s)" <pgsql|mysql> <database> "<worktree path, or ->" \
-  >> "$(git rev-parse --path-format=absolute --git-common-dir)/scratch-databases"
-```
+register it the moment you create it, per `laravel-herd-worktrees`'
+[Scratch database registry](../../laravel-herd-worktrees/SKILL.md#scratch-database-registry)
+(`scratch-db.sh register <pgsql|mysql> <database> <worktree path, or ->`).
 
 ## Land
 
@@ -67,7 +64,9 @@ gh issue view N --json state
 
 ## Clean up
 
-At step 6, for each item it removes: remove `.claude/worktrees/issues-<run>` from the main checkout by `laravel-herd-worktrees`' **Remove a served worktree** (it never forces;
-if it refuses, the tree holds unsaved work, so report it instead). Then drop each
-database and its parallel-testing copies (`<database>_test_<N>`) with the repo's client
-(`DROP DATABASE IF EXISTS`), and delete its line from the `scratch-databases` file.
+At step 6, for each item it removes: from the main checkout, remove
+`.claude/worktrees/issues-<run>` by `laravel-herd-worktrees`' **Remove a served worktree**
+(`remove-worktree.sh`; it never forces, and a refusal means unsaved work, so report it).
+Then drop each database it lists, plus any this run registered with `-` (no worktree), and their parallel-testing copies (`<database>_test_<N>`)
+with the repo's client (`DROP DATABASE IF EXISTS`), and `scratch-db.sh unregister` each
+one after its drop succeeds.

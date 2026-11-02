@@ -2,7 +2,7 @@
 
 With more than one PR, or with one PR that must merge after another, build the
 **merge plan** before any write: one ordered list of every PR the run may merge. Steps
-5 and 6 follow it exactly. Build it once, as the first of [Several PRs](../SKILL.md#several-prs)'
+5 and 6 follow it exactly. Build it once, as the first of [Several PRs](several-prs.md)'
 steps, from the PR metadata you read anyway.
 
 ## 1. Collect the edges

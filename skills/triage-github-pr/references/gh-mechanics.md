@@ -11,22 +11,24 @@ gh pr checks N --json name,state,bucket,link \
   --jq '.[] | select(.bucket == "fail") | {name, link}'   # finished failures on the head
 # A GitHub Actions link ends in /job/<job-id>: read only the failed steps
 gh run view --job <job-id> --log-failed
-# Reviews: state, body, and the commit each one reviewed
-gh api repos/{owner}/{repo}/pulls/N/reviews --paginate \
-  --jq '.[] | {id, user: .user.login, state, commit: .commit_id[:8], at: .submitted_at, body}'
-# Inline comments: where most actionable findings live
-gh api repos/{owner}/{repo}/pulls/N/comments --paginate \
-  --jq '.[] | {id, user: .user.login, path, line: (.line // .original_line), commit: .commit_id[:8], at: .updated_at, reply_to: .in_reply_to_id, url: .html_url, body}'
-# Issue comments: bot summaries and humans not on a line
-gh api repos/{owner}/{repo}/issues/N/comments --paginate \
-  --jq '.[] | {id, user: .user.login, at: .updated_at, url: .html_url, body}'
-gh api user --jq .login   # you: your replies and your disposition comment carry this login
 ```
 
-The snapshot is every `{id, at}` pair from the three comment calls. At step 6, an id
-not in it, or an id whose `at` changed, is new: bots often edit a summary comment in
-place instead of posting another. Your own replies and your disposition comment are
-never new.
+The three comment surfaces (reviews, inline comments, issue comments), your login, and
+each inline comment's review thread come from one script,
+[`scripts/pr-comments.sh`](../scripts/pr-comments.sh), run from the repo with
+`<this-skill-dir>` the triage-github-pr skill's directory. Save the first run as the snapshot:
+
+```bash
+bash <this-skill-dir>/scripts/pr-comments.sh N | tee <scratch>/pr-N-snapshot.json   # step 3
+bash <this-skill-dir>/scripts/pr-comments.sh N --since <scratch>/pr-N-snapshot.json  # step 6: new or edited only
+bash <this-skill-dir>/scripts/pr-comments.sh N --count                              # unresolved threads
+```
+
+Its JSON holds `reviews`, `inline` (each with `thread`, the id to resolve, and
+`resolved`), `issue`, `me`, `head`, and `threads_open`; the script's header names
+every field. The snapshot is every `{id, at}` pair in it. `--since` prints only an id
+not in it, or an id whose `at` changed (bots often edit a summary comment in place
+instead of posting another), and never your own replies or disposition comment.
 
 **Earlier answers.** An inline comment by you with a `reply_to` is your answer to the
 thread it replies to; its `url` is the link a repeat cites. The disposition comment's
@@ -131,30 +133,23 @@ A new worktree starts bare (no `vendor/`, no `.env`): make it runnable with `lar
 leave the tree as it is.
 
 At step 7, once the PR shows merged, `cd` back to the main checkout and remove
-`.claude/worktrees/pr-N` by `laravel-herd-worktrees`' **Remove a served worktree** (it never forces; if it refuses, the tree
-holds unsaved work, so report it instead). A stopped or `--auto`-queued PR keeps its
-worktree unless the user selects it at step 7.
+`.claude/worktrees/pr-N` by `laravel-herd-worktrees`' **Remove a served worktree**
+(`remove-worktree.sh`; it never forces, and a refusal means unsaved work, so report it).
+A stopped or `--auto`-queued PR keeps its worktree unless the user selects it at step 7.
 
 ## Reply and resolve
 
-Reply to an inline comment, then resolve its thread. Map comment ids to thread ids
-first: REST cannot resolve, and GraphQL `reviewThreads` gives the thread id (`PRRT_…`)
-with its comments' `databaseId` (the REST comment id).
+Reply to an inline comment, then resolve its thread. REST cannot resolve; the
+GraphQL thread id (`PRRT_…`) is the comment's `thread` in [`pr-comments.sh`](../scripts/pr-comments.sh)'s
+output.
 
 ```bash
-gh api graphql --paginate -F owner='{owner}' -F repo='{repo}' -F pr=N -f query='
-query($owner: String!, $repo: String!, $pr: Int!, $endCursor: String) {
-  repository(owner: $owner, name: $repo) { pullRequest(number: $pr) {
-    reviewThreads(first: 100, after: $endCursor) {
-      pageInfo { hasNextPage endCursor }
-      nodes { id isResolved comments(first: 1) { nodes { databaseId } } } } } } }' \
-  --jq '.data.repository.pullRequest.reviewThreads.nodes[] | {thread: .id, resolved: .isResolved, comment: .comments.nodes[0].databaseId}'
 gh api repos/{owner}/{repo}/pulls/N/comments/COMMENT_ID/replies -f body="$BODY"
 gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "PRRT_…"}) { thread { isResolved } } }'
 ```
 
 Keep `$BODY` free of apostrophes and backticks. A resolve that returns nothing means no
-write access or a stale thread id: re-query the threads.
+write access or a stale thread id: run `pr-comments.sh N` again.
 
 Bodies and resolution by delivery state:
 
@@ -171,7 +166,7 @@ Bodies and resolution by delivery state:
 Publish the classification reply before coding, then reply again when its state
 changes. A local fix SHA is the same after pushing, but is not yet remotely available;
 record the published head in the disposition only after the push succeeds. Re-query
-the unresolved thread count before pushing, right after each push, and before merging:
+the unresolved thread count (`pr-comments.sh N --count`) before pushing, right after each push, and before merging:
 a reviewer watching the PR sees each batch's threads close as it lands, not all at the end. An unresolved owner decision
 or accepted-but-unfixed current-batch finding stays visible, not falsely resolved.
 
@@ -242,17 +237,14 @@ first edit.
 Run tests against the repo's configured test database when you can. When the run
 needs its own (a worktree `.env`, a throwaway test database), name it
 `<app db>_pr<N>`, never a name the main checkout's `.env`, `.env.testing`, or
-`phpunit.xml` uses, and register it the moment you create it:
-
-```bash
-printf '%s\t%s\t%s\t%s\n' "$(date +%s)" <pgsql|mysql> <database> "<worktree path, or ->" \
-  >> "$(git rev-parse --path-format=absolute --git-common-dir)/scratch-databases"
-```
+`phpunit.xml` uses, and register it the moment you create it, per `laravel-herd-worktrees`'
+[Scratch database registry](../../laravel-herd-worktrees/SKILL.md#scratch-database-registry)
+(`scratch-db.sh register <pgsql|mysql> <database> <worktree path, or ->`).
 
 At step 7, once the PR shows merged (or the user selected it), drop the database and
 its parallel-testing copies (`<database>_test_<N>`) with the repo's client
-(`DROP DATABASE IF EXISTS`), then delete its line from that file. A database the user
-kept stays registered for `repository-cleanup`.
+(`DROP DATABASE IF EXISTS`), then `scratch-db.sh unregister <database>`. A database the
+user kept stays registered for `repository-cleanup`.
 
 ## Merge
 

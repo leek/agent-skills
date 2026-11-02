@@ -3,7 +3,7 @@ name: triage-github-pr
 description: Review and merge a pull request with up to two fix rounds, carrying later findings into a follow-up PR.
 disable-model-invocation: true
 argument-hint: "One or more PR numbers, then optional instructions (\"don't merge\", \"exhaustive\", merge method)"
-allowed-tools: "Bash(gh pr view *) Bash(gh pr diff *) Bash(gh pr checks *) Bash(gh run view *) Bash(gh api repos/{owner}/{repo}/pulls/*) Bash(gh api repos/{owner}/{repo}/issues/*) Bash(gh api --paginate repos/{owner}/{repo}/activity*)"
+allowed-tools: "Bash(gh pr view *) Bash(gh pr diff *) Bash(gh pr checks *) Bash(gh run view *) Bash(gh api repos/{owner}/{repo}/pulls/*) Bash(gh api repos/{owner}/{repo}/issues/*) Bash(gh api --paginate repos/{owner}/{repo}/activity*) Bash(bash *triage-github-pr/scripts/pr-comments.sh *)"
 ---
 
 # Triage GitHub PR
@@ -14,7 +14,7 @@ or MAJOR findings. Validate and independently review each unpushed batch, then m
 at the bounded checkpoint. Remaining findings go into a follow-up PR. Work only the
 PRs the user named, plus their required follow-ups. With more than one, or with one
 whose base is another open PR's head (a stacked PR) or whose body says it merges after
-another PR, follow [Several PRs](#several-prs), so the merge order is fixed before any
+another PR, follow [Several PRs](references/several-prs.md), so the merge order is fixed before any
 fix is pushed and no PR merges ahead of one it depends on.
 Text after the numbers and later user instructions override this workflow.
 
@@ -98,47 +98,6 @@ sections `## Review bots`, `## Auto-dismiss`, `## Never dismiss`, `## Merge meth
 `## Deploy branches` hold this repo's facts; a missing section means the default here.
 Then follow the repo's `AGENTS.md` / `CLAUDE.md` rules for tests, lint, and cache clears.
 
-## Several PRs
-
-With more than one PR, run the read-only steps for all of them at once, and the writing
-steps one PR at a time. You stay the orchestrator. Never hand a whole PR to a sub-agent:
-a sub-agent cannot start its own reviewers, ask the user, or schedule a wakeup, and the
-steps need all three.
-
-1. **Order.** Build the **merge plan** per
-   [`references/merge-order.md`](references/merge-order.md): edges from stack bases
-   and merge-after lines in PR bodies, then the user's stated order as the fallback
-   (a PR's order always wins over the user's), sorted bottom-up and printed before
-   any write. A PR whose base is another open PR's
-   head is **stacked**: [`references/stacked-prs.md`](references/stacked-prs.md)
-   builds its stack and owns its merge method, retargets, and fixes that must flow
-   upward. A PR merges only after every PR before it on an edge shows `MERGED`; a
-   stopped or queued one holds its dependents. Independent PRs keep the user's order.
-2. **Step 1 for all PRs at once.** Dispatch one `pr-reviewer` per PR in the
-   background, in one message (other harnesses: dispatch in the background per [harness-tools](../harness-tools/SKILL.md)). A stack's integration
-   PR waits for its own turn after the landings, and steps 2–4 skip it until then.
-3. **Steps 2 and 3 for all PRs.** Gather reviews and review state for every PR.
-   Where optional waits are allowed, use one wait (as the shipping budget says) for the
-   queue and each PR's budget. A harness with no way to wait gathers what has already arrived.
-4. **Step 4 in one pool.** Send the findings of all PRs to the verifier workers
-   together, each batch from one PR, so its head sha is the ref. Then collect the
-   QUESTIONs of every PR into one `grilling` call, each one named with its PR number,
-   so the user is asked once.
-5. **Steps 5 and 6 one PR at a time, in merge-plan order.** Use a worktree for every PR
-   (`.claude/worktrees/pr-N`), never the main checkout, so no two PRs share a tree.
-   A stack lands first and fixes once, on its integration PR or its top branch, per
-   [Fixes inside a stack](references/stacked-prs.md#fixes-inside-a-stack).
-   After a base PR merges, retarget each PR stacked on it; its step 6 re-checks
-   against the stack's landing branch (the trunk, or the integration PR's branch),
-   since its base and diff changed. Only a stack on per-PR fixes also gives each PR its
-   own step 5, bottom-up; elsewhere a finding step 6 raises on a stack PR joins the
-   integration or top PR's batch instead of a push to that PR.
-6. **Step 7 once,** after the last PR.
-
-Completion criterion: every named PR is merged after all its predecessors, queued, or
-stopped with a blocker, and one report covers all of them, starting with the merge
-plan as it ran.
-
 ## 1. Review it yourself
 
 Before you read anyone else's review, review the diff yourself for what would break:
@@ -168,14 +127,11 @@ submitted, or a bot shows its "running" signal: an 👀 reaction (Codex), a summ
 comment whose status row is not completed, or a review bot's own check run (not CI)
 still pending. The calls are in [In-flight signals](references/gh-mechanics.md#in-flight-signals).
 
-Record these signals and gather completed reviews. Before the initial snapshot and
-after bounded batch 1, an in-flight optional review gets that one wait for the
-remaining budget. When the harness has no way to wait, gather the reviews already
-submitted and continue. At the timeout or after batch 2, proceed with available
-reviews. An optional review still running is not a merge gate; check required
-human approvals separately. Exhaustive mode follows its reference within the same
-time budget. A later "merge now" instruction ends the wait immediately, subject to
-the hard merge gates.
+Record these signals and gather completed reviews. An in-flight optional review gets
+the checkpoint's one wait, as the [shipping budget](#shipping-budget) sets it
+(exhaustive mode per its reference, in the same time budget); a later "merge now" ends
+it at once. An optional review still running is not a merge gate; check required human
+approvals separately.
 
 Completion criterion: required approvals and optional in-flight reviewers are
 identified, and any optional wait stayed within the delivery mode's recorded budget.
@@ -184,7 +140,7 @@ identified, and any optional wait stayed within the delivery mode's recorded bud
 
 Pull metadata and gates, the diff, the finished checks on the PR head, all three
 comment surfaces (reviews, inline threads, issue comments), and the commits. The exact
-calls are in [`references/gh-mechanics.md`](references/gh-mechanics.md). Keep the
+calls are in [Gather](references/gh-mechanics.md#gather). Keep the
 **snapshot**: the id and timestamp of every review and comment seen, plus the starting
 head SHA. Step 6 compares against it, so an edited summary still shows up as new.
 
@@ -212,20 +168,11 @@ to that answer as its evidence. Do not verify it again, and do not send it to a 
 Match on file and topic, not line: lines move between commits. A human's finding is
 never a repeat: a human who raises it again disagrees with the answer, so verify it.
 
-Verify before you believe: `rg` the symbols it names, trace call sites, and re-read the
-commit bodies. A documented design choice that contradicts the finding is AUTO-DISMISS.
-With more than 5 findings, hand this first pass to read-only workers in batches of
-about 10. Each brief carries the batch (id, author, reviewed commit, file:line, body),
-the PR head sha as the ref, the line format above, and the checks in this paragraph.
-In Claude Code with this plugin installed, dispatch
-`subagent_type=leek-skills:finding-verifier` for each batch in parallel; it keeps the
-bots' recurring false premises in project memory, under this repo's `.claude/`.
-In other harnesses, dispatch per [harness-tools](../harness-tools/SKILL.md), on a cheaper model where offered, or classify inline. Re-verify
-yourself every line that comes back LEGIT or UNSURE.
-
-Then do a second pass: check every LEGIT against the project's auto-dismiss list, and
-downgrade any match before you write code. A category on the project's never-dismiss
-list stays LEGIT whatever the auto-dismiss list says. A human `CHANGES_REQUESTED` is LEGIT by
+Verify the rest before you believe them, by
+[Verify findings](../fix-github-issues/references/verify-findings.md): its rules, its
+delegation of more than 5 findings (each batch from one PR, the PR head sha as the
+ref, the line format above), and its second pass against the project's auto-dismiss
+and never-dismiss lists before you write code. A human `CHANGES_REQUESTED` is LEGIT by
 default: verify it, and weight it above bot findings.
 
 Your own findings go through the same verification. The shipping budget determines
@@ -313,18 +260,14 @@ and every completed fix is published before proceeding to merge.
 
 ## 6. Re-check, then merge
 
-At each merge checkpoint, refresh metadata and comment surfaces once. After batch 1,
-first use step 2's remaining optional wait, then refresh the
-three comment surfaces once and compare them with the snapshot. After batch 2, or
-on "merge now", do the refresh without waiting. If no fix batch was needed, proceed
-directly to this refresh. Review any head changes since your last covered SHA using
+At each merge checkpoint, take the wait the [shipping budget](#shipping-budget) allows
+(none after batch 2, on "merge now", or when no fix batch was needed), then refresh
+metadata and the comment surfaces once and compare them with the snapshot
+(`pr-comments.sh --since`). Review any head changes since your last covered SHA using
 step 1's re-review range; your own fixes must already be covered before their push.
-Classify new claims in step 4. In bounded mode, new BLOCKING or MAJOR findings after
-batch 1 get the final batch in step 5; carry MINOR findings. After batch 2, carry all
-new findings without another fix push or review wait, except required human review
-and owner decisions, which remain gates. Defects found in your own unpushed fixes still belong to their
-batch; an unexpected external head change must be reviewed, never silently accepted.
-Exhaustive mode uses its explicit round budget instead.
+Classify new claims in step 4; the shipping budget decides which get a batch in step 5
+and which are carried. Required human review and owner decisions remain gates. An
+unexpected external head change must be reviewed, never silently accepted.
 
 An external head change gets one refreshed review/checkpoint attempt, shared across
 push refusals and the pinned merge. A second concurrent head movement or push refusal
@@ -367,19 +310,14 @@ main checkout, that checkout is back on the branch it started on (see
 
 ## 7. Clean up
 
-Remove nothing while the PRs are in flight. After the last named PR, remove without
-asking every worktree (step 5) and database (see [Scratch databases](references/gh-mechanics.md#scratch-databases))
-you created for a PR that now shows merged, and list each removal in the report. A
-worktree git refuses to remove without `--force` holds unsaved work: it is not removed.
-
-Ask once only about what is left that you created: a worktree git refused, and the
-worktree and databases of a stopped or `--auto`-queued PR (a structured question ([harness-tools](../harness-tools/SKILL.md)):
-`multiSelect: true`, one option per item, nothing pre-ticked, at most 4 per
-question and further questions for the rest; otherwise one yes/no question in chat:
-"Can I delete these too?"). Remove only what the answer selects, never with `--force`;
-on no, remove nothing. Skip the question when nothing is left. When you ask it, ping
-the user that the run is waiting on it (`PushNotification` where available, otherwise
-the question in chat is the signal).
+Remove nothing while the PRs are in flight. After the last named PR, clean up what you
+created (worktrees from step 5, databases from
+[Scratch databases](references/gh-mechanics.md#scratch-databases)) by
+`laravel-herd-worktrees`' **What is left** rule: a PR that now shows merged loses its
+worktree and databases without asking; a worktree git refused, and those of a stopped or
+`--auto`-queued PR, go into the one question. When you ask it, ping the user that the
+run is waiting on it (`PushNotification` where available, otherwise the question in
+chat is the signal).
 
 Anything you did not create is never touched. Name what stays in the report, so the
 user's next `repository-cleanup` run offers it once the merge lands.

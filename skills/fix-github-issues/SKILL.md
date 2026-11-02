@@ -48,35 +48,10 @@ Finding N: [STALE | AUTO-DISMISS | HALLUCINATION | LEGIT] — <one-line evidence
 - `Finding 3: HALLUCINATION — rg 'BarPolicy::class' returns 0; symbol does not exist`
 - `Finding 4: LEGIT — app/Auth.php:88 still uses < instead of <=, exploitable on token boundary`
 
-Verification rules:
-
-- For a "class, method, or permission missing" claim, `rg` the symbol where the finding
-  says it is missing (that file, call site, or test). If it is there, the finding is
-  HALLUCINATION. That it exists somewhere else does not refute a missing check.
-- For an "X may break Y" claim, trace the real call sites. If nothing calls it, the
-  finding is STALE or HALLUCINATION.
-- A finding whose file:line does not exist at the reviewed commit, or does not hold the
-  code it describes, is HALLUCINATION. A finding on a file the commit did not touch
-  stands when the change reaches it (a changed caller that breaks an unchanged callee);
-  only when nothing in the commit leads there is it HALLUCINATION.
-- A documented design choice in the commit body that contradicts the finding is
-  AUTO-DISMISS.
-- A finding whose body retracts itself ("this technically works", "disregard") is
-  AUTO-DISMISS.
-
-**Delegate the legwork on a large set.** With more than 5 findings, hand the first pass
-to read-only workers in batches of about 10. Each brief carries the batch (id, author,
-reviewed commit, file:line, body), the ref `origin/<default>`, the line format above,
-and the verification rules. In Claude Code with this plugin installed, dispatch
-`subagent_type=leek-skills:finding-verifier` for each batch in parallel; it keeps the
-bots' recurring false premises in project memory, under this repo's `.claude/`.
-In other harnesses, dispatch per [harness-tools](../harness-tools/SKILL.md), on a cheaper model where offered, or classify inline when the
-harness has no sub-agents. Then re-verify yourself every line that came back LEGIT or UNSURE.
-You read that code for the fix anyway.
-
-**Second pass.** Re-read every LEGIT against the project's auto-dismiss list and
-downgrade any match. A category on the project's never-dismiss list stays LEGIT. Do this
-before writing any code.
+Verify each line, delegate a set of more than 5, and run the second pass against the
+project's auto-dismiss and never-dismiss lists before any code, all by
+[Verify findings](references/verify-findings.md), with `origin/<default>` as the ref.
+You re-read the LEGIT code for the fix anyway.
 
 Completion criterion: every finding in the working set has a line, and the second pass is done.
 
@@ -144,17 +119,11 @@ agrees with it.
 
 ## 6. Clean up
 
-Remove nothing before this step. Then remove without asking every worktree and database
-you created whose fixes are on `<default>` (or nothing was fixed in it), and list each
-removal in the report ([Clean up](references/mechanics.md#clean-up)). A worktree git
-refuses to remove without `--force` holds unsaved work: keep it.
-
-Ask once only about what is left that you created: a refused worktree, and one whose
-fixes are in an open pull request or kept local (a structured question ([harness-tools](../harness-tools/SKILL.md)): a
-`multiSelect: true` question with one option per item, nothing pre-ticked, at most 4 per
-question and further questions for the rest; otherwise a plain question in chat: "Can I
-delete these too?"). Remove only what the answer selects, never with `--force`. What
-stays stays registered, for `repository-cleanup`. Skip the question when nothing is left.
+Remove nothing before this step. Then clean up what you created by
+`laravel-herd-worktrees`' **What is left** rule ([Clean up](references/mechanics.md#clean-up)):
+a worktree and its databases whose fixes are on `<default>` (or that fixed nothing) go
+without asking; a refused worktree, and one whose fixes are in an open pull request or
+kept local, go into the one question. What stays stays registered, for `repository-cleanup`.
 
 Completion criterion: everything removable is removed, any question is answered, or you
 created nothing. Report the tally:
