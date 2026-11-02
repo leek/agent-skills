@@ -1,5 +1,5 @@
 // leek-skills' one Claude Code mod module. Each feature is optional polish over a skill
-// that already works without it; see AGENTS.md "Mods". Every hook that touches $ lives
+// that already works without it; see docs/authoring.md "Mods". Every hook that touches $ lives
 // in this file (the engine never follows $ across an import); the imports are pure.
 //
 // /scratch: a live pane of every .scratch/ effort, opened without a Claude turn. Where

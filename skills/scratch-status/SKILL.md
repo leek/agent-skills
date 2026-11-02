@@ -1,6 +1,6 @@
 ---
 name: scratch-status
-description: "Report what is still open across .scratch/: every effort's open tickets and decisions, what blocks it, how stale it is, and the next skill to run. Read-only — never files research, removes anything, or touches disk. Companion to scratch-cleanup, which does those."
+description: "Report what is still open across .scratch/ and the next skill to run for each effort. Read-only."
 disable-model-invocation: true
 argument-hint: "An effort slug to check just one (omit for every effort)"
 model: sonnet

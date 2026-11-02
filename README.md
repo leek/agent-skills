@@ -81,7 +81,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 
 ## Subagents
 
-Installing the Claude Code or Grok plugin also loads the subagents in [`agents/`](./agents) as `leek-skills:<name>`. The skills dispatch them where they already fan out work: `code-review` → `standards-reviewer` + `spec-reviewer`, `codebase-design` (design-it-twice) → `module-designer`, `improve-codebase-architecture` → `deepening-scout`, `retro` → `session-miner`, `panel` → `panelist`, `browser-test` → `browser-test-planner` + `browser-tester` + `browser-writer`, `chatter-scout` → `chatter-sweeper` + `chatter-verifier`, `code-smells-audit` → `smell-sweeper`, `prune-tests` → `test-auditor`, `fix-github-issues` + `triage-github-pr` → `finding-verifier`, `triage-github-pr` → `pr-reviewer`, `upgrade-plan` → `release-notes-collector` + `upgrade-impact-scout`; `research` and `dependency-audit` fork into `researcher` and `dependency-auditor`. The one plugin hook, [`hooks/hooks.json`](./hooks/hooks.json), guards `browser-tester` and `browser-test-planner` so they can only run read-only browser commands. Codex does not load the directory; its skills fall back to inline or generic sub-agents. Conventions in [`AGENTS.md`](./AGENTS.md#subagents-agents).
+Installing the Claude Code or Grok plugin also loads the subagents in [`agents/`](./agents) as `leek-skills:<name>`. The skills dispatch them where they already fan out work: `code-review` → `standards-reviewer` + `spec-reviewer`, `codebase-design` (design-it-twice) → `module-designer`, `improve-codebase-architecture` → `deepening-scout`, `retro` → `session-miner`, `panel` → `panelist`, `browser-test` → `browser-test-planner` + `browser-tester` + `browser-writer`, `chatter-scout` → `chatter-sweeper` + `chatter-verifier`, `code-smells-audit` → `smell-sweeper`, `prune-tests` → `test-auditor`, `fix-github-issues` + `triage-github-pr` → `finding-verifier`, `triage-github-pr` → `pr-reviewer`, `upgrade-plan` → `release-notes-collector` + `upgrade-impact-scout`; `research` and `dependency-audit` fork into `researcher` and `dependency-auditor`. The one plugin hook, [`hooks/hooks.json`](./hooks/hooks.json), guards `browser-tester` and `browser-test-planner` so they can only run read-only browser commands. Codex does not load the directory; its skills fall back to inline or generic sub-agents. Conventions in [`docs/authoring.md`](./docs/authoring.md#subagents-agents).
 
 ## Mods (Claude Code)
 
@@ -168,7 +168,7 @@ skills/
     references/      # optional: supporting docs
 ```
 
-The `SKILL.md` frontmatter requires only two fields (Claude Code reads a few optional ones such as `argument-hint` and `allowed-tools`; other harnesses ignore them, see [`AGENTS.md`](./AGENTS.md)):
+The `SKILL.md` frontmatter requires only two fields (Claude Code reads a few optional ones such as `argument-hint` and `allowed-tools`; other harnesses ignore them, see [`docs/authoring.md`](./docs/authoring.md)):
 
 ```markdown
 ---
@@ -181,7 +181,7 @@ description: One sentence, what it does and when Claude should use it.
 Instructions here.
 ```
 
-See [`template/SKILL.md.example`](./template/SKILL.md.example) for a starting point and [`AGENTS.md`](./AGENTS.md) for full conventions.
+See [`template/SKILL.md.example`](./template/SKILL.md.example) for a starting point and [`docs/authoring.md`](./docs/authoring.md) for full conventions.
 
 ## Creating a Skill
 

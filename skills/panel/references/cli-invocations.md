@@ -1,19 +1,18 @@
 # Panel CLI invocations
 
-Per-CLI detail behind the invocation table in `SKILL.md`. Read this only when a CLI
-misbehaves, when you want a hard read-only guarantee, or when the panel roster changes.
-`SKILL.md` holds the canonical command for each CLI; this file explains the flags and
-the alternatives; it does not restate the canonical command.
+Per-CLI detail behind [`scripts/launch.sh`](../scripts/launch.sh), which holds the one
+canonical headless command for each CLI. Read this only when a CLI misbehaves, when you
+want a hard read-only guarantee, or when the panel roster changes; a roster change is a
+new `case` in that script plus a section here.
 
 Three rules hold for every CLI:
 
 - **No `--model`.** Each CLI must run as its own latest/default model.
-- **Literal words only.** Worktree isolation refuses a command whose words are computed
-  at runtime, so `TASK=$(cat …) && cli "$TASK"` and `--cd "$PWD"` are both refused inside
-  a panelist's worktree. Hand each CLI the task file by absolute path: on stdin (`claude`,
-  `codex`) or as `--prompt-file` (`grok`). `agy` alone takes the task text inline, as one
-  single-quoted literal with each `'` written as `'\''`, so the shell expands nothing. A
-  CLI that does not read the task on stdin gets `< /dev/null`, so it does not block there.
+- **The task reaches each CLI from the file.** On stdin (`claude`, `codex`), by
+  `--prompt-file` (`grok`), or, for `agy`, read by the script and passed as one argument
+  (bash quotes it, so a backtick or `$` in the task stays text). A CLI that does not read
+  the task on stdin gets `< /dev/null`, so it does not block there. The panelist's own
+  command stays literal, which is what worktree isolation needs.
 - **Headless needs auto-approval.** A headless run cannot answer a permission prompt, so
   each command carries that CLI's bypass flag. The read-only options below vary in
   quality; the working-tree check in `SKILL.md` step 3 (not a flag) is what enforces
@@ -22,7 +21,7 @@ Three rules hold for every CLI:
 ## claude
 
 - Headless: `-p` / `--print` runs one prompt and exits. With no prompt argument it reads
-  the prompt from stdin, which is how the row passes the task file.
+  the prompt from stdin, which is how the script passes the task file.
 - Auto-approve: `--dangerously-skip-permissions`.
 - Read-only variant: keep `--dangerously-skip-permissions` (so it stays non-interactive)
   and drop the edit tools: `--disallowedTools Edit Write NotebookEdit`. Those three are
@@ -32,10 +31,10 @@ Three rules hold for every CLI:
 ## codex
 
 - Headless: the `exec` subcommand is non-interactive.
-- Working dir: `-C` / `--cd <dir>`: pass the worktree's absolute path, written out (not
-  `"$PWD"`), so codex reads the right repo.
+- Working dir: `-C` / `--cd <dir>`: the script passes the directory it runs from, so
+  codex reads the right repo.
 - Auto-approve: `--dangerously-bypass-approvals-and-sandbox`.
-- Read-only variant: `codex exec --sandbox read-only --cd WORKTREE - < TASK_FILE`: the
+- Read-only variant: `codex exec --sandbox read-only --cd <worktree> - < <task file>`: the
   `read-only` sandbox blocks writes while still running non-interactively. Drop the
   bypass flag when you use it; the two are mutually exclusive.
 - Prompt position: trailing positional, after all flags. `-` (or no prompt) reads the
@@ -46,7 +45,7 @@ Three rules hold for every CLI:
 
 - Headless: `-p` / `--print` runs one prompt and exits. It has no prompt-file flag, and
   `-p` with no value prints help rather than reading stdin (stdin is read only with
-  `--input-format stream-json`), so the task goes inline as a single-quoted literal.
+  `--input-format stream-json`), so the script passes the task text as `-p`'s value.
 - **Always pass `--print-timeout 30m`.** The default is 5m, and a code review takes longer
   than that, so without it agy dies with `Error: timeout waiting for response` after five
   minutes and the seat returns nothing. Put it before `-p` like every other flag.
@@ -65,7 +64,7 @@ Three rules hold for every CLI:
 ## grok
 
 - Headless: `-p` / `--single <PROMPT>` runs one prompt and exits; `--prompt-file <PATH>`
-  does the same with the prompt read from a file, which is how the row passes the task.
+  does the same with the prompt read from a file, which is how the script passes the task.
 - Auto-approve: `--always-approve`.
 - Read-only variant: grok has `--sandbox <profile>` (also `GROK_SANDBOX` env) plus
   `--deny <rule>` permission rules. Run `grok --help` for the profile names on this

@@ -57,25 +57,14 @@ Without those tools, show the same tabs as numbered lists in chat, and take the 
 
 ## Inventory Commands
 
-Use the repository's existing tools and hosting provider first. Common Git and GitHub CLI checks:
+One read-only script covers steps 1–3's git and GitHub state as one JSON object: working tree, stashes with their files, remotes, stale remote-tracking refs, worktrees (locked, prunable, dirty), local branches (upstream, gone upstream, last commit, merged into origin's default branch), and open and last 30 closed PRs:
 
 ```bash
-git status --short --branch
-git stash list
-git stash show --stat stash@{0}
-git remote -v
-git fetch --all --no-prune --no-prune-tags
-git remote prune --dry-run origin
-git worktree list --porcelain
-git branch --format='%(refname:short) %(upstream:short) %(committerdate:relative)'
-git branch --merged
-git branch --no-merged
-git log --all --decorate --oneline --graph --date-order -n 80
-gh pr list --state open --json number,title,headRefName,baseRefName,author,updatedAt,url
-gh pr list --state closed --limit 30 --json number,title,headRefName,baseRefName,author,updatedAt,closedAt,mergedAt,url
+bash scripts/inventory.sh               # fetches first, never pruning
+bash scripts/inventory.sh --graph 80    # adds the recent `git log --all --graph`, when commit topology matters
 ```
 
-Fetch with `--no-prune --no-prune-tags` even when the user's config sets `fetch.prune` or `fetch.pruneTags`: a pruning fetch deletes stale remote-tracking refs and local-only tags (an `archive/*` tag made to preserve work) that nobody selected. `git remote prune --dry-run` shows the stale refs as candidates instead.
+Its fetch is `--no-prune --no-prune-tags` even when the user's config sets `fetch.prune` or `fetch.pruneTags`: a pruning fetch deletes stale remote-tracking refs and local-only tags (an `archive/*` tag made to preserve work) that nobody selected. Never fetch with pruning yourself; `stale_remote_refs` lists those refs as candidates instead. Dig into one item with plain git (`git stash show -p stash@{N}`, `git log <base>..<branch>`).
 
 Worktrees whose PR merged, and the databases left behind, come from one script. With no arguments it changes nothing and prints the candidates as JSON. It removes only the names you pass, after the user selected them, and it refuses the whole run, changing nothing, if one name is not a candidate:
 
@@ -86,7 +75,7 @@ bash scripts/prune-merged-worktrees.sh --remove <worktree path> --drop pgsql:<da
 
 A worktree's database can be dropped only in the same run that removes that worktree. Never pass a name the user did not select, and never build the arguments from the whole list.
 
-If `gh` is unavailable or the repository is not on GitHub, use the equivalent provider CLI, web UI, or local Git evidence and report the PR visibility gap.
+When `prs` is `null` (`gh` unavailable, or the repository is not on GitHub), use the equivalent provider CLI, web UI, or local Git evidence and report the PR visibility gap.
 
 ## Databases
 

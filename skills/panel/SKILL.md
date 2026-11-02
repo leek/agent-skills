@@ -3,7 +3,7 @@ name: panel
 description: Convene a panel of agent CLIs (grok, claude, codex, agy) on a prompt or a code review, then report one consensus grouped by how much they agree.
 disable-model-invocation: true
 argument-hint: "A prompt, or a review scope like 'review since main'"
-allowed-tools: "Bash(grok *) Bash(claude *) Bash(codex *) Bash(agy *)"
+allowed-tools: "Bash(bash *panel/scripts/launch.sh *) Bash(grok *) Bash(claude *) Bash(codex *) Bash(agy *)"
 compatibility: "Needs at least one of the grok, claude, codex, or agy CLIs on PATH"
 model: sonnet
 effort: medium
@@ -45,8 +45,8 @@ panel when the task mentions panels, panelists, or other CLIs:
 `$SCRATCH` is the session's scratchpad directory where the harness has one, otherwise
 one `mktemp -d`; hand subagents its absolute path, since they do not share your shell.
 Save the string to `$SCRATCH/panel-task.txt` with the file-write tool (where the harness
-has none, a quoted heredoc: `cat > "$SCRATCH/panel-task.txt" <<'PANEL_EOF'`). Three of the
-launch rows then read the file and never contain the task's words, so a guard hook that
+has none, a quoted heredoc: `cat > "$SCRATCH/panel-task.txt" <<'PANEL_EOF'`). The launcher
+reads the file, so no launch command contains the task's words, and a guard hook that
 reads the command (task text that names `git commit`, say) cannot block the launch.
 
 ### 2. Check who is on the panel
@@ -63,30 +63,20 @@ cheap wrapper, since the thinking happens inside the CLI it runs; in other harne
 in the background per [harness-tools](../harness-tools/SKILL.md), one per CLI, and collect every result). Give each subagent
 the path of the **same** task file and this brief:
 
-- **Launch with literal paths only.** Worktree isolation refuses a command whose words
-  are computed at runtime (`$(cat …)`, `$TASK`, `$PWD`), since it cannot prove the
-  command stays inside the worktree. So write every path out in full: `TASK_FILE` in the
-  rows is the task file's absolute path, and `WORKTREE` is the output of `pwd`, taken in
-  its own earlier call. `claude` and `codex` read the task on stdin, and `grok` reads it
-  with `--prompt-file`. `agy` has no file or stdin form, so its row carries the task text
-  inline, as one single-quoted literal: copy the file's text in, writing each `'` as `'\''`.
-  Single quotes stop every expansion, so a backtick or `$` in the task stays text. Run
-  your CLI **once**, headless, from the repo root, using its row below. Add no
-  `--model`; keep the row's flags as written. If a guard still refuses the launch, that
-  is a launch-form problem, not a CLI error: say which word it refused and fix that.
-- **Run every CLI detached: never let one time out.** These agent CLIs take many
-  minutes, and a slow model (codex at high reasoning is the usual culprit) will run past
-  the Bash tool's 10-minute foreground ceiling and get killed mid-orientation, before it
-  ever reports. Do **not** run the command in the foreground with a big timeout, 10 min
-  is the hard max and it will be killed. Instead redirect the command's output to a
-  scratch file and launch it with the Bash tool's `run_in_background: true`: append
-  ` > SCRATCH/panel-<cli>.out 2>&1` to the row's command, with `SCRATCH` written out as
-  its absolute path (keep the row's `<` redirect).
-  Your turn pauses and you are re-invoked automatically when the CLI exits; then read the
-  scratch file and distill it. Background runs have no timeout; this is what guarantees
-  nothing is cut off. Where the shell tool has no background mode and rejects `&` (Grok
-  CLI), run the command in the foreground, still redirected, with the tool's timeout
-  parameter set to its maximum (for example `timeout: 900000`), never its default.
+- **Launch with the launcher script, literal paths only.** Run your CLI **once**, from
+  the repo root (or your worktree), with `bash LAUNCHER <cli> TASK_FILE SCRATCH/panel-<cli>.out`,
+  where `LAUNCHER` is this skill's [`scripts/launch.sh`](scripts/launch.sh), and every path is
+  absolute and written out in full: worktree isolation refuses a command whose words are
+  computed at runtime (`$(cat …)`, `$TASK`, `$PWD`). The script holds each CLI's headless
+  command and flags (no `--model`, ever) and writes all its output to the `.out` file. If a
+  guard still refuses the launch, that is a launch-form problem, not a CLI error: say
+  which word it refused; `bash LAUNCHER --print <cli> …` prints the plain command to run instead.
+- **Run it detached: never let one time out.** These CLIs take many minutes, past the
+  shell tool's 10-minute foreground ceiling, which kills a run before it reports. Launch
+  with the Bash tool's `run_in_background: true`; your turn pauses and you are re-invoked
+  when the CLI exits; then read the `.out` file. Where the shell tool has no background
+  mode and rejects `&` (Grok CLI), run it in the foreground with the tool's timeout set to
+  its maximum (for example `timeout: 900000`), never its default.
 - **Wait with one call, never poll.** No `sleep`, `ps`, `pgrep`, or repeated reads of
   the output file while the CLI runs: each check spends a turn, and the turn cap ends the
   subagent while its CLI is still running.
@@ -94,17 +84,7 @@ the path of the **same** task file and this brief:
   capture three things: a one-line **claim**, a **location** (`file:line`, or
   `general`), and a one-line **reason**. Drop the CLI's logs, thinking, and prose.
 - Return `{ cli, status, points[] }`. `status` is `responded`, or `errored` with a
-  one-line cause. Return the object only, no narration.
-
-Headless commands (`TASK_FILE` and `WORKTREE` are absolute paths written out in full;
-`< /dev/null` stops a CLI that does not read the task on stdin from blocking on it):
-
-| CLI | Command |
-|---|---|
-| `claude` | `claude -p --dangerously-skip-permissions < TASK_FILE` |
-| `codex` | `codex exec --dangerously-bypass-approvals-and-sandbox --cd WORKTREE - < TASK_FILE` |
-| `agy` | `agy --dangerously-skip-permissions --print-timeout 30m -p '<task text>' < /dev/null` |
-| `grok` | `grok --prompt-file TASK_FILE --always-approve < /dev/null` |
+  one-line cause (a non-zero exit or an empty `.out`). Return the object only, no narration.
 
 In **review** shape, the task string is this brief. Name the pinned diff from step 1 in
 plain words, with **no backticks**, so nothing is left for a shell to expand:
@@ -124,8 +104,8 @@ delete new files) and name that CLI. A path that was already dirty holds the use
 unsaved work: report it and leave it as it is. This isolation or tree check (not a
 per-CLI flag) is what enforces review-only.
 
-Per-CLI notes: read-only options and their traps, structured-output flags,
-absent-vs-errored, auth: live in
+Per-CLI notes: why each flag in `scripts/launch.sh` is there, read-only options and their
+traps, structured-output flags, absent-vs-errored, auth: live in
 [`references/cli-invocations.md`](references/cli-invocations.md). Read it only when a CLI
 misbehaves or the panel roster changes.
 

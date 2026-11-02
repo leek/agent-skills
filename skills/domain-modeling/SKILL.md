@@ -1,6 +1,6 @@
 ---
 name: domain-modeling
-description: "Build and sharpen a project's domain model: challenge terms against the glossary, resolve fuzzy language, stress-test concepts with concrete scenarios, and record GLOSSARY.md entries and ADRs the moment decisions land. Use when pinning down domain terminology or a ubiquitous language, recording an architectural decision, or when another skill (grilling, wayfinder, to-spec) needs the domain model maintained."
+description: "Build and sharpen a project's domain model: its GLOSSARY.md and ADRs. Use when pinning down domain terminology or a ubiquitous language, challenging fuzzy terms, recording an architectural decision, or when another skill needs the domain model maintained."
 ---
 
 # Domain Modeling
