@@ -35,7 +35,7 @@ Build the plan for every bucket:
 - **Mismatched effort**: state `mismatch` in one line and what would settle it.
 - **Unclassified**: one line per non-junk file saying what it looks like and a proposed fate (file, remove, or keep).
 
-Show the plan in one message, with these sections in order: **File** (research moves and link rewrites), **ADR candidates** (numbered, so the user can pick by number), **Remove** (committed paths), **Remove: cannot recover** (untracked paths, with a note that git holds no copy), **Questions** (mismatched efforts, unclear destinations, unclassified files), and **Keep** (the report table from step 4). Ask for approval with `AskUserQuestion` in Claude Code or `ask_user_question` in Grok, otherwise in chat. The untracked removals need their own explicit yes, separate from the rest of the plan.
+Show the plan in one message, with these sections in order: **File** (research moves and link rewrites), **ADR candidates** (numbered, so the user can pick by number), **Remove** (committed paths), **Remove: cannot recover** (untracked paths, with a note that git holds no copy), **Questions** (mismatched efforts, unclear destinations, unclassified files), and **Keep** (the report table from step 4). Ask for approval with a structured question ([harness-tools](../harness-tools/SKILL.md)), otherwise in chat. The untracked removals need their own explicit yes, separate from the rest of the plan.
 
 Done when the user has approved, trimmed, or rejected each section, and has answered every question.
 

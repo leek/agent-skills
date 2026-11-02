@@ -70,8 +70,8 @@ reviewed commit, file:line, body), the ref `origin/<default>`, the line format a
 and the verification rules. In Claude Code with this plugin installed, dispatch
 `subagent_type=leek-skills:finding-verifier` for each batch in parallel; it keeps the
 bots' recurring false premises in project memory, under this repo's `.claude/`.
-In Codex, use `spawn_agent` with `fork_turns: "none"`. In Grok, use `spawn_subagent` (`subagent_type` `leek-skills:finding-verifier` when this plugin is installed). Elsewhere, use any read-only sub-agent on a cheaper model, or classify inline when the
-harness has none. Then re-verify yourself every line that came back LEGIT or UNSURE.
+In other harnesses, dispatch per [harness-tools](../harness-tools/SKILL.md), on a cheaper model where offered, or classify inline when the
+harness has no sub-agents. Then re-verify yourself every line that came back LEGIT or UNSURE.
 You read that code for the fix anyway.
 
 **Second pass.** Re-read every LEGIT against the project's auto-dismiss list and
@@ -150,7 +150,7 @@ removal in the report ([Clean up](references/mechanics.md#clean-up)). A worktree
 refuses to remove without `--force` holds unsaved work: keep it.
 
 Ask once only about what is left that you created: a refused worktree, and one whose
-fixes are in an open pull request or kept local (`AskUserQuestion` in Claude Code or `ask_user_question` in Grok: a
+fixes are in an open pull request or kept local (a structured question ([harness-tools](../harness-tools/SKILL.md)): a
 `multiSelect: true` question with one option per item, nothing pre-ticked, at most 4 per
 question and further questions for the rest; otherwise a plain question in chat: "Can I
 delete these too?"). Remove only what the answer selects, never with `--force`. What

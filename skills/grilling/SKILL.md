@@ -86,7 +86,7 @@ These rules govern the text shown to the user. They do not govern the code, the 
 
 ## Asking the question
 
-Where `AskUserQuestion` (Claude Code) or `ask_user_question` (Grok) is available, use it: decisions become click-to-answer:
+Where the harness has a structured question tool ([harness-tools](../harness-tools/SKILL.md)), use it: decisions become click-to-answer. These rules are for Claude Code's `AskUserQuestion`; for another harness's tool, keep what it supports and follow its limits in that file:
 
 - One question per call.
 - 2–4 options, every one real: no filler choices, no explicit `Other` (the tool provides free-form input).
@@ -94,8 +94,6 @@ Where `AskUserQuestion` (Claude Code) or `ask_user_question` (Grok) is available
 - Describe what each option commits the project to, not just what it is.
 - `multiSelect: true` only when options legitimately stack.
 - When the options are artifacts to compare side by side (a signature, a schema, a payload, a screen layout), put each one's snippet or ASCII mockup in that option's `preview`. `preview` works only on a single-select question.
-
-In Codex, when `request_user_input` is listed for the turn, ask through it with the same shape (recommendation first, 2–4 real options); it has no `preview`, so put a short snippet in the option description or fall back to chat for side-by-side artifacts.
 
 Without one of these tools, ask the same shape in chat (numbered options, recommendation first, trade-off per line, and under each option the fenced block its `preview` would hold) and wait for the answer. Never print fake tool JSON.
 

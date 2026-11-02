@@ -59,8 +59,8 @@ consensus to form: say which are missing and stop.
 
 Spawn one subagent per present CLI, all in a single message so they run at once (in
 Claude Code with this plugin installed, `subagent_type=leek-skills:panelist`: a small,
-cheap wrapper, since the thinking happens inside the CLI it runs; in Codex, `spawn_agent`
-with `fork_turns: "none"` per CLI, then `wait_agent` on all of them; in Grok, `spawn_subagent` per CLI, `subagent_type` `leek-skills:panelist` when this plugin is installed, then `get_command_or_subagent_output`). Give each subagent
+cheap wrapper, since the thinking happens inside the CLI it runs; in other harnesses, dispatch
+in the background per [harness-tools](../harness-tools/SKILL.md), one per CLI, and collect every result). Give each subagent
 the path of the **same** task file and this brief:
 
 - **Launch with literal paths only.** Worktree isolation refuses a command whose words

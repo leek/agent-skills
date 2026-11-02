@@ -37,7 +37,7 @@ Map body template, ticket body, claim/block/resolve mechanics: [references/map-a
 
 ## Structured questions
 
-Decision points that arise outside a full grilling: confirming the destination phrasing, choosing between scope rulings, picking which frontier ticket to work, use the question shape from `grilling` (via `AskUserQuestion` in Claude Code or `ask_user_question` in Grok, otherwise a plain question in chat): recommended option first, real trade-offs per option, wait for the answer. Don't reinvent the protocol here, including its **Settle it yourself first** ladder and **What still earns a question** bar, which gate every question this skill asks and every ticket it charts. When this skill invokes `grilling` or `domain-modeling`, the inner skill does **not** print an end-of-session block, only the outermost skill does.
+Decision points that arise outside a full grilling: confirming the destination phrasing, choosing between scope rulings, picking which frontier ticket to work, use the question shape from `grilling` (as a structured question ([harness-tools](../harness-tools/SKILL.md)), otherwise a plain question in chat): recommended option first, real trade-offs per option, wait for the answer. Don't reinvent the protocol here, including its **Settle it yourself first** ladder and **What still earns a question** bar, which gate every question this skill asks and every ticket it charts. When this skill invokes `grilling` or `domain-modeling`, the inner skill does **not** print an end-of-session block, only the outermost skill does.
 
 ## Invocation
 

@@ -44,6 +44,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | `grill-with-docs` | user | Run a grilling session with domain-modeling alongside, capturing terms in GLOSSARY.md and decisions as ADRs while they land. |
 | `grilling` | model | Interview the user one decision at a time until reaching shared understanding, resolving each branch of the decision tree with recommended options and trade-offs. |
 | `handoff` | user | Compact the current conversation into a handoff document for another agent to pick up. |
+| `harness-tools` | model | Which tool each harness (Claude Code, Codex, Grok, agy) uses to start, follow up with, or stop a sub-agent, and to ask a structured question. The one place skills look these up. |
 | `housekeeper` | user | Run a conservative code-project housekeeping pass. |
 | `implement` | user | Implement one work item end to end: scope and claim it when trackable, TDD at agreed seams, commit, review, verify, and resolve it. |
 | `implement-spec` | user | Build a whole spec fast: parallel implementer subagents work the ticket frontier, each in its own worktree, merging onto one integration branch; then one review, one verification pass, and one PR or a stack of PRs (it asks). Cuts the tickets first when the spec has none. |
@@ -128,7 +129,7 @@ codex plugin marketplace add leek/agent-skills
 codex plugin add leek-skills@leek-agent-skills
 ```
 
-Codex lists the model-invoked skills as `leek-skills:<name>` and loads the plugin's `hooks/hooks.json`. It does not load `agents/` or the mod; the skills fall back to Codex's own sub-agents (`spawn_agent`) or run inline. Pick one route per machine: if you already installed with `npx skills`, the plugin lists those skills a second time.
+Codex lists the model-invoked skills as `leek-skills:<name>` and loads the plugin's `hooks/hooks.json`. It does not load `agents/` or the mod; the skills fall back to Codex's own sub-agents or run inline, per [`harness-tools`](./skills/harness-tools/SKILL.md). Pick one route per machine: if you already installed with `npx skills`, the plugin lists those skills a second time.
 
 ### Grok (plugin marketplace)
 
@@ -139,7 +140,7 @@ grok plugin marketplace add leek/agent-skills
 grok plugin install leek-skills --trust
 ```
 
-Grok loads the plugin's skills, `agents/` as `leek-skills:<name>`, and `hooks/hooks.json`. It does not load the mod. A dispatch uses `spawn_subagent`. See [`AGENTS.md`](./AGENTS.md).
+Grok loads the plugin's skills, `agents/` as `leek-skills:<name>`, and `hooks/hooks.json`. It does not load the mod. Each harness's sub-agent and question tools are in [`harness-tools`](./skills/harness-tools/SKILL.md).
 
 ### Claude Code (manual copy)
 

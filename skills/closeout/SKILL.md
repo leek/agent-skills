@@ -16,7 +16,7 @@ From the conversation, write down:
 
 - **Files** created, edited, or deleted, grouped by the checkout or worktree they sit in.
 - **Branches and worktrees** created, and **PRs** opened or pushed to (number and repo).
-- **Jobs** started: background Bash tasks, subagents (`Agent` in Claude Code, `spawn_agent` in Codex, `spawn_subagent` in Grok), `Monitor`s, `CronCreate` jobs, `ScheduleWakeup` loops, dev servers, watchers, queue workers.
+- **Jobs** started: background Bash tasks, subagents (any dispatch in [harness-tools](../harness-tools/SKILL.md)), `Monitor`s, `CronCreate` jobs, `ScheduleWakeup` loops, dev servers, watchers, queue workers.
 - **Questions** you asked the user, and every grill ledger branch still `open` or `deferred`.
 - **Asks**: each thing the user asked this session to do.
 - **Deploy facts**: migrations, new env keys (`.env.example`), new scheduled commands or queued jobs, config or cache changes, and any "after merge" or "after deploy" step said in the conversation.
@@ -28,7 +28,7 @@ Done when every checkout, branch, PR, job, question, ask, and deploy fact from t
 A **blocker** is an item that loses work or stops a job if the session closes now.
 
 - **Git state**: run [`scripts/git-state.sh`](scripts/git-state.sh) `<path> …` once, with every checkout and worktree from step 1. In its `changes`, count only the files on your list, plus anything under `.claude/agent-memory/`; another session's files are not yours, the same rule `commit` follows. Uncommitted files → `/commit`. On a branch this session committed to, `unpushed` above 0, or null (nothing to compare against) → `git push`, or `git push -u origin <branch>` when `upstream` is null. `upstream_gone` true means the remote branch was deleted, most often by a merge: check its PR, and a merged one is a `/repository-cleanup` follow-up, not a push. A non-null `operation` → `/resolving-merge-conflicts`, or the `--continue`/`--abort` that finishes it.
-- **Running jobs**: every background task or subagent with no completion notification yet → wait for it, or stop it (`TaskStop` in Claude Code, `interrupt_agent` in Codex, `kill_command_or_subagent` in Grok). For a cron job or wakeup loop this session made, confirm it still exists (`CronList` in Claude Code; a harness without cron tools leaves it **not checked**) → `CronDelete`, or keep it on purpose. For a dev server or watcher, confirm it is still alive (`lsof -iTCP:<port> -sTCP:LISTEN`, or `ps -p <pid>`) → stop it, or keep it on purpose. A job you cannot check in this harness is **not checked**, not finished.
+- **Running jobs**: every background task or subagent with no completion notification yet → wait for it, or stop it (per [harness-tools](../harness-tools/SKILL.md)). For a cron job or wakeup loop this session made, confirm it still exists (`CronList` in Claude Code; a harness without cron tools leaves it **not checked**) → `CronDelete`, or keep it on purpose. For a dev server or watcher, confirm it is still alive (`lsof -iTCP:<port> -sTCP:LISTEN`, or `ps -p <pid>`) → stop it, or keep it on purpose. A job you cannot check in this harness is **not checked**, not finished.
 
 Done when every git path and every job from step 1 is cleared, listed as a blocker, or kept on purpose. A job kept on purpose is a follow-up that names how to stop it.
 
@@ -76,7 +76,7 @@ Leave out an empty section. **Not checked** lists each check that could not run 
 
 A **runnable** item is one whose fix can run in this session now: a commit, a push, stopping a job, a skill such as `/resolve-review-comments`, `/grill-me`, or `/handoff`. A PR waiting on a reviewer, a not-checked item, and a post-merge or post-deploy step are not runnable; they stay in the report only. With no runnable item, stop after the report.
 
-Ask which fixes to run (`AskUserQuestion` in Claude Code or `ask_user_question` in Grok: `multiSelect: true`, one option per runnable item labelled with the item and its fix, blockers first, nothing pre-ticked, at most 4 per question and further questions in the same call for the rest; `request_user_input` in Codex when it is listed for the turn; otherwise a numbered list in chat, picked by number). The pick is the user's approval for those fixes and no others. Nothing picked → stop.
+Ask which fixes to run (a structured question ([harness-tools](../harness-tools/SKILL.md)): `multiSelect: true`, one option per runnable item labelled with the item and its fix, blockers first, nothing pre-ticked, at most 4 per question and further questions in the same call for the rest; otherwise a numbered list in chat, picked by number). The pick is the user's approval for those fixes and no others. Nothing picked → stop.
 
 Run the picked fixes in dependency order (commit before push, push before a PR fix), quick fixes before interactive skills. A picked skill keeps its own confirmations. When a fix fails, stop: skip every fix that depends on it and report the failure with its output.
 

@@ -37,9 +37,8 @@ Make it runnable the way step 5's worktree was. When its tests need a database o
 own, name it `<app db>_pr<N>_fix<k>` and register it per
 [Scratch databases](gh-mechanics.md#scratch-databases). Then start one fixer per group
 in one message, in the background (Claude Code: `Agent`, `run_in_background: true`,
-`name: pr-<N>--fix-<k>`; Codex: `spawn_agent` with `fork_turns: "none"` per group, keeping each id, then
-`wait_agent`; Grok: `spawn_subagent` per group, keeping each id, then
-`get_command_or_subagent_output`; elsewhere, any sub-agent the harness offers). Its brief gives the worktree
+`name: pr-<N>--fix-<k>`; other harnesses: dispatch in the background per
+[harness-tools](../../harness-tools/SKILL.md), keeping each id; elsewhere, any sub-agent the harness offers). Its brief gives the worktree
 path, its findings' step 4 lines with links, its file list, the repo's `AGENTS.md` /
 `CLAUDE.md`, and these rules:
 
@@ -58,7 +57,7 @@ path, its findings' step 4 lines with links, its file list, the repo's `AGENTS.m
 
 Then end the turn and let the completion notifications wake you; never poll. An idle
 notification with no report and no new commit is a stall: message that fixer at once
-(`SendMessage` to its name, `followup_task` in Codex, `send_subagent_message` in Grok when active agent messages are on) to finish or say what blocks it.
+(`SendMessage` to its name in Claude Code; other harnesses follow up per [harness-tools](../../harness-tools/SKILL.md)) to finish or say what blocks it.
 
 Completion criterion: every group has a fixer running or a report back.
 
@@ -78,8 +77,8 @@ dispositioned as blocked.
 
 Run the union of the fixers' focused test commands once on the merged tree, then step
 5's pre-push review over the whole fix range. A failure or review defect goes back to
-the fixer that owns the file, with the output (`SendMessage` to its name, `followup_task`
-in Codex, `send_subagent_message` in Grok when active agent messages are on), and its new commits are merged as in step 3. Fix inline only what no
+the fixer that owns the file, with the output (`SendMessage` to its name in Claude Code; other harnesses
+follow up per [harness-tools](../../harness-tools/SKILL.md)), and its new commits are merged as in step 3. Fix inline only what no
 fixer owns. Then reply on each finding with its commit's SHA, `validated; push pending`,
 record the batch and push, as step 5 says.
 

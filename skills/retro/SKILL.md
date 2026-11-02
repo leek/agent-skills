@@ -87,7 +87,7 @@ Surface corrections fast by grepping extracted human messages:
 
 ## 3. Fan out: one subagent per batch
 
-50 sessions won't fit one context. Split the file list into ~7 round-robin batches (so big files spread out) and dispatch one subagent per batch **in parallel**, on a cheaper model where the harness lets you pick one (extraction, not judgement), each with the cheat-sheet above for the formats in its batch and an identical brief (in Claude Code with this plugin installed, `subagent_type=leek-skills:session-miner`: log-read-only, skips project CLAUDE.md, and remembers patterns from earlier retros so it can mark them recurring; in Codex, `spawn_agent` with `fork_turns: "none"`; in Grok, `spawn_subagent` (`subagent_type` `leek-skills:session-miner` when this plugin is installed); elsewhere, any sub-agent the harness offers). Each subagent returns a structured findings list; the orchestrator dedupes across batches and synthesizes. Round-robin assignment:
+50 sessions won't fit one context. Split the file list into ~7 round-robin batches (so big files spread out) and dispatch one subagent per batch **in parallel**, on a cheaper model where the harness lets you pick one (extraction, not judgement), each with the cheat-sheet above for the formats in its batch and an identical brief (in Claude Code with this plugin installed, `subagent_type=leek-skills:session-miner`: log-read-only, skips project CLAUDE.md, and remembers patterns from earlier retros so it can mark them recurring; in other harnesses, dispatch in the background per [harness-tools](../harness-tools/SKILL.md)). Each subagent returns a structured findings list; the orchestrator dedupes across batches and synthesizes. Round-robin assignment:
 ```bash
 awk '{ b=((NR-1)%7)+1; print > ("batch_" b ".jsonl") }' parents.jsonl
 ```
@@ -131,7 +131,7 @@ For each finding, give: the proposal, **the one verbatim (redacted) evidence lin
 - a config or settings change
 - **or nothing**, if it was a genuine one-off
 
-**Do not change anything.** Present the list and let the user choose which to apply (`AskUserQuestion` in Claude Code or `ask_user_question` in Grok: one `multiSelect: true` question per destination, up to 4 questions per call and 4 options each, further rounds for the rest; otherwise the user picks by number in chat). Lead with the cross-cutting themes (patterns that recurred across 3+ sessions are the highest-value to act on).
+**Do not change anything.** Present the list and let the user choose which to apply (a structured question ([harness-tools](../harness-tools/SKILL.md)): one `multiSelect: true` question per destination, up to 4 questions per call and 4 options each, further rounds for the rest; otherwise the user picks by number in chat). Lead with the cross-cutting themes (patterns that recurred across 3+ sessions are the highest-value to act on).
 
 ## Reference: where a fix belongs
 

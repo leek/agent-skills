@@ -4,7 +4,7 @@ Two additions to the `implement` process. A **spec run** builds every ticket of 
 
 ## Choose the delivery shape
 
-Before anything is claimed or branched, settle how and where to build. Ask each question below that applies, in one `AskUserQuestion` (Claude Code) or `ask_user_question` (Grok) call (single-select, the recommended option first; otherwise one message in chat), and nothing else. Skip a question when the request already answers it ("open a PR", "stack it", "just commit", "in a worktree", `all`), or when the repo's rules or the user's saved preferences settle it, and follow that answer. When every question is settled, ask nothing.
+Before anything is claimed or branched, settle how and where to build. Ask each question below that applies, in one structured-question call ([harness-tools](../../harness-tools/SKILL.md); single-select, the recommended option first; otherwise one message in chat), and nothing else. Skip a question when the request already answers it ("open a PR", "stack it", "just commit", "in a worktree", `all`), or when the repo's rules or the user's saved preferences settle it, and follow that answer. When every question is settled, ask nothing.
 
 **Scope** comes first, in a call of its own, because its answer picks the delivery options. Ask it when the input is a spec whose `tickets/` are published and the request names neither a ticket nor the whole spec:
 

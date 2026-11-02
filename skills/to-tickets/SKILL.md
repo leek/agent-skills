@@ -52,7 +52,7 @@ When even batches can't stay green alone, keep the sequence but share an integra
 
 Questions a builder would otherwise raise mid-build belong here, while nothing is waiting on them. Run one read-only subagent (a domain-expert agent type when the harness offers one for the spec's domain) over the spec, the drafted breakdown, and the effort's `decisions/` and `research/`. Its brief: list every choice the build will have to make that these documents leave open, each with the tickets it touches, the line that leaves it open, and a recommended answer. Settled choices and pure implementation detail are not open decisions.
 
-Ask them in `AskUserQuestion` (Claude Code) or `ask_user_question` (Grok) batches of up to 4, recommended answer first (otherwise one message in chat), and fold each answer into the tickets it touches. When the sweep finds nothing open, say so. This is the effort's last decision pass: `implement-spec` skips its own sweep while no later commit changes the spec or tickets.
+Ask them as structured questions ([harness-tools](../harness-tools/SKILL.md)) in batches of up to 4, recommended answer first (otherwise one message in chat), and fold each answer into the tickets it touches. When the sweep finds nothing open, say so. This is the effort's last decision pass: `implement-spec` skips its own sweep while no later commit changes the spec or tickets.
 
 ### 5. Publish
 

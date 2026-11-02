@@ -15,7 +15,7 @@ allowed-tools: "Bash(composer outdated *) Bash(composer audit) Bash(composer aud
 
 Deliver a dependency audit summary for the package manager this project uses.
 
-In Claude Code with this plugin installed, this skill runs in its own `dependency-auditor` subagent (read-only, remembers packages the project has chosen to hold back); the report comes back to the main session when it finishes. In Codex, dispatch it with `spawn_agent` (`fork_turns: "none"`, then `wait_agent`). In Grok, dispatch it with `spawn_subagent` (`background: false`, and `subagent_type` `leek-skills:dependency-auditor` when this plugin is installed). Otherwise it runs inline. The steps are the same.
+In Claude Code with this plugin installed, this skill runs in its own `dependency-auditor` subagent (read-only, remembers packages the project has chosen to hold back); the report comes back to the main session when it finishes. In other harnesses, dispatch it and wait per [harness-tools](../harness-tools/SKILL.md). Otherwise it runs inline. The steps are the same.
 
 ## Detect package manager
 

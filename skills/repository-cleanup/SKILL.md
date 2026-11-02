@@ -38,7 +38,7 @@ This loop cleans Git repository state. It is not a source-code housekeeping pass
 
 ## Selection Form
 
-Where `AskUserQuestion` (Claude Code) or `ask_user_question` (Grok) is available, ask the step 7 selection in one call, one question (one tab) per kind of state, with up to 4 questions:
+Where the harness has a structured question ([harness-tools](../harness-tools/SKILL.md)), ask the step 7 selection in one call, one question (one tab) per kind of state, with up to 4 questions:
 
 | Tab (`header`) | Covers |
 |---|---|

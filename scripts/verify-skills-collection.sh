@@ -302,7 +302,7 @@ check "skills naming an agent keep a non-Claude fallback" \
       rg -qi "elsewhere|inline|other harness|plain Claude Code" "$f" || { echo "$f: names an agent without a fallback clause" >&2; exit 1; }
     done'
 
-# 9. which-skill names every user-invoked skill, and harness tool names stay paired.
+# 9. which-skill names every user-invoked skill, and harness tool names live only in harness-tools.
 #    Hyphen-aware: \b treats "-" as a boundary, so "implement" would match "implement-spec".
 check "which-skill names every user-invoked skill" \
   bash -c '
@@ -328,42 +328,38 @@ if missing:
     sys.exit(1)
 PY
   '
-check "spawn_agent sites also name spawn_subagent" \
-  bash -c '
-    python3 - <<'"'"'PY'"'"'
-import os, sys
+check "harness-tools is the only skill file naming non-Claude harness tools" \
+  python3 -c '
+import os, re, sys
+tools = re.compile(r"\b(spawn_subagent|spawn_agent|wait_agent|fork_turns|followup_task|interrupt_agent|request_user_input|ask_user_question|send_subagent_message|get_command_or_subagent_output|kill_command_or_subagent|invoke_subagent|manage_subagents|ask_question)\b")
 bad = []
 for root, dirs, files in os.walk("skills"):
+    if root.startswith(os.path.join("skills", "harness-tools")):
+        continue
     for name in files:
-        if not name.endswith(".md"):
-            continue
-        p = os.path.join(root, name)
-        text = open(p).read()
-        if "spawn_agent" in text and "spawn_subagent" not in text:
-            bad.append(p)
+        if name.endswith(".md"):
+            p = os.path.join(root, name)
+            hits = sorted(set(tools.findall(open(p, encoding="utf-8").read())))
+            if hits:
+                bad.append(p + ": " + ", ".join(hits) + " (point at harness-tools instead)")
 if bad:
-    print("spawn_agent without spawn_subagent:", ", ".join(bad), file=sys.stderr)
+    print("\n".join(bad), file=sys.stderr)
     sys.exit(1)
-PY
-  '
-check "AskUserQuestion sites also name ask_user_question" \
-  bash -c '
-    python3 - <<'"'"'PY'"'"'
-import os, sys
+'
+check "harness-tools has a row per harness in every table" \
+  python3 -c '
+import re, sys
+text = open("skills/harness-tools/SKILL.md", encoding="utf-8").read()
+want = ["Claude Code", "Codex", "Grok", "agy"]
 bad = []
-for root, dirs, files in os.walk("skills"):
-    for name in files:
-        if not name.endswith(".md"):
-            continue
-        p = os.path.join(root, name)
-        text = open(p).read()
-        if "AskUserQuestion" in text and "ask_user_question" not in text:
-            bad.append(p)
+for sec in re.split(r"^## ", text, flags=re.M)[1:]:
+    rows = re.findall(r"^\| (Claude Code|Codex|Grok|agy) \|", sec, re.M)
+    if rows and sorted(rows) != sorted(want):
+        bad.append(sec.splitlines()[0] + ": rows " + ", ".join(rows))
 if bad:
-    print("AskUserQuestion without ask_user_question:", ", ".join(bad), file=sys.stderr)
+    print("\n".join(bad), file=sys.stderr)
     sys.exit(1)
-PY
-  '
+'
 
 # 10. Plugin manifests and hooks pass Claude Code's own validator (valid JSON, mod modules exist)
 #     and its mod tests, and the browser-test and review-agent guards hold. This script never names

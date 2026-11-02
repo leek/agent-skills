@@ -1,0 +1,5 @@
+interface:
+  display_name: "Harness Tools"
+  short_description: "Which tool each harness (Claude Code, Codex, Grok, agy) uses to start, follow up with, or stop a sub-agent, or ask a structured question"
+policy:
+  allow_implicit_invocation: true
