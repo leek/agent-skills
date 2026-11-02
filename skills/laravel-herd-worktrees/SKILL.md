@@ -19,7 +19,7 @@ Run several branches of a Laravel project side by side, each a git worktree that
 
 1. `git worktree add -b <branch> .claude/worktrees/<name> <base>` (or the path the user names).
 2. Make it runnable with [Bootstrap a bare worktree](#bootstrap-a-bare-worktree), passing `--database=empty` (a fresh migrated database) or `--database=clone` (a copy of the main one) instead of `shared` when the user wants the worktree's data kept apart.
-3. With `clone` or `empty`, read `database_mode` and `database_name` from the `--json` output: Herd falls back to `shared` with only a note when it cannot create the database, so say so when it did. Register a created server database the way every worktree skill does, so `repository-cleanup` sees it: `printf '%s\t%s\t%s\t%s\n' "$(date +%s)" <pgsql|mysql> <database_name> "<worktree path>" >> "$(git rev-parse --path-format=absolute --git-common-dir)/scratch-databases"`. With `empty`, run `php artisan migrate` once the bootstrap's step 2 has installed `vendor/`: Herd's own migration runs before that and only warns when `vendor/` was missing.
+3. With `clone` or `empty`, read `database_mode` and `database_name` from the `--json` output: Herd falls back to `shared` with only a note when it cannot create the database, so say so when it did. Register a created server database per [Scratch database registry](#scratch-database-registry), so `repository-cleanup` sees it. With `empty`, run `php artisan migrate` once the bootstrap's step 2 has installed `vendor/`: Herd's own migration runs before that and only warns when `vendor/` was missing.
 4. Give the user the `url` and the database.
 
 Remove it with [Remove a served worktree](#remove-a-served-worktree).
@@ -35,14 +35,30 @@ A worktree made with plain `git worktree add` (the PR, issue, and CI recipes in 
 
 ## Remove a served worktree
 
-Run every step from the main checkout, in order, so nothing is dropped while git might still keep the worktree:
+From the main checkout (or, for `implement-spec`, the integration checkout `git branch -d` checks against), run [`scripts/remove-worktree.sh`](scripts/remove-worktree.sh) `<path>`, adding `--branch <name>` when the run's branch goes too. It works in the safe order and prints one JSON line:
 
-1. **Clean check.** `git -C <path> status --porcelain` prints nothing. When it prints anything, `git worktree remove` would refuse: stop, and the worktree and its database stay (the calling skill's rule for a refused removal applies).
-2. **Unserve.** When `<path>/.herd-workspace.json` exists, `herd workspace:delete <site> --force --keep-files`, with `<site>` the file's `site` field (`jq -r .site <path>/.herd-workspace.json`), its host, which unlike the branch name is unique across Herd sites. Herd's `--force` only skips its confirmation prompt; it is not git's `--force`. `--keep-files` leaves the checkout for step 3, since without it Herd runs `git worktree remove --force`. Herd unlinks the host, removes its certificate and PHP pin, and drops a database it created (`clone` or `empty`).
-3. **Remove.** `git worktree remove <path>`, never with `--force`. When git still refuses, the worktree stays for the user; visiting its URL serves it again.
-4. **Registry.** Delete the `scratch-databases` line of a database Herd dropped in step 2.
+1. **Clean check.** A worktree with any `git status --porcelain` output stays, with its branch and databases: `removed: false` and the reason. The calling skill's rule for a refused removal applies.
+2. **Unserve.** With `.herd-workspace.json`, `herd workspace:delete <site> --force --keep-files` (Herd's `--force` only skips a prompt; `--keep-files` leaves the checkout for git). Herd drops a database it created (`clone` or `empty`), and the script unregisters it.
+3. **Remove.** `git worktree remove <path>`, never with `--force`. When git refuses, everything stays; visiting its URL serves it again.
+4. **Branch.** `git branch -d <name>` only after a removal; a refusal keeps the branch, named in `branch_reason`. Git's `-D` hint is not a go-ahead.
 
-When step 2 fails because the Herd app is not running: when the file's `database_mode` is `clone` or `empty` on a server driver, drop its `database_name` with the repo's client (`DROP DATABASE IF EXISTS`; a SQLite file goes with the checkout), then do steps 3 and 4, then `herd workspaces --all >/dev/null`, which drops the link, certificate and PHP pin of any workspace whose checkout is gone.
+`databases` lists what is still registered for that path once it is removed (`[]` when kept, since a kept worktree keeps its databases): the calling skill's own databases. Drop each, and its parallel-testing copies (`<database>_test_<N>`), with the repo's client (`DROP DATABASE IF EXISTS`; a SQLite file goes with the checkout), then unregister each one only after its drop succeeded. A failed drop keeps its registry line and is reported.
+
+When `herd_unserve_failed` is set (the Herd app is not running) and its `database_mode` is `clone` or `empty` on a server driver, drop its `database_name` yourself and unregister it.
+
+**What is left.** A calling skill removes without asking what it created whose work has landed, and lists each removal. It asks once only about the rest it created (a worktree git refused, unmerged or queued work): a structured question ([harness-tools](../harness-tools/SKILL.md)) with `multiSelect: true`, one option per item naming its worktree, branch, and databases, nothing pre-ticked, at most 4 per question and further questions for the rest; otherwise one yes/no question in chat: "Can I delete these too?". It removes only what the answer selects, by the steps above; on no, nothing. It skips the question when nothing is left, and names everything kept in its report for `repository-cleanup`.
+
+## Scratch database registry
+
+Every skill that creates a worktree or a throwaway database registers each database in `<git-common-dir>/scratch-databases`, so `repository-cleanup` finds what a stopped run left behind. One script owns the file:
+
+```bash
+bash <this-skill-dir>/scripts/scratch-db.sh register <pgsql|mysql|sqlite> <database> <worktree path, or ->   # the moment it is created
+bash <this-skill-dir>/scripts/scratch-db.sh unregister <database>                                           # only after a successful drop
+bash <this-skill-dir>/scripts/scratch-db.sh list [<worktree path>]                                          # JSON
+```
+
+Name a scratch database so no checkout config uses it: never a name in the main checkout's `.env`, `.env.testing`, or `phpunit.xml`.
 
 ## Diagnostics
 
