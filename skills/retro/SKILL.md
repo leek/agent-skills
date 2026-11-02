@@ -32,7 +32,7 @@ Never `cat` a whole log. `bash <this-skill-dir>/scripts/extract-signal.sh <path>
 
 ## 3. Fan out: one subagent per batch
 
-50 sessions won't fit one context. Dispatch one subagent per `batch_<k>.jsonl` **in parallel**, on a cheaper model where the harness lets you pick one (extraction, not judgement), each with an identical brief: its batch file path, the `extract-signal.sh` path, and the lenses in step 4 (in Claude Code with this plugin installed, `subagent_type=leek-skills:session-miner`: log-read-only, skips project CLAUDE.md, and remembers patterns from earlier retros so it can mark them recurring; in other harnesses, dispatch in the background per [harness-tools](../harness-tools/SKILL.md)). Each subagent returns a structured findings list; the orchestrator dedupes across batches and synthesizes.
+50 sessions won't fit one context. Dispatch one subagent per `batch_<k>.jsonl` **in parallel**, on a cheaper model where the harness lets you pick one (extraction, not judgement), each with an identical brief: its batch file path, the `extract-signal.sh` path, and the lenses in step 4 (in Claude Code with this plugin installed, `subagent_type=leek-skills:session-miner`: log-read-only, skips project CLAUDE.md, and remembers patterns from earlier retros so it can mark them recurring; in other harnesses, dispatch and wait per [harness-tools](../harness-tools/SKILL.md), all at once). Each subagent returns a structured findings list; the orchestrator dedupes across batches and synthesizes.
 
 ## 4. What to find
 

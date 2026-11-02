@@ -45,7 +45,7 @@ the index section(s) for the lens or lenses it will sweep, nothing more: pass th
 absolute path of [references/index.md](references/index.md) and the lens heading(s)
 to read, so you never load the whole index yourself to dispatch. In Claude
 Code with this plugin installed, dispatch `subagent_type=leek-skills:smell-sweeper`
-(read-only, no project CLAUDE.md, a cheaper model); in other harnesses, dispatch per
+(read-only, no project CLAUDE.md, a cheaper model); in other harnesses, dispatch and wait per
 [harness-tools](../harness-tools/SKILL.md), read-only where offered, on the cheapest model the harness lets you pick: the sweep is recall
 only, and verification runs here on the main model.
 

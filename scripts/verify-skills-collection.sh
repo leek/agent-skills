@@ -331,7 +331,7 @@ PY
 check "harness-tools is the only skill file naming non-Claude harness tools" \
   python3 -c '
 import os, re, sys
-tools = re.compile(r"\b(spawn_subagent|spawn_agent|wait_agent|fork_turns|followup_task|interrupt_agent|request_user_input|ask_user_question|send_subagent_message|get_command_or_subagent_output|kill_command_or_subagent|invoke_subagent|manage_subagents|ask_question)\b")
+tools = re.compile(r"\b(spawn_subagent|spawn_agent|wait_agent|fork_turns|followup_task|send_message|resume_from|interrupt_agent|request_user_input|request_user_input_async|ask_user_question|multi_select|send_subagent_message|get_command_or_subagent_output|kill_command_or_subagent|invoke_subagent|manage_subagents|ask_question|is_multi_select)\b")
 bad = []
 for root, dirs, files in os.walk("skills"):
     if root.startswith(os.path.join("skills", "harness-tools")):
@@ -346,16 +346,44 @@ if bad:
     print("\n".join(bad), file=sys.stderr)
     sys.exit(1)
 '
-check "harness-tools has a row per harness in every table" \
+check "skill files naming a Claude Code harness tool also point at harness-tools" \
+  python3 -c '
+import os, re, sys
+claude = re.compile(r"\b(AskUserQuestion|SendMessage|TaskStop)\b")
+bad = []
+for root, dirs, files in os.walk("skills"):
+    if root.startswith(os.path.join("skills", "harness-tools")):
+        continue
+    for name in files:
+        if name.endswith(".md"):
+            p = os.path.join(root, name)
+            text = open(p, encoding="utf-8").read()
+            if claude.search(text) and "harness-tools" not in text:
+                bad.append(p)
+if bad:
+    print("no harness-tools pointer beside a Claude Code tool:", ", ".join(bad), file=sys.stderr)
+    sys.exit(1)
+'
+check "harness-tools has every move, with one row per harness in each table" \
   python3 -c '
 import re, sys
 text = open("skills/harness-tools/SKILL.md", encoding="utf-8").read()
 want = ["Claude Code", "Codex", "Grok", "agy"]
+moves = ["Dispatch and wait", "Dispatch in the background", "Follow up", "Stop", "Structured question"]
+sections = {s.splitlines()[0].strip(): s for s in re.split(r"^## ", text, flags=re.M)[1:]}
 bad = []
-for sec in re.split(r"^## ", text, flags=re.M)[1:]:
-    rows = re.findall(r"^\| (Claude Code|Codex|Grok|agy) \|", sec, re.M)
-    if rows and sorted(rows) != sorted(want):
-        bad.append(sec.splitlines()[0] + ": rows " + ", ".join(rows))
+for move in moves:
+    sec = sections.get(move)
+    if sec is None:
+        bad.append(move + ": section missing")
+        continue
+    lines = [l for l in sec.splitlines() if l.startswith("|")]
+    if len(lines) < 3 or not lines[0].startswith("| Harness |"):
+        bad.append(move + ": no harness table")
+        continue
+    rows = [l.split("|")[1].strip() for l in lines[2:]]
+    if sorted(rows) != sorted(want):
+        bad.append(move + ": rows " + ", ".join(rows) + " (want exactly " + ", ".join(want) + ")")
 if bad:
     print("\n".join(bad), file=sys.stderr)
     sys.exit(1)

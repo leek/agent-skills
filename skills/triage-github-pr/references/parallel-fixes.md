@@ -38,7 +38,7 @@ own, name it `<app db>_pr<N>_fix<k>` and register it per
 [Scratch databases](gh-mechanics.md#scratch-databases). Then start one fixer per group
 in one message, in the background (Claude Code: `Agent`, `run_in_background: true`,
 `name: pr-<N>--fix-<k>`; other harnesses: dispatch in the background per
-[harness-tools](../../harness-tools/SKILL.md), keeping each id; elsewhere, any sub-agent the harness offers). Its brief gives the worktree
+[harness-tools](../../harness-tools/SKILL.md), keeping each id). Its brief gives the worktree
 path, its findings' step 4 lines with links, its file list, the repo's `AGENTS.md` /
 `CLAUDE.md`, and these rules:
 

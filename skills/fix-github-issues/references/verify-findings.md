@@ -29,7 +29,7 @@ With more than 5 findings, hand the first pass to read-only workers in batches o
 ref, the calling skill's line format, and the rules above. In Claude Code with this
 plugin installed, dispatch `subagent_type=leek-skills:finding-verifier` for each batch
 in parallel; it keeps the bots' recurring false premises in project memory, under the
-target repo's `.claude/`. In other harnesses, dispatch per
+target repo's `.claude/`. In other harnesses, dispatch and wait per
 [harness-tools](../../harness-tools/SKILL.md), on a cheaper model where offered, or
 classify inline when the harness has no sub-agents. Re-verify yourself every line that
 comes back LEGIT or UNSURE.

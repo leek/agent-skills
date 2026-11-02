@@ -74,7 +74,8 @@ SHOT_DIR: <run_dir>
 In Claude Code with this plugin, dispatch `subagent_type=leek-skills:browser-tester` for
 `read` cases and `subagent_type=leek-skills:browser-writer` for confirmed `write` cases.
 A plugin hook blocks every non-read-only command from `browser-tester`. In other harnesses,
-dispatch per [harness-tools](../harness-tools/SKILL.md); in Grok with this plugin, the typed agents above. Outside Claude Code and Grok there
+dispatch and wait per [harness-tools](../harness-tools/SKILL.md); in Grok with this plugin installed, the typed agents above,
+which the same hook guards. Anywhere else (Codex, agy, or any install without this plugin) there
 is no hook: use sub-agents on the cheapest model with the rules from those agent files,
 or run the cases inline one by one, and hold them to the read-only rules yourself.
 

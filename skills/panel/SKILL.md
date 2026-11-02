@@ -60,7 +60,7 @@ consensus to form: say which are missing and stop.
 Spawn one subagent per present CLI, all in a single message so they run at once (in
 Claude Code with this plugin installed, `subagent_type=leek-skills:panelist`: a small,
 cheap wrapper, since the thinking happens inside the CLI it runs; in other harnesses, dispatch
-in the background per [harness-tools](../harness-tools/SKILL.md), one per CLI, and collect every result). Give each subagent
+and wait per [harness-tools](../harness-tools/SKILL.md), one per CLI, all at once). Give each subagent
 the path of the **same** task file and this brief:
 
 - **Launch with the launcher script, literal paths only.** Run your CLI **once**, from
