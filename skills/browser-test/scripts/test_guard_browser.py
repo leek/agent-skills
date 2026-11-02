@@ -98,7 +98,10 @@ class GuardBrowserTest(unittest.TestCase):
             (f"agent-browser --session bt-20260101-000000-1 snapshot", "no scope.json"),
             (f"{S} snapshot > out.txt", "redirects are not allowed"),
             (f"{S} snapshot $(rm x)", "command substitution"),
+            (f"{S} snapshot =(rm x)", "command substitution"),
             (f"{S} snapshot\nrm x", "multi-line"),
+            (f"{S} snapshot\rrm x", "multi-line"),
+            (f"{S} snapshot *(e:'rm x':)", "subshells and glob qualifiers"),
             (f"{S} snapshot | tee out.txt", "`tee` is not allowed"),
         ]:
             with self.subTest(cmd=cmd):

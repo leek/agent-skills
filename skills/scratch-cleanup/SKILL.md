@@ -11,56 +11,47 @@ argument-hint: "Days of inactivity before open work counts as stale (default 30)
 
 The stale threshold is `$ARGUMENTS` days; 30 when empty.
 
-## 1. Inventory
+## 1. Inventory and judge
 
-Read the tracker layout from `.agents/issue-tracker.md` (fallback `docs/agents/issue-tracker.md`, then `setup/issue-tracker.md` in this collection) and the status vocabulary from the matching `triage-labels.md`. Then walk `.scratch/` and put every file in exactly one bucket:
+From inside the repository, run [`../scratch-status/scripts/scratch-state.sh`](../scratch-status/scripts/scratch-state.sh) `--days <threshold>` once.
 
-- **Effort**: a `.scratch/<slug>/` directory holding a map, spec, decisions, tickets, or triage request files. Older efforts may use an `issues/` folder instead of `tickets/`; treat it as tickets.
-- **Research**: findings files, by default under `.scratch/research/`, or any file whose body is a cited findings report ending in **What this unblocks**.
-- **Unclassified**: everything else (wizards, loose notes, questionnaires outside an effort). `.DS_Store` files are junk: they go in the plan as deletions with no question.
+The script walks `.scratch/`, checks git tracking (`tracked` and `untracked_files`) and last-change dates (`last_change`), resolves status and blockers in both frontmatter and legacy `Status:` dialects, verifies every cited ticket commit against `default_branch` (`git merge-base --is-ancestor`, merged PRs via `gh api`, `git cherry`, and commit subject match), and sorts `.scratch/` into three buckets:
 
-For every file, record whether git tracks it (`git ls-files --error-unmatch <path>`) and its last change date (`git log -1 --format=%cs -- <path>`, or the file mtime when untracked).
+- **`efforts`**: each `.scratch/<slug>/` directory, classified as:
+  - **done**: every artifact (`map`, `decisions`, `spec`, `tickets`/`issues`, `requests`) is closed or wontfix, every cited commit is on `default_branch`, and `mismatch` is `null`.
+  - **mismatched**: has an unreadable status (`unreadable_efforts` or `mismatch`) or a contradiction (e.g., `spec` still `ready-for-agent` while every ticket is closed, or a closed ticket whose cited commit is missing). Goes in the plan as a question, never a removal.
+  - **open**: has any open file, with `stale: true` when its newest file is older than `--days`. Any `claimed_by` in a stale effort is a stale claim to release in step 3 (the session is gone); leave its status alone.
+- **`research`**: findings files under `.scratch/research/` or loose `.md` files ending in **What this unblocks**.
+- **`unclassified`**: everything else outside an effort (wizards, loose notes, questionnaires, and `.DS_Store` entries marked `junk: true`, which go in the plan as deletions with no question).
 
-Done when every file under `.scratch/` has a bucket, a tracked/untracked flag, and a date.
+Done when `scratch-state.sh` has returned the bucketed inventory and effort judgements.
 
-## 2. Judge each effort
-
-Read each file's status in either dialect: the YAML frontmatter `status:` field, or a legacy `**Status:**` / `Status:` line near the top of the body. A file is **done** when its status is `closed` or the wontfix role string. An effort is **done** only when all three hold:
-
-1. Every file in it is done: the map, every decision ticket, the spec, every build ticket, every triage file.
-2. Every commit a ticket cites (a 7–40 character hex SHA in its status line, `## Resolution`, or `## Comments`) exists on the default branch: `git merge-base --is-ancestor <sha> <default-branch>`. The default branch is `git symbolic-ref --short refs/remotes/origin/HEAD` without the remote prefix, else `main`. A cited commit that is not an ancestor still counts as on the default branch when the work arrived by squash-merge or rebase, so check equivalence before calling it missing: a merged PR contains it (`gh api repos/{owner}/{repo}/commits/<sha>/pulls --jq '.[] | select(.merged_at) | .number'`), `git cherry <default-branch> <sha> <sha>~1` prints it with `-` (an equivalent patch is on the branch), or a commit on the default branch has the same subject (`git log <default-branch> --fixed-strings --grep="$(git log -1 --format=%s <sha>)" -1`). A SHA git cannot resolve at all is checked by the PR route only. Only a commit that fails every check is missing.
-3. Nothing in the effort contradicts itself: for example, a spec still `ready-for-agent` while every ticket is closed, or a closed ticket whose commit is missing.
-
-An effort that fails rule 3, or has a file with no readable status, is **mismatched**: it goes in the plan as a question, never a removal. An effort with any open file is **open**. An open effort is also **stale** when its newest file is older than the threshold; clear any `claimed-by` in a stale effort (the claim's session is gone) and leave its status alone.
-
-Done when every effort is labelled done, mismatched, or open (with stale marked).
-
-## 3. Plan
+## 2. Plan
 
 Build the plan for every bucket:
 
 - **Research**: pick a destination under `docs/`. Match an existing topic folder (`docs/<topic>/`) when one fits the subject; otherwise use `docs/research/<same-filename>`. When two folders fit, or none fits and the subject clearly belongs to a topic that does not exist yet, list the choice as a question. Find every inbound link (`rg -n --fixed-strings '<old path>'` across the repo, `.scratch/` included) so the move can rewrite each one.
-- **Done effort**: read its spec, map, and closed decision tickets for **lasting decisions**: choices that are hard to reverse, still true in the code today, and whose reasons live nowhere else. List each as a one-line ADR candidate. Then list the effort for removal.
-- **Mismatched effort**: state the contradiction in one line and what would settle it.
-- **Unclassified**: one line per file saying what it looks like and a proposed fate (file, remove, or keep).
+- **Done effort**: read its spec, map, and closed decision tickets for **lasting decisions**: choices that are hard to reverse, still true in the code today, and whose reasons live nowhere else. List each as a one-line ADR candidate. Then list the effort for removal (separating tracked paths from `untracked_files`).
+- **Mismatched effort**: state `mismatch` in one line and what would settle it.
+- **Unclassified**: one line per non-junk file saying what it looks like and a proposed fate (file, remove, or keep).
 
-Show the plan in one message, with these sections in order: **File** (research moves and link rewrites), **ADR candidates** (numbered, so the user can pick by number), **Remove** (committed paths), **Remove: cannot recover** (untracked paths, with a note that git holds no copy), **Questions** (mismatched efforts, unclear destinations, unclassified files), and **Keep** (the report table from step 5). Ask for approval with `AskUserQuestion` in Claude Code or `ask_user_question` in Grok, otherwise in chat. The untracked removals need their own explicit yes, separate from the rest of the plan.
+Show the plan in one message, with these sections in order: **File** (research moves and link rewrites), **ADR candidates** (numbered, so the user can pick by number), **Remove** (committed paths), **Remove: cannot recover** (untracked paths, with a note that git holds no copy), **Questions** (mismatched efforts, unclear destinations, unclassified files), and **Keep** (the report table from step 4). Ask for approval with `AskUserQuestion` in Claude Code or `ask_user_question` in Grok, otherwise in chat. The untracked removals need their own explicit yes, separate from the rest of the plan.
 
 Done when the user has approved, trimmed, or rejected each section, and has answered every question.
 
-## 4. Apply
+## 3. Apply
 
 Apply only what the user approved, in this order:
 
 1. **ADRs first**, while the source files still exist: write each picked candidate as an ADR through the `domain-modeling` skill's format and location (`docs/adr/` in a single-context repo).
-2. **File research**: `git mv` for tracked files, `mv` for untracked ones, creating `docs/` folders as needed. Rewrite every inbound link found in step 3 to the new path.
+2. **File research**: `git mv` for tracked files, `mv` for untracked ones, creating `docs/` folders as needed. Rewrite every inbound link found in step 2 to the new path.
 3. **Remove**: `git rm -r -- <path>` for committed efforts and files; `rm` for approved untracked ones and `.DS_Store`.
-4. **Release stale claims** found in step 2.
+4. **Release stale claims** found in step 1.
 5. **Stage** every changed path by explicit path (`git add -- <path> …`); leave the commit to the user.
 
 Done when `rg -n --fixed-strings` finds no reference to any moved or removed path, and `git status --short` shows only the approved changes.
 
-## 5. Report
+## 4. Report
 
 End with the table of everything that stayed in `.scratch/`, one row per effort or kept file:
 

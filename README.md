@@ -51,14 +51,14 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | `laravel-herd-worktrees` | model | Use when working with Laravel projects served by Laravel Herd alongside git worktrees on macOS. |
 | `panel` | user | Convene a panel of agent CLIs (grok, claude, codex, agy) on a prompt or a code review, each in its own headless subagent, then report one consensus grouped by how much they agree. |
 | `pr` | model | The pull request body format, built for fast human review: the smallest visual of the change, before/after evidence, and a one-way or two-way door call with its blast radius. |
-| `prune-tests` | user | Delete low-signal tests one test area at a time, keeping coverage within 2%, and open one PR per area. Earlier runs' areas are excluded. |
 | `prototype` | model | Build a throwaway prototype to answer a design question. |
+| `prune-tests` | user | Delete low-signal tests one test area at a time, keeping coverage within 2%, and open one PR per area. Earlier runs' areas are excluded. |
 | `release` | model | Commit this session's work, bump the version, tag, push, and publish a GitHub release with grouped notes. |
 | `repository-cleanup` | user | Audit and clean Git repository state, including the local databases old worktrees left behind. |
 | `research` | model | Investigate a question against high-trust primary sources and capture the findings as a cited Markdown file. |
-| `retro` | user | Mine Claude Code, Codex (including compressed rollouts), Grok, and agy parent sessions for corrections and workflow friction; compare current guidance and loaded versions before proposing fixes. |
 | `resolve-review-comments` | model | Triage, fix or rebut, then reply-and-resolve every review comment on a PR (including AI-review bot findings). |
 | `resolving-merge-conflicts` | model | "Use when you need to resolve an in-progress git merge/rebase conflict." |
+| `retro` | user | Mine Claude Code, Codex (including compressed rollouts), Grok, and agy parent sessions for corrections and workflow friction; compare current guidance and loaded versions before proposing fixes. |
 | `scratch-cleanup` | user | Sweep a dusty .scratch/: file research into docs/, remove finished efforts, and report the work still open. |
 | `scratch-status` | user | Report what is still open across `.scratch/`: every effort's open tickets and decisions, what blocks it, how stale it is, and the next skill to run. Read-only. |
 | `setup` | user | Configure this repo for the engineering skills: the markdown issue tracker layout, triage label vocabulary, and domain doc layout. |

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """PreToolUse guard for the browser-test read-only agents.
 
-Wired from the plugin's hooks/hooks.json, so it sees every Bash call in the
-session. It exits 0 at once unless the caller's agent_type is one of GUARDED.
-For those, every segment of the command (split on &&, ||, ;, |) must be an
-allowed read-only agent-browser call or a read-only text filter. Anything else
-exits 2, which blocks the call and shows stderr to the agent.
+Dispatched via hooks/shell_guard.py (or directly), it exits 0 at once unless the
+caller's agent_type is one of GUARDED. For those, every segment of the command
+(split on &&, ||, ;, |) must be an allowed read-only agent-browser call or a
+read-only text filter under both bash and zsh rules. Anything else exits 2,
+which blocks the call and shows stderr to the agent.
 
 Per-run scope comes from .scratch/browser-test/<run-id>/scope.json, written by
 start-run.sh. The run id is read from the session name, bt-<run-id>-<tag>.
@@ -13,12 +13,13 @@ start-run.sh. The run id is read from the session name, bt-<run-id>-<tag>.
 
 import json
 import os
+from pathlib import Path
 import re
-import shlex
 import sys
 from urllib.parse import urlsplit
 
-GUARDED = {"browser-tester", "browser-test-planner"}
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "hooks"))
+from shell_guard import Blocked, BROWSER_GUARDED as GUARDED, parse_command, segments  # noqa: E402
 
 PROBE = (
     "(() => { const t = document.body.innerText; "
@@ -40,11 +41,6 @@ SAFE_FLAGS = {"--clear", "--filter", "--type", "--status", "--method", "--load",
               "-s", "--selector"}
 ELEMENT_STATES = {"visible", "hidden", "attached", "detached"}
 FILTERS = {"grep", "head", "tail", "wc", "sort", "uniq", "echo"}
-SAFE_REDIRECTS = {("2", ">", "/dev/null"), ("2", ">&", "1"), ("2", ">", "&1")}
-
-
-class Blocked(Exception):
-    pass
 
 
 def same_origin(url: str, origin: str) -> bool:
@@ -77,7 +73,7 @@ def check_browser(args: list[str], scope: dict | None, run_dir: str | None) -> N
     if len(args) < 2 or args[0] != "--session" or not SESSION.match(args[1]):
         raise Blocked("every agent-browser call must start with `--session bt-<run-id>-<tag>`")
     if scope is None:
-        raise Blocked(f"no scope.json for this run under .scratch/browser-test/ — the run was not started")
+        raise Blocked("no scope.json for this run under .scratch/browser-test/ — the run was not started")
     args = args[2:]
     if args[:1] == ["--state"]:
         if len(args) < 2 or not scope.get("state") or args[1] != scope["state"]:
@@ -139,30 +135,6 @@ def check_browser(args: list[str], scope: dict | None, run_dir: str | None) -> N
     raise Blocked(f"`{verb}` is not an allowed verb for a read-only browser test")
 
 
-def segments(command: str) -> list[list[str]]:
-    lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
-    lexer.whitespace_split = True
-    tokens = list(lexer)
-    cleaned, i = [], 0
-    while i < len(tokens):
-        if tuple(tokens[i:i + 3]) in SAFE_REDIRECTS:
-            i += 3
-            continue
-        cleaned.append(tokens[i])
-        i += 1
-    out, current = [], []
-    for token in cleaned:
-        if token in {"&&", "||", ";", "|"}:
-            if current:
-                out.append(current)
-            current = []
-        else:
-            current.append(token)
-    if current:
-        out.append(current)
-    return out
-
-
 def load_scope(cwd: str, segments_: list[list[str]]) -> tuple[dict | None, str | None]:
     for seg in segments_:
         if seg[:2] == ["agent-browser", "--session"] and len(seg) > 2:
@@ -178,20 +150,9 @@ def load_scope(cwd: str, segments_: list[list[str]]) -> tuple[dict | None, str |
 
 
 def check(command: str, cwd: str) -> None:
-    if "\n" in command or "\r" in command:
-        raise Blocked("multi-line commands are not allowed")
-    if "`" in command or "$(" in command:
-        raise Blocked("command substitution is not allowed")
-    try:
-        parts = segments(command)
-    except ValueError as error:
-        raise Blocked(f"could not parse the command ({error})")
-    if not parts:
-        raise Blocked("empty command")
+    parts = parse_command(command)
     scope, run_dir = load_scope(cwd, parts)
     for seg in parts:
-        if any(re.fullmatch(r"[();<>|&]+", t) and any(c in t for c in "<>&") for t in seg):
-            raise Blocked("redirects are not allowed")
         if seg[0] in FILTERS:
             continue
         if seg[0] != "agent-browser":
@@ -199,8 +160,7 @@ def check(command: str, cwd: str) -> None:
         check_browser(seg[1:], scope, run_dir)
 
 
-def main() -> int:
-    payload = json.load(sys.stdin)
+def run_payload(payload: dict) -> int:
     agent = (payload.get("agent_type") or "").rsplit(":", 1)[-1]
     if agent not in GUARDED or payload.get("tool_name", "Bash") != "Bash":
         return 0
@@ -213,6 +173,10 @@ def main() -> int:
               "another way. Record what you could not do and move on.", file=sys.stderr)
         return 2
     return 0
+
+
+def main() -> int:
+    return run_payload(json.load(sys.stdin))
 
 
 if __name__ == "__main__":

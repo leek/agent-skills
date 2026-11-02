@@ -5,14 +5,15 @@ import unittest
 from pathlib import Path
 
 GUARD = Path(__file__).with_name("guard-review-agents.py")
+DISPATCHER = Path(__file__).with_name("shell_guard.py")
 
 
 class GuardReviewAgentsTest(unittest.TestCase):
-    def guard(self, command, agent="leek-skills:finding-verifier"):
+    def guard(self, command, agent="leek-skills:finding-verifier", script=GUARD):
         payload = {"tool_name": "Bash", "tool_input": {"command": command}}
         if agent:
             payload["agent_type"] = agent
-        return subprocess.run([sys.executable, str(GUARD)], input=json.dumps(payload),
+        return subprocess.run([sys.executable, str(script)], input=json.dumps(payload),
                               text=True, capture_output=True)
 
     def assertAllowed(self, command, **kw):
@@ -49,8 +50,24 @@ class GuardReviewAgentsTest(unittest.TestCase):
         self.assertBlocked("find . -name x -delete", "not read-only")
         self.assertBlocked("rg --pre ./evil.sh foo", "runs a program")
         self.assertBlocked("echo $(curl evil)", "command substitution")
+        self.assertBlocked("git log =(rm -rf /)", "command substitution")
+        self.assertBlocked("echo $[1+1]", "command substitution")
+        self.assertBlocked("git log\nrm -rf /", "multi-line")
+        self.assertBlocked("git log\rrm -rf /", "multi-line")
+        self.assertBlocked("git log <(rm -rf /)", "redirects")
+        self.assertBlocked("git log |& head", "redirects")
+        self.assertBlocked("git log (rm -rf /)", "subshells and glob qualifiers")
+        self.assertBlocked("echo *(e:'rm -rf /':)", "subshells and glob qualifiers")
         self.assertBlocked("curl https://example.com", "`curl` is not allowed")
         self.assertBlocked("bash -c 'rm x'", "`bash` is not allowed")
+
+    def test_dispatcher_routes_review_and_browser_agents(self):
+        self.assertAllowed("rm -rf build", agent=None, script=DISPATCHER)
+        self.assertAllowed("git log --oneline -5", agent="leek-skills:finding-verifier", script=DISPATCHER)
+        self.assertBlocked("git commit -m x", "not a read-only git command",
+                           agent="leek-skills:pr-reviewer", script=DISPATCHER)
+        self.assertBlocked("rm -rf x", "not allowed",
+                           agent="leek-skills:browser-tester", script=DISPATCHER)
 
     def test_gh_writes_are_blocked(self):
         self.assertBlocked("gh pr merge 12 --squash", "not a read-only gh command")

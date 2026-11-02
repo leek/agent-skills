@@ -2,19 +2,20 @@
 """PreToolUse guard for the PR-review agents (finding-verifier, pr-reviewer).
 
 Both agents read untrusted text: review comments, bot findings, and the PR diff.
-Their bodies say read-only; this hook enforces it. Wired from the plugin's
-hooks/hooks.json, so it sees every Bash call in the session, and it exits 0 at
-once unless the caller's agent_type is one of GUARDED. For those, every segment
-of the command (split on &&, ||, ;, |) must be a read-only git, gh, rg, or text
-command. Anything else exits 2, which blocks the call and shows stderr to the agent.
+Their bodies say read-only; this hook enforces it. Dispatched via
+hooks/shell_guard.py (or directly), it exits 0 at once unless the caller's
+agent_type is one of GUARDED. For those, every segment of the command (split on
+&&, ||, ;, |) must be a read-only git, gh, rg, find, or text command under both
+bash and zsh rules. Anything else exits 2, which blocks the call and shows
+stderr to the agent.
 """
 
 import json
-import re
-import shlex
+from pathlib import Path
 import sys
 
-GUARDED = {"finding-verifier", "pr-reviewer"}
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from shell_guard import Blocked, REVIEW_GUARDED as GUARDED, parse_command, segments  # noqa: E402
 
 FILTERS = {"cat", "head", "tail", "wc", "sort", "uniq", "cut", "tr", "echo", "ls", "jq",
            "grep", "egrep", "cd", "pwd", "basename", "dirname", "true"}
@@ -24,11 +25,6 @@ GIT_READ = {"log", "show", "diff", "ls-files", "ls-tree", "blame", "grep", "rev-
 GH_READ = {("pr", "view"), ("pr", "diff"), ("pr", "checks"), ("pr", "list"),
            ("issue", "view"), ("issue", "list"), ("run", "view"), ("repo", "view")}
 GH_FIELDS = {"-f", "-F", "--field", "--raw-field"}
-SAFE_REDIRECTS = {("2", ">", "/dev/null"), ("2", ">&", "1"), ("2", ">", "&1")}
-
-
-class Blocked(Exception):
-    pass
 
 
 def check_git(args: list[str]) -> None:
@@ -87,42 +83,9 @@ def check_find(args: list[str]) -> None:
         raise Blocked("`find` with -exec, -delete, or -fprint is not read-only")
 
 
-def segments(command: str) -> list[list[str]]:
-    lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
-    lexer.whitespace_split = True
-    tokens = list(lexer)
-    cleaned, i = [], 0
-    while i < len(tokens):
-        if tuple(tokens[i:i + 3]) in SAFE_REDIRECTS:
-            i += 3
-            continue
-        cleaned.append(tokens[i])
-        i += 1
-    out, current = [], []
-    for token in cleaned:
-        if token in {"&&", "||", ";", "|"}:
-            if current:
-                out.append(current)
-            current = []
-        else:
-            current.append(token)
-    if current:
-        out.append(current)
-    return out
-
-
 def check(command: str) -> None:
-    if "`" in command or "$(" in command:
-        raise Blocked("command substitution is not allowed")
-    try:
-        parts = segments(command.replace("\\\n", " "))
-    except ValueError as error:
-        raise Blocked(f"could not parse the command ({error})")
-    if not parts:
-        raise Blocked("empty command")
+    parts = parse_command(command)
     for seg in parts:
-        if any(re.fullmatch(r"[();<>|&\n]+", t) and any(c in t for c in "<>&\n") for t in seg):
-            raise Blocked("redirects, background jobs, and multi-line commands are not allowed")
         name, args = seg[0], seg[1:]
         if name in FILTERS:
             continue
@@ -138,8 +101,7 @@ def check(command: str) -> None:
             raise Blocked(f"`{name}` is not allowed — only read-only git, gh, rg, find, and text filters")
 
 
-def main() -> int:
-    payload = json.load(sys.stdin)
+def run_payload(payload: dict) -> int:
     agent = (payload.get("agent_type") or "").rsplit(":", 1)[-1]
     if agent not in GUARDED or payload.get("tool_name", "Bash") != "Bash":
         return 0
@@ -152,6 +114,10 @@ def main() -> int:
               file=sys.stderr)
         return 2
     return 0
+
+
+def main() -> int:
+    return run_payload(json.load(sys.stdin))
 
 
 if __name__ == "__main__":

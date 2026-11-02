@@ -20,11 +20,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/skills/browser-test/scripts/guard-browser.py\""
-          },
-          {
-            "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-review-agents.py\""
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/shell_guard.py\""
           }
         ]
       },
