@@ -50,6 +50,8 @@ class GuardReviewAgentsTest(unittest.TestCase):
         self.assertAllowed("git log \\\n  --oneline -5")
         self.assertAllowed("gh api graphql -f query='\nquery {\n  viewer { login }\n}'")
         self.assertAllowed("sort -u -k2 notes.txt | uniq -c")
+        self.assertAllowed("git log --oneline --name-only -5 | grep -c 'a#b'")
+        self.assertAllowed("rg -n 'x' app/Foo#Bar.php")
 
     def test_substitution_inside_double_quotes_is_blocked(self):
         self.assertBlocked('echo "$(rm -rf x)"', "command substitution")
@@ -83,6 +85,12 @@ class GuardReviewAgentsTest(unittest.TestCase):
         self.assertBlocked("uniq notes.txt out.txt", "writes a file")
         self.assertBlocked("git grep -Ovim foo", "runs a program")
         self.assertBlocked("git grep --open-files-in-pager=sh foo", "runs a program")
+        self.assertBlocked("git grep --open=sh foo", "runs a program")
+        self.assertBlocked("git diff --outp=/tmp/x", "writes files")
+        self.assertBlocked("sort --out=x.txt notes.txt", "write files")
+        self.assertBlocked("sort --comp=sh notes.txt", "run a program")
+        self.assertBlocked("echo hi # '\nrm -rf x #'", "comments are not allowed")
+        self.assertBlocked("git log # note", "comments are not allowed")
 
     def test_dispatcher_routes_review_and_browser_agents(self):
         self.assertAllowed("rm -rf build", agent=None, script=DISPATCHER)

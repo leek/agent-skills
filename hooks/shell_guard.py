@@ -107,6 +107,10 @@ def tokenize(command: str) -> list[str]:
             flush()
             i += 1
             continue
+        if c == "#" and not in_word:
+            # Both shells start a comment here, and a comment hides quotes from them but
+            # not from this tokenizer: `echo # '<newline>rm x #'` would run `rm x`.
+            raise Blocked("comments are not allowed")
         if c in OPERATOR_CHARS:
             flush()
             j = i
@@ -157,6 +161,18 @@ def parse_command(command: str) -> list[list[str]]:
     return parts
 
 
+def long_option_in(arg: str, names: tuple[str, ...]) -> bool:
+    """True when arg is one of names, carries a value or suffix after one, or abbreviates one.
+
+    GNU getopt and git's parse-options accept any unambiguous prefix of a long option, so
+    `--out=x` is `--output=x`; matching only the full spelling lets the short form through.
+    """
+    if not arg.startswith("--") or arg == "--":
+        return False
+    name = arg.split("=", 1)[0]
+    return any(name.startswith(n) or n.startswith(name) for n in names)
+
+
 UNIQ_VALUE_FLAGS = {"-f", "-s", "-w", "--skip-fields", "--skip-chars", "--check-chars"}
 
 
@@ -164,7 +180,7 @@ def check_filter(name: str, args: list[str]) -> None:
     """Refuse the text-filter forms that write a file or run a program."""
     if name == "sort":
         for a in args:
-            if a.startswith(("--output", "--compress-program")) or (
+            if long_option_in(a, ("--output", "--compress-program")) or (
                     a.startswith("-") and not a.startswith("--") and "o" in a[1:]):
                 raise Blocked("`sort -o` and `--compress-program` write files or run a program")
     elif name == "uniq":

@@ -13,7 +13,7 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from shell_guard import Blocked, check_filter, parse_command  # noqa: E402
+from shell_guard import Blocked, check_filter, long_option_in, parse_command  # noqa: E402
 
 FILTERS = {"cat", "head", "tail", "wc", "sort", "uniq", "cut", "tr", "echo", "ls", "jq",
            "grep", "egrep", "cd", "pwd", "basename", "dirname", "true"}
@@ -31,11 +31,11 @@ def check_git(args: list[str]) -> None:
     if not args or args[0] not in GIT_READ:
         raise Blocked(f"`git {args[0] if args else ''}` is not a read-only git command")
     if args[0] == "grep" and any(
-            a.startswith("--open-files-in-pager") or (a.startswith("-") and not a.startswith("--") and "O" in a)
+            long_option_in(a, ("--open-files-in-pager",)) or (a.startswith("-") and not a.startswith("--") and "O" in a)
             for a in args[1:]):
         raise Blocked("`git grep -O` runs a program")
     for a in args[1:]:
-        if a.startswith(("--output", "--upload-pack", "--ext-diff", "--exec")):
+        if long_option_in(a, ("--output", "--upload-pack", "--ext-diff", "--exec")):
             raise Blocked(f"`git {args[0]} {a}` writes files or runs a program")
 
 
