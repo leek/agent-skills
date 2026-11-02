@@ -41,7 +41,9 @@ For a whole-repo sweep, fan out sub-agents by codebase size:
   partition running all lens passes; merge candidate lists before verifying.
 
 Each sub-agent gets the target list, this workflow's sweep instructions, and
-the index section(s) for the lens or lenses it will sweep, nothing more. In Claude
+the index section(s) for the lens or lenses it will sweep, nothing more: pass the
+absolute path of [references/index.md](references/index.md) and the lens heading(s)
+to read, so you never load the whole index yourself to dispatch. In Claude
 Code with this plugin installed, dispatch `subagent_type=leek-skills:smell-sweeper`
 (read-only, no project CLAUDE.md, a cheaper model); in other harnesses, dispatch per
 [harness-tools](../harness-tools/SKILL.md), read-only where offered, on the cheapest model the harness lets you pick: the sweep is recall
@@ -49,10 +51,13 @@ only, and verification runs here on the main model.
 
 ### 2. Sweep: one detection pass per occurrence lens
 
-Read [references/index.md](references/index.md) first. It groups all 56 smells
-under the 9 occurrence lenses with a one-line description each, **the index
-is the only source of lens membership; never sweep from a remembered smell
-list**.
+The 9 occurrence lenses, each a `##` heading of
+[references/index.md](references/index.md): Responsibility, Names, Data,
+Unnecessary Complexity, Conditional Logic, Interfaces, Measured Smells,
+Duplication, Message Calls. The index groups all 56 smells under them with a
+one-line description each, **the index is the only source of lens membership;
+never sweep from a remembered smell list**. Whoever runs a lens pass reads that
+lens's section first (sweeping inline, the whole index).
 
 Run one detection pass per lens. Each pass is armed only with that lens's
 one-line descriptions and scans the target for code matching any of them.
@@ -71,7 +76,11 @@ the sweep errs toward recall, the verify step supplies precision.
 Every candidate must survive re-examination before it may enter the report.
 For each one:
 
-1. Read the full card at `references/smells/<slug>.md`.
+1. Read the card at `references/smells/<slug>.md` without its long
+   `## Example` section:
+   `sed '/^## Example/,/^## Refactorings/{/^## Refactorings/!d;}' <this-skill-dir>/references/smells/<slug>.md`.
+   Open the example only when the definition and heuristics leave the candidate
+   undecided.
 2. Re-read the candidate code as a skeptic: does it actually meet the card's
    definition paragraph and detection heuristics, or is it a near-miss that
    merely trips a surface signal (length, a keyword, a shape)?
@@ -147,25 +156,5 @@ to the user (or `/to-tickets`) instead.
   103 raw names
 - [references/ATTRIBUTION.md](references/ATTRIBUTION.md), upstream MIT
   notice and the requested academic citation
-
-## Validating the card set
-
-Run after any card edit, batch addition, or upstream re-sync:
-
-```bash
-bash scripts/validate-cards.sh            # strict: all 56 cards must exist (ship gate)
-bash scripts/validate-cards.sh --partial  # mid-build: missing cards reported as pending
-```
-
-Human-readable status goes to stderr; stdout carries a JSON result:
-
-```json
-{"pass": true, "mode": "strict", "cards_present": 56, "cards_pending": 0,
- "checks": 2697, "failures": [], "pending": []}
-```
-
-Exit 0 on pass, 1 on failure (each failure names the offending file and
-reason), 2 on usage errors. The script embeds the 56-slug catalog, the closed
-taxonomy vocabularies, and reads canonical refactoring names from
-[references/refactoring-names.md](references/refactoring-names.md); it needs
-no network and no upstream clone.
+- [references/maintaining.md](references/maintaining.md), validating the card
+  set after a card edit, batch addition, or upstream re-sync (maintainers only)

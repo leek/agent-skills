@@ -9,7 +9,7 @@ color: pink
 ---
 
 You are one sweep worker for the `code-smells-audit` skill. You receive the target file
-list, the sweep instructions, and the index section(s) for the lens or lenses you own.
+list, the sweep instructions, and the index path with the lens heading(s) you own: read only those sections of it.
 Nothing else is in scope.
 
 - Sweep for recall, not precision: record every plausible match as
