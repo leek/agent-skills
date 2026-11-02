@@ -69,6 +69,23 @@ class GuardReviewAgentsTest(unittest.TestCase):
         self.assertBlocked("rm -rf x", "not allowed",
                            agent="leek-skills:browser-tester", script=DISPATCHER)
 
+    def test_dispatcher_guards_grok_payloads(self):
+        def grok(command, agent):
+            payload = {"hookEventName": "pre_tool_use", "toolName": "run_terminal_command",
+                       "tool_name": "run_terminal_command", "toolInput": {"command": command},
+                       "tool_input": {"command": command}}
+            if agent:
+                payload["subagentType"] = agent
+            return subprocess.run([sys.executable, str(DISPATCHER)], input=json.dumps(payload),
+                                  text=True, capture_output=True)
+
+        self.assertEqual(grok("rm -rf build", None).returncode, 0)
+        self.assertEqual(grok("git log --oneline -5", "leek-skills:finding-verifier").returncode, 0)
+        blocked = grok("git commit -m x", "leek-skills:pr-reviewer")
+        self.assertEqual(blocked.returncode, 2)
+        self.assertIn("not a read-only git command", blocked.stderr)
+        self.assertEqual(grok("rm -rf x", "leek-skills:browser-tester").returncode, 2)
+
     def test_gh_writes_are_blocked(self):
         self.assertBlocked("gh pr merge 12 --squash", "not a read-only gh command")
         self.assertBlocked("gh pr view 12 --web", "opens a browser")

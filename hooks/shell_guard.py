@@ -8,6 +8,7 @@ unquoted subshells or zsh glob qualifiers ((, ), ;).
 
 Wired from hooks/hooks.json so every Bash tool call spawns one Python process
 instead of one per guard, exiting 0 at once unless agent_type is guarded.
+Grok loads the same hooks.json; normalize() maps its payload onto Claude's keys.
 """
 
 import importlib.util
@@ -79,9 +80,29 @@ def _load_module(name: str, path: Path):
     return module
 
 
+SHELL_TOOLS = {"Bash", "run_terminal_command"}
+
+
+def normalize(payload: dict) -> dict:
+    """Map Grok's hook envelope onto Claude Code's keys.
+
+    Grok names the subagent `subagentType` (never `agent_type`), calls its shell
+    tool `run_terminal_command`, and sends `toolName`/`toolInput` in camelCase
+    beside the `tool_name`/`tool_input` aliases. The guards read Claude's shape.
+    """
+    tool = payload.get("tool_name") or payload.get("toolName") or "Bash"
+    return {
+        **payload,
+        "agent_type": payload.get("agent_type") or payload.get("subagentType") or "",
+        "tool_name": "Bash" if tool in SHELL_TOOLS else tool,
+        "tool_input": payload.get("tool_input") or payload.get("toolInput") or {},
+    }
+
+
 def dispatch(payload: dict) -> int:
-    agent = (payload.get("agent_type") or "").rsplit(":", 1)[-1]
-    if payload.get("tool_name", "Bash") != "Bash":
+    payload = normalize(payload)
+    agent = payload["agent_type"].rsplit(":", 1)[-1]
+    if payload["tool_name"] != "Bash":
         return 0
     hooks_dir = Path(__file__).resolve().parent
     if agent in REVIEW_GUARDED:
