@@ -1,31 +1,6 @@
 # Spec run and PR delivery
 
-Two additions to the `implement` process. A **spec run** builds every ticket of one spec in this session. **PR delivery** puts the work on its own branch, in a worktree when asked, and ends with a pull request. A spec run always uses PR delivery; a single work item uses it when the delivery question below picks it. `implement-spec` reads the same delivery question and stacked-PR rules.
-
-## Choose the delivery shape
-
-Before anything is claimed or branched, settle how and where to build. Ask each question below that applies, in one structured-question call ([harness-tools](../../harness-tools/SKILL.md); single-select, the recommended option first; otherwise one message in chat), and nothing else. Skip a question when the request already answers it ("open a PR", "stack it", "just commit", "in a worktree", `all`), or when the repo's rules or the user's saved preferences settle it, and follow that answer. When every question is settled, ask nothing.
-
-**Scope** comes first, in a call of its own, because its answer picks the delivery options. Ask it when the input is a spec whose `tickets/` are published and the request names neither a ticket nor the whole spec:
-
-- **Next frontier ticket** (recommended when one ticket is ready): build the lowest-numbered open, unblocked ticket as the work item.
-- **Every ticket, here**: a spec run, one ticket after another in this session.
-- **Every ticket, in parallel**: stop, and tell the user to run `/implement-spec <spec path>`.
-
-Then the rest, together:
-
-- **Delivery**, for one work item:
-  - **Current branch** (recommended on a feature branch): commit here, no PR.
-  - **New branch and PR** (recommended on the default branch): PR delivery below.
-  - **Worktree and PR**: PR delivery in `.claude/worktrees/<branch>`.
-- **Delivery**, for a whole spec (more than one ticket; with one ticket, ask the one-item question):
-  - **One PR** (recommended): every ticket on one branch.
-  - **Stacked PRs**: one PR per ticket, each based on the one below, over an integration branch that reaches `<default>` in one merge, so each review holds one ticket. Before offering it, run `gh repo view --json mergeCommitAllowed`: a stack must land with merge commits (`triage-github-pr`'s stacked-PR rules), so when it reads `false`, say so in the option.
-  - **Branch, no PR**: deliver as **One PR**, but push the branch and stop before `gh pr create`.
-- **Worktree**, for a whole spec: build the branch in a worktree at `.claude/worktrees/<slug>` (recommended: this checkout stays as it is), or switch this checkout to it. Skip it when the tree is dirty (the worktree is the only option; say so).
-- **Local `<default>`**, when the spec's `.scratch/<slug>` will come from local `<default>` and that is all `<default>` holds ahead of `origin/<default>` (`git log --format=%h origin/<default>..<default> -- . ':!.scratch/<slug>'` prints nothing, and `git rev-list --count origin/<default>..<default>` is not `0`): move `<default>` back to `origin/<default>` once the new branch carries the spec (recommended), or leave it. This is the question PR delivery's step 3 would otherwise ask mid-run.
-
-Every shape runs the same build, review, and verification. Only the branches and PRs differ.
+Two additions to the `implement` process. A **spec run** builds every ticket of one spec in this session. **PR delivery** puts the work on its own branch, in a worktree when asked, and ends with a pull request. A spec run always uses PR delivery; a single work item uses it when the [delivery question](delivery-shape.md) picks it. `implement-spec` reads the same delivery question and stacked-PR rules.
 
 ## PR delivery: before step 1 claims anything
 
@@ -56,7 +31,7 @@ Run it on a spec whose `tickets/` already exist and the user asked to build all 
 ## PR delivery: after step 8
 
 1. Push the branch and open the PR with `gh pr create`. Write the body with the `pr` skill's template, its Evidence from the verification pass with the screenshots uploaded as its **Screenshots** section says, then one line per ticket closed, and a `Left open:` line per finding step 5's rounds left open. For **Stacked PRs**, skip this push and PR: the ticket and integration PRs are already open, and the closing PR follows the stack's step 4 below.
-2. Read the PR's unresolved review threads once (the GraphQL `reviewThreads` query in `resolve-review-comments`). When any exist, run `resolve-review-comments` on the PR. When review bots are still running, say so in the end block. For **Stacked PRs**, skip this step: `triage-github-pr` answers the stack's threads, and a push to an open ticket PR would break the rule below.
+2. Read the PR's unresolved review threads once (`bash <triage-github-pr skill dir>/scripts/pr-comments.sh <PR> --count`, as `resolve-review-comments` does). When any exist, run `resolve-review-comments` on the PR. When review bots are still running, say so in the end block. For **Stacked PRs**, skip this step: `triage-github-pr` answers the stack's threads, and a push to an open ticket PR would break the rule below.
 3. Keep the worktree: it holds the PR branch. If you entered it, leave with `ExitWorktree({action: "keep"})`, which never removes it. Name its path in the report; `repository-cleanup` removes it after the merge.
 4. Without a worktree, return the main checkout to the default branch: `git switch <default> && git pull --ff-only`. Say so in the report, so the next request starts on fresh `<default>`.
 

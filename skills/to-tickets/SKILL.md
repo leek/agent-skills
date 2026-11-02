@@ -66,7 +66,7 @@ Write step 4's answers to `decisions/` as one closed decision ticket titled **Bu
 
 Do NOT close or modify the parent spec. Invoked directly on a spec-less map, set that `map.md`'s frontmatter to `status: closed`: `to-tickets` is then the handoff that ends the map. Invoked on a spec, leave the already-closed map alone.
 
-Commit the tickets where the spec is committed, so `implement` finds both in one place, with `docs(scratch): <slug> tickets`. Unless `git check-ignore -q .scratch` says the repo ignores it: when the branch `docs/<slug>-spec` exists (`git rev-parse --verify -q docs/<slug>-spec`), follow `to-spec`'s worktree steps on that branch; otherwise commit them exactly as `to-spec` commits a spec, its check for commits this session did not make included, so tickets never ride along on an unrelated branch. `implement` carries a committed but unpushed effort directory onto its PR branch; an uncommitted one it cannot reach from a worktree.
+Commit the tickets where the spec is committed, so `implement` finds both in one place: run `to-spec`'s [`publish-spec.sh`](../to-spec/scripts/publish-spec.sh) `<slug> -m "docs(scratch): <slug> tickets"`, with `--own <sha>` for each commit this session made on this branch (the spec's, when this session wrote it). It commits on `docs/<slug>-spec` when that branch exists or `HEAD` carries another session's commits, otherwise on the current branch, so tickets never ride along on an unrelated branch. `implement` carries a committed but unpushed effort directory onto its PR branch; an uncommitted one it cannot reach from a worktree.
 
 ## Ticket template
 
