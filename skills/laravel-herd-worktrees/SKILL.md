@@ -42,7 +42,7 @@ From the main checkout (or, for `implement-spec`, the integration checkout `git 
 3. **Remove.** `git worktree remove <path>`, never with `--force`. When git refuses, everything stays; visiting its URL serves it again.
 4. **Branch.** `git branch -d <name>` only after a removal; a refusal keeps the branch, named in `branch_reason`. Git's `-D` hint is not a go-ahead.
 
-`databases` lists what is still registered for that path once it is removed (`[]` when kept, since a kept worktree keeps its databases): the calling skill's own databases. Drop each, and its parallel-testing copies (`<database>_test_<N>`), with the repo's client (`DROP DATABASE IF EXISTS`; a SQLite file goes with the checkout), then unregister each one only after its drop succeeded. A failed drop keeps its registry line and is reported.
+`databases` lists what is still registered for that path once it is removed (`[]` when kept, since a kept worktree keeps its databases): the calling skill's own databases. Wait for the script's JSON before dropping anything (if your harness backgrounds a slow command, read its output first): a drop issued earlier runs before git decides, and an unregister issued earlier empties the list. Drop each, and its parallel-testing copies (`<database>_test_<N>`), with the repo's client (`DROP DATABASE IF EXISTS`; a SQLite file goes with the checkout), then unregister each one only after its drop succeeded. A failed drop keeps its registry line and is reported.
 
 When `herd_unserve_failed` is set (the Herd app is not running) and its `database_mode` is `clone` or `empty` on a server driver, drop its `database_name` yourself and unregister it.
 
