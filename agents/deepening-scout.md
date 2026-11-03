@@ -1,8 +1,8 @@
 ---
 name: deepening-scout
 description: Read-only sweep of a codebase for shallow modules and deepening opportunities, armed with the codebase-design vocabulary. Returns candidates, not file dumps. Dispatched by the improve-codebase-architecture skill.
-tools: Read, Grep, Glob, Bash
-disallowedTools: Edit, Write, NotebookEdit
+tools: Read, Grep, Glob, Bash, Write, Edit
+disallowedTools: NotebookEdit
 model: sonnet
 effort: medium
 skills:

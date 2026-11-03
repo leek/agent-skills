@@ -400,6 +400,8 @@ check "browser-test guard tests pass" \
   python3 -m unittest -q skills/browser-test/scripts/test_guard_browser.py
 check "review-agent guard tests pass" \
   python3 -m unittest -q hooks/test_guard_review_agents.py
+check "memory-write guard tests pass" \
+  python3 -m unittest -q hooks/test_memory_write_guard.py
 check "bare-worktree notice speaks only in a bare Laravel worktree" \
   bash -c '
     t=$(mktemp -d); trap "rm -rf \"$t\"" EXIT

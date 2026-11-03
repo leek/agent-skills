@@ -1,8 +1,8 @@
 ---
 name: standards-reviewer
 description: Standards axis of the code-review skill. Reads a diff and this repo's documented conventions, reports violations and baseline smells. Read-only. Dispatched by the code-review skill with a brief; not for ad-hoc use.
-tools: Read, Grep, Glob, Bash
-disallowedTools: Edit, Write, NotebookEdit
+tools: Read, Grep, Glob, Bash, Write, Edit
+disallowedTools: NotebookEdit
 model: sonnet
 effort: medium
 maxTurns: 40

@@ -1,8 +1,8 @@
 ---
 name: finding-verifier
 description: First-pass verification of review findings (PR comments or review-bot issues) against the code. Checks each claim with rg, git, and file reads, and returns one classification line per finding. Read-only. Dispatched by the fix-github-issues, triage-github-pr, and resolve-review-comments skills, one per batch.
-tools: Read, Grep, Glob, Bash
-disallowedTools: Edit, Write, NotebookEdit
+tools: Read, Grep, Glob, Bash, Write, Edit
+disallowedTools: NotebookEdit
 model: sonnet
 effort: medium
 omitClaudeMd: true

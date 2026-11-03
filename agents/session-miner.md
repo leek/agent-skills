@@ -1,8 +1,8 @@
 ---
 name: session-miner
 description: Mines one batch of AI-coding session transcripts (Claude Code, Codex, Grok, and agy) for corrections, errored commands, repeated setup, and content moments. Read-only over the logs. Dispatched by the retro skill, one per batch.
-tools: Bash, Read, Grep, Glob
-disallowedTools: Edit, Write, NotebookEdit
+tools: Bash, Read, Grep, Glob, Write, Edit
+disallowedTools: NotebookEdit
 model: sonnet
 omitClaudeMd: true
 memory: user
