@@ -34,7 +34,7 @@ Cut the spec into **tracer bullet** tickets:
 
 Give each ticket its **blocking edges**: the tickets that must complete before it can start. A ticket with no blockers can start immediately.
 
-List the **files** each ticket expects to create or edit, from step 2's exploration. Two tickets with no edge between them that edit the same file conflict when built in parallel, so `implement-spec` builds them one after the other; the list is how it knows. A shared registration line (a route, a provider, a translation key) counts too.
+List the **files** each ticket expects to create or edit, from step 2's exploration. Every path is resolved, never guessed: an edited file must exist (`git ls-files <path>`), and a new file sits beside its nearest sibling of the same kind (`rg --files | rg '<SiblingName>'`), so a new test follows where the repo's existing tests for that layer live. Never publish a `(verify path)` placeholder: look it up now. Two tickets with no edge between them that edit the same file conflict when built in parallel, so `implement-spec` builds them one after the other; the list is how it knows. A shared registration line (a route, a provider, a translation key) counts too.
 
 **Wide refactors are the exception to vertical slicing.** A wide refactor is one mechanical change (rename a column, retype a shared value object) whose blast radius fans across the codebase so no vertical slice can land green. Sequence it as **expand–contract**:
 
