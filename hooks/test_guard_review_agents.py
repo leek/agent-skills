@@ -39,6 +39,8 @@ class GuardReviewAgentsTest(unittest.TestCase):
             self.assertAllowed("gh api graphql -f query='query { viewer { login } }'", agent=agent)
             self.assertAllowed("gh api -X GET search/code -f q=Foo", agent=agent)
             self.assertAllowed("find app -name '*.php' | wc -l", agent=agent)
+            self.assertAllowed("sed -n '10,40p' app/Foo.php", agent=agent)
+            self.assertAllowed("git show HEAD:app/Foo.php | sed -n 5p", agent=agent)
 
     def test_quoted_and_escaped_operators_are_data(self):
         self.assertAllowed(r"find . \( -name '*.py' -o -name '*.sh' \) -type f")
@@ -78,6 +80,11 @@ class GuardReviewAgentsTest(unittest.TestCase):
         self.assertBlocked("git log (rm -rf /)", "subshells and glob qualifiers")
         self.assertBlocked("echo *(e:'rm -rf /':)", "subshells and glob qualifiers")
         self.assertBlocked("curl https://example.com", "`curl` is not allowed")
+        self.assertBlocked("sed -i 's/a/b/' app/Foo.php", "only `sed -n")
+        self.assertBlocked("sed -n '1w /tmp/x' app/Foo.php", "only `sed -n")
+        self.assertBlocked("sed -n '1e rm -rf /' app/Foo.php", "only `sed -n")
+        self.assertBlocked("sed -n 1p app/Foo.php -i", "only `sed -n")
+        self.assertBlocked("sed 's/a/b/' app/Foo.php", "only `sed -n")
         self.assertBlocked("bash -c 'rm x'", "`bash` is not allowed")
         self.assertBlocked("sort -o out.txt notes.txt", "write files")
         self.assertBlocked("sort -uo out.txt notes.txt", "write files")

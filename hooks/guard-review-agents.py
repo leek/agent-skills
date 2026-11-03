@@ -4,12 +4,13 @@
 Both agents read untrusted text: review comments, bot findings, and the PR diff.
 Their bodies say read-only; this hook enforces it. hooks/shell_guard.py calls
 run_payload only for those agents' shell calls. Every segment of the command
-(split on &&, ||, ;, |) must be a read-only git, gh, rg, find, or text command
+(split on &&, ||, ;, |) must be a read-only git, gh, rg, find, `sed -n '<range>p'`, or text command
 under both bash and zsh rules. Anything else returns 2, which blocks the call and
 shows stderr to the agent.
 """
 
 from pathlib import Path
+import re
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -85,6 +86,20 @@ def check_find(args: list[str]) -> None:
         raise Blocked("`find` with -exec, -delete, or -fprint is not read-only")
 
 
+SED_PRINT = re.compile(r"(\d+|\$)(,(\d+|\$))?p")
+
+
+def check_sed(args: list[str]) -> None:
+    """Allow only `sed -n '<line>[,<line>]p' [file …]`, the read-a-range form."""
+    if len(args) < 2 or args[0] != "-n" or not SED_PRINT.fullmatch(args[1]):
+        raise Blocked("only `sed -n '<start>,<end>p' <file>` is allowed; use the Read tool")
+    files = args[2:]
+    if files[:1] == ["--"]:
+        files = files[1:]
+    elif any(f.startswith("-") for f in files):
+        raise Blocked("only `sed -n '<start>,<end>p' <file>` is allowed; use the Read tool")
+
+
 def check(command: str) -> None:
     parts = parse_command(command)
     for seg in parts:
@@ -100,6 +115,8 @@ def check(command: str) -> None:
             check_rg(args)
         elif name == "find":
             check_find(args)
+        elif name == "sed":
+            check_sed(args)
         else:
             raise Blocked(f"`{name}` is not allowed — only read-only git, gh, rg, find, and text filters")
 
