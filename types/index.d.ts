@@ -99,6 +99,8 @@ declare module 'claude-code' {
       workers: Worker[]
       isWorkersHidden: boolean
       tickets: TicketBoard | null
+      /** The non-blocking question the last main-loop reply ended on (its ❓ line), until the next prompt. */
+      question: string | null
     }
   }
 }
