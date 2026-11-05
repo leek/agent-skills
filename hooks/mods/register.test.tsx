@@ -156,7 +156,7 @@ test('ticket_board shows the review stage and each finding once the tickets are 
   expect(await pane.find({ type: 'Text', text: /◐ Notes page checks readiness once per row {2}fixing/ })).toBeDefined()
 })
 
-test('question band holds the reply\'s ❓ question until the next prompt', async ($, on) => {
+test('question band holds every ❓ question of the reply until the next prompt', async ($, on) => {
   mock.clock(on, { now: 0 })
   on('ui.render', async ($, e) => engineDraw($, e))
   on('turn.complete', async () => ({ text: '' }))
@@ -165,9 +165,11 @@ test('question band holds the reply\'s ❓ question until the next prompt', asyn
   const end = (answer: string) =>
     $.turn.complete({ reason: 'answer', answer, durationMs: 5, isAborted: false, turnId: 'm1' } as never)
 
-  await end('Done.\n\n---\n\n❓ **Should I push `main` now?**')
+  await end('Done.\n\n---\n\n❓ **Ring the bell too?**\n❓ **Should I push `main` now?**')
   const band = await $.ui.mount({ plugin: 'leek-skills', surface: 'terminal', ...idle } as never)
-  expect(await band.find({ type: 'Text', text: /❓ Waiting on you: Should I push main now\?/ })).toBeDefined()
+  expect(await band.find({ type: 'Text', text: /Waiting on you/ })).toBeDefined()
+  expect(await band.find({ type: 'Text', text: /❓ Ring the bell too\?/ })).toBeDefined()
+  expect(await band.find({ type: 'Text', text: /❓ Should I push main now\?/ })).toBeDefined()
 
   // While a turn runs, the band leaves the question out.
   const busy = await $.ui.mount({ plugin: 'leek-skills', surface: 'terminal', ...BAND } as never)

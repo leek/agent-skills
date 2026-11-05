@@ -1,12 +1,12 @@
-// Pure helper for the question band: the reply's last ❓ line, the non-blocking question the
+// Pure helper for the question band: the reply's ❓ lines, the non-blocking questions the
 // reply leaves for the user (the convention: `❓ **<question>**`, last, after a `---` line).
 
 const MARK = '❓'
 
-/** The text of the last line that starts with ❓ outside a code fence, or null when there is none. */
-export function openQuestion(answer: string): string | null {
+/** The text of every line that starts with ❓ outside a code fence, in reply order. */
+export function openQuestions(answer: string): string[] {
   let isFenced = false
-  let found: string | null = null
+  const found: string[] = []
   for (const raw of answer.split('\n')) {
     const line = raw.trim()
     if (/^(```|~~~)/.test(line)) {
@@ -24,7 +24,7 @@ export function openQuestion(answer: string): string | null {
       .replace(/\s+/g, ' ')
       .trim()
     if (text !== '') {
-      found = text
+      found.push(text)
     }
   }
 

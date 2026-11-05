@@ -9,9 +9,10 @@
 // autopilot, browser-test, panel, chatter-scout, code-review), with its tool count, last
 // tool, and outcome. Where nothing draws, the skills report their workers as before.
 //
-// Question band: when a main-loop reply ends on a non-blocking question (a `❓` line, the
-// convention in the user's CLAUDE.md and AGENTS.md's status marks), the band above the prompt
-// holds that question until the next prompt, so it cannot scroll away. Blocking questions
+// Question band: when a main-loop reply ends on non-blocking questions (`❓` lines, the
+// convention in the user's CLAUDE.md and AGENTS.md), the band above the prompt holds every one
+// of them until the next prompt, so none scrolls away. A question the user skipped is asked
+// again in the next reply (the convention's rule), which puts it back in the band. Blocking questions
 // use the question dialog and never reach the band.
 //
 // Ticket board: implement-spec, implement <spec> all, and wayfinder <map> all report each
@@ -38,7 +39,7 @@ import {
   tally as boardTally,
   summary as boardSummary,
 } from './ticket-board'
-import { openQuestion } from './open-question'
+import { openQuestions } from './open-question'
 import { KEEP, describeTool, duration, isFailed, mark, ordered } from './workers-model'
 
 const PANE = 'scratch'
@@ -48,7 +49,7 @@ const isWorkersHidden = atom({ plugin: 'leek-skills', key: 'isWorkersHidden' } a
 const TICKETS_PANE = 'tickets'
 const TICKETS_TOOL = 'mcp__leek-skills__ticket_board'
 const tickets = atom({ plugin: 'leek-skills', key: 'tickets' } as const, null)
-const question = atom({ plugin: 'leek-skills', key: 'question' } as const, null)
+const questions = atom({ plugin: 'leek-skills', key: 'questions' } as const, [])
 
 const ago = (ms: number) => {
   const days = Math.floor(ms / 86_400_000)
@@ -203,8 +204,8 @@ export const register: Register = on => {
   on('turn.complete', async ($, e, next) => {
     const id = e.agentId
     if (id === undefined) {
-      const asked = e.reason === 'answer' ? openQuestion(e.answer) : null
-      await update($, question, () => asked)
+      const asked = e.reason === 'answer' ? openQuestions(e.answer) : []
+      await update($, questions, () => asked)
     } else {
       const now = await $.clock.now()
       await update($, workers, list => list.map(w => (w.id === id ? { ...w, outcome: e.reason, endedAt: now } : w)))
@@ -216,16 +217,16 @@ export const register: Register = on => {
   // A new prompt with nothing running starts a clean slate.
   on('prompt.submit', async ($, e, next) => {
     await update($, workers, list => (list.some(w => w.outcome === 'running') ? list : []))
-    await update($, question, () => null)
+    await update($, questions, () => [])
 
     return next(e)
   }).catch(($, e, next) => next(e))
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    // The question shows only between turns: a running turn is still working on the answer.
-    const asked = e.props.isWorking ? null : await read($, question)
+    // The questions show only between turns: a running turn is still working on the answer.
+    const asked = e.props.isWorking ? [] : await read($, questions)
     const list = (await read($, isWorkersHidden)) ? [] : await read($, workers)
-    if (e.props.hasSurvey || (asked === null && list.length === 0)) {
+    if (e.props.hasSurvey || (asked.length === 0 && list.length === 0)) {
       return next(e)
     }
 
@@ -234,21 +235,31 @@ export const register: Register = on => {
     const running = list.filter(w => w.outcome === 'running').length
     const failed = list.filter(isFailed).length
     const color = (w: Worker) => (w.outcome === 'running' ? 'suggestion' : w.outcome === 'answer' ? 'success' : 'error')
-    const label = '❓ Waiting on you: '
-    // The framed question wraps inside the border and padding; the workers get the rows left.
+    // The framed questions wrap inside the border and padding; the workers get the rows left.
+    const width = Math.max(1, e.props.bodyColumns - 4)
     const questionRows =
-      asked === null ? 0 : 2 + Math.ceil((label.length + asked.length) / Math.max(1, e.props.bodyColumns - 4)) + (list.length > 0 ? 1 : 0)
+      asked.length === 0
+        ? 0
+        : 3 + asked.reduce((rows, q) => rows + Math.ceil((q.length + 2) / width), 0) + (list.length > 0 ? 1 : 0)
 
     return (
       <Box flexDirection="column" width={e.props.bodyColumns}>
-        {asked !== null && (
-          <Box borderStyle="round" borderColor="warning" paddingX={1} marginBottom={list.length > 0 ? 1 : 0}>
-            <Text wrap="wrap">
-              <Text color="warning" bold>
-                {label}
-              </Text>
-              <Text bold>{asked}</Text>
+        {asked.length > 0 && (
+          <Box
+            borderStyle="round"
+            borderColor="warning"
+            paddingX={1}
+            flexDirection="column"
+            marginBottom={list.length > 0 ? 1 : 0}
+          >
+            <Text color="warning" bold>
+              Waiting on you
             </Text>
+            {asked.map((q, i) => (
+              <Text key={`q${i}`} wrap="wrap" bold>
+                ❓ {q}
+              </Text>
+            ))}
           </Box>
         )}
         {list.length > 0 && (
