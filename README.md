@@ -60,6 +60,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | `resolve-review-comments` | model | Triage, fix or rebut, then reply-and-resolve every review comment on a PR (including AI-review bot findings). |
 | `resolving-merge-conflicts` | model | "Use when you need to resolve an in-progress git merge/rebase conflict." |
 | `retro` | user | Mine Claude Code, Codex (including compressed rollouts), Grok, and agy parent sessions for corrections and workflow friction; compare current guidance and loaded versions before proposing fixes. |
+| `run-after` | user | Run this session's waiting steps (a backfill after deploy, a command after commit or merge) once their trigger lands: start the deploy, run it, and it confirms the steps, watches the deploy, and runs them. |
 | `scratch-cleanup` | user | Sweep a dusty .scratch/: file research into docs/, remove finished efforts, and report the work still open. |
 | `scratch-status` | user | Report what is still open across `.scratch/`: every effort's open tickets and decisions, what blocks it, how stale it is, and the next skill to run. Read-only. |
 | `setup` | user | Configure this repo for the engineering skills: the markdown issue tracker layout, triage label vocabulary, and domain doc layout. |

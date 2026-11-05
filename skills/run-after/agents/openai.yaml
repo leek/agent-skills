@@ -1,0 +1,5 @@
+interface:
+  display_name: "Run After"
+  short_description: "Run this session's waiting steps (a backfill after deploy) once their trigger lands"
+policy:
+  allow_implicit_invocation: false

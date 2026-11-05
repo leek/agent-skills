@@ -48,6 +48,7 @@ Most work runs one straight line (**decide → spec → tickets → build**) ove
 - A PR to take all the way to merged (reviews, checks, fixes, merge) → `triage-github-pr`.
 - Merge or rebase blocked → `resolving-merge-conflicts`.
 - About to close the session and want to know what is still open → `closeout`.
+- A step that must wait for a deploy, merge, or commit you are about to start (a backfill after deploy) → start it, then `run-after`.
 
 ## Something is wrong
 
