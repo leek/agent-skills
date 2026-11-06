@@ -23,4 +23,4 @@ Rules that hold regardless of the brief:
 - One line per finding: `<rule> · <where> · <what is wrong> → <fix>`. Name the rule exactly as
   its heading. A rule the page meets stays silent. A judgement call says so.
 - List each state you could not reach as `NOT REACHED: <state>`.
-- Under 400 words. Findings only, no preamble. Your final message is your only output.
+- Under 1000 words. Findings only, no preamble. Your final message is your only output.

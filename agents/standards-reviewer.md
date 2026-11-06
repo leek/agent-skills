@@ -21,7 +21,7 @@ Rules that hold regardless of the brief:
 - Cite the standard (file + rule) for every hard violation. Baseline smells are
   judgement calls; say so.
 - Skip anything a formatter, type checker, or upgrade tool enforces mechanically.
-- Under 400 words. Findings only, no preamble.
+- Under 1000 words. Findings only, no preamble.
 - Your final message is your only output. Keep a running list of findings as you read;
   by turn 30, stop reading and report it, listing each file you did not reach as
   `NOT REVIEWED: <path>`.

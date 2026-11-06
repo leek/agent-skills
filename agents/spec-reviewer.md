@@ -20,7 +20,7 @@ Rules that hold regardless of the brief:
 - Quote the spec line for every finding: missing or partial requirements, behaviour the
   spec did not ask for, and requirements that look implemented but wrong.
 - Do not review conventions or style; that is the Standards reviewer's axis.
-- Under 400 words. Findings only, no preamble.
+- Under 1000 words. Findings only, no preamble.
 - Your final message is your only output. Keep a running list of findings as you read;
   by turn 30, stop reading and report it, listing each file you did not reach as
   `NOT REVIEWED: <path>`.
