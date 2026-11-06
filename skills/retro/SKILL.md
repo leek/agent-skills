@@ -27,7 +27,7 @@ It discovers every harness's logs, groups child logs under their parents (childr
 
 ## 2. Extract signal
 
-Never `cat` a whole log. `bash <this-skill-dir>/scripts/extract-signal.sh <path>` prints one JSONL event per user-role message, queued message, shell command, tool call, and failed tool result, each with its source path and line (SQLite step index for agy). A user-role message is not proof of human authorship: exclude preambles, agent briefs, relayed messages, and quoted earlier corrections from human counts. Surface corrections fast by grepping the `user` and `queued` texts:
+Never `cat` a whole log. `bash <this-skill-dir>/scripts/extract-signal.sh <path>` prints one JSONL event per user-role message, queued message, assistant reply (its tail, where closing questions sit), shell command, tool call, and failed tool result, each with its source path and line (SQLite step index for agy). A user-role message is not proof of human authorship: exclude preambles, agent briefs, relayed messages, and quoted earlier corrections from human counts. Surface corrections fast by grepping the `user` and `queued` texts:
 `grep -iE "no,|actually|that.?s wrong|don.?t |stop |instead|you should have|i told you|revert|why did you|wrong"`
 
 ## 3. Fan out: one subagent per batch

@@ -1,6 +1,7 @@
 #!/bin/bash
 # Extract the signal from one session log, read-only: user-role messages, queued messages,
-# shell commands, and tool errors, each with its source line (or SQLite step index).
+# the tail of each assistant text reply, shell commands, and tool errors, each with its
+# source line (or SQLite step index).
 # Claude Code, Codex (plain or .jsonl.zst, streamed, never decompressed in place),
 # Grok, and agy (.db, opened read-only).
 #
@@ -9,8 +10,10 @@
 # Output: JSONL, one event per line: {"path","line","kind","text"}
 #   kind: user (a user-role message: NOT proof of human authorship; preambles, agent
 #   briefs, and relayed or quoted text also arrive here), queued (typed while a turn
-#   ran), command (a shell command the agent ran), tool_call (other tool input),
-#   error (a failed tool result).
+#   ran), assistant (the last N characters of an assistant text reply, where its closing
+#   questions and next steps sit; not agy), command (a shell command the agent ran),
+#   tool_call (other tool input), error (a failed tool result; a Codex "Script completed"
+#   result is never one).
 # Status and coverage gaps go to stderr. An empty result from a non-empty log means the
 # format changed: inspect the event types (`jq -rc .type FILE | sort | uniq -c`).
 
@@ -68,8 +71,16 @@ case "$f" in
              zstd -dc -- "$f" > "$tmp" ;;
       *)     cat -- "$f" > "$tmp" ;;
     esac
-    jq -c --arg errs "$errs" '
+    jq -c --arg errs "$errs" --argjson max "$max" '
       def txt: if type=="array" then map(.text // "") | join(" ") elif type=="string" then . else tostring end;
+      def tail: if length > $max then .[-$max:] else . end;
+      # Codex code-mode results open with "Script completed" or "Script failed"; the rest is
+      # the script output, which often holds the word "error" without anything failing. A
+      # completed script still failed when a command inside it exited non-zero.
+      def codex_failed: (.output | if type=="array" then (.[0].text // "") else tostring end) as $head
+        | if ($head|startswith("Script completed") or startswith("Script running")) then (.output|txt|test("\"exit_code\": ?[1-9]"))
+          elif ($head|startswith("Script failed")) then true
+          else (.output|tostring|test($errs; "i")) end;
       input_line_number as $n
       | if .type=="queue-operation" and .operation=="enqueue" then
           (.content | select(type=="string" and (startswith("<task-notification>")|not)) | {line:$n, kind:"queued", text:.})
@@ -79,20 +90,23 @@ case "$f" in
               elif .type=="tool_result" and .is_error==true then {line:$n, kind:"error", text:(.content|txt)}
               else empty end end)
         elif .type=="assistant" and (.message.content? != null) then
-          (.message.content[]? | select(.type=="tool_use")
-            | if .name=="Bash" then {line:$n, kind:"command", text:.input.command}
-              else {line:$n, kind:"tool_call", text:(.name + " " + (.input|tostring))} end)
+          (.message.content[]? | if .type=="text" then {line:$n, kind:"assistant", text:(.text|tail)}
+            elif .type!="tool_use" then empty
+            elif .name=="Bash" then {line:$n, kind:"command", text:.input.command}
+            else {line:$n, kind:"tool_call", text:(.name + " " + (.input|tostring))} end)
         elif .type=="response_item" then                           # Codex
           (.payload | if .type=="message" and .role=="user" then {line:$n, kind:"user", text:(.content|txt)}
+            elif .type=="message" and .role=="assistant" then {line:$n, kind:"assistant", text:(.content|txt|tail)}
             elif .type=="custom_tool_call" or .type=="function_call" then {line:$n, kind:"command", text:((.input // .arguments)|tostring)}
-            elif (.type=="custom_tool_call_output" or .type=="function_call_output") and ((.output|tostring)|test($errs; "i")) then {line:$n, kind:"error", text:(.output|tostring)}
+            elif (.type=="custom_tool_call_output" or .type=="function_call_output") and codex_failed then {line:$n, kind:"error", text:(.output|txt)}
             else empty end)
         elif .type=="event_msg" and .payload.type=="user_message" then  # older Codex logs
           {line:$n, kind:"user", text:.payload.message}
         elif .type=="user" then                                    # Grok
           {line:$n, kind:"user", text:(.content|txt)}
-        elif .type=="assistant" and .tool_calls then
-          (.tool_calls[] | {line:$n, kind:"command", text:tostring})
+        elif .type=="assistant" then                               # Grok
+          ((.content | select(type=="string" and . != "") | {line:$n, kind:"assistant", text:tail}),
+           (.tool_calls[]? | {line:$n, kind:"command", text:tostring}))
         elif (.type=="tool_result" or .type=="tool") and ((.content|tostring)|test($errs; "i")) then
           {line:$n, kind:"error", text:(.content|tostring)}
         else empty end' "$tmp" | emit
