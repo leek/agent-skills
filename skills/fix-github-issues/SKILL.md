@@ -61,8 +61,9 @@ Work on a new branch `fix/issues-<run>` from `origin/<default>`, always in a wor
 ([Branch or worktree](references/mechanics.md#branch-or-worktree)). The main checkout
 stays on the branch the run found it on, including when that tree is clean.
 
-Per LEGIT finding: make the minimal change, with no drive-by refactors. Add a test for
-logic, auth, or data changes and run that test file green. A user message to stop the
+Per LEGIT finding: make the minimal change, with no drive-by refactors. Prove it per the
+`tdd` skill's [What needs a test](../tdd/SKILL.md#what-needs-a-test-and-what-proves-the-rest): a test for
+behaviour, run that test file green; `verify` for a presentation change. A user message to stop the
 tests ends test commands for the rest of the run: the last focused result stands, and
 the commits continue. Commit each fix on its own (Conventional
 Commits, explicit staging). Put `fixes #NNN` **only** on the commit that resolves the

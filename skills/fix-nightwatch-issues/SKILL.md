@@ -81,7 +81,8 @@ Completion criterion: every issue has a line.
 
 The symptom rarely points at the layer that needs the fix:
 
-- App logic: fix the code, with a test.
+- App logic: fix the code, proved per the `tdd` skill's
+  [What needs a test](../tdd/SKILL.md#what-needs-a-test-and-what-proves-the-rest).
 - Environment or permissions: fix the container setup or the infra env config.
 - A slow route, job, or command: add an index (check the schema first), eager-load,
   chunk, or move the work to a queue.

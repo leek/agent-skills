@@ -9,7 +9,7 @@ allowed-tools: "Bash(git diff *) Bash(git log *) Bash(git merge-base *)"
 
 Three-axis review of the diff between `HEAD` and a fixed point the user supplies:
 
-- **Correctness**: would this change break something? Bugs, failure modes (what a side effect does when it fails, repeats, or races), security, data, broken contracts, missing tests.
+- **Correctness**: would this change break something? Bugs, failure modes (what a side effect does when it fails, repeats, or races), security, data, broken contracts, missing tests (for behaviour only, per the `tdd` skill's [What needs a test](../tdd/SKILL.md#what-needs-a-test-and-what-proves-the-rest) section).
 - **Standards**: does the code conform to how this repo writes code?
 - **Spec**: does the code faithfully implement the originating ticket / PRD / spec?
 

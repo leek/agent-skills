@@ -43,8 +43,9 @@ path, its findings' step 4 lines with links, its file list, the repo's `AGENTS.m
 `CLAUDE.md`, and these rules:
 
 - Work only in that worktree. Call the Skill tool with `tdd` (otherwise follow
-  `skills/tdd/SKILL.md`) and give each logic, auth or data fix a regression test that
-  fails without it. Make the minimal change.
+  `skills/tdd/SKILL.md`) and prove each fix per its **What needs a test** section: a
+  behaviour fix gets a regression test that fails without it, a presentation fix gets
+  none, and the report says so. Make the minimal change.
 - Run focused tests in the foreground and wait for the result; an idle fixer may not
   wake when a background run ends. End with them green.
 - Touch a file outside the list only when the fix cannot land without it, and name it in

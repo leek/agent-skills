@@ -82,7 +82,9 @@ Completion criterion: every issue has a line.
 ## 4. Fix each LEGIT cluster at the right layer
 
 - App Alpine component or page script: use the project's registration pattern.
-- Livewire or Filament component behaviour: fix the PHP, with a Pest regression test.
+- Livewire or Filament component behaviour: fix the PHP, with a Pest regression test
+  (a styling-only fix gets `verify` instead, per the `tdd` skill's
+  [What needs a test](../tdd/SKILL.md#what-needs-a-test-and-what-proves-the-rest)).
 - A class of noise you control: add a `before_send` matcher. Gate it to the navigation
   window unless the value is always benign, so a steady-state break still reports.
 - Vendor or browser noise: add a suppression rule, never a vendor patch.

@@ -8,7 +8,7 @@ allowed-tools: "Bash(gh pr view *) Bash(gh pr diff *) Bash(gh pr checks *) Bash(
 # Resolve Review Comments
 
 Take every review comment on a pull request to a **resolved** end state: each one is
-either **fixed** (code changed, with a test) or **rebutted** (a one-line reason it is
+either **fixed** (code changed, with its proof) or **rebutted** (a one-line reason it is
 not a defect), then replied to and its thread resolved. No thread is left open and no
 finding is actioned on faith.
 
@@ -63,9 +63,12 @@ step added to its rules.
 
 ## 4. Fix the legit ones
 
-Change the code, and add or extend a test that **fails without the fix and passes with
-it**; a behaviour change with no test proving it is not done. Run the affected tests
-green. For a race or concurrency claim, drive the interleaving deterministically (write
+Change the code, and prove it the way the `tdd` skill's
+[What needs a test](../tdd/SKILL.md#what-needs-a-test-and-what-proves-the-rest) section
+says for its kind. A behaviour fix gets a test that **fails without the fix and passes
+with it**; a behaviour change with no test proving it is not done. A presentation fix
+(styling, copy, markup) gets no test: run the `verify` skill on the page instead. Run the
+affected tests green. For a race or concurrency claim, drive the interleaving deterministically (write
 the conflicting state, then act on a stale in-memory model) rather than asserting timing.
 
 If proving a guard needs a disproportionately brittle harness, and the guard is a
@@ -73,8 +76,8 @@ byte-identical mirror of one already tested elsewhere, say so in the reply and l
 that parity instead of shipping a flaky test, but this is the rare exception, not the
 default escape hatch.
 
-Completion criterion: every legit cluster has a code change and a green test (or a
-stated parity rationale); run the project's Filament/lint/static checks the repo
+Completion criterion: every legit cluster has a code change and its proof: a green test,
+a `verify` observation for a presentation fix, or a stated parity rationale; run the project's Filament/lint/static checks the repo
 expects on touched files.
 
 ## 5. Commit and push
@@ -87,7 +90,8 @@ threads resolve against the pushed state.
 
 For each thread, post a reply then resolve it (mechanics in the references file):
 
-- **fixed** → name the commit and the behaviour now, and the test that pins it.
+- **fixed** → name the commit and the behaviour now, and the test that pins it (for a
+  presentation fix, what `verify` showed).
 - **not a bug** → the one-line evidence from step 3 (cite the spec line, the role/leaf,
   or the existing test).
 

@@ -226,8 +226,9 @@ No findings eligible for this batch: finish the dispositions, then go to step 6.
 
 Otherwise work on the head branch without disturbing a dirty tree, following
 [Check out the head branch safely](references/gh-mechanics.md#check-out-the-head-branch-safely)
-(fork PRs included). For each LEGIT finding in the current batch: make the minimal change, add a test for any
-logic, auth, or data change, run it green, then commit with explicit staging.
+(fork PRs included). For each LEGIT finding in the current batch: make the minimal change, prove it per the `tdd` skill's
+[What needs a test](../tdd/SKILL.md#what-needs-a-test-and-what-proves-the-rest) (a failing-first test for behaviour, `verify`
+for presentation), run the tests green, then commit with explicit staging.
 A batch of at least 6 findings that split into at least 2 groups of separate files is
 written in parallel instead, per [Parallel fix batch](references/parallel-fixes.md).
 A test failing outside your fix runs on the starting SHA first: with your work

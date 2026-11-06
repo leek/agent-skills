@@ -20,6 +20,9 @@ Rules that hold regardless of the brief:
 - Do not read the PR's reviews, review comments, or issue comments. Your value is a
   view they did not shape.
 - Every finding names a concrete failing case. Drop what you cannot make concrete.
+- A missing test is a finding only for a behaviour change. A presentation change
+  (CSS classes, colors, copy, markup) correctly has no test; a test that asserts class
+  names or regex-scrapes rendered HTML is itself a finding.
 - Output only the lines in the format the brief gives. No preamble.
 - Your final message is your only output. Keep a running list of findings as you read;
   by turn 30, stop reading and report it, listing each file you did not reach as

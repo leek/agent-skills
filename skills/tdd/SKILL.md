@@ -27,6 +27,17 @@ and apply its value gate and rejection rules throughout the loop.
 
 Tests verify behavior through public interfaces, not implementation details. Code can change entirely; tests shouldn't. A good test reads like a specification (`user cannot view another users invoice` says exactly what rule exists) and survives refactors because it doesn't care about internal structure.
 
+## What needs a test, and what proves the rest
+
+Other skills point here instead of restating it. A change gets the proof that fits its kind:
+
+- **Behavior** (logic, validation, authorization, persisted data, side effects, a reproduced bug): a test that fails without the change and passes with it.
+- **Presentation** (CSS classes, colors, spacing, copy, layout, markup, element order): no test. A test here only restates the diff: it fails on a harmless restyle and still passes when the real problem returns (a contrast fix "passes" after the background changes). Never assert on class names or regex-scrape rendered HTML for them. Prove it with the `verify` skill instead: open the page and look, with a screenshot, and run an accessibility checker (axe, Lighthouse) for a contrast or accessibility claim.
+- **Performance**: a measured before and after (query count, timing), not a test of the internals.
+- **Config or infra that cannot run locally**: say so plainly; do not write a test that mocks it.
+
+When a change has no test, say which kind it is and what proved it, in the reply, commit, or PR.
+
 ## Seams: where tests go
 
 A **seam** is the public boundary you test at (`codebase-design` holds the full deep-module vocabulary). Test at the chosen seams: the caller (`to-spec` or `implement`) picks them from the ranking below and states the choice rather than asking, one line per seam naming what it catches and what it misses; test at the highest seam that can observe the behavior, prefer a seam the codebase already has over cutting a new one, and use as few as possible, one is the target. Ask only on a genuine fork the rules rank equally.
