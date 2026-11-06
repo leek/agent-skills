@@ -35,7 +35,7 @@ When the user states a UI preference, or shows a before and after and says why o
    - **Except:** <optional: when the rule yields>
    ```
 
-3. Describe screenshots in words; never copy an image into this skill. The repo is public, and a screenshot can carry real names or client data.
+3. Write the example as a generic case (a customer record, an orders table) that shows the correct pattern, in words. Leave out the app, screen, tab names, bug, or screenshot that prompted the rule: this skill is public and serves every app, and an example copied from one app teaches its quirks, not the rule.
 4. Show the user the added or changed rule text in your reply.
 
 ## Rules
