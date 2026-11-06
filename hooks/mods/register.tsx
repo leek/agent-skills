@@ -9,12 +9,6 @@
 // autopilot, browser-test, panel, chatter-scout, code-review), with its tool count, last
 // tool, and outcome. Where nothing draws, the skills report their workers as before.
 //
-// Question band: when a main-loop reply ends on non-blocking questions (`❓` lines, the
-// convention in the user's CLAUDE.md and AGENTS.md), the band above the prompt holds every one
-// of them until the next prompt, so none scrolls away. A question the user skipped is asked
-// again in the next reply (the convention's rule), which puts it back in the band. Blocking questions
-// use the question dialog and never reach the band.
-//
 // Ticket board: implement-spec, implement <spec> all, and wayfinder <map> all report each
 // ticket's status through the ticket_board tool this module registers, and a pane shows
 // the run, joined to each ticket's running worker; once the tickets are built, it shows the
@@ -39,7 +33,6 @@ import {
   tally as boardTally,
   summary as boardSummary,
 } from './ticket-board'
-import { openQuestions } from './open-question'
 import { KEEP, describeTool, duration, isFailed, mark, ordered } from './workers-model'
 
 const PANE = 'scratch'
@@ -49,7 +42,6 @@ const isWorkersHidden = atom({ plugin: 'leek-skills', key: 'isWorkersHidden' } a
 const TICKETS_PANE = 'tickets'
 const TICKETS_TOOL = 'mcp__leek-skills__ticket_board'
 const tickets = atom({ plugin: 'leek-skills', key: 'tickets' } as const, null)
-const questions = atom({ plugin: 'leek-skills', key: 'questions' } as const, [])
 
 const ago = (ms: number) => {
   const days = Math.floor(ms / 86_400_000)
@@ -203,10 +195,7 @@ export const register: Register = on => {
 
   on('turn.complete', async ($, e, next) => {
     const id = e.agentId
-    if (id === undefined) {
-      const asked = e.reason === 'answer' ? openQuestions(e.answer) : []
-      await update($, questions, () => asked)
-    } else {
+    if (id !== undefined) {
       const now = await $.clock.now()
       await update($, workers, list => list.map(w => (w.id === id ? { ...w, outcome: e.reason, endedAt: now } : w)))
     }
@@ -217,16 +206,13 @@ export const register: Register = on => {
   // A new prompt with nothing running starts a clean slate.
   on('prompt.submit', async ($, e, next) => {
     await update($, workers, list => (list.some(w => w.outcome === 'running') ? list : []))
-    await update($, questions, () => [])
 
     return next(e)
   }).catch(($, e, next) => next(e))
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    // The questions show only between turns: a running turn is still working on the answer.
-    const asked = e.props.isWorking ? [] : await read($, questions)
-    const list = (await read($, isWorkersHidden)) ? [] : await read($, workers)
-    if (e.props.hasSurvey || (asked.length === 0 && list.length === 0)) {
+    const list = await read($, workers)
+    if (e.props.hasSurvey || list.length === 0 || (await read($, isWorkersHidden))) {
       return next(e)
     }
 
@@ -235,43 +221,17 @@ export const register: Register = on => {
     const running = list.filter(w => w.outcome === 'running').length
     const failed = list.filter(isFailed).length
     const color = (w: Worker) => (w.outcome === 'running' ? 'suggestion' : w.outcome === 'answer' ? 'success' : 'error')
-    // The framed questions wrap inside the border and padding; the workers get the rows left.
-    const width = Math.max(1, e.props.bodyColumns - 4)
-    const questionRows =
-      asked.length === 0
-        ? 0
-        : 3 + asked.reduce((rows, q) => rows + Math.ceil((q.length + 2) / width), 0) + (list.length > 0 ? 1 : 0)
 
     return (
       <Box flexDirection="column" width={e.props.bodyColumns}>
-        {asked.length > 0 && (
-          <Box
-            borderStyle="round"
-            borderColor="warning"
-            paddingX={1}
-            flexDirection="column"
-            marginBottom={list.length > 0 ? 1 : 0}
-          >
-            <Text color="warning" bold>
-              Waiting on you
-            </Text>
-            {asked.map((q, i) => (
-              <Text key={`q${i}`} wrap="wrap" bold>
-                ❓ {q}
-              </Text>
-            ))}
-          </Box>
-        )}
-        {list.length > 0 && (
-          <Box gap={1}>
-            <Text bold>
-              Workers {list.length - running}/{list.length} done
-            </Text>
-            {failed > 0 && <Text color="error">{failed} failed</Text>}
-            <Button key="hide" label="hide" plain dimColor onPress={() => update($, isWorkersHidden, () => true)} />
-          </Box>
-        )}
-        {ordered(list, Math.max(0, e.props.maxRows - 1 - questionRows)).map(w => (
+        <Box gap={1}>
+          <Text bold>
+            Workers {list.length - running}/{list.length} done
+          </Text>
+          {failed > 0 && <Text color="error">{failed} failed</Text>}
+          <Button key="hide" label="hide" plain dimColor onPress={() => update($, isWorkersHidden, () => true)} />
+        </Box>
+        {ordered(list, e.props.maxRows - 1).map(w => (
           <Text key={w.id} wrap="truncate-end">
             <Text color={color(w)}>{mark(w)} </Text>
             <Text>{w.type.replace(/^leek-skills:/, '')}</Text>

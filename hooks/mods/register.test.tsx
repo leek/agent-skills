@@ -155,33 +155,3 @@ test('ticket_board shows the review stage and each finding once the tickets are 
   expect(await pane.find({ type: 'Text', text: /✓ Old workers' runs vanish from the audit list {2}fixed · a1b2c3/ })).toBeDefined()
   expect(await pane.find({ type: 'Text', text: /◐ Notes page checks readiness once per row {2}fixing/ })).toBeDefined()
 })
-
-test('question band holds every ❓ question of the reply until the next prompt', async ($, on) => {
-  mock.clock(on, { now: 0 })
-  on('ui.render', async ($, e) => engineDraw($, e))
-  on('turn.complete', async () => ({ text: '' }))
-  on('prompt.submit', async (_$, e) => e as never)
-  const idle = { ...BAND, props: { ...BAND.props, isWorking: false } }
-  const end = (answer: string) =>
-    $.turn.complete({ reason: 'answer', answer, durationMs: 5, isAborted: false, turnId: 'm1' } as never)
-
-  await end('Done.\n\n---\n\n❓ **Ring the bell too?**\n❓ **Should I push `main` now?**')
-  const band = await $.ui.mount({ plugin: 'leek-skills', surface: 'terminal', ...idle } as never)
-  expect(await band.find({ type: 'Text', text: /Waiting on you/ })).toBeDefined()
-  expect(await band.find({ type: 'Text', text: /❓ Ring the bell too\?/ })).toBeDefined()
-  expect(await band.find({ type: 'Text', text: /❓ Should I push main now\?/ })).toBeDefined()
-
-  // While a turn runs, the band leaves the question out.
-  const busy = await $.ui.mount({ plugin: 'leek-skills', surface: 'terminal', ...BAND } as never)
-  expect(await busy.find({ type: 'Text', text: /Waiting on you/ })).toBeUndefined()
-
-  await $.prompt.submit({ text: 'yes' } as never)
-  const after = await $.ui.mount({ plugin: 'leek-skills', surface: 'terminal', ...idle } as never)
-  expect(await after.find({ type: 'Text', text: /Waiting on you/ })).toBeUndefined()
-
-  // A reply with no ❓ line, or a subagent's, leaves the band empty.
-  await end('All done, nothing to ask.')
-  await $.turn.complete({ agentId: 'a9', reason: 'answer', answer: '❓ Sub?', durationMs: 5, isAborted: false, turnId: 's1' } as never)
-  const quiet = await $.ui.mount({ plugin: 'leek-skills', surface: 'terminal', ...idle } as never)
-  expect(await quiet.find({ type: 'Text', text: /Waiting on you/ })).toBeUndefined()
-})
