@@ -50,6 +50,14 @@ Give a component one alignment edge, and group its parts by role: identity, deta
 - **Check:** count the left edges. Primary actions sit together, apart from secondary links. Repeated label and value pairs line up as columns, label small and muted above a larger value.
 - **Example:** a profile card had the photo beside the name, stats as a 2×2 grid of inline "Followers 31,261" pairs, and social-icon buttons centred under the main actions. Better: a cover strip with the photo overlapping it, social links at the top right, name → bio → location on one left edge, the four stats in one row, and the two primary actions as equal full-width buttons at the bottom.
 
+#### Nested navigation is hierarchy
+
+Keep a second level of tabs when it is scoped to something narrower than the first (record-level tabs above, page-level tabs inside one of them), and give each level labels that do not repeat the other's.
+
+- **Why:** nesting tells the user what each set of tabs belongs to. Flattening record and page tabs into one row loses that scope. A label shown at both levels for two different things makes the user guess which one they want.
+- **Check:** each tab row belongs to one scope you can name. No label appears in both rows unless it is the same destination.
+- **Example:** a customer record has record tabs (Overview, Orders, Invoices, History), and the Orders tab has its own view tabs (Open, Shipped, Returned). Two rows, two scopes, no shared labels. Merging them into one row would hide which tabs belong to the customer and which to the orders list.
+
 #### Emphasis
 
 Give accent colour, weight, and size to the one thing per area that needs attention; keep the rest neutral.
