@@ -59,6 +59,7 @@ Most work runs one straight line (**decide → spec → tickets → build**) ove
 - Suspect a specific module smells → `code-smells-audit`.
 - Nothing known is wrong, but you want the next unnoticed problem found, proven, and fixed as a PR → `sweep`.
 - Unsure whether a state model or a UI direction holds up → `prototype`.
+- Want a page held to your UI rules, or a new rule recorded → `ui-design`.
 
 ## Repo upkeep
 
