@@ -17,8 +17,9 @@ holds what it cannot decide: who wrote a session.
   history names their id) and the last-active time; `<user_query>` holds the human text.
 - **agy:** `history.jsonl` joins `conversationId` to the `.db` basename.
 - Hints that exclude a root unless `--keep-automated`: a headless entrypoint (`sdk-cli`,
-  `sdk-py`, `codex exec`, Grok `headless`), a panelist brief, an agy conversation absent
-  from history with no step 14 prompt in its `.db` (relayed or headless). A `/private/tmp`
+  `sdk-py`, `codex exec`, Grok `headless`), a panelist brief (for agy, also one found in
+  the step 14 prompt), a Claude session opened by a relayed teammate message, an agy
+  conversation absent from history with no step 14 prompt in its `.db` (relayed or headless). A `/private/tmp`
   cwd, or an agy prompt found only as step 14, sets `clue`.
 - Roots rank by their latest activity, linked children included.
 

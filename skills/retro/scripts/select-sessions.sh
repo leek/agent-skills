@@ -70,6 +70,7 @@ if want claude; then
            children:$kids, first_prompt:(($p.message.content // "")[0:200]),
            hint:(if ($ev|map(.entrypoint//empty)|first) as $e | ($e=="sdk-cli" or $e=="sdk-py") then "headless (\($ev|map(.entrypoint//empty)|first))"
                  elif (($p.message.content // "")|test("^You are one panelist")) then "panelist brief"
+                 elif (($p.message.content // "")|test("^Another Claude session sent a message:")) then "relayed teammate message"
                  else null end),
            clue:(if ($path|test("/-private-tmp-")) then "cwd under /private/tmp" else null end)} end' "$f" 2>/dev/null >> "$cands" || echo "$f" >> "$unreadable"
     done
@@ -166,16 +167,24 @@ if want agy; then
       fi
       # Not in history: a human prompt still shows as a step 14 in the .db; only relayed
       # (step 101) or empty conversations are treated as automated.
-      steps=""
+      steps=""; p14=""; panel14=0
       if [ -z "$p" ]; then
         steps=$(sqlite3 -readonly "$f" "select group_concat(distinct step_type) from steps where step_type in (14,101)" 2>/dev/null ||
                 sqlite3 -readonly "file:$f?immutable=1" "select group_concat(distinct step_type) from steps where step_type in (14,101)" 2>/dev/null) || true
+        # The step 14 payload is protobuf: ids come before the prompt, so a panelist brief
+        # is found anywhere in the decoded text, not only at its start.
+        case ",$steps," in *,14,*)
+          p14=$( { sqlite3 -readonly "$f" "select hex(step_payload) from steps where step_type=14 order by idx limit 1" 2>/dev/null ||
+                   sqlite3 -readonly "file:$f?immutable=1" "select hex(step_payload) from steps where step_type=14 order by idx limit 1" 2>/dev/null; } |
+                 xxd -r -p | LC_ALL=C strings -n 8 | LC_ALL=C tr '\n' ' ' | iconv -f utf-8 -t utf-8 -c | cut -c1-400) || true
+          case "$p14" in *"You are one panelist"*) panel14=1 ;; esac ;;
+        esac
       fi
       if [ -n "$ts" ]; then ts=$(date -u -r $((ts / 1000)) +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "@$((ts / 1000))" +%Y-%m-%dT%H:%M:%SZ); else ts=$(mtime_iso "$f"); fi
-      jq -nc --arg id "$id" --arg path "$f" --arg ts "$ts" --arg p "$p" --arg steps "$steps" \
-        '{harness:"agy", id:$id, path:$path, timestamp:$ts, children:[], first_prompt:$p,
+      jq -nc --arg id "$id" --arg path "$f" --arg ts "$ts" --arg p "$p" --arg steps "$steps" --arg p14 "$p14" --argjson panel14 "$panel14" \
+        '{harness:"agy", id:$id, path:$path, timestamp:$ts, children:[], first_prompt:(if $p=="" then $p14 else $p end),
           hint:(if $p=="" and ($steps|split(",")|index("14")|not) then "not in history (relayed or headless)"
-                elif ($p|test("^You are one panelist")) then "panelist brief" else null end),
+                elif ($p|test("^You are one panelist")) or $panel14==1 then "panelist brief" else null end),
           clue:(if $p=="" and ($steps|split(",")|index("14")) then "not in history; prompt is step 14 in the .db" else null end)}' >> "$cands"
     done
   else missing+=(agy); fi
