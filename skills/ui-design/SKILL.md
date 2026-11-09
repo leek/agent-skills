@@ -84,6 +84,14 @@ Pick each visual by what the user does with the data, not by what is easiest to 
 - **Check:** change over time is a chart (with the headline total) above the detail table. Severity or priority escalates in icon and colour, with red kept for the worst level only. People show as avatar + name.
 - **Example:** an incident tracker shows a bar chart of incidents per day under "214 Total", then the table: severity as bar-strength icons for Low/Medium/High and a red ⚠ for Critical, reporter as avatar + first name, category as coloured tags.
 
+#### Every option reachable
+
+Make every valid option of a select reachable: list them all, or, when the list is capped or loaded on demand, make it searchable across the full set.
+
+- **Why:** a select that silently stops at the first N options, with no search, hides the very option the user came for. They conclude it does not exist and give up or create a duplicate. Such a select is useless.
+- **Check:** count the valid options in the data and compare with what the dropdown can reach. If the list is capped (first 50, a preloaded page), typing must search the whole set, server side when needed, not just the loaded slice. A long list (more than about 10) is searchable. Nothing filters out valid options without saying so.
+- **Example:** a "Customer" select preloads the first 50 of 2,000 customers and offers no search, so customer #51 cannot be picked. Better: a searchable select that queries all 2,000 as the user types and shows matches by name and account number.
+
 ### Disclosure
 
 #### Progressive disclosure
