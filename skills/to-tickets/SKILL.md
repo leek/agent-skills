@@ -74,7 +74,7 @@ This template is canonical.
 
 ```markdown
 ---
-title: <Ticket title>
+title: "<Ticket title>"
 status: ready-for-agent
 claimed-by:
 blocked-by: []

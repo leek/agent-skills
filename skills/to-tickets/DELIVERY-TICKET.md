@@ -16,7 +16,7 @@ Fill each list from the source. Do not leave a generic placeholder: write the re
 
 ```markdown
 ---
-title: Delivery check: <spec title>
+title: "Delivery check: <spec title>"
 status: ready-for-agent
 claimed-by:
 blocked-by: [01, 02, …]

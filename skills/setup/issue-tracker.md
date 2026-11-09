@@ -23,7 +23,7 @@ The pipeline runs straight through it: `/wayfinder` writes `map.md` and `decisio
 - There is no `issues/` folder
 - Build tickets are one file each, numbered from `01`; where a dependency is known give the blocker the lower number. Numbers only tie-break the frontier: `blocked-by` is what actually gates work
 - The last build ticket is the **delivery ticket** (`delivery: true`), blocked by every other ticket: it proves the spec shipped whole and holds the after-deploy steps. It sits at `ready-for-human` between merge and those steps (see `to-tickets`' `DELIVERY-TICKET.md`)
-- **Every tracker file carries YAML frontmatter** with at least `title` and `status`; tickets also carry `claimed-by` and `blocked-by`. Status is that frontmatter field, never a `**Status:**` line in the body
+- **Every tracker file carries YAML frontmatter** with at least `title` and `status`; tickets also carry `claimed-by` and `blocked-by`. Status is that frontmatter field, never a `**Status:**` line in the body. Write `title` in double quotes always (`title: "SLA report: LAT"`): a bare title that holds `: ` or starts with `[`, `{`, `#`, `*`, `&`, `!`, `|`, `>`, `%` or `@` is invalid YAML. Inside the quotes, write a `"` as `'`
 - Comments and conversation history append under a `## Comments` heading
 
 ## Status values
@@ -62,7 +62,7 @@ Map file format:
 
 ```markdown
 ---
-title: <map title>
+title: "<map title>"
 status: open
 ---
 
@@ -75,7 +75,7 @@ Decision ticket format:
 
 ```markdown
 ---
-title: <ticket title>
+title: "<ticket title>"
 type: research | prototype | grilling | task
 status: open | closed
 claimed-by:
