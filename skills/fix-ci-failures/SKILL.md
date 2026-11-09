@@ -79,8 +79,14 @@ they will go, and land them without asking:
 - **Direct pushes forbidden** (branch protection, or the repo's rules): push a
   `fix/ci-<branch>` branch and open a pull request into `B` with a body in the `pr`
   skill's template.
+- **`B` is not the default branch** (a `production` or release branch): land the same
+  fixes on the default branch too, so the next merge into `B` does not bring the failure
+  back. Cherry-pick each fix commit onto `origin/<default>`, re-run each fixed command,
+  and land it by the two rules above. A fix the default branch already has, or one that
+  does not apply there, is named in the report, not forced. A cherry-pick conflict stops
+  this step: ask the user.
 - A user instruction in the input or the conversation ("open a PR", "don't push")
-  overrides both.
+  overrides all of these.
 
 The push starts new CI runs. Leave them running and do not come back for their result.
 When step 3 worked in the main checkout on a local `B`, it is now in step with
@@ -88,7 +94,8 @@ When step 3 worked in the main checkout on a local `B`, it is now in step with
 it is behind.
 
 Completion criterion: every fix commit is on `origin/B`, in an open pull request, or
-kept local by the user's instruction.
+kept local by the user's instruction; when `B` is not the default branch, each one is
+also on the default branch, in a pull request into it, or named as not needed there.
 
 ## 5. Clean up and report
 
