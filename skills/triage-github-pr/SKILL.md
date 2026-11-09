@@ -108,6 +108,9 @@ every PR, even one with no reviews, and even when `implement` already reviewed i
 is the model-independent look, and a PR body's `Left open:` lines are findings to verify
 in step 4, never a substitute for it. Include the brief's workflow-coverage pass so a
 changed invariant is checked across its live sibling paths before the fix batch.
+A dependency bump (the diff touches only manifests and lockfiles) is reviewed from the
+lockfile diff and each package's release notes for that version span; never `diff -r`
+an installed `vendor/` or `node_modules/` tree.
 
 Run it in a fresh context so the bots cannot frame it. In Claude Code with this plugin
 installed, dispatch `subagent_type=leek-skills:pr-reviewer` with the brief, in the
