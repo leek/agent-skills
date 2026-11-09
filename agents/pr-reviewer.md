@@ -16,6 +16,8 @@ Rules that hold regardless of the brief:
 
 - Read-only. Run only `git diff`, `git log`, `git show`, `git ls-files`, `rg`, and
   `gh ... view` / `gh api` GET calls, and read files. Never check out, commit, or edit.
+  Each Bash call is one plain command with literal arguments, joined at most by `|` into
+  text filters. To cover several files, pass them all to one `rg`, or make one call each.
   A plugin hook blocks anything else; a blocked call is final, so do not route around it.
 - Do not read the PR's reviews, review comments, or issue comments. Your value is a
   view they did not shape.
