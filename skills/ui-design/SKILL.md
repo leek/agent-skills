@@ -11,6 +11,8 @@ House rules for interfaces: what this user counts as good UI, in any stack. Each
 
 While you build or restyle a page or component, apply every rule in [Rules](#rules) to it, including the states the default view hides ([Hidden states](#hidden-states)). Done when, for each rule, you can name how the page meets it or why the rule does not apply.
 
+A fix to a shared component, class, or style covers every page that renders it. Search for each use, fix or check each one, and name the pages you covered.
+
 ## Review
 
 Review a page (URL), screenshots, or a UI diff against every rule. Where the harness loads this plugin's agents, dispatch and wait ([harness-tools](../harness-tools/SKILL.md)) on one sub-agent: in Claude Code, the Agent tool with `subagent_type=leek-skills:ui-reviewer`, which arrives with these rules preloaded. Brief it with what to look at (URL, screenshot paths, or the diff command), the page's purpose, and its main user. Elsewhere, review inline yourself.
@@ -89,7 +91,7 @@ Pick each visual by what the user does with the data, not by what is easiest to 
 Make every valid option of a select reachable: list them all, or, when the list is capped or loaded on demand, make it searchable across the full set.
 
 - **Why:** a select that silently stops at the first N options, with no search, hides the very option the user came for. They conclude it does not exist and give up or create a duplicate. Such a select is useless.
-- **Check:** count the valid options in the data and compare with what the dropdown can reach. If the list is capped (first 50, a preloaded page), typing must search the whole set, server side when needed, not just the loaded slice. A long list (more than about 10) is searchable. Nothing filters out valid options without saying so.
+- **Check:** count the valid options in the data and compare with what the dropdown can reach. If the list is capped (first 50, a preloaded page), typing must search the whole set, server side when needed, not just the loaded slice. A long list (more than about 10) is searchable. A short list loads with the page and keeps its options: opening the select or moving focus away does not fetch them again. Nothing filters out valid options without saying so.
 - **Example:** a "Customer" select preloads the first 50 of 2,000 customers and offers no search, so customer #51 cannot be picked. Better: a searchable select that queries all 2,000 as the user types and shows matches by name and account number.
 
 ### Disclosure
@@ -124,7 +126,7 @@ Place each affordance on a spectrum, from labelled button to icon only, to shown
 Design every state the default view does not show (menus, popovers, filter, sort and group builders, context menus, empty, loading and error states, onboarding, comments) with the same care as the default view.
 
 - **Why:** most of a UI is what you cannot see in its first screenshot. A skipped state ships as an unstyled default, and users spend real time there.
-- **Check:** list every state the page can reach, and look at each one. Hidden pieces use the same type scale, spacing, icon set, and radius as the default view, and menu items pair an icon with a label.
+- **Check:** list every state the page can reach, and look at each one. Hidden pieces use the same type scale, spacing, icon set, and radius as the default view, and menu items pair an icon with a label. Every change that loads new data (a filter, a tab, a sort, a list or board switch) shows the loading state, and every column takes part in it.
 - **Example:** a database table page looks simple, but behind it sit a share popover, sort, filter, and group builders, row and column context menus, a comment thread, a getting-started checklist, and a what's-new card, all one consistent family.
 
 ### Guidance
@@ -144,3 +146,11 @@ Give every icon-only control a tooltip that names its action, and use the same n
 - **Why:** icons are ambiguous (⇅ is sort or reorder; ≡ is filter or menu). A tooltip settles it without costing space.
 - **Check:** the tooltip shows on hover and on keyboard focus; `aria-label` matches it. An icon that is both ambiguous and used often gets a visible text label instead.
 - **Example:** a toolbar of sort, filter, group, search, and settings icons; hovering the magnifier shows "Search".
+
+#### Clickable looks clickable
+
+Show the pointer cursor on everything that responds to a click: buttons, links, clickable rows and cards, and checkbox and radio inputs with their labels.
+
+- **Why:** the cursor change is how a user finds out, before clicking, that something will respond. A clickable label with the arrow cursor reads as plain text, so the user aims at the small box instead.
+- **Check:** hover each clickable element, including labels of checkboxes and radios, and see the pointer. Disabled controls and plain text keep the default cursor.
+- **Example:** a filter panel's checkbox labels toggle their box but show the arrow cursor. Better: the label and the box both show the pointer, so the whole label reads as the target.
