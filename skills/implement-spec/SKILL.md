@@ -80,7 +80,7 @@ For each frontier ticket, up to the concurrency limit (default 4: each one runs 
 
 Then end the turn and let completion notifications wake you; never poll. An idle notification with no report and no new commit is a stall, not progress: follow up with that implementer at once to finish or say what blocks it. One that repeats a report you already acted on needs nothing: end the turn without a reply.
 
-A hung tool call sends no notification at all. So whenever the run waits on a single implementer (the others have reported, or nothing else is ready), arm one 20-minute wake-up the harness offers (Claude Code: a `Monitor` whose command exits once that worktree has gone 20 minutes with no file change; otherwise check that worktree's last file change whenever anything wakes you). Woken with no new commit, message it to report what it is waiting on, and stop the hung call when it cannot.
+A hung tool call sends no notification at all. So whenever the run waits on a single implementer (the others have reported, or nothing else is ready), arm one 20-minute wake-up the harness offers (Claude Code: a `Monitor` running `bash <this skill's dir>/scripts/worktree-idle.sh <worktree>`, which exits once that worktree has gone 20 minutes with no file change; never hand-write the time check, since `stat` and `date` flags differ between macOS and Linux; otherwise run that script in the background, or check the worktree's last file change whenever anything wakes you). Woken with no new commit, message it to report what it is waiting on, and stop the hung call when it cannot.
 
 ### 4. Merge as each implementer lands
 
