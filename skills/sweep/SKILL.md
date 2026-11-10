@@ -89,7 +89,7 @@ Drop a candidate that is disproven, covered, speculative, or out of scope, then 
 3. **Prove it.** For a bug, write the regression test first, through the real entry point (HTTP, Livewire, Filament, job, command, observer). It must fail before the fix and pass after; follow the `tdd` loop. For performance, compare measured query counts or timings. For UX and presentation, show it on the worktree's running site with `verify`, never a test (the `tdd` skill's [What needs a test](../tdd/SKILL.md#what-needs-a-test-and-what-proves-the-rest) section). For refactors and coverage, protect the behavior with tests. Never change production to reproduce.
 4. **Checks.** Run the checks the repo requires, in its order, on the changed paths only. Report failures that existed before this change apart from regressions it caused.
 
-**Findings outside this issue** (including severe ones out of focus): write each to the **main checkout** as `.scratch/sweep/findings/<YYYY-MM-DD>-<topic>.md`, with the frontmatter from `.agents/issue-tracker.md` when it exists (`title`, `status: open`, `triage: needs-triage`). Do not fix them, commit them, or open issues for them. `/triage` takes them from there.
+**Findings outside this issue** (including severe ones out of focus): write each to the **main checkout** as `.scratch/sweep/findings/<YYYY-MM-DD>-<topic>.md`, in the triage request format: a `# <title>` heading, then a `**Status:** needs-triage` line (the string `.agents/triage-labels.md` maps that role to, when the file exists), then the finding. Do not fix them, commit them, or open issues for them. `/triage` takes them from there.
 
 ## 4. Submit
 

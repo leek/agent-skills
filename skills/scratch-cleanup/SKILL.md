@@ -18,9 +18,9 @@ From inside the repository, run [`../scratch-status/scripts/scratch-state.sh`](.
 The script walks `.scratch/`, checks git tracking (`tracked` and `untracked_files`) and last-change dates (`last_change`), resolves status and blockers in both frontmatter and legacy `Status:` dialects, verifies every cited ticket commit against `default_branch` (`git merge-base --is-ancestor`, merged PRs via `gh api`, `git cherry`, and commit subject match), and sorts `.scratch/` into three buckets:
 
 - **`efforts`**: each `.scratch/<slug>/` directory, classified as:
-  - **done**: every artifact (`map`, `decisions`, `spec`, `tickets`/`issues`, `requests`) is closed or wontfix, every cited commit is on `default_branch`, and `mismatch` is `null`.
-  - **mismatched**: has an unreadable status (`unreadable_efforts` or `mismatch`) or a contradiction (e.g., `spec` still `ready-for-agent` while every ticket is closed, or a closed ticket whose cited commit is missing). Goes in the plan as a question, never a removal.
-  - **open**: has any open file, with `stale: true` when its newest file is older than `--days`. Any `claimed_by` in a stale effort is a stale claim to release in step 3 (the session is gone); leave its status alone.
+  - **done**: every artifact (`map`, `decisions`, `spec`, `tickets`/`issues`, `requests`) is closed or wontfix, every cited commit is on `default_branch`, and `mismatch` is `null`. A spec with tickets counts as closed when every ticket is: no skill writes `closed` onto it.
+  - **mismatched**: has an unreadable status (`unreadable_efforts` or `mismatch`) or a contradiction (e.g., a map still open though its spec exists, or a closed ticket whose cited commit is missing). Goes in the plan as a question, never a removal.
+  - **open**: has any open file, with `stale: true` when its newest file is older than `--days`. Any `claimed_by` in a stale effort is a stale claim to release in step 3 (the session is gone), with the tracker's **Release** operation: clear `claimed-by`, and set a build ticket's `status: in-progress` back to `ready-for-agent`, so the ticket returns to the frontier.
 - **`research`**: findings files under `.scratch/research/` or loose `.md` files ending in **What this unblocks**.
 - **`unclassified`**: everything else outside an effort (wizards, loose notes, questionnaires, and `.DS_Store` entries marked `junk: true`, which go in the plan as deletions with no question).
 

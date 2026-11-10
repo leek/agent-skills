@@ -38,7 +38,7 @@ Open the ticket board now, before anything else in this step: load `mcp__leek-sk
 
 Leave out closed tickets and tickets claimed by someone else (name them in the report). Never dispatch the delivery ticket (`delivery: true`) to an implementer: you work it in steps 6–7. A `deploy-gate: true` ticket bounds the run: build up to and including it, then stop at step 7 with a PR.
 
-Run [`scripts/spec-run-state.sh`](scripts/spec-run-state.sh) `<slug>` once from the main checkout (read-only, JSON). Its `branch` is the name this run uses wherever this skill says `<slug>`: an earlier run's finished branch moves this one to the next free `<slug>-<n>`. When `mode` is `resume`, or a deploy gate has dependents in scope, read [`references/resume-and-gates.md`](references/resume-and-gates.md) now and follow it in steps 1–3.
+Run [`scripts/spec-run-state.sh`](scripts/spec-run-state.sh) `<slug>` once from the main checkout (read-only, JSON). Its `branch` is the name this run uses wherever this skill says `<slug>`: an earlier run's finished branch moves this one to the next free `<slug>-<n>`. That covers the branch, its worktree, and the notes directory only: the spec's own directory is always `.scratch/<spec slug>/`, never `.scratch/<slug>-<n>/`. When `mode` is `resume`, or a deploy gate has dependents in scope, read [`references/resume-and-gates.md`](references/resume-and-gates.md) now and follow it in steps 1–3.
 
 **Sweep for open decisions first.** Run one read-only subagent over the spec, every in-scope ticket, and the spec's `decisions/` and `research/` (a domain-expert agent type when the harness offers one for the spec's domain). Its brief: list every choice the build will have to make that these documents do not settle, each with the tickets it touches, the line that leaves it open, and a recommended answer. Settled choices (including those `to-tickets`' sweep already wrote to `decisions/`) and pure implementation detail are not open decisions. Most questions a run would otherwise raise mid-build come from here, and asking them now keeps the frontier moving. Skip the sweep when the script's `decision_sweep_done` is true (a committed **Build decisions** ticket from `to-tickets`, and no later commit touched the spec or a ticket): that sweep already covered these documents.
 
@@ -137,4 +137,4 @@ Next:
 - **The delivery ticket is at `ready-for-human`** → merge and deploy, then `/implement <delivery ticket>` for its after-deploy steps; list them
 - **Tickets released or left open** → `/implement <ticket>` for each, or `/implement-spec <spec>` again
 - **The build exposed a decision nobody made** → `/grill-me` on it, then re-run `/to-spec`
-- **The run went sideways** → `/retro this` before clearing
+- **The run went sideways** → `/retro this`

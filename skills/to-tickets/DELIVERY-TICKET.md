@@ -10,6 +10,7 @@ Fill each list from the source. Do not leave a generic placeholder: write the re
 
 - **Spec coverage**: each user story or requirement in the spec, with the ticket that delivers it. A requirement that no ticket delivers is a gap: add a ticket for it before you publish.
 - **Before merge**: checks the builder runs in the session. The full test suite (or the repo's rule for it). One end-to-end pass over each flow that crosses tickets. The docs, `.env.example` keys, config, and changelog lines the spec needs.
+- **Spec-less breakdown** (tickets cut from a map, no `spec.md`): **Parent** names `../map.md`, and **Spec coverage** lists each resolved decision in the map's `decisions/` that asks for a change, with the ticket that delivers it.
 - **After deploy**: each step that runs in a real environment. Migrations, artisan or other commands, data backfills, scheduled jobs and queue workers to check or restart, feature flags to flip, env keys to set, smoke checks (a URL, a command, a query, with the result to expect), logs and error trackers to watch, and the timing of a later contract step. Mark each step that changes data as `(changes data)`.
 
 ## Template
@@ -28,7 +29,7 @@ delivery: true
 
 ## Parent
 
-`../spec.md`
+`../spec.md` (`../map.md` on a spec-less breakdown)
 
 ## What to build
 
@@ -59,4 +60,4 @@ The builder (`implement`, a spec run, `implement-spec`, an autopilot worker) wor
 2. Run each **Before merge** check, and tick each one that passes.
 3. With **After deploy** at `None`: close the ticket per `implement` step 8. Otherwise: set `status: ready-for-human`, clear `claimed-by`, and append a `## Comments` note with the commit or PR to deploy. Copy the After deploy list into the PR body after Merge Danger, as `After deploy:` lines. `ready-for-human` holds autopilot at this ticket and keeps the spec open in `scratch-status`.
 
-**Pass 2: after deploy.** `/implement <this ticket>` once the work is live. Confirm the deploy first: ask the user, or check the deployed commit when the repo documents how. Run each read-only check yourself. A step that changes data or a real environment runs only with the user's explicit approval for that step; otherwise give the user the exact command and wait for the result. Tick each item with what you observed. When every item is ticked, append `## Resolution` with the evidence and set `status: closed`. An item that fails stays unticked: report it, and leave the ticket open. An item that cannot be judged yet (an error watch over 48 hours) also stays unticked: tick what it shows so far, and name the UTC time it can be judged, so the end block's **Next** line carries that time.
+**Pass 2: after deploy.** `/implement <this ticket>` once the work is live. Pass 2 makes no claim: skip `implement` step 1's claim write and leave `status: ready-for-human` with `claimed-by` empty until every item is ticked, so a pass that ends with items open can be run again and the hold stays in place. Confirm the deploy first: ask the user (a structured question ([harness-tools](../harness-tools/SKILL.md)), otherwise in chat), or check the deployed commit when the repo documents how. Run each read-only check yourself. A step that changes data or a real environment runs only with the user's explicit approval for that step; otherwise give the user the exact command and wait for the result. Tick each item with what you observed. When every item is ticked, append `## Resolution` with the evidence and set `status: closed`. An item that fails stays unticked: report it, and leave the ticket at `ready-for-human`. An item that cannot be judged yet (an error watch over 48 hours) also stays unticked: tick what it shows so far, and name the UTC time it can be judged, so the end block's **Next** line carries that time.

@@ -19,7 +19,7 @@ The axes run **separately** so they don't pollute each other's context, then thi
 
 ### 1. Pin the fixed point
 
-Whatever the user said is the fixed point: a commit SHA, branch name, tag, `main`, `HEAD~5`, etc. If they didn't specify one, ask for it (when invoked from `implement`, it's the ticket's base commit).
+Whatever the user said is the fixed point: a commit SHA, branch name, tag, `main`, `HEAD~5`, etc. If they didn't specify one, ask for it (a structured question ([harness-tools](../harness-tools/SKILL.md)), otherwise in chat; when invoked from `implement`, it's the ticket's base commit).
 
 Capture the diff command once: `git diff <fixed-point>...HEAD` (three-dot, so the comparison is against the merge-base). Also note the list of commits via `git log <fixed-point>..HEAD --oneline`.
 
@@ -34,7 +34,7 @@ Look for the originating spec, in this order:
 1. Ticket references in the commit messages or branch name: read the matching markdown file under `.scratch/` (or wherever `.agents/issue-tracker.md`, written by `/setup`, says this repo keeps them).
 2. A path the user passed as an argument.
 3. A PRD/spec file under `docs/`, `specs/`, or `.scratch/` matching the branch name or feature.
-4. If nothing is found, ask the user where the spec is. If they say there isn't one, the **Spec** axis skips and reports "no spec available".
+4. If nothing is found, ask the user where the spec is (a structured question, as in step 1, with **There is no spec** as one option). If they say there isn't one, the **Spec** axis skips and reports "no spec available".
 
 ### 3. Identify the standards sources
 
@@ -51,7 +51,7 @@ On top of whatever the repo documents, the Standards axis always carries the **s
 
 ### 4. Run the axes: sub-agents or inline
 
-**If the harness can spawn parallel sub-agents** (dispatch and wait per [harness-tools](../harness-tools/SKILL.md)): launch three foreground sub-agents in parallel, wait for all results before writing anything. Do not background them, a background handle can die with the session. Where the harness loads this plugin's agents, use the typed agents `leek-skills:pr-reviewer`, `leek-skills:standards-reviewer` and `leek-skills:spec-reviewer` (read-only tools enforced, the Standards one remembers this repo's recurring violations); elsewhere, any general sub-agent with the briefs below, the Correctness one on your strongest model.
+**If the harness can spawn parallel sub-agents** (dispatch and wait per [harness-tools](../harness-tools/SKILL.md)): launch three foreground sub-agents in parallel, wait for all results before writing anything. Do not background them, a background handle can die with the session. Where the harness loads this plugin's agents, use the typed agents `leek-skills:pr-reviewer`, `leek-skills:standards-reviewer` and `leek-skills:spec-reviewer` (read-only tools enforced, the Standards one remembers this repo's recurring violations, in files under this repo's `.claude/agent-memory/` that the next commit includes); elsewhere, any general sub-agent with the briefs below, the Correctness one on your strongest model.
 
 **If sub-agents are unavailable:** run the reviews inline in this session, Correctness first, then Standards, then Spec (or skip Spec when no source was found). Same briefs, same output shape, only the execution host changes.
 
