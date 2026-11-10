@@ -32,6 +32,7 @@ Most work runs one straight line (**decide → spec → tickets → build**) ove
 | one ticket | it built end to end | `implement` |
 | a spec | the whole thing built fast, in parallel, this session | `implement-spec` (`implement <spec> all` for one-by-one, no subagents) |
 | a map, spec, or tickets, and no wish to babysit | it driven to done | `autopilot` |
+| a change with no ticket | it built test-first, red then green | `tdd` (the loop `implement` runs; the agent also reaches for it on its own) |
 
 **Before any of it, once per repo:** `setup` writes the tracker, status vocabulary, and domain doc layout.
 
@@ -43,6 +44,7 @@ Most work runs one straight line (**decide → spec → tickets → build**) ove
 - Prove it in the running app → `verify`.
 - Test a web app from a URL and a prompt → `browser-test`.
 - Ship the session's work → `commit`.
+- Cut a version: bump, tag, push, and a GitHub release page → `release` (the agent also reaches for it when asked to release).
 - Write or rewrite a PR body → `pr` (the agent also reaches for it on its own).
 - Review comments waiting on a PR → `resolve-review-comments`.
 - A PR to take all the way to merged (reviews, checks, fixes, merge) → `triage-github-pr`.

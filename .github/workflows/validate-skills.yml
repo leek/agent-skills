@@ -39,6 +39,7 @@ jobs:
       - name: Run the collection verifier
         run: |
           python3 -m pip install --quiet pyyaml
-          sudo apt-get update -qq && sudo apt-get install -y -qq ripgrep
+          # ripgrep for the checks; jq, perl and git for the skills/*/scripts/test-*.sh the verifier runs
+          sudo apt-get update -qq && sudo apt-get install -y -qq ripgrep jq
           npm install -g --silent @anthropic-ai/claude-code
           bash scripts/verify-skills-collection.sh

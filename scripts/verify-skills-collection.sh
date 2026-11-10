@@ -11,9 +11,14 @@ fail=0
 # (PyYAML installed) still enforces. Say so, or a local pass hides a CI failure.
 python3 -c "import yaml" 2>/dev/null || echo "WARN: PyYAML is not installed; YAML validity is not checked here (CI checks it). Run: python3 -m pip install pyyaml" >&2
 
+# VERIFY_ONLY=<text> runs only the checks whose name contains <text> (for work on one check;
+# CI runs them all).
 check() {
   local name="$1"
   shift
+  if [[ -n "${VERIFY_ONLY:-}" && "$name" != *"$VERIFY_ONLY"* ]]; then
+    return 0
+  fi
   if "$@"; then
     echo "PASS: $name"
   else
@@ -336,9 +341,10 @@ check "skills naming an agent keep a non-Claude fallback" \
       rg -qi "elsewhere|inline|other harness|plain Claude Code" "$f" || { echo "$f: names an agent without a fallback clause" >&2; exit 1; }
     done'
 
-# 9. which-skill names every user-invoked skill, and harness tool names live only in harness-tools.
+# 9. which-skill names every skill a user can start (user-invoked or model-invoked; only
+#    `user-invocable: false` protocols are left out), and harness tool names live only in harness-tools.
 #    Hyphen-aware: \b treats "-" as a boundary, so "implement" would match "implement-spec".
-check "which-skill names every user-invoked skill" \
+check "which-skill names every skill that is not user-invocable: false" \
   bash -c '
     python3 - <<'"'"'PY'"'"'
 import os, re, sys
@@ -353,7 +359,7 @@ for d in sorted(os.listdir("skills")):
     parts = open(f).read().split("---")
     if len(parts) < 3:
         continue
-    if not re.search(r"^disable-model-invocation:\s*true\b", parts[1], re.M):
+    if re.search(r"^user-invocable:\s*false\b", parts[1], re.M):
         continue
     if not re.search(rf"(?<![a-z0-9-]){re.escape(d)}(?![a-z0-9-])", router):
         missing.append(d)
@@ -471,6 +477,120 @@ check "scratch-state.sh classifies open, mismatched, and done efforts" \
     )
     out=$(cd "$t/sub" && bash "$ROOT/skills/scratch-status/scripts/scratch-state.sh")
     python3 -c "import json, sys; d = json.loads(sys.argv[1]); assert d[\"counts\"] == {\"open\": 1, \"stale\": 0, \"mismatched\": 1, \"done\": 3}, d[\"counts\"]; assert \"⚠\" not in sys.argv[1]" "$out"'
+
+# 11. Skill scripts: their tests run, a skill pre-approves the scripts it runs, and a script
+#     path names the skill directory.
+#     Every skills/*/scripts/test-*.sh runs with bash from the repo root, each in its own process
+#     group under a time limit (SKILL_TEST_TIMEOUT seconds, default 120; perl, because macOS has no
+#     `timeout`). No test files is a pass.
+run_skill_script_tests() {
+  local t out code failed=""
+  for t in skills/*/scripts/test-*.sh; do
+    [[ -e "$t" ]] || continue
+    code=0
+    out=$(perl -e '
+      my $limit = shift;
+      my $pid = fork();
+      die "fork: $!" unless defined $pid;
+      if (!$pid) { setpgrp(0, 0); exec @ARGV; exit 127; }
+      setpgrp($pid, $pid);
+      $SIG{ALRM} = sub { kill "KILL", -$pid; waitpid($pid, 0); exit 124; };
+      alarm $limit;
+      waitpid($pid, 0);
+      exit($? & 127 ? 128 + ($? & 127) : $? >> 8);
+    ' "${SKILL_TEST_TIMEOUT:-120}" bash "$t" 2>&1) || code=$?
+    if [[ "$code" -ne 0 ]]; then
+      failed="$failed $t"
+      if [[ "$code" -eq 124 ]]; then
+        echo "$t: timed out after ${SKILL_TEST_TIMEOUT:-120}s" >&2
+      else
+        echo "$t: exit $code" >&2
+      fi
+      printf '%s\n' "$out" | tail -n 15 | sed 's/^/    /' >&2
+    fi
+  done
+  if [[ -n "$failed" ]]; then
+    echo "failed script tests:$failed" >&2
+    return 1
+  fi
+}
+check "every skills/*/scripts/test-*.sh passes" run_skill_script_tests
+
+# maintaining.md asks for this after every card edit; strict mode is the ship gate.
+check "code-smells-audit cards pass validate-cards.sh" \
+  bash -c 'out=$(bash skills/code-smells-audit/scripts/validate-cards.sh 2>&1 >/dev/null) || { printf "%s\n" "$out" | grep "^FAIL" >&2; exit 1; }'
+
+# A skill with allowed-tools whose SKILL.md body names one of its own scripts/*.sh runs that
+# script, so allowed-tools must cover it (docs/authoring.md), or every run stops for a prompt.
+# EXEMPT holds "<skill>/<script>" for a script that must keep its prompt: a write the body says
+# to ask about first, or a maintainer-only script. Each entry carries its reason.
+check "allowed-tools covers each script a skill body runs" \
+  python3 -c '
+import glob, os, re, sys
+EXEMPT = set()
+bad = []
+for md in sorted(glob.glob("skills/*/SKILL.md")):
+    d = md.split("/")[1]
+    m = re.match(r"^---\n(.*?)\n---\n(.*)$", open(md, encoding="utf-8").read(), re.S)
+    if not m:
+        continue
+    allowed = re.search(r"^allowed-tools:\s*(.+)$", m.group(1), re.M)
+    if not allowed:
+        continue
+    for script in sorted(glob.glob(f"skills/{d}/scripts/*.sh")):
+        name = os.path.basename(script)
+        if name.startswith("test-") or f"{d}/{name}" in EXEMPT:
+            continue
+        # Its own script: scripts/<name> with no other skill folder in front of it.
+        own = re.search(rf"(?:(?<![A-Za-z0-9_-]/)|(?<=/{re.escape(d)}/)|(?<=\*{re.escape(d)}/))scripts/{re.escape(name)}(?![A-Za-z0-9_.-])", m.group(2))
+        if own and f"scripts/{name}" not in allowed.group(1):
+            bad.append(f"{md}: body runs scripts/{name} but allowed-tools does not cover it (add Bash(bash *{d}/scripts/{name} *), or exempt it in the verifier with the reason)")
+if bad:
+    print("\n".join(bad), file=sys.stderr)
+    sys.exit(1)
+'
+
+check "no openai.yaml short_description is cut off with ..." \
+  python3 -c '
+import glob, re, sys
+bad = []
+for y in sorted(glob.glob("skills/*/agents/openai.yaml")):
+    m = re.search(r"^\s*short_description:\s*(.+)$", open(y, encoding="utf-8").read(), re.M)
+    if m and re.search(r"(\.\.\.|…)$", m.group(1).strip().strip("\"\x27").rstrip()):
+        bad.append(f"{y}: short_description ends in an ellipsis; write the whole sentence")
+if bad:
+    print("\n".join(bad), file=sys.stderr)
+    sys.exit(1)
+'
+
+# A command that runs scripts/<name>.sh with no skill directory in front only works from the
+# skill folder, and a skill runs from the target repo. The spelling is
+# <this-skill-dir>/scripts/<name>.sh. A markdown link to a script and a mention in prose are
+# fine; a command is `bash scripts/x.sh`, a code-block line that starts with scripts/x.sh, or
+# an inline code span that starts with scripts/x.sh and goes on with arguments.
+check "script commands name the skill directory, not a bare scripts/ path" \
+  python3 -c '
+import glob, re, sys
+script = r"(?:\./)?scripts/[A-Za-z0-9_.-]+\.sh"
+with_shell = re.compile(r"(?<![A-Za-z0-9_>}/.*-])(?:bash|sh|zsh)\s+" + script)
+line_start = re.compile(r"^\s*(?:\$\s+)?" + script + r"(?![A-Za-z0-9_.-])")
+span = re.compile(r"`" + script + r"\s+[^`]+`")
+link = re.compile(r"\[[^\]]*\]\([^)]*\)")
+bad = []
+for p in sorted(glob.glob("skills/**/*.md", recursive=True)):
+    fenced = False
+    for n, line in enumerate(open(p, encoding="utf-8").read().splitlines(), 1):
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+            continue
+        text = link.sub("LINK", line)
+        if with_shell.search(text) or span.search(text) or (fenced and line_start.search(text)):
+            bad.append(f"{p}:{n}: {line.strip()[:110]}")
+if bad:
+    print("bare scripts/ path in a command (write <this-skill-dir>/scripts/<name>.sh):", file=sys.stderr)
+    print("\n".join(bad), file=sys.stderr)
+    sys.exit(1)
+'
 
 if [[ "$fail" -ne 0 ]]; then
   echo "verify-skills-collection: FAILED" >&2
