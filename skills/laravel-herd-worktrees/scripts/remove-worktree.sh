@@ -39,8 +39,20 @@ wt=$(cd "$wt" && pwd -P)
 
 removed=0; reason=""; branch_deleted=0; branch_reason=""; herd_failed=null
 
+# What git will refuse is checked before Herd is touched, so a refusal leaves everything
+# in place: a locked worktree, or the main checkout, never loses its site or database.
+wt_state=$(git worktree list --porcelain | awk -v w="$wt" '
+  /^worktree / { n++; p = substr($0, 10) }
+  p == w && n == 1 { main = 1 }
+  p == w && /^locked/ { locked = 1 }
+  END { if (main) print "main"; else if (locked) print "locked" }')
+
 if [ -n "$(git -C "$wt" status --porcelain)" ]; then
   reason="uncommitted or untracked changes"
+elif [ "$wt_state" = locked ]; then
+  reason="worktree is locked"
+elif [ "$wt_state" = main ]; then
+  reason="this is the main checkout, not a linked worktree"
 else
   # The site comes from Herd's own state for this exact path, never from the checkout:
   # a branch could commit a .herd-workspace.json naming another site. The database

@@ -13,7 +13,9 @@
 #   --count  print only {"pr","head","threads_open"}: the re-query before a push or merge.
 # Save a full run to a file as the snapshot (`> <scratch>/pr-<N>-snapshot.json`).
 # Read-only: GET calls and one GraphQL query.
+# pipefail: every `gh api … | jq -s .` must fail when gh does, or a 403 reads as "no threads".
 set -e
+set -o pipefail
 
 pr=""; repo=""; since=""; count=0
 while [ $# -gt 0 ]; do

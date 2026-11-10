@@ -24,7 +24,8 @@
 #     (lines: epoch<TAB>connection<TAB>database<TAB>worktree path, or "-" for none), or the
 #     DB_DATABASE of its .env and .env.testing. Dropping one needs its worktree in --remove too.
 #   - source "registry": a registry line 12 hours old with no worktree, or whose directory is gone
-#   - source "orphan": a local database named <app db>_* that no checkout uses
+#   - source "orphan": a local database named <app db>_* that no checkout uses and no
+#     registry line younger than 12 hours names
 # A database named by the main checkout's .env, .env.testing, or phpunit.xml(.dist), or by
 # a remaining worktree's .env or .env.testing, is never a candidate, nor is a
 # parallel-testing copy of one.
@@ -170,7 +171,7 @@ worktrees=$(git worktree list --porcelain | awk '
 
 while IFS=$'\t' read -r path head branch flags; do
   [ -n "$path" ] || continue
-  case "$flags" in *prunable*) continue ;; esac   # directory already gone; `git worktree prune` below
+  case "$flags" in *prunable*) continue ;; esac   # directory already gone: nothing here to remove
 
   match=0
   if [ "$branch" = "-" ]; then
@@ -193,6 +194,7 @@ while IFS=$'\t' read -r path head branch flags; do
 
   wt_cands+=("$path	${branch/#-/detached}")
   wt_dbs=$(mktemp)
+  trap 'rm -f "$wt_dbs" "$registry.tmp"' EXIT
   {
     for f in .env .env.testing; do
       c=$(env_get "$path/$f" DB_CONNECTION); d=$(env_get "$path/$f" DB_DATABASE)
@@ -208,8 +210,10 @@ done <<< "$worktrees"
 
 # --- plan: registry lines a run left behind, and orphans --------------------------
 
+recent=""   # databases registered in the last 12 hours: a run may still use them
 if [ -f "$registry" ]; then
   now=$(date +%s)
+  recent=$(awk -F'\t' -v now="$now" '$1 >= now - 43200 { print $3 }' "$registry")
   stale=$(awk -F'\t' -v now="$now" '$1 < now - 43200 { print $2 "\t" $3 "\t" $4 }' "$registry")
   while IFS=$'\t' read -r c d w; do
     [ -n "$d" ] || continue
@@ -217,6 +221,11 @@ if [ -f "$registry" ]; then
     plan_db "$c" "$d" "$w" registry "$main/.env" "$main/.env.testing"
   done <<< "$stale"
 fi
+
+is_recent() {  # is_recent <db>: registered in the last 12 hours, or a parallel-testing copy of one
+  [ -n "$recent" ] || return 1
+  printf '%s\n' "$recent" | awk -v d="$1" '$0 != "" && (d == $0 || d ~ ("^" $0 "_test_[0-9]+$")) { f = 1 } END { exit !f }'
+}
 
 seen=""
 prefixes=$(printf '%s\n' "$protected" | awk -F'\t' '$1 == "MAIN" { print $2 }' | sort -u)
@@ -231,7 +240,7 @@ for f in "$main/.env" "$main/.env.testing"; do
     [ -n "$d" ] || continue
     for p in $prefixes; do
       case "$d" in "${p}_"*)
-        is_protected "$d" "" || add_db_cand "$conn" "$d" - orphan "$size"
+        is_protected "$d" "" || is_recent "$d" || add_db_cand "$conn" "$d" - orphan "$size"
         break ;;
       esac
     done
@@ -310,7 +319,8 @@ for p in ${remove_args[@]+"${remove_args[@]}"}; do
   fi
 done
 if [ ${#removed[@]} -gt 0 ]; then
-  git -C "$main" worktree prune
+  # No `git worktree prune` here: it would also drop the record of a worktree nobody
+  # selected whose directory is only missing for now (an unmounted volume).
   # A worktree Herd served (`herd workspace`) leaves a link, certificate and PHP pin behind;
   # listing workspaces makes Herd forget the ones whose checkout is gone. Its database, if
   # Herd created one, is a "worktree" candidate (the worktree's .env names it) for --drop.

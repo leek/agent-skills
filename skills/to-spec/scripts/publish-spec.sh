@@ -50,10 +50,14 @@ if [ -z "$default" ]; then
   [ -n "$default" ] || default=main
 fi
 git fetch -q origin
+git rev-parse --verify -q "refs/remotes/origin/$default" >/dev/null \
+  || { echo "origin/$default does not exist; pass --default <branch>" >&2; exit 2; }
 
 docs="docs/$slug-spec"
 foreign=""
-for s in $(git rev-list "origin/$default..HEAD"); do
+# Assigned first: a failing rev-list inside `for … in $(…)` would not stop the script.
+revs=$(git rev-list "origin/$default..HEAD")
+for s in $revs; do
   mine=0
   for o in ${own[@]+"${own[@]}"}; do [ "$s" = "$o" ] && mine=1; done
   [ "$mine" = 1 ] || { foreign=$s; break; }
@@ -73,6 +77,19 @@ fi
 main=$(git worktree list --porcelain | awk '/^worktree /{ print substr($0, 10); exit }')
 wt="$main/.claude/worktrees/docs-$slug-spec"
 src=$(pwd -P)/$dir
+# A step that fails (a pre-commit hook, a full disk) must not leave the temporary worktree
+# behind: the next run would stop at "already exists". The worktree is this run's own, so
+# its uncommitted copy is discarded and it is removed without --force. The branch stays.
+added=0
+cleanup() {
+  [ "$added" = 1 ] && [ -d "$wt" ] || return 0
+  git -C "$wt" reset -q --hard HEAD 2>/dev/null || true
+  git -C "$wt" clean -fdq -- .scratch 2>/dev/null || true
+  git worktree remove "$wt" >&2 || echo ">> could not remove $wt; remove it before the next run" >&2
+}
+trap cleanup EXIT
+[ ! -e "$wt" ] || { echo "$wt already exists; remove that worktree first (git worktree remove)" >&2; exit 1; }
+added=1
 if git rev-parse --verify -q "refs/heads/$docs" >/dev/null; then
   git worktree add -q "$wt" "$docs" >&2
 else
@@ -90,4 +107,5 @@ else
   sha=$(git -C "$wt" rev-parse HEAD)
 fi
 git worktree remove "$wt" >&2 || echo ">> git worktree remove refused $wt; it stays" >&2
+added=0
 out docs-branch "$docs" "$sha"

@@ -18,6 +18,18 @@ dir="$(printf '%s' "$branch" | tr -c 'A-Za-z0-9._-' '-')"
 index="$(mktemp)"
 trap 'rm -f "$index"' EXIT
 
+# Percent-encode a file name for the URL: a space in a Markdown link target breaks the image.
+urlencode() {
+  local hex out=""
+  for hex in $(printf '%s' "$1" | od -An -tx1); do
+    case "$hex" in
+      2d|2e|5f|7e|3[0-9]|4[1-9a-f]|5[0-9a]|6[1-9a-f]|7[0-9a]) out="$out$(printf "\\x$hex")" ;;
+      *) out="$out%$(printf '%s' "$hex" | tr 'a-f' 'A-F')" ;;
+    esac
+  done
+  printf '%s' "$out"
+}
+
 for attempt in 1 2 3; do
   rm -f "$index"
   if git fetch -q origin pr-assets 2>/dev/null; then
@@ -40,7 +52,7 @@ for attempt in 1 2 3; do
     for f in "$@"; do
       name="$(basename "$f")"
       blob="$(git hash-object -- "$f")"
-      echo "![${name%.*}](https://github.com/$repo/blob/pr-assets/$dir/${blob:0:8}-$name?raw=true)"
+      echo "![${name%.*}](https://github.com/$repo/blob/pr-assets/$dir/${blob:0:8}-$(urlencode "$name")?raw=true)"
     done
     exit 0
   fi

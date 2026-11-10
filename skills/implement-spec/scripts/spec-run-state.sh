@@ -11,9 +11,9 @@
 #    "decision_sweep_done": true|false, "build_decisions": path or "",
 #    "local_default_scratch_only": true|false, "default"}
 #
-# - branch: <slug> unless it is finished (origin/<default> contains it, or its PR merged
-#   or closed); then the next unfinished or free <slug>-<n>. "resume" means that branch
-#   exists and is unfinished.
+# - branch: <slug> unless it is finished (origin/<default> contains it and it moved past
+#   its recorded base_sha, or its PR merged or closed); then the next unfinished or free
+#   <slug>-<n>. "resume" means that branch exists and is unfinished.
 # - base_sha (resume only): $notes/base_sha, else the first parent of the branch's first
 #   merge on the first-parent line.
 # - decision_sweep_done: a committed "Build decisions" ticket in .scratch/<slug>/decisions/
@@ -43,8 +43,17 @@ json_str() { printf '"%s"' "$(printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\
 bool() { [ "$1" = 1 ] && echo true || echo false; }
 has_branch() { git rev-parse --verify -q "refs/heads/$1" >/dev/null; }
 
+common=$(git rev-parse --path-format=absolute --git-common-dir)
+
+# A branch that still sits on its recorded base_sha has no ticket merged yet. It is an
+# ancestor of origin/<default> too, but it is a run that stopped early, not one that landed.
+not_started() {  # not_started <branch>
+  local f="$common/implement-spec/$1/base_sha"
+  [ -f "$f" ] && [ "$(tr -d '[:space:]' < "$f")" = "$(git rev-parse "$1")" ]
+}
+
 is_finished() {  # is_finished <branch>
-  git merge-base --is-ancestor "$1" "origin/$default" 2>/dev/null && return 0
+  if git merge-base --is-ancestor "$1" "origin/$default" 2>/dev/null && ! not_started "$1"; then return 0; fi
   command -v gh >/dev/null 2>&1 || { echo ">> gh missing: PR state of $1 not checked" >&2; return 1; }
   gh pr list --head "$1" --state all --json state --jq '.[].state' 2>/dev/null | grep -qE '^(MERGED|CLOSED)$'
 }
@@ -62,7 +71,6 @@ while has_branch "$branch"; do
   fi
 done
 
-common=$(git rev-parse --path-format=absolute --git-common-dir)
 notes="$common/implement-spec/$branch"
 wt=""
 base=""
