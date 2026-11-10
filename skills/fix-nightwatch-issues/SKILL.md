@@ -20,18 +20,14 @@ clears, and a dirty tree.
 
 ## 1. Resolve the target
 
-Use the Nightwatch MCP tools. If they are not loaded, discover them first.
-`list_applications` gives the application id and `list_environments` gives the
-production environment. `list_issues` (status `open`, sorted by last seen) is the
-working set. `get_issue` returns the stack trace, code context, occurrence stats, and
-execution context.
+Read [`references/nightwatch-mcp.md`](references/nightwatch-mcp.md) before your first
+Nightwatch call. It covers finding the application and the production environment, the
+issue tools, an issue that will not load, and the resolve calls. The working set is the
+`open` issues of the production environment, ordered by last seen.
 
-A `get_issue` that errors ("Server Error") or is too large to read is a problem with
-that one issue's payload, not with the environment. Retry it once at most. Do not walk
-the `list_environments` ids through `environment_id`: an issue lives only in the
-environments its own `get_issue` lists, and any other id returns "Environment … not
-found for this issue". Work from its `list_issues` summary and the other issues in its
-cluster, and name it as unread in the report.
+An issue whose detail will not load is a problem with that one issue's payload, not with
+the environment. Work from its list summary and the other issues in its cluster, and
+name it as unread in the report.
 
 An empty application list or issue list can mean collection is off, not that production
 is healthy. Check the project context (or the infra config) and report "collection is
@@ -50,7 +46,7 @@ Completion criterion: every open issue in scope belongs to a cluster, even a clu
 
 ## 3. Classify each cluster
 
-For each cluster, open the `file:line` from `get_issue` on current `main` and read the
+For each cluster, open the `file:line` from the issue detail on current `main` and read the
 commits around it. Compare last-seen with deploys (`git log --oneline -- <file>`): if
 it stopped at a deploy of a fix, it is STALE. Then write one line per issue:
 
@@ -95,8 +91,8 @@ unrelated GitHub issue that has the same number.
 
 ## 5. Resolve in Nightwatch
 
-For each fixed issue, `add_issue_comment` with the root cause and the fix sha, then
-`update_issue` to `resolved`. For a cluster, do this for every member and point back to
+For each fixed issue, comment with the root cause and the fix sha, then set it to
+`resolved`. For a cluster, do this for every member and point back to
 the lead cause. A fix is not verified until it is deployed and last-seen goes quiet, so
 note "resolved pending deploy verification" where that applies.
 

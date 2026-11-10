@@ -3,8 +3,8 @@ name: upgrade-plan
 description: Plan a library or framework upgrade from the installed version to the latest. Finds what breaks, which local patches and workarounds can go, and what to adopt, sorted into must do, should do, and do later.
 disable-model-invocation: true
 argument-hint: "One or more packages, optionally pinned (laravel/framework, vite@7). Default target: latest stable"
-allowed-tools: "Bash(composer why-not *) Bash(composer show *) Bash(composer audit) Bash(composer audit *) Bash(npm view *) Bash(npm ls *) Bash(npm audit) Bash(npm audit *) WebFetch WebSearch"
-compatibility: "The version script needs jq and curl, and covers Composer and npm. Other ecosystems resolve the same facts by hand"
+allowed-tools: "Bash(bash *upgrade-plan/scripts/versions.sh *) Bash(bash *dependency-audit/scripts/audit.sh) Bash(bash *dependency-audit/scripts/audit.sh *) Bash(composer why-not *) Bash(composer show *) Bash(npm view *) Bash(npm ls *) WebFetch WebSearch"
+compatibility: "The version script needs jq and curl, the audit script jq; both cover Composer and npm. Other ecosystems resolve the same facts by hand"
 ---
 
 # Upgrade Plan
@@ -22,7 +22,7 @@ a breaking change the collector misses is the costliest miss.
 
 1. **Resolve.** Split `$ARGUMENTS` into packages, each with an optional `@target`. Map a
    loose name to the installed package (`laravel` → `laravel/framework`); if several
-   match, ask which one. For each package, run `bash <skill-dir>/scripts/versions.sh
+   match, ask which one. For each package, run `bash <this-skill-dir>/scripts/versions.sh
    <package> [target]` from the project root. It prints the installed version, the
    constraint, the latest version, the stable releases crossed, what the target requires,
    and the installed packages that depend on this one. In another ecosystem (pip, Cargo,
@@ -55,8 +55,10 @@ a breaking change the collector misses is the costliest miss.
    `model: haiku` for collectors and `model: sonnet` for scouts. In other harnesses,
    dispatch in the background per [harness-tools](../harness-tools/SKILL.md), on the cheapest model for collectors and a mid-tier one for scouts, or run
    them inline one after another. While they run, fetch the official upgrade guide for
-   each major version crossed, and run `composer audit` or `npm audit` for advisories
-   against the installed versions. *Done when* every span has returned (send each
+   each major version crossed, and run
+   `bash <this-skill-dir>/../dependency-audit/scripts/audit.sh` from the project root: its
+   JSON `managers[].advisories` are the advisories against the locked versions (a `null`
+   `lockfile` means no audit ran). *Done when* every span has returned (send each
    `uncovered` list to one more collector), every package has an inventory, and every
    `breaking` change in each upgrade guide is an item, added by you if the collectors
    missed it.

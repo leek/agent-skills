@@ -6,10 +6,11 @@ through `ReportFindings`.
 
 ## Task string
 
-In **review** shape, the task string is this brief. Name the pinned diff from step 1 in
-plain words, with **no backticks**, so nothing is left for a shell to expand:
+In **review** shape, the task string is this brief. Put step 1's `diff_cmd` where
+DIFF-CMD stands, in plain words, with **no backticks**, so nothing is left for a shell to
+expand (with `--wip`, add: plus the untracked files, and list step 1's `untracked`):
 
-> Review the change from git diff FIXED-POINT in this repository. Read the diff and any
+> Review the change from DIFF-CMD in this repository. Read the diff and any
 > files you need. Report concrete findings only, for each, a one-line claim, the
 > file:line, and a one-line reason. Review only; do not modify any file. Be concise.
 
@@ -17,7 +18,7 @@ plain words, with **no backticks**, so nothing is left for a shell to expand:
 
 **Keep review read-only.** For a committed scope, dispatch each panelist with
 `isolation: "worktree"` where the harness offers it, so a stray write never reaches the
-user's tree; its brief first runs `git checkout --detach <step 1's HEAD sha>`, since the
+user's tree; its brief first runs `git checkout --detach <step 1's head_sha>`, since the
 worktree may start from another base. A worktree left with uncommitted changes means
 its CLI wrote: name both. For WIP scope, or without isolation, save `git status --porcelain` and `git diff`
 as the baseline before fanning out, and compare after every subagent returns. A path

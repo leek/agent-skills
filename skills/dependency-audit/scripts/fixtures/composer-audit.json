@@ -1,0 +1,80 @@
+{
+    "advisories": {
+        "twig/twig": [
+            {
+                "advisoryId": "PKSA-8zx5-v2nz-58pb",
+                "packageName": "twig/twig",
+                "affectedVersions": "<=3.26.0",
+                "title": "Twig: Sandbox filter, tag and function allow-list bypass when sandbox state changes between renders for a cached `Template`",
+                "cve": "CVE-2026-49981",
+                "link": "https://github.com/advisories/GHSA-529h-vh3j-85hq",
+                "reportedAt": "2026-07-01T18:55:49+00:00",
+                "sources": [
+                    {
+                        "name": "GitHub",
+                        "remoteId": "GHSA-529h-vh3j-85hq"
+                    }
+                ],
+                "severity": "high"
+            },
+            {
+                "advisoryId": "PKSA-fbvq-z33h-r2np",
+                "packageName": "twig/twig",
+                "affectedVersions": ">=1.0.0,<2.0.0|>=2.0.0,<3.0.0|>=3.0.0,<3.27.0",
+                "title": "Sandbox property allowlist bypass via the `column` filter under `SourcePolicyInterface`",
+                "cve": "CVE-2026-48808",
+                "link": "https://symfony.com/blog/cve-2026-48808-sandbox-property-allowlist-bypass-via-the-column-filter-under-sourcepolicyinterface",
+                "reportedAt": "2026-05-27T15:00:00+00:00",
+                "sources": [
+                    {
+                        "name": "GitHub",
+                        "remoteId": "GHSA-h8vq-8gpg-mhcg"
+                    },
+                    {
+                        "name": "FriendsOfPHP/security-advisories",
+                        "remoteId": "twig/twig/CVE-2026-48808.yaml"
+                    }
+                ],
+                "severity": "medium"
+            },
+            {
+                "advisoryId": "PKSA-yd6k-t2gh-1m43",
+                "packageName": "twig/twig",
+                "affectedVersions": ">=1.0.0,<2.0.0|>=2.0.0,<3.0.0|>=3.0.0,<3.27.0",
+                "title": "Sandbox filter, tag and function allow-list bypass when sandbox state changes between renders",
+                "cve": "CVE-2026-46636",
+                "link": "https://symfony.com/blog/cve-2026-46636-sandbox-filter-tag-and-function-allow-list-bypass-when-sandbox-state-changes-between-renders",
+                "reportedAt": "2026-05-27T15:00:00+00:00",
+                "sources": [
+                    {
+                        "name": "FriendsOfPHP/security-advisories",
+                        "remoteId": "twig/twig/CVE-2026-46636.yaml"
+                    }
+                ],
+                "severity": null
+            },
+            {
+                "advisoryId": "PKSA-h8hf-ytnd-5t9q",
+                "packageName": "twig/twig",
+                "affectedVersions": ">=1.0.0,<2.0.0|>=2.0.0,<3.0.0|>=3.0.0,<3.26.0",
+                "title": "PHP code injection via `{% use %}` template name",
+                "cve": "CVE-2026-46633",
+                "link": "https://symfony.com/cve-2026-46633",
+                "reportedAt": "2026-05-20T08:00:00+00:00",
+                "sources": [
+                    {
+                        "name": "GitHub",
+                        "remoteId": "GHSA-7p85-w9px-jpjp"
+                    },
+                    {
+                        "name": "FriendsOfPHP/security-advisories",
+                        "remoteId": "twig/twig/CVE-2026-46633.yaml"
+                    }
+                ],
+                "severity": "critical"
+            }
+        ]
+    },
+    "abandoned": [],
+    "filter": []
+}

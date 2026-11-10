@@ -2,7 +2,7 @@
 name: code-review
 description: "Three-axis review of the diff since a fixed point: Correctness (bugs, failure modes, security), Standards (repo conventions) and Spec (ticket/PRD fidelity). Use when the user wants to review a branch, PR, WIP changes, or asks to \"review since X\"."
 argument-hint: "since <ref>, or a PR or branch (omit for WIP changes)"
-allowed-tools: "Bash(git diff *) Bash(git log *) Bash(git merge-base *)"
+allowed-tools: "Bash(bash *code-review/scripts/review-scope.sh *) Bash(git diff *) Bash(git log *) Bash(git merge-base *)"
 ---
 
 # Code Review
@@ -21,11 +21,9 @@ The axes run **separately** so they don't pollute each other's context, then thi
 
 Whatever the user said is the fixed point: a commit SHA, branch name, tag, `main`, `HEAD~5`, etc. If they didn't specify one, ask for it (a structured question ([harness-tools](../harness-tools/SKILL.md)), otherwise in chat; when invoked from `implement`, it's the ticket's base commit).
 
-Capture the diff command once: `git diff <fixed-point>...HEAD` (three-dot, so the comparison is against the merge-base). Also note the list of commits via `git log <fixed-point>..HEAD --oneline`.
+Pin it once, from inside the repo: `bash <this-skill-dir>/scripts/review-scope.sh <fixed-point>`. When the caller passes a **path scope** (as `implement` does, so parallel sessions sharing one branch don't pollute the range), append ` -- <paths>`: the script adds it to both commands. It prints one JSON object: `diff_cmd` (`git diff <fixed-point>...HEAD`: three-dot, so the comparison is against the merge-base) and `commits` (from `log_cmd`) are the diff command and commit list every brief carries, `files` the changed paths, and `size` what step 4 reads.
 
-When the caller passes a **path scope** (as `implement` does, so parallel sessions sharing one branch don't pollute the range), append it to both: `git diff <fixed-point>...HEAD -- <paths>` and `git log <fixed-point>..HEAD --oneline -- <paths>`.
-
-Before going further, confirm the fixed point resolves (`git rev-parse <fixed-point>`) and the diff is non-empty. A bad ref or empty diff should fail here, not inside three parallel reviews.
+Exit 1 is a fixed point that does not resolve, or an empty diff (`"empty": true`): stop here, not inside three parallel reviews.
 
 ### 2. Identify the spec source
 
@@ -55,9 +53,9 @@ On top of whatever the repo documents, the Standards axis always carries the **s
 
 **If sub-agents are unavailable:** run the reviews inline in this session, Correctness first, then Standards, then Spec (or skip Spec when no source was found). Same briefs, same output shape, only the execution host changes.
 
-**Small diffs run inline too.** When `git diff --shortstat` shows at most 3 files and about 150 changed lines, three fresh contexts each re-reading it cost more than they find: take the inline path above.
+**Small diffs run inline too.** When step 1's `size` is `inline` (at most 3 files and 150 changed lines), three fresh contexts each re-reading it cost more than they find: take the inline path above.
 
-**Large diffs split Correctness.** When the diff touches more than about 25 files, one Correctness reviewer runs out of turns before it reports. Dispatch two, each given half the changed paths (a file and its tests stay together) and the full commit list, and present both reports under the one `## Correctness` heading.
+**Large diffs split Correctness.** When `size` is `split` (more than 25 files), one Correctness reviewer runs out of turns before it reports. Dispatch two, each given half of `files` (a file and its tests stay together) and the full commit list, and present both reports under the one `## Correctness` heading.
 
 **A caller may name the axes.** Run only those, and report the rest as `not run`.
 

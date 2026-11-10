@@ -1,0 +1,60 @@
+{
+    "installed": [
+        {
+            "name": "psr/container",
+            "direct-dependency": true,
+            "homepage": "https://github.com/php-fig/container",
+            "source": "https://github.com/php-fig/container/tree/2.0.1",
+            "version": "2.0.1",
+            "release-age": "5 years old",
+            "release-date": "2021-03-24T13:40:57+00:00",
+            "latest": "2.0.2",
+            "latest-status": "semver-safe-update",
+            "latest-release-date": "2021-11-05T16:47:00+00:00",
+            "description": "Common Container Interface (PHP FIG PSR-11)",
+            "abandoned": false
+        },
+        {
+            "name": "psr/log",
+            "direct-dependency": true,
+            "homepage": "https://github.com/php-fig/log",
+            "source": "https://github.com/php-fig/log/tree/master",
+            "version": "1.1.0",
+            "release-age": "7 years old",
+            "release-date": "2018-11-20T15:27:04+00:00",
+            "latest": "3.0.2",
+            "latest-status": "update-possible",
+            "latest-release-date": "2024-09-11T13:17:53+00:00",
+            "description": "Common interface for logging libraries",
+            "abandoned": false
+        },
+        {
+            "name": "symfony/polyfill-ctype",
+            "direct-dependency": true,
+            "homepage": "https://symfony.com",
+            "source": "https://github.com/symfony/polyfill-ctype/tree/v1.30.0",
+            "version": "v1.30.0",
+            "release-age": "2 years old",
+            "release-date": "2024-05-31T15:07:36+00:00",
+            "latest": "v1.37.0",
+            "latest-status": "semver-safe-update",
+            "latest-release-date": "2026-04-10T16:19:22+00:00",
+            "description": "Symfony polyfill for ctype functions",
+            "abandoned": false
+        },
+        {
+            "name": "twig/twig",
+            "direct-dependency": true,
+            "homepage": "http://twig.sensiolabs.org",
+            "source": "https://github.com/twigphp/Twig/tree/v2.4.0",
+            "version": "v2.4.0",
+            "release-age": "9 years old",
+            "release-date": "2017-06-05T17:24:44+00:00",
+            "latest": "v3.30.0",
+            "latest-status": "update-possible",
+            "latest-release-date": "2026-09-25T13:20:01+00:00",
+            "description": "Twig, the flexible, fast, and secure template language for PHP",
+            "abandoned": false
+        }
+    ]
+}

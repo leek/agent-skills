@@ -1,0 +1,30 @@
+{
+  "chalk": {
+    "current": "4.0.0",
+    "wanted": "4.0.0",
+    "latest": "6.0.1",
+    "dependent": "fixture",
+    "location": "/tmp/fixture/node_modules/chalk"
+  },
+  "lodash": {
+    "current": "4.17.20",
+    "wanted": "4.17.20",
+    "latest": "4.18.1",
+    "dependent": "fixture",
+    "location": "/tmp/fixture/node_modules/lodash"
+  },
+  "minimist": {
+    "current": "1.2.0",
+    "wanted": "1.2.0",
+    "latest": "1.2.8",
+    "dependent": "fixture",
+    "location": "/tmp/fixture/node_modules/minimist"
+  },
+  "semver": {
+    "current": "7.5.0",
+    "wanted": "7.5.0",
+    "latest": "7.8.6",
+    "dependent": "fixture",
+    "location": "/tmp/fixture/node_modules/semver"
+  }
+}

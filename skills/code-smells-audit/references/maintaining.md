@@ -1,10 +1,10 @@
 # Maintaining the card set
 
-Run after any card edit, batch addition, or upstream re-sync, from the skill directory:
+Run after any card edit, batch addition, or upstream re-sync (`<this-skill-dir>` is this skill's directory; the repo verifier also runs the strict form):
 
 ```bash
-bash scripts/validate-cards.sh            # strict: all 56 cards must exist (ship gate)
-bash scripts/validate-cards.sh --partial  # mid-build: missing cards reported as pending
+bash <this-skill-dir>/scripts/validate-cards.sh            # strict: all 56 cards must exist (ship gate)
+bash <this-skill-dir>/scripts/validate-cards.sh --partial  # mid-build: missing cards reported as pending
 ```
 
 Human-readable status goes to stderr; stdout carries a JSON result:

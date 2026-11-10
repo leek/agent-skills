@@ -3,7 +3,7 @@ name: panel
 description: Convene a panel of agent CLIs (grok, claude, codex, agy) on a prompt or a code review, then report one consensus grouped by how much they agree.
 disable-model-invocation: true
 argument-hint: "A prompt, or a review scope like 'review since main'"
-allowed-tools: "Bash(bash *panel/scripts/launch.sh *) Bash(grok *) Bash(claude *) Bash(codex *) Bash(agy *)"
+allowed-tools: "Bash(bash *panel/scripts/launch.sh *) Bash(bash *code-review/scripts/review-scope.sh *) Bash(git diff *) Bash(git status *) Bash(grok *) Bash(claude *) Bash(codex *) Bash(agy *)"
 compatibility: "Needs at least one of the grok, claude, codex, or agy CLIs on PATH"
 model: sonnet
 effort: medium
@@ -23,12 +23,12 @@ them.** The point of the panel is four independent models; pinning a model defea
 ### 1. Read the task and pick the shape
 
 - **Review** when the user asks to review a branch, PR, WIP, or "review since X".
-  Pin the fixed point the way `code-review` does: the diff is
-  `git diff <fixed-point>...HEAD` (three-dot, against the merge-base), default
-  `main` when the user names none. For uncommitted work in progress, drop the `...HEAD`
-  so the diff also covers staged and unsaved changes. Confirm the ref resolves
-  (`git rev-parse <fixed-point>`), record `git rev-parse HEAD`, and confirm the diff is non-empty **before** fanning out, 
-  a bad ref should fail here, not inside four subagents. Then read
+  Pin the fixed point with `code-review`'s script, **before** fanning out:
+  `bash <this-skill-dir>/../code-review/scripts/review-scope.sh <fixed-point>` (default
+  `main` when the user names none; add `--wip` for uncommitted work in progress, so the
+  diff also covers staged, unsaved, and untracked changes). It prints JSON: `diff_cmd` is
+  the pinned diff (three-dot, against the merge-base), `head_sha` the HEAD step 3 uses.
+  Exit 1 is a bad ref or an empty diff: stop here, not inside four subagents. Then read
   [`references/review-shape.md`](references/review-shape.md): it holds the review task
   string, step 3's read-only guard, and step 5's `ReportFindings` mapping.
 - **Prompt** otherwise; the user's text is the task, passed word for word.

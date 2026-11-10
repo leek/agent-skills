@@ -2,7 +2,7 @@
 name: code-smells-audit
 description: Audit a codebase, path, or branch diff for classic code smells against the 56-smell Luzkan catalog (PHP/Laravel and TS/React heuristics). Use when the user asks for a code-smell audit or smell-check of a module or diff.
 argument-hint: "[path | glob | diff] (omit for a whole-repo sweep)"
-allowed-tools: "Bash(git diff *) Bash(git status *) Bash(git merge-base *)"
+allowed-tools: "Bash(bash *code-review/scripts/review-scope.sh *) Bash(git diff *)"
 ---
 
 # Code Smells Audit
@@ -25,7 +25,7 @@ The argument decides scope:
 |---|---|
 | a path | that file or directory, recursively |
 | a glob | files matching it |
-| `diff` | the current branch's changes: files listed by `git diff --name-only $(git merge-base <default-branch> HEAD)` plus uncommitted changes (`git status --porcelain`), audit only those files, and only their changed regions when judging severity |
+| `diff` | the current branch's changes, uncommitted ones included: the `files` that `bash <this-skill-dir>/../code-review/scripts/review-scope.sh <default-branch> --wip` prints as JSON (exit 1 with `"empty": true`: nothing to audit). Audit only those files, and only their changed regions (its `diff_cmd` shows them; a file in `untracked` is all new) when judging severity |
 | *(none)* | whole-repo sweep |
 
 Always exclude dependencies and generated code: `vendor/`, `node_modules/`,
