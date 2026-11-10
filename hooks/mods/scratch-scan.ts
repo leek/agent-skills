@@ -37,6 +37,30 @@ const byText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
 
 const unquote = (s: string) => s.replace(/^["']+|["']+$/g, '')
 
+// Lowest number first, as number_key in scratch-state.sh: 9 before 10, no number last.
+const byNumber = (a: string, b: string) => {
+  const rank = (n: string) => (/^\d+$/.test(n) ? Number(n) : Infinity)
+
+  return rank(a) - rank(b) || byText(a, b)
+}
+
+// A frontmatter value without its quotes or an unquoted trailing ` # comment`: clean_value
+// in scratch-state.sh.
+function cleanValue(raw: string): string {
+  const val = raw.trim()
+  const quote = val[0]
+  if (quote === '"' || quote === "'") {
+    const end = val.indexOf(quote, 1)
+    const rest = end > 0 ? val.slice(end + 1).trim() : 'x'
+    if (rest === '' || rest.startsWith('#')) {
+      return val.slice(1, end)
+    }
+  }
+  const comment = val.search(/(?:^|\s)#/)
+
+  return unquote((comment === -1 ? val : val.slice(0, comment)).trim())
+}
+
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 /** `/scratch`'s argument as a slug: `.scratch/auth/`, `/auth/`, and `auth` all name `auth`. */
@@ -61,7 +85,7 @@ export function parseFile(path: string, kind: ScratchKind, text: string): Scratc
   const split = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/)
   const front = split?.[1] ?? ''
   const body = split ? (split[2] ?? '') : text
-  const field = (key: string) => unquote(front.match(new RegExp(`^${escape(key)}:[ \\t]*(.*)$`, 'm'))?.[1]?.trim() ?? '')
+  const field = (key: string) => cleanValue(front.match(new RegExp(`^${escape(key)}:[ \\t]*(.*)$`, 'm'))?.[1] ?? '')
 
   let status = field('status')
   if (status === '') {
@@ -105,7 +129,7 @@ export function parseFile(path: string, kind: ScratchKind, text: string): Scratc
 function parseList(front: string, key: string): string[] {
   const name = escape(key)
   const items = (raw: string) => raw.split(',').map(s => unquote(s.trim())).filter(Boolean)
-  const inline = front.match(new RegExp(`^${name}:[ \\t]*\\[(.*)\\]`, 'm'))
+  const inline = front.match(new RegExp(`^${name}:[ \\t]*\\[([^\\]]*)\\]`, 'm'))
   if (inline) {
     return items(inline[1] ?? '')
   }
@@ -113,11 +137,10 @@ function parseList(front: string, key: string): string[] {
   if (block) {
     return (block[1] ?? '')
       .split(/\r?\n/)
-      .map(line => line.replace(/^\s*-\s*/, '').trim())
+      .map(line => cleanValue(line.replace(/^\s*-\s*/, '')))
       .filter(Boolean)
-      .map(unquote)
   }
-  const bare = front.match(new RegExp(`^${name}:[ \\t]*(\\S.*)$`, 'm'))?.[1]?.trim() ?? ''
+  const bare = cleanValue(front.match(new RegExp(`^${name}:[ \\t]*(\\S.*)$`, 'm'))?.[1] ?? '')
 
   return ['none', 'null', '~', '[]'].includes(bare.toLowerCase()) ? [] : items(bare)
 }
@@ -163,7 +186,7 @@ export function classify(slug: string, files: ScratchFile[], lastChangeMs: numbe
 
   const frontier = files
     .filter(f => isWork(f) && isReady(f))
-    .sort((a, b) => byText(a.number, b.number))
+    .sort((a, b) => byNumber(a.number, b.number))
     .map(f => f.path)
 
   const base = { slug, files, lastChangeMs, frontier, isStale: false }
@@ -182,14 +205,11 @@ export function classify(slug: string, files: ScratchFile[], lastChangeMs: numbe
   const decisions = byKind('decision')
   const isMapOpen = map !== undefined && !isClosed(map)
   const isSpecOpen = spec !== undefined && !isClosed(spec)
-  const readyDecision = decisions.find(isReady)
+  const readyDecision = decisions.filter(isReady).sort((a, b) => byNumber(a.number, b.number))[0]
   const isWaitingOnDeploy = (t: ScratchFile) => t.delivery && t.status === 'ready-for-human'
-  // How many open tickets each ticket holds back: the most-unblocking ready ticket goes first.
-  const unblocks = (t: ScratchFile) =>
-    tickets.filter(other => !isClosed(other) && (blockers.get(other) ?? []).includes(t.number)).length
-  const buildable = tickets
-    .filter(t => isReady(t) && !isWaitingOnDeploy(t))
-    .sort((a, b) => unblocks(b) - unblocks(a) || byText(a.number, b.number))
+  // Lowest number first, the tracker's Frontier rule (scratch-state.sh adds the unblock count
+  // to `next_why`, which the board does not show).
+  const buildable = tickets.filter(t => isReady(t) && !isWaitingOnDeploy(t)).sort((a, b) => byNumber(a.number, b.number))
   const waiting = tickets.find(t => isReady(t) && isWaitingOnDeploy(t))
 
   // The same order as scratch-state.sh's `next` chain; change both together.

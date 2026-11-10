@@ -3,26 +3,52 @@
 # Performs frontmatter/legacy status parsing, blocker/claim resolution, git tracked/date
 # lookups, and commit-ancestry checks (merge-base, merged PRs, git cherry, commit subject).
 #
-# Usage: scratch-state.sh [--days N] [slug]
-#   --days N   days of inactivity before an open effort counts as stale (default 30)
-#   slug       optional effort slug to scan only .scratch/<slug>/
+# Usage: scratch-state.sh [--days N] [--root DIR] [--no-commits] [slug]
+#   --days N      days of inactivity before an open effort counts as stale (default 30)
+#   --root DIR    read DIR/.scratch/ instead of the git top level's (tests, ticket.sh)
+#   --no-commits  skip the cited-commit checks: no `gh` call, no network; every ticket then
+#                 reports "commits": [] (setup's ticket.sh reads the tracker this way)
+#   slug          optional effort slug to scan only .scratch/<slug>/
 #
-# Stdout: JSON object {"root", "exists", "default_branch", "stale_days", "counts",
-#   "efforts", "unreadable_efforts", "research", "unclassified"}
+# Stdout: JSON object {"root", "exists", "default_branch", "stale_days", "vocabulary",
+#   "counts", "efforts", "unreadable_efforts", "research", "unclassified"}
+#   "vocabulary" is {"closed": [..], "wontfix": [..], "roles": {<triage role>: <status string>}},
+#   read from .agents/triage-labels.md. Each map, spec, decision, and ticket carries "status",
+#   "claimed_by", "blocked_by", "open_blockers", "derived_status", "type", "delivery",
+#   "deploy_gate", "last_change", and "last_change_ts" (epoch seconds: the last commit when
+#   tracked, else the modification time).
+#   An effort's "next" names the lowest-numbered ready ticket; "next_why" says how many
+#   open tickets it unblocks.
 # Stderr: status/error messages. Read-only.
+#
+# This file holds the tracker's one frontmatter reader. skills/setup/scripts/ticket.sh calls
+# it for every read, hooks/mods/scratch-scan.ts ports it, and autopilot's lib/tickets.sh uses
+# the same closed vocabulary and comment rule: change them together.
 set -e
 
+usage="usage: scratch-state.sh [--days N] [--root DIR] [--no-commits] [slug]"
 days=30
 slug=""
+root_dir=""
+check_commits=1
 while [ $# -gt 0 ]; do
   case "$1" in
     --days)
-      [ $# -ge 2 ] || { echo "usage: scratch-state.sh [--days N] [slug]" >&2; exit 2; }
+      [ $# -ge 2 ] || { echo "$usage" >&2; exit 2; }
       days="$2"
       shift 2
       ;;
+    --root)
+      [ $# -ge 2 ] || { echo "$usage" >&2; exit 2; }
+      root_dir="$2"
+      shift 2
+      ;;
+    --no-commits)
+      check_commits=0
+      shift
+      ;;
     --help|-h)
-      echo "usage: scratch-state.sh [--days N] [slug]" >&2
+      echo "$usage" >&2
       exit 0
       ;;
     -*)
@@ -38,9 +64,13 @@ while [ $# -gt 0 ]; do
 done
 
 # Resolve .scratch/ against the repository root, so a run from a subdirectory still finds it.
-top=$(git rev-parse --show-toplevel 2>/dev/null) && cd "$top"
+if [ -n "$root_dir" ]; then
+  cd "$root_dir" 2>/dev/null || { echo "no such directory: $root_dir" >&2; exit 2; }
+else
+  top=$(git rev-parse --show-toplevel 2>/dev/null) && cd "$top"
+fi
 
-python3 - "$days" "$slug" <<'PY'
+python3 - "$days" "$slug" "$check_commits" <<'PY'
 # Annotations stay unevaluated, so `dict | None` loads on the macOS system Python 3.9.
 from __future__ import annotations
 
@@ -61,6 +91,7 @@ except ValueError:
 only_slug = sys.argv[2].strip().strip("/")
 if only_slug.startswith(".scratch/"):
     only_slug = only_slug[len(".scratch/"):].strip("/")
+CHECK_COMMITS = sys.argv[3] == "1"
 
 root = Path(".scratch")
 now_ts = datetime.now(timezone.utc).timestamp()
@@ -86,22 +117,31 @@ def detect_default_branch() -> str:
     return "main"
 
 
-def load_closed_vocabulary() -> tuple[set[str], set[str]]:
+TRIAGE_ROLES = ("needs-triage", "needs-info", "ready-for-agent", "ready-for-human", "wontfix")
+
+
+def load_closed_vocabulary() -> tuple[set[str], set[str], dict[str, str]]:
     wontfix = {"wontfix", "declined", "duplicate"}
     closed = {"closed", "done", "resolved"} | wontfix
+    # Each triage role's status string; a role the table does not list keeps its own name.
+    roles = {role: role for role in TRIAGE_ROLES}
     for candidate in (Path(".agents/triage-labels.md"), Path("docs/agents/triage-labels.md")):
         if candidate.is_file():
             text = candidate.read_text(encoding="utf-8", errors="replace")
-            # The setup table's wontfix row: | `wontfix` | `<status string>` | <meaning> |
-            for m in re.finditer(r"^\|\s*`wontfix`\s*\|\s*`([^`]+)`", text, re.M | re.I):
-                label = m.group(1).strip().lower()
-                closed.add(label)
-                wontfix.add(label)
+            # The setup table's rows: | `<role>` | `<status string>` | <meaning> |
+            for m in re.finditer(r"^\|\s*`([a-z-]+)`\s*\|\s*`([^`]+)`", text, re.M | re.I):
+                role = m.group(1).lower()
+                label = m.group(2).strip().lower()
+                if role in roles:
+                    roles[role] = label
+                if role == "wontfix":
+                    closed.add(label)
+                    wontfix.add(label)
             break
-    return closed, wontfix
+    return closed, wontfix, roles
 
 
-CLOSED_SET, WONTFIX_SET = load_closed_vocabulary()
+CLOSED_SET, WONTFIX_SET, ROLE_STRINGS = load_closed_vocabulary()
 DEFAULT_BRANCH = detect_default_branch()
 HAS_GH = shutil.which("gh") is not None
 
@@ -141,8 +181,28 @@ def one_line(text: str) -> str:
     return ""
 
 
+def clean_value(raw: str) -> str:
+    """A frontmatter value without its quotes or an unquoted trailing ` # comment`."""
+    val = raw.strip()
+    if val[:1] in ("\"", "'"):
+        end = val.find(val[0], 1)
+        if end > 0:
+            rest = val[end + 1:].strip()
+            if rest == "" or rest.startswith("#"):
+                return val[1:end]
+    m = re.search(r"(?:^|\s)#", val)
+    if m is not None:
+        val = val[:m.start()]
+    return val.strip().strip("\"'")
+
+
+def number_key(number: str) -> tuple[float, str]:
+    """Lowest number first: 9 before 10, and a file with no number last."""
+    return (float(int(number)) if number.isdigit() else float("inf"), number)
+
+
 def parse_list(front: str, key: str) -> list[str]:
-    inline = re.search(rf"^{re.escape(key)}:[ \t]*\[(.*)\]", front, re.M)
+    inline = re.search(rf"^{re.escape(key)}:[ \t]*\[([^\]]*)\]", front, re.M)
     if inline is not None:
         return [
             s.strip().strip("\"'")
@@ -152,13 +212,13 @@ def parse_list(front: str, key: str) -> list[str]:
     block = re.search(rf"^{re.escape(key)}:[ \t]*\r?\n((?:[ \t]*-.*\r?\n?)+)", front, re.M)
     if block is not None:
         return [
-            re.sub(r"^\s*-\s*", "", line).strip().strip("\"'")
+            clean_value(re.sub(r"^\s*-\s*", "", line))
             for line in block.group(1).splitlines()
-            if re.sub(r"^\s*-\s*", "", line).strip()
+            if clean_value(re.sub(r"^\s*-\s*", "", line))
         ]
     bare = re.search(rf"^{re.escape(key)}:[ \t]*(\S.*)$", front, re.M)
     if bare is not None:
-        val = bare.group(1).strip()
+        val = clean_value(bare.group(1))
         if val.lower() in ("none", "null", "~", "[]"):
             return []
         return [s.strip().strip("\"'") for s in val.split(",") if s.strip().strip("\"'")]
@@ -242,7 +302,7 @@ def parse_md(full_path: Path, rel_in_effort: str, kind: str) -> dict:
 
     def field(key: str) -> str:
         m = re.search(rf"^{re.escape(key)}:[ \t]*(.*)$", front, re.M)
-        return m.group(1).strip().strip("\"'") if m else ""
+        return clean_value(m.group(1)) if m else ""
 
     status_raw = field("status")
     if not status_raw:
@@ -284,8 +344,11 @@ def parse_md(full_path: Path, rel_in_effort: str, kind: str) -> dict:
         "status": status,
         "claimed_by": claimed_by,
         "blocked_by": blocked_by,
+        "type": field("type").lower(),
         "delivery": field("delivery").lower() == "true",
+        "deploy_gate": field("deploy-gate").lower() in ("true", "yes"),
         "last_change": date_s,
+        "last_change_ts": int(ts),
         "mtime_ts": ts,
         "tracked": tracked,
     }
@@ -304,7 +367,7 @@ def parse_md(full_path: Path, rel_in_effort: str, kind: str) -> dict:
     elif kind == "decision":
         item["resolution"] = one_line(extract_section(body, "Resolution|Closed"))
     elif kind == "ticket":
-        commits = extract_commits(status_raw, body)
+        commits = extract_commits(status_raw, body) if CHECK_COMMITS else []
         item["commits"] = commits
         item["missing_commits"] = [c["sha"] for c in commits if not c["on_default_branch"]]
 
@@ -383,7 +446,7 @@ def analyze_effort(slug_name: str, effort_dir: Path) -> dict | None:
         f for f in files
         if f["kind"] in ("decision", "ticket") and f["derived_status"] == "ready"
     ]
-    ready_items.sort(key=lambda x: x["number"])
+    ready_items.sort(key=lambda x: number_key(x["number"]))
     frontier = [f["path"] for f in ready_items]
 
     # Check contradictions / mismatch
@@ -444,7 +507,9 @@ def analyze_effort(slug_name: str, effort_dir: Path) -> dict | None:
         next_cmd = "/scratch-cleanup"
         next_why = "nothing is left open and cited commits are on the default branch"
     else:
-        ready_decisions = [d for d in decisions if d["derived_status"] == "ready"]
+        ready_decisions = sorted(
+            (d for d in decisions if d["derived_status"] == "ready"), key=lambda d: number_key(d["number"])
+        )
         ready_tickets = [t for t in tickets if t["derived_status"] == "ready"]
         buildable_tickets = [t for t in ready_tickets if not (t["delivery"] and t["status"] == "ready-for-human")]
         delivery_waiting = [t for t in ready_tickets if t["delivery"] and t["status"] == "ready-for-human"]
@@ -473,11 +538,12 @@ def analyze_effort(slug_name: str, effort_dir: Path) -> dict | None:
             next_cmd = f"/to-tickets {at(spec_f['path'])}"
             next_why = "spec has no build tickets yet"
         elif buildable_tickets:
-            buildable_tickets.sort(key=lambda t: (-unblock_counts.get(t["number"], 0), t["number"]))
+            # Lowest number first, the tracker's Frontier rule; the unblock count only informs.
+            buildable_tickets.sort(key=lambda t: number_key(t["number"]))
             pick = buildable_tickets[0]
             unblocks = unblock_counts.get(pick["number"], 0)
             next_cmd = f"/implement {at(pick['path'])}"
-            next_why = f"ready ticket {pick['number']}" + (f" (unblocks {unblocks})" if unblocks > 0 else "")
+            next_why = f"lowest-numbered ready ticket ({pick['number']})" + (f", unblocks {unblocks}" if unblocks > 0 else "")
             if len(buildable_tickets) >= 2 and spec_f:
                 also.append(f"/implement-spec {at(spec_f['path'])}")
                 also.append("other ready tickets: " + ", ".join(t["number"] for t in buildable_tickets[1:]))
@@ -530,12 +596,15 @@ def analyze_effort(slug_name: str, effort_dir: Path) -> dict | None:
     }
 
 
+VOCABULARY = {"closed": sorted(CLOSED_SET), "wontfix": sorted(WONTFIX_SET), "roles": ROLE_STRINGS}
+
 if not root.is_dir():
     print(json.dumps({
         "root": ".scratch",
         "exists": False,
         "default_branch": DEFAULT_BRANCH,
         "stale_days": stale_days,
+        "vocabulary": VOCABULARY,
         "counts": {"open": 0, "stale": 0, "mismatched": 0, "done": 0},
         "efforts": [],
         "unreadable_efforts": [],
@@ -617,6 +686,7 @@ print(json.dumps({
     "exists": True,
     "default_branch": DEFAULT_BRANCH,
     "stale_days": stale_days,
+    "vocabulary": VOCABULARY,
     "counts": counts,
     "efforts": efforts,
     "unreadable_efforts": unreadable_efforts,

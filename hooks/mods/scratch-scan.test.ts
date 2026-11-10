@@ -36,6 +36,18 @@ describe('parseFile', () => {
     expect(block.blockedBy).toEqual(['01', '02'])
   })
 
+  test('drops an unquoted trailing comment and keeps a quoted #', async () => {
+    const file = parseFile(
+      'tickets/02-x.md',
+      'ticket',
+      '---\ntitle: "Fix #12" # note\nstatus: closed # shipped\nclaimed-by: # nobody\nblocked-by: [01] # see [09]\n---\n',
+    )
+    expect(file.title).toBe('Fix #12')
+    expect(file.status).toBe('closed')
+    expect(file.claimedBy).toBe('')
+    expect(file.blockedBy).toEqual(['01'])
+  })
+
   test('falls back to a legacy Status line', async () => {
     expect(parseFile('req.md', 'request', '# Bug\n\n**Status:** needs-triage\n').status).toBe('needs-triage')
   })
@@ -144,12 +156,21 @@ const SHARED: Record<string, string> = {
   'legacy/tickets/02-b.md': '# Two\n\n**Status:** ready-for-agent\n**Blocked by:** 01, 03\n',
   'legacy/tickets/03-c.md': '# Three\n\n**Status:** closed\n',
   'legacy/tickets/04-d.md': '# Four\n\nStatus: ready-for-agent\nBlocked by: none\nClaimed by: none\n',
-  // Finding 4: the most-unblocking ready ticket goes first.
+  // The lowest-numbered ready ticket goes first, however many tickets another one unblocks.
   'unblock/spec.md': md('ready-for-agent'),
   'unblock/tickets/01-a.md': md('ready-for-agent'),
   'unblock/tickets/02-b.md': md('ready-for-agent'),
   'unblock/tickets/03-c.md': md('ready-for-agent', 'blocked-by: [02]\n'),
   'unblock/tickets/04-d.md': md('ready-for-agent', 'blocked-by: [02]\n'),
+  // An unquoted trailing ` # comment` is not part of a value; a quoted value keeps its `#`.
+  'comments/tickets/01-a.md': md('closed # shipped'),
+  'comments/tickets/02-b.md': md('ready-for-agent', 'claimed-by: ann-1 # since Monday\n'),
+  'comments/tickets/03-c.md': md('ready-for-agent', 'claimed-by: # nobody\nblocked-by: [01] # see [02]\n'),
+  'comments/tickets/04-d.md': md('ready-for-agent', 'blocked-by: 02 # waits\n'),
+  'comments/tickets/05-e.md': md('ready-for-agent', 'blocked-by:\n  - 02 # waits\n'),
+  // Lowest number first is numeric: 9 before 10.
+  'numeric/tickets/10-j.md': md('ready-for-agent'),
+  'numeric/tickets/9-i.md': md('ready-for-agent'),
   // Finding 4: open questions and no ticket started.
   'questions/spec.md': md('ready-for-agent', '', '## Open Questions\n\n- Which queue?\n\n## Notes\n\nx\n'),
   'questions/tickets/01-a.md': md('ready-for-agent'),
@@ -191,7 +212,14 @@ const FROM_SCRATCH_STATE: Record<string, { state: string; stale: boolean; fronti
     state: 'open',
     stale: false,
     frontier: ['tickets/01-a.md', 'tickets/02-b.md'],
-    next: '/implement .scratch/unblock/tickets/02-b.md',
+    next: '/implement .scratch/unblock/tickets/01-a.md',
+  },
+  comments: { state: 'open', stale: false, frontier: ['tickets/03-c.md'], next: '/implement .scratch/comments/tickets/03-c.md' },
+  numeric: {
+    state: 'open',
+    stale: false,
+    frontier: ['tickets/9-i.md', 'tickets/10-j.md'],
+    next: '/implement .scratch/numeric/tickets/9-i.md',
   },
   questions: { state: 'open', stale: false, frontier: ['tickets/01-a.md'], next: '/grill-me .scratch/questions/spec.md' },
   delivery: {

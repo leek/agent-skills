@@ -83,9 +83,56 @@ work_item_is_deploy_gate() {
   [[ "$value" == true || "$value" == yes ]]
 }
 
-# A frontmatter value with its YAML comment (`  # …`) and surrounding blanks removed.
+# A frontmatter value without its quotes or an unquoted trailing ` # comment`: the same rule
+# as clean_value in skills/scratch-status/scripts/scratch-state.sh. Change them together.
 strip_yaml_comment() {
-  sed -E 's/(^|[[:space:]]+)#.*$//;s/^[[:space:]]+//;s/[[:space:]]+$//'
+  awk '{
+    v = $0
+    sub(/^[ \t]+/, "", v); sub(/[ \t\r]+$/, "", v)
+    q = substr(v, 1, 1)
+    if (q == "\"" || q == "\047") {
+      e = index(substr(v, 2), q)
+      if (e > 0) {
+        rest = substr(v, e + 2)
+        sub(/^[ \t]+/, "", rest)
+        if (rest == "" || substr(rest, 1, 1) == "#") { print substr(v, 2, e - 1); next }
+      }
+    }
+    if (substr(v, 1, 1) == "#") v = ""
+    else if (match(v, /[ \t]#/)) v = substr(v, 1, RSTART - 1)
+    sub(/[ \t]+$/, "", v)
+    gsub(/^["\047]+|["\047]+$/, "", v)
+    print v
+  }'
+}
+
+# The status string the repo's triage table maps a role to (`| `role` | `string` | … |` in
+# .agents/triage-labels.md, legacy docs/agents/), lowercased; the role's own name when the
+# table is missing or does not list it.
+triage_role_string() {
+  local role="$1" candidate labels_file="" value=""
+  for candidate in "${REPO_ROOT:-.}/.agents/triage-labels.md" "${REPO_ROOT:-.}/docs/agents/triage-labels.md"; do
+    if [[ -f "$candidate" ]]; then
+      labels_file="$candidate"
+      break
+    fi
+  done
+  if [[ -n "$labels_file" ]]; then
+    value="$(awk -F'|' -v role="$role" '
+      /^\|/ {
+        key = $2; gsub(/[ \t`]/, "", key)
+        if (tolower(key) != role) next
+        if (match($3, /`[^`]+`/)) { print tolower(substr($3, RSTART + 1, RLENGTH - 2)); exit }
+      }
+    ' "$labels_file" 2>/dev/null | sed -E 's/^[[:space:]]+//;s/[[:space:]]+$//')" || true
+  fi
+  printf '%s' "${value:-$role}"
+}
+
+# The first word of a status, lowercased, without backticks or asterisks: `closed (abc123)`
+# and a legacy `**closed**` both read `closed`, as scratch-state.sh reads them.
+status_word() {
+  printf '%s' "$1" | tr -d '`*' | awk '{ print tolower($1); exit }'
 }
 
 # Reads status/claim from YAML frontmatter (all pipeline files now use it),
@@ -129,10 +176,17 @@ read_work_item_type() {
   [[ -n "$WORK_ITEM_TYPE" ]]
 }
 
+# The tracker's one closed vocabulary (load_closed_vocabulary in scratch-state.sh): closed,
+# done, resolved, wontfix, declined, duplicate, and the repo's own wontfix string. A wontfix
+# ticket is closed, never frontier work.
 work_item_is_closed() {
   local status
-  status="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
-  [[ "$status" == closed* || "$status" == resolved* || "$status" == done* ]]
+  status="$(status_word "$1")"
+  case "$status" in
+    closed|done|resolved|wontfix|declined|duplicate) return 0 ;;
+    "") return 1 ;;
+  esac
+  [[ "$status" == "$(triage_role_string wontfix)" ]]
 }
 
 work_item_is_claimed() {
@@ -146,9 +200,16 @@ work_item_is_human_gate() {
   local mode="$1" status="$2" type="$3" normalized_status normalized_type
   normalized_status="$(printf '%s' "$status" | tr '[:upper:]' '[:lower:]')"
   normalized_type="$(printf '%s' "$type" | tr '[:upper:]' '[:lower:]')"
-  if [[ "$normalized_status" == ready-for-human* || "$normalized_status" == needs-input* ]]; then
-    return 0
-  fi
+  normalized_status="$(status_word "$normalized_status")"
+  case "$normalized_status" in
+    ready-for-human|needs-info) return 0 ;;
+    "") ;;
+    *)
+      if [[ "$normalized_status" == "$(triage_role_string ready-for-human)" || "$normalized_status" == "$(triage_role_string needs-info)" ]]; then
+        return 0
+      fi
+      ;;
+  esac
   [[ "$mode" == "decision" && ("$normalized_type" == "grilling" || "$normalized_type" == "prototype") ]]
 }
 
