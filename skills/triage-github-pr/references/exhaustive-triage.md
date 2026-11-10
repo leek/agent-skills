@@ -8,8 +8,8 @@ exact-head review, merge gates and cleanup.
 ## Wait for optional reviews
 
 Use the [in-flight signals](gh-mechanics.md#in-flight-signals). Spend the remaining
-budget as the main skill's one wait (a `ScheduleWakeup`, or one background command that
-exits when the signals clear or the budget runs out). When the harness has neither,
+budget as the main skill's one wait (a `ScheduleWakeup`, or the background command under
+**Taking the wait** there). When the harness has neither,
 gather the reviews already submitted and continue. Keep progress event-driven as the
 main skill allows.
 

@@ -5,6 +5,9 @@
 #   reviews  [{id, user, state, commit, at, body}]                     at = submitted_at
 #   inline   [{id, user, path, line, commit, at, reply_to, url, thread, resolved, body}]
 #   issue    [{id, user, at, url, body}]                                at = updated_at
+#   disposition {id, url, body} | null   your newest issue comment carrying the
+#            <!-- triage-disposition --> (or older <!-- triage-round: N -->) marker, with or
+#            without --since. null also when `me` is "" (the login lookup failed): not checked.
 # `thread` is the GraphQL id (PRRT_...) that resolveReviewThread takes; null when unmapped.
 #
 # Usage: pr-comments.sh <pr> [--repo OWNER/REPO] [--since <earlier output.json>] [--count]
@@ -12,7 +15,7 @@
 #            whose `at` changed (bots edit summaries in place). Your own items are dropped.
 #   --count  print only {"pr","head","threads_open"}: the re-query before a push or merge.
 # Save a full run to a file as the snapshot (`> <scratch>/pr-<N>-snapshot.json`).
-# Read-only: GET calls and one GraphQL query.
+# Read-only: GET calls and one GraphQL query (review-threads.sh, beside this script).
 # pipefail: every `gh api … | jq -s .` must fail when gh does, or a 403 reads as "no threads".
 set -e
 set -o pipefail
@@ -33,7 +36,6 @@ command -v gh >/dev/null || { echo "gh is required" >&2; exit 1; }
 command -v jq >/dev/null || { echo "jq is required" >&2; exit 1; }
 
 [ -n "$repo" ] || repo=$(gh repo view --json nameWithOwner -q .nameWithOwner)
-owner=${repo%/*}; name=${repo#*/}
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
@@ -42,14 +44,7 @@ echo ">> PR #$pr in $repo" >&2
 gh pr view "$pr" -R "$repo" --json headRefOid -q .headRefOid > "$tmp/head"
 
 # Every thread with all its comment ids, so a reply maps to its thread as well as the root.
-gh api graphql --paginate -F owner="$owner" -F repo="$name" -F pr="$pr" -f query='
-query($owner: String!, $repo: String!, $pr: Int!, $endCursor: String) {
-  repository(owner: $owner, name: $repo) { pullRequest(number: $pr) {
-    reviewThreads(first: 100, after: $endCursor) {
-      pageInfo { hasNextPage endCursor }
-      nodes { id isResolved comments(first: 100) { nodes { databaseId } } } } } } }' \
-  --jq '.data.repository.pullRequest.reviewThreads.nodes[] | {thread: .id, resolved: .isResolved, ids: [.comments.nodes[].databaseId]}' \
-  | jq -s . > "$tmp/threads.json"
+bash "$(dirname "$0")/review-threads.sh" "$repo" "$pr" > "$tmp/threads.json"
 
 if [ "$count" = 1 ]; then
   jq -n --argjson pr "$pr" --arg head "$(cat "$tmp/head")" --slurpfile t "$tmp/threads.json" \
@@ -79,4 +74,7 @@ jq -n --argjson pr "$pr" --arg head "$(cat "$tmp/head")" --arg me "$(cat "$tmp/m
      reviews: ($r[0] | fresh("reviews")),
      inline: ($i[0] | map(. as $x | ([$threads[] | select(.ids | index($x.id))][0]) as $th
                          | $x + {thread: $th.thread, resolved: $th.resolved}) | fresh("inline")),
-     issue: ($c[0] | fresh("issue"))}'
+     issue: ($c[0] | fresh("issue")),
+     disposition: (if $me == "" then null else
+       ([$c[0][] | select(.user == $me and (.body // "" | test("<!-- triage-(disposition|round: [0-9]+) -->")))]
+        | last | if . then {id, url, body} else null end) end)}'

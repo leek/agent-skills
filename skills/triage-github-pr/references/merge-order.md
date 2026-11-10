@@ -76,7 +76,7 @@ from [`stacked-prs.md`](stacked-prs.md#merge-in-order) still needs an answer.
   other chains carry on in plan order.
 - **After a predecessor merges, re-check its dependents** before their own merges:
   a stack PR retargets per [Merge in order](stacked-prs.md#merge-in-order); a declared
-  dependent on the trunk re-reads `mergeable` and `mergeStateStatus`, since the trunk
+  dependent on the trunk re-reads `mergeable` and `merge_state`, since the trunk
   moved under it. `BEHIND` or a conflict goes through
   [Merge gates](gh-mechanics.md#merge-gates) inside that PR's push budget.
 - **Fixes never reorder the plan.** A fix batch on a later PR never merges it ahead of

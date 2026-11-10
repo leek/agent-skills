@@ -3,7 +3,7 @@ name: triage-github-pr
 description: Review and merge a pull request with up to two fix rounds, carrying later findings into a follow-up PR.
 disable-model-invocation: true
 argument-hint: "One or more PR numbers, then optional instructions (\"don't merge\", \"exhaustive\", merge method)"
-allowed-tools: "Bash(gh pr view *) Bash(gh pr diff *) Bash(gh pr checks *) Bash(gh run view *) Bash(gh api repos/{owner}/{repo}/pulls/*) Bash(gh api repos/{owner}/{repo}/issues/*) Bash(gh api --paginate repos/{owner}/{repo}/activity*) Bash(bash *triage-github-pr/scripts/pr-comments.sh *)"
+allowed-tools: "Bash(gh pr view *) Bash(gh pr diff *) Bash(gh pr checks *) Bash(gh run view *) Bash(gh api repos/{owner}/{repo}/pulls/*) Bash(gh api repos/{owner}/{repo}/issues/*) Bash(gh api --paginate repos/{owner}/{repo}/activity*) Bash(bash *triage-github-pr/scripts/pr-comments.sh *) Bash(bash *closeout/scripts/pr-state.sh *) Bash(bash *fix-ci-failures/scripts/failed-jobs.sh *) Bash(bash *run-after/scripts/wait-until.sh * -- bash *closeout/scripts/pr-state.sh * --in-flight*)"
 ---
 
 # Triage GitHub PR
@@ -119,7 +119,7 @@ recorded head sha, plus coverage of the changed invariants' live paths. An expli
 A review is **in flight** while a requested reviewer (bot or human) has not
 submitted, or a bot shows its "running" signal: an 👀 reaction (Codex), a summary
 comment whose status row is not completed, or a review bot's own check run (not CI)
-still pending. The calls are in [In-flight signals](references/gh-mechanics.md#in-flight-signals).
+still pending. The snapshot fields are in [In-flight signals](references/gh-mechanics.md#in-flight-signals).
 
 Record these signals and gather completed reviews. An in-flight optional review gets
 the checkpoint's one wait, as the [shipping budget](#shipping-budget) sets it

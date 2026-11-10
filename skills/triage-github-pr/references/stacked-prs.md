@@ -17,22 +17,21 @@ merges into the trunk last, so the trunk receives the stack once, verified.
 ## Build the stack
 
 ```bash
-gh pr view N --json number,baseRefName,headRefName,headRefOid,isCrossRepository
-gh pr list --head <baseRefName> --state open --json number,headRefName,baseRefName,isCrossRepository   # the PR whose head is that base
-gh repo view --json defaultBranchRef --jq .defaultBranchRef.name
+bash <this-skill-dir>/../closeout/scripts/pr-state.sh N   # base, head, head_sha, cross_repo, stacked_above, repo.default_branch
+gh pr list --head <base> --state open --json number,headRefName,baseRefName,isCrossRepository   # the PR whose head is that base
 ```
 
-Walk down from each named PR: while its `baseRefName` is the head of an open PR with
+Walk down from each named PR: while its `base` is the head of an open PR with
 `isCrossRepository` false, step to that PR. A fork's branch can share the name (a fork
 PR from its own `main`), but a base is always a branch of this repo, so a cross-repo PR
 is never a parent. Stop on the PR whose base is the trunk: the **bottom**. A base that
 is neither the trunk nor an open PR's head normally blocks every PR above it. Before
-stopping, query `gh pr list --head <baseRefName> --state merged` and inspect any
+stopping, query `gh pr list --head <base> --state merged` and inspect any
 same-repository candidate's `headRefOid` and base. If its base is the landing branch and its
 recorded head is an ancestor of the named PR's reviewed head, follow
 [Recover a rewritten parent](#recover-a-rewritten-parent); a closed-unmerged or
 unverifiable parent remains a blocker. Never merge into that old base. Walk up the same way for
-PRs based on a named PR's head (`gh pr list --base <head> --state open`).
+PRs based on a named PR's head (its snapshot's `stacked_above`).
 
 - **An unnamed PR below a named one** gates it: the named PR cannot land before it. Ask
   once, as a merge question, whether to take the whole chain from the bottom; otherwise
@@ -71,17 +70,12 @@ below it, or conflicts. A method the user named in the request (`squash`, `rebas
 does not apply silently to a stack: ask once, as a merge question, whether to merge
 the stack with merge commits or hold it.
 
-Check the repo allows it before the first merge:
-
-```bash
-gh repo view --json mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed,deleteBranchOnMerge
-```
-
-When `mergeCommitAllowed` is false, the stack cannot land through this skill: changing
+Check the repo allows it before the first merge: the snapshot's `repo.merge_methods`
+must hold `merge`. When it does not, the stack cannot land through this skill: changing
 the repo setting and restacking each PR above with a force push are both the user's to
 do. Stop the stack before merging anything, name those two ways forward in the report,
-and continue only after the user says which one they took (re-read
-`mergeCommitAllowed` if they enabled it).
+and continue only after the user says which one they took (run the snapshot again if
+they enabled it).
 
 ## Merge in order
 
@@ -101,7 +95,7 @@ is none), from the bottom up:
    When required checks are pending, `--auto` queues it; the PRs above wait for that
    merge to land, so stop the stack there and report it queued, naming the retarget
    each PR above still needs once it lands (step 3's `gh pr edit`), unless
-   `deleteBranchOnMerge` is true and GitHub retargets them itself.
+   `repo.delete_branch_on_merge` is true and GitHub retargets them itself.
 3. **Retarget** each PR based on its head to the merged PR's base. GitHub does this by
    itself only when the merged head branch is deleted; this skill deletes nothing, so
    retarget explicitly and skip a PR whose base already reads the landing branch. First record
@@ -178,7 +172,9 @@ list. Continue only when that exact head is reviewed and validated; pin it in th
 
 A fix landed on a lower PR conflicts with every PR above it that touches the same lines,
 and each of those then pays a merge, a conflict resolution, a re-test and a re-review.
-So a stack lands first and fixes once, wherever its shape allows.
+So a stack lands first and fixes once, wherever its shape allows. Replies and resolves
+on the stack's PRs go as one `pr-reply.sh` batch per PR
+([Reply and resolve](gh-mechanics.md#reply-and-resolve)).
 
 **Fix on the integration PR** when the stack has one:
 

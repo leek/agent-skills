@@ -2,7 +2,7 @@
 name: resolve-review-comments
 description: Fix or rebut every review comment on a pull request, human or AI-review bot (Codex, Copilot, Gemini), then reply and resolve each thread. Use when the user wants a PR's review comments addressed, answered, or cleared.
 argument-hint: "A PR number or URL (defaults to the PR for the current branch)"
-allowed-tools: "Bash(gh pr view *) Bash(gh pr diff *) Bash(gh pr checks *) Bash(gh api *) Bash(bash *triage-github-pr/scripts/pr-comments.sh *)"
+allowed-tools: "Bash(gh pr view *) Bash(gh pr diff *) Bash(gh pr checks *) Bash(gh api *) Bash(bash *triage-github-pr/scripts/pr-comments.sh *) Bash(bash *triage-github-pr/scripts/pr-reply.sh *) Bash(bash *fix-ci-failures/scripts/failed-jobs.sh *)"
 ---
 
 # Resolve Review Comments
@@ -88,15 +88,13 @@ threads resolve against the pushed state.
 
 ## 6. Reply and resolve every thread
 
-For each thread, post a reply then resolve it (mechanics in the references file):
+Reply to every thread and resolve it, all in one `pr-reply.sh` batch (the call is in the
+references file):
 
 - **fixed** → name the commit and the behaviour now, and the test that pins it (for a
   presentation fix, what `verify` showed).
 - **not a bug** → the one-line evidence from step 3 (cite the spec line, the role/leaf,
   or the existing test).
-
-Keep reply bodies free of apostrophes and backticks so a shell heredoc or `-f body=`
-cannot mangle them; batch the reply+resolve pairs through one script.
 
 Completion criterion: the PR reports **zero unresolved review threads** (re-query to
 confirm), every reply is posted, and `git status` is clean.
@@ -107,8 +105,9 @@ The push triggers CI and fresh bot reviews. Wait for both where the harness can 
 Claude Code: `gh pr checks <n> --watch` as a background Bash command, then
 `ScheduleWakeup` for 5–10 minutes so the bots can re-review); otherwise report the
 pushed sha and tell the user to rerun this skill once CI and the bots finish. After the
-wait, re-query unresolved threads: new threads or a failed check send you back to step
-1. Stop after 3 rounds.
+wait, re-query unresolved threads and read the failed checks (`failed-jobs.sh --pr`, in
+the references file): new threads or a failed job send you back to step 1. Stop after 3
+rounds.
 
 Completion criterion: CI is green and no new thread appeared, the round cap is hit, or
 the user has the rerun instruction. Report the tally: fixed vs rebutted, the commit(s)
