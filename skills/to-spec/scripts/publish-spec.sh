@@ -15,7 +15,7 @@
 #     stays where it is.
 #   - "current": otherwise, on the current branch, staging only .scratch/<slug>.
 #
-# Output: JSON {"where","branch","sha"} (sha "" when nothing changed or ignored)
+# Output: JSON {"where","branch","sha"} (sha "" when nothing changed or ignored). Needs jq.
 
 set -e
 
@@ -33,12 +33,12 @@ while [ $# -gt 0 ]; do
   shift
 done
 [ -n "$msg" ] || { echo "-m <message> is required" >&2; exit 2; }
+command -v jq >/dev/null 2>&1 || { echo "publish-spec.sh needs jq on PATH" >&2; exit 1; }
 
 dir=".scratch/$slug"
 [ -d "$dir" ] || { echo "No $dir in $(pwd)" >&2; exit 2; }
 
-json_str() { printf '"%s"' "$(printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"; }
-out() { echo "{\"where\":\"$1\",\"branch\":$(json_str "$2"),\"sha\":$(json_str "$3")}"; }
+out() { jq -cn --arg where "$1" --arg branch "$2" --arg sha "$3" '{where: $where, branch: $branch, sha: $sha}'; }
 
 if git check-ignore -q .scratch; then
   echo ">> .scratch is ignored here; nothing committed" >&2

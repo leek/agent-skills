@@ -2,14 +2,17 @@
 # Read-only start-of-run facts for implement-spec, so the run does not re-derive them
 # from git by hand. Changes nothing.
 #
-# Usage: spec-run-state.sh <slug> [--default <branch>]
+# Usage: spec-run-state.sh <slug> [--default <branch>] [--default-only]
 #   Run from the main checkout. <slug> is the spec's directory name under .scratch/.
+#   Needs jq.
 #
 # Output: JSON
 #   {"slug", "branch", "mode": "fresh"|"resume", "finished": [branches already landed],
 #    "integration_worktree": path or "", "notes": dir, "base_sha": sha or "",
 #    "decision_sweep_done": true|false, "build_decisions": path or "",
 #    "local_default_scratch_only": true|false, "default"}
+#   With --default-only (what implement's start-branch.sh reads, so the rule lives here
+#   once): only {"default", "local_default_scratch_only"}, with no branch or gh lookup.
 #
 # - branch: <slug> unless it is finished (origin/<default> contains it and it moved past
 #   its recorded base_sha, or its PR merged or closed); then the next unfinished or free
@@ -24,24 +27,39 @@
 set -e
 
 slug=${1:-}
-[ -n "$slug" ] || { echo "Usage: spec-run-state.sh <slug> [--default <branch>]" >&2; exit 2; }
+[ -n "$slug" ] || { echo "Usage: spec-run-state.sh <slug> [--default <branch>] [--default-only]" >&2; exit 2; }
 shift
 default=""
+default_only=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --default) [ -n "${2:-}" ] || { echo "--default needs a branch" >&2; exit 2; }; default=$2; shift ;;
+    --default-only) default_only=1 ;;
     *) echo "Unknown arg: $1" >&2; exit 2 ;;
   esac
   shift
 done
+command -v jq >/dev/null 2>&1 || { echo "spec-run-state.sh needs jq on PATH" >&2; exit 1; }
 if [ -z "$default" ]; then
   default=$(git symbolic-ref --short -q refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||') || true
   [ -n "$default" ] || default=main
 fi
 
-json_str() { printf '"%s"' "$(printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"; }
 bool() { [ "$1" = 1 ] && echo true || echo false; }
 has_branch() { git rev-parse --verify -q "refs/heads/$1" >/dev/null; }
+
+scratch_only=0
+if git rev-parse --verify -q "refs/heads/$default" >/dev/null && git rev-parse --verify -q "refs/remotes/origin/$default" >/dev/null; then
+  ahead=$(git rev-list --count "origin/$default..refs/heads/$default")
+  other=$(git log --format=%h "origin/$default..refs/heads/$default" -- . ":!.scratch/$slug")
+  [ "$ahead" != 0 ] && [ -z "$other" ] && scratch_only=1
+fi
+
+if [ "$default_only" = 1 ]; then
+  jq -cn --arg default "$default" --argjson scratch_only "$(bool $scratch_only)" \
+    '{default: $default, local_default_scratch_only: $scratch_only}'
+  exit 0
+fi
 
 common=$(git rev-parse --path-format=absolute --git-common-dir)
 
@@ -58,13 +76,13 @@ is_finished() {  # is_finished <branch>
   gh pr list --head "$1" --state all --json state --jq '.[].state' 2>/dev/null | grep -qE '^(MERGED|CLOSED)$'
 }
 
-finished=()
+finished='[]'
 branch=$slug
 mode=fresh
 n=1
 while has_branch "$branch"; do
   if is_finished "$branch"; then
-    finished+=("$(json_str "$branch")")
+    finished=$(jq -cn --argjson f "$finished" --arg b "$branch" '$f + [$b]')
     n=$((n + 1)); branch="$slug-$n"
   else
     mode=resume; break
@@ -97,11 +115,9 @@ for f in .scratch/"$slug"/decisions/*.md; do
   break
 done
 
-scratch_only=0
-if git rev-parse --verify -q "refs/heads/$default" >/dev/null && git rev-parse --verify -q "refs/remotes/origin/$default" >/dev/null; then
-  ahead=$(git rev-list --count "origin/$default..$default")
-  other=$(git log --format=%h "origin/$default..$default" -- . ":!.scratch/$slug")
-  [ "$ahead" != 0 ] && [ -z "$other" ] && scratch_only=1
-fi
-
-(IFS=,; echo "{\"slug\":$(json_str "$slug"),\"branch\":$(json_str "$branch"),\"mode\":\"$mode\",\"finished\":[${finished[*]}],\"integration_worktree\":$(json_str "$wt"),\"notes\":$(json_str "$notes"),\"base_sha\":$(json_str "$base"),\"decision_sweep_done\":$(bool $sweep),\"build_decisions\":$(json_str "$bd"),\"local_default_scratch_only\":$(bool $scratch_only),\"default\":$(json_str "$default")}")
+jq -cn --arg slug "$slug" --arg branch "$branch" --arg mode "$mode" --argjson finished "$finished" \
+  --arg wt "$wt" --arg notes "$notes" --arg base "$base" --argjson sweep "$(bool $sweep)" \
+  --arg bd "$bd" --argjson scratch_only "$(bool $scratch_only)" --arg default "$default" \
+  '{slug: $slug, branch: $branch, mode: $mode, finished: $finished, integration_worktree: $wt,
+    notes: $notes, base_sha: $base, decision_sweep_done: $sweep, build_decisions: $bd,
+    local_default_scratch_only: $scratch_only, default: $default}'
