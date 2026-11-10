@@ -43,9 +43,9 @@ Any other area is a **product area** (`billing`, `scheduling`). Confirm by searc
 
 1. Read `AGENTS.md` / `CLAUDE.md`, the rule files they point to, and `.agents/domain.md` when it exists. A repo's list of usually-false review claims also rejects candidates.
 2. `git fetch origin`. Resolve the default branch. Every PR targets `origin/<default>`.
-3. Save the ledger of known work to a scratch file. `<scratch>` is the session scratchpad where the harness has one, otherwise `$TMPDIR`:
+3. Save the ledger of known work to a scratch file. `<scratch>` is the session scratchpad where the harness has one, otherwise `$TMPDIR`; `<this-skill-dir>` is this skill's directory:
    ```bash
-   bash <sweep-skill-dir>/scripts/known-work.sh > <scratch>/known-work.json
+   bash <this-skill-dir>/scripts/known-work.sh > <scratch>/known-work.json
    ```
    It holds every open PR, every PR merged in the last 30 days (`--days N` to widen), every PR closed unmerged in the last year, the taken `sweep*` branch names, and earlier sweep findings files. It is large, so query it. Do not read it whole:
    ```bash

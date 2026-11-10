@@ -57,10 +57,10 @@ Without those tools, show the same tabs as numbered lists in chat, and take the 
 
 ## Inventory Commands
 
-One read-only script covers steps 1–3's git and GitHub state as one JSON object: working tree, stashes with their files, remotes, stale remote-tracking refs, worktrees (locked, prunable, dirty), local branches (upstream, gone upstream, last commit, merged into origin's default branch), and open and last 30 closed PRs:
+One read-only script covers steps 1–3's git and GitHub state as one JSON object: working tree, stashes with their files, remotes, stale remote-tracking refs, worktrees (locked, prunable, dirty), local branches (upstream, gone upstream, last commit, merged into origin's default branch), and open and last 30 closed PRs (`<this-skill-dir>` is this skill's directory):
 
 ```bash
-bash scripts/inventory.sh    # fetches first, never pruning; `--graph 80` adds the recent `git log --all --graph`, when commit topology matters
+bash <this-skill-dir>/scripts/inventory.sh    # fetches first, never pruning; `--graph 80` adds the recent `git log --all --graph`, when commit topology matters
 ```
 
 Its fetch is `--no-prune --no-prune-tags` even when the user's config sets `fetch.prune` or `fetch.pruneTags`: a pruning fetch deletes stale remote-tracking refs and local-only tags (an `archive/*` tag made to preserve work) that nobody selected. Never fetch with pruning yourself; `stale_remote_refs` lists those refs as candidates instead. Dig into one item with plain git (`git stash show -p stash@{N}`, `git log <base>..<branch>`). When `prs` is `null` (`gh` unavailable, or the repository is not on GitHub), use the equivalent provider CLI, web UI, or local Git evidence and report the PR visibility gap.
@@ -68,19 +68,19 @@ Its fetch is `--no-prune --no-prune-tags` even when the user's config sets `fetc
 Worktrees whose PR merged, and the databases left behind, come from one script. With no arguments it changes nothing and prints the candidates as JSON. It removes only the names you pass, after the user selected them, and it refuses the whole run, changing nothing, if one name is not a candidate:
 
 ```bash
-bash scripts/prune-merged-worktrees.sh    # list: merged clean worktrees, their databases, orphans
-bash scripts/prune-merged-worktrees.sh --remove <worktree path> --drop pgsql:<database>   # selected items only
+bash <this-skill-dir>/scripts/prune-merged-worktrees.sh    # list: merged clean worktrees, their databases, orphans
+bash <this-skill-dir>/scripts/prune-merged-worktrees.sh --remove <worktree path> --drop pgsql:<database>   # selected items only
 ```
 
 A worktree's database can be dropped only in the same run that removes that worktree. Never pass a name the user did not select, and never build the arguments from the whole list.
 
 ## Databases
 
-When the `databases` list of `scripts/prune-merged-worktrees.sh` is not empty, read [Database candidates](references/mechanics.md#database-candidates) first: where these databases come from, what the list holds, and what each `source` means. Classify each listed database by its name: a PR number, branch, worktree, or date that maps to merged or removed work is **abandoned**; a name that reads as a deliberate copy (`_backup`, `_snapshot`, `_pre_migration`) or maps to nothing is **uncertain**. Show the list grouped that way, with sizes, in the step 7 selection, and drop only the selected names, through the script's `--drop`. Each drop is irreversible: offer a `pg_dump`/`mysqldump` first for anything uncertain.
+When the `databases` list of `prune-merged-worktrees.sh` is not empty, read [Database candidates](references/mechanics.md#database-candidates) first: where these databases come from, what the list holds, and what each `source` means. Classify each listed database by its name: a PR number, branch, worktree, or date that maps to merged or removed work is **abandoned**; a name that reads as a deliberate copy (`_backup`, `_snapshot`, `_pre_migration`) or maps to nothing is **uncertain**. Show the list grouped that way, with sizes, in the step 7 selection, and drop only the selected names, through the script's `--drop`. Each drop is irreversible: offer a `pg_dump`/`mysqldump` first for anything uncertain.
 
 ## PR screenshots
 
-The `pr` skill uploads PR screenshots to the orphan `pr-assets` branch, one folder per PR branch, and nothing else ever removes them: every clone downloads the whole branch. One script lists the folders whose PR merged or closed more than 90 days ago (`--days N` to change it), or, with no PR found, whose last upload is that old. An open PR's folder is never a candidate. With no arguments it changes nothing: `bash scripts/prune-pr-assets.sh` prints the plan (tip, candidates, kept, with sizes).
+The `pr` skill uploads PR screenshots to the orphan `pr-assets` branch, one folder per PR branch, and nothing else ever removes them: every clone downloads the whole branch. One script lists the folders whose PR merged or closed more than 90 days ago (`--days N` to change it), or, with no PR found, whose last upload is that old. An open PR's folder is never a candidate. With no arguments it changes nothing: `bash <this-skill-dir>/scripts/prune-pr-assets.sh` prints the plan (tip, candidates, kept, with sizes).
 
 Offer the candidates as one `Remote` option, with their count, total size and folder names, and `cannot recover` in its description: dropping rewrites `pr-assets` as a fresh orphan commit with a force push, leased on the plan's tip, so those images leave every future clone. When the plan has a candidate, read [Dropping pr-assets folders](references/mechanics.md#dropping-pr-assets-folders) before you offer it: the drop command, for the selected folders only, which image links keep working, and a tip that moved since the plan.
 

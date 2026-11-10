@@ -5,8 +5,7 @@
 # Run it from the main checkout (or the checkout `git branch -d` should check against).
 #
 # It never drops a database a calling skill created: it prints those still registered
-# for the worktree, so the caller drops each (and its <database>_test_<N> copies) with the
-# repo's client, then runs `scratch-db.sh unregister <database>` after each success.
+# for the worktree, so the caller runs `scratch-db.sh drop <database>` for each.
 # A database Herd created (`--database=clone|empty`) Herd drops itself; this script
 # unregisters it.
 #
@@ -18,6 +17,7 @@
 
 set -e
 
+command -v jq >/dev/null 2>&1 || { echo "jq is required" >&2; exit 1; }
 here=$(cd "$(dirname "$0")" && pwd)
 wt=${1:-}
 branch=""
@@ -31,7 +31,6 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-json_str() { printf '"%s"' "$(printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"; }
 bool() { [ "$1" = 1 ] && echo true || echo false; }
 
 [ -d "$wt" ] || { echo "No such worktree: $wt" >&2; exit 2; }
@@ -41,7 +40,8 @@ removed=0; reason=""; branch_deleted=0; branch_reason=""; herd_failed=null
 
 # What git will refuse is checked before Herd is touched, so a refusal leaves everything
 # in place: a locked worktree, or the main checkout, never loses its site or database.
-wt_state=$(git worktree list --porcelain | awk -v w="$wt" '
+wt_state=$(git worktree list --porcelain | W="$wt" awk '
+  BEGIN { w = ENVIRON["W"] }   # not -v, which would rewrite a backslash in the path
   /^worktree / { n++; p = substr($0, 10) }
   p == w && n == 1 { main = 1 }
   p == w && /^locked/ { locked = 1 }
@@ -74,7 +74,7 @@ else
       case "$mode" in clone|empty) [ -n "$hdb" ] && bash "$here/scratch-db.sh" unregister "$hdb" ;; esac
     else
       echo ">> herd workspace:delete failed for $site" >&2
-      herd_failed="{\"database_mode\":$(json_str "$mode"),\"database_name\":$(json_str "$hdb")}"
+      herd_failed=$(jq -n -c --arg m "$mode" --arg d "$hdb" '{database_mode: $m, database_name: $d}')
     fi
   fi
   if git worktree remove "$wt" >&2; then
@@ -108,4 +108,8 @@ if [ -n "$branch" ]; then
 fi
 
 if [ "$removed" = 1 ]; then dbs=$(bash "$here/scratch-db.sh" list "$wt"); else dbs="[]"; fi
-echo "{\"path\":$(json_str "$wt"),\"removed\":$(bool $removed),\"reason\":$(json_str "$reason"),\"branch\":$(json_str "$branch"),\"branch_deleted\":$(bool $branch_deleted),\"branch_reason\":$(json_str "$branch_reason"),\"herd_unserve_failed\":$herd_failed,\"databases\":$dbs}"
+jq -n -c --arg path "$wt" --argjson removed "$(bool $removed)" --arg reason "$reason" --arg branch "$branch" \
+  --argjson branch_deleted "$(bool $branch_deleted)" --arg branch_reason "$branch_reason" \
+  --argjson herd_unserve_failed "$herd_failed" --argjson databases "$dbs" \
+  '{path: $path, removed: $removed, reason: $reason, branch: $branch, branch_deleted: $branch_deleted,
+    branch_reason: $branch_reason, herd_unserve_failed: $herd_unserve_failed, databases: $databases}'

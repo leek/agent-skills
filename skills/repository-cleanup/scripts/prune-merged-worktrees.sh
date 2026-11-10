@@ -53,6 +53,10 @@ while [ $# -gt 0 ]; do
   shift
 done
 
+command -v jq >/dev/null 2>&1 || { echo "jq is required" >&2; exit 1; }
+lib="$(cd "$(dirname "$0")" && pwd)/../../laravel-herd-worktrees/scripts/scratch-db-lib.sh"
+[ -f "$lib" ] || { echo "Missing $lib: install the laravel-herd-worktrees skill beside this one" >&2; exit 1; }
+
 main=$(git worktree list --porcelain | awk '/^worktree /{ print substr($0, 10); exit }')
 common=$(git rev-parse --path-format=absolute --git-common-dir)
 registry="$common/scratch-databases"
@@ -62,67 +66,20 @@ kept=()
 wt_cands=()   # path<TAB>branch
 db_cands=()   # connection<TAB>database<TAB>worktree<TAB>source<TAB>size<TAB>host<TAB>port<TAB>user<TAB>pass
 
-json_str() { printf '"%s"' "$(printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"; }
-join() { local IFS=,; echo "$*"; }
-keep() { kept+=("{\"path\":$(json_str "$1"),\"reason\":$(json_str "$2")}"); }
+# One compact JSON value per array element, built by jq; jarr joins them into one array.
+jarr() { if [ $# -eq 0 ]; then echo '[]'; else printf '%s\n' "$@" | jq -s -c .; fi; }
+keep() { kept+=("$(jq -n -c --arg p "$1" --arg r "$2" '{path: $p, reason: $r}')"); }
 
 # --- databases ------------------------------------------------------------------
 
-env_get() {  # env_get <file> <KEY>: value with surrounding quotes stripped
-  [ -f "$1" ] || return 0
-  grep -E "^$2=" "$1" | tail -n 1 | cut -d= -f2- | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'$/\1/"
-}
-
-env_dbs() {  # env_dbs <dir>: the DB_DATABASE of its .env and .env.testing
-  local f
-  for f in "$1/.env" "$1/.env.testing"; do env_get "$f" DB_DATABASE; done
-}
+# env_get, env_dbs, db_protected_set, is_protected, creds_for, is_local, sql, server_dbs and
+# drop_database: the rules for what may be dropped, and the DROP, shared with scratch-db.sh.
+# shellcheck source-path=SCRIPTDIR source=../../laravel-herd-worktrees/scripts/scratch-db-lib.sh
+. "$lib"
+trap 'rm -f "$registry.tmp"' EXIT
 
 # Databases nothing may drop: the main checkout's, then each worktree's under its path.
-protected=$( {
-  env_dbs "$main" | sed 's/^/MAIN\t/'
-  for f in "$main/phpunit.xml" "$main/phpunit.xml.dist"; do
-    [ -f "$f" ] && sed -n 's/.*name="DB_DATABASE"[^>]*value="\([^"]*\)".*/MAIN\t\1/p' "$f"
-  done
-  git worktree list --porcelain | awk '/^worktree /{ print substr($0, 10) }' | while read -r w; do
-    [ "$w" = "$main" ] || env_dbs "$w" | sed "s|^|$w\t|"
-  done
-} | awk -F'\t' '$2 != ""' )
-
-is_protected() {  # is_protected <db> <worktree being removed>: named, or a parallel-testing copy of one
-  printf '%s\n' "$protected" | awk -F'\t' -v d="$1" -v w="$2" '$1 != w && (d == $2 || d ~ ("^" $2 "_test_[0-9]+$")) { f = 1 } END { exit !f }'
-}
-
-# Credentials for a connection: the first of these env files that uses it.
-creds_for() {  # creds_for <connection> <env files...>; sets host port user pass
-  local conn=$1 f; shift
-  host=127.0.0.1; port=""; user=root; pass=""
-  for f in "$@"; do
-    [ "$(env_get "$f" DB_CONNECTION)" = "$conn" ] || continue
-    host=$(env_get "$f" DB_HOST); port=$(env_get "$f" DB_PORT)
-    user=$(env_get "$f" DB_USERNAME); pass=$(env_get "$f" DB_PASSWORD)
-    break
-  done
-  [ -n "$host" ] || host=127.0.0.1
-  [ -n "$user" ] || user=root
-  [ -n "$port" ] || { [ "$conn" = pgsql ] && port=5432 || port=3306; }
-}
-
-is_local() { case "$host" in 127.0.0.1|localhost|::1) return 0 ;; esac; return 1; }
-
-sql() {  # sql <connection> <statement>; uses host port user pass
-  case "$1" in
-    pgsql) PGPASSWORD="$pass" psql -h "$host" -p "$port" -U "$user" -d postgres -Atqc "$2" ;;
-    mysql) MYSQL_PWD="$pass" mysql -h "$host" -P "$port" -u "$user" -N -B -e "$2" ;;
-  esac
-}
-
-server_dbs() {  # server_dbs <connection>: "name size" per line; uses host port user pass
-  case "$1" in
-    pgsql) sql pgsql "SELECT datname || ' ' || pg_size_pretty(pg_database_size(datname)) FROM pg_database WHERE NOT datistemplate" ;;
-    mysql) sql mysql "SELECT schema_name, '-' FROM information_schema.schemata" | tr '\t' ' ' ;;
-  esac
-}
+protected=$(db_protected_set)
 
 is_db_cand() {  # is_db_cand <connection> <db>
   local c
@@ -255,19 +212,21 @@ if [ ${#remove_args[@]} -eq 0 ] && [ ${#drop_args[@]} -eq 0 ]; then
     p=$(printf '%s' "$w" | cut -f1); b=$(printf '%s' "$w" | cut -f2)
     names=()
     for c in ${db_cands[@]+"${db_cands[@]}"}; do
-      [ "$(printf '%s' "$c" | cut -f3)" = "$p" ] && names+=("$(json_str "$(printf '%s' "$c" | cut -f2)")")
+      [ "$(printf '%s' "$c" | cut -f3)" = "$p" ] && names+=("$(jq -n -c --arg d "$(printf '%s' "$c" | cut -f2)" '$d')")
     done
-    wt_json+=("{\"path\":$(json_str "$p"),\"branch\":$(json_str "$b"),\"databases\":[$(join ${names[@]+"${names[@]}"})]}")
+    wt_json+=("$(jq -n -c --arg p "$p" --arg b "$b" --argjson dbs "$(jarr ${names[@]+"${names[@]}"})" '{path: $p, branch: $b, databases: $dbs}')")
     echo ">> candidate worktree $p ($b)" >&2
   done
   db_json=()
   for c in ${db_cands[@]+"${db_cands[@]}"}; do
     IFS=$'\t' read -r conn d w src size _ <<< "$c"
-    db_json+=("{\"connection\":$(json_str "$conn"),\"database\":$(json_str "$d"),\"size\":$(json_str "$size"),\"source\":$(json_str "$src"),\"worktree\":$(json_str "$w")}")
+    db_json+=("$(jq -n -c --arg c "$conn" --arg d "$d" --arg s "$size" --arg src "$src" --arg w "$w" \
+      '{connection: $c, database: $d, size: $s, source: $src, worktree: $w}')")
     echo ">> candidate $conn database $d ($size, $src)" >&2
   done
   echo ">> Nothing changed. Remove only what a human selects: --remove <path> / --drop <connection>:<database>" >&2
-  echo "{\"worktrees\":[$(join ${wt_json[@]+"${wt_json[@]}"})],\"databases\":[$(join ${db_json[@]+"${db_json[@]}"})],\"kept\":[$(join ${kept[@]+"${kept[@]}"})]}"
+  jq -n -c --argjson w "$(jarr ${wt_json[@]+"${wt_json[@]}"})" --argjson d "$(jarr ${db_json[@]+"${db_json[@]}"})" \
+    --argjson k "$(jarr ${kept[@]+"${kept[@]}"})" '{worktrees: $w, databases: $d, kept: $k}'
   exit 0
 fi
 
@@ -313,7 +272,7 @@ dropped=()
 failed_wts=()
 for p in ${remove_args[@]+"${remove_args[@]}"}; do
   if git -C "$main" worktree remove "$p" >&2; then
-    echo ">> removed $p" >&2; removed+=("$(json_str "$p")")
+    echo ">> removed $p" >&2; removed+=("$(jq -n -c --arg p "$p" '$p')")
   else
     keep "$p" "git worktree remove refused"; failed_wts+=("$p")
   fi
@@ -330,14 +289,12 @@ fi
 for c in ${selected_dbs[@]+"${selected_dbs[@]}"}; do
   IFS=$'\t' read -r conn d w src size host port user pass <<< "$c"
   if in_list "$w" ${failed_wts[@]+"${failed_wts[@]}"}; then keep "$d" "its worktree was not removed"; continue; fi
-  if case "$conn" in pgsql) sql pgsql "DROP DATABASE IF EXISTS \"$d\"" ;; mysql) sql mysql "DROP DATABASE IF EXISTS \`$d\`" ;; esac; then
-    echo ">> dropped $conn database $d" >&2; dropped+=("$(json_str "$d")")
-    if [ -f "$registry" ]; then
-      awk -F'\t' -v d="$d" '$3 != d' "$registry" > "$registry.tmp" && mv "$registry.tmp" "$registry"
-    fi
+  if drop_database "$conn" "$d" >&2; then   # the DROP, then its registry lines
+    echo ">> dropped $conn database $d" >&2; dropped+=("$(jq -n -c --arg d "$d" '$d')")
   else
     keep "$d" "drop failed (open connections?)"
   fi
 done
 
-echo "{\"removed\":[$(join ${removed[@]+"${removed[@]}"})],\"dropped\":[$(join ${dropped[@]+"${dropped[@]}"})],\"kept\":[$(join ${kept[@]+"${kept[@]}"})]}"
+jq -n -c --argjson r "$(jarr ${removed[@]+"${removed[@]}"})" --argjson d "$(jarr ${dropped[@]+"${dropped[@]}"})" \
+  --argjson k "$(jarr ${kept[@]+"${kept[@]}"})" '{removed: $r, dropped: $d, kept: $k}'

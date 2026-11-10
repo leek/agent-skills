@@ -35,16 +35,16 @@ A worktree made with plain `git worktree add` (the PR, issue, and CI recipes in 
 
 ## Remove a served worktree
 
-From the main checkout (or, for `implement-spec`, the integration checkout `git branch -d` checks against), run [`scripts/remove-worktree.sh`](scripts/remove-worktree.sh) `<path>`, adding `--branch <name>` when the run's branch goes too. It works in the safe order and prints one JSON line:
+From the main checkout (or, for `implement-spec`, the integration checkout `git branch -d` checks against), run `bash <this-skill-dir>/scripts/remove-worktree.sh <path>` (`<this-skill-dir>` is this skill's directory), adding `--branch <name>` when the run's branch goes too. It works in the safe order and prints one JSON line:
 
 1. **Clean check.** A worktree with any `git status --porcelain` output stays, with its branch and databases: `removed: false` and the reason. The calling skill's rule for a refused removal applies.
 2. **Unserve.** When Herd's own `herd workspaces --all --json` serves this exact path, `herd workspace:delete --force --keep-files -- <site>` with that site (never a site read from the checkout, which a branch could plant) (Herd's `--force` only skips a prompt; `--keep-files` leaves the checkout for git). Herd drops a database it created (`clone` or `empty`), and the script unregisters it.
 3. **Remove.** `git worktree remove <path>`, never with `--force`. When git refuses, everything stays; visiting its URL serves it again.
 4. **Branch.** `git branch -d <name>` only after a removal; a refusal keeps the branch, named in `branch_reason`. Git's `-D` hint is not a go-ahead.
 
-`databases` lists what is still registered for that path once it is removed (`[]` when kept, since a kept worktree keeps its databases): the calling skill's own databases. Wait for the script's JSON before dropping anything (if your harness backgrounds a slow command, read its output first): a drop issued earlier runs before git decides, and an unregister issued earlier empties the list. Drop each, and its parallel-testing copies (`<database>_test_<N>`), with the repo's client (`DROP DATABASE IF EXISTS`; a SQLite file goes with the checkout), then unregister each one only after its drop succeeded. A failed drop keeps its registry line and is reported.
+`databases` lists what is still registered for that path once it is removed (`[]` when kept, since a kept worktree keeps its databases): the calling skill's own databases. Wait for the script's JSON before dropping anything (if your harness backgrounds a slow command, read its output first): a drop issued earlier runs before git decides, and an unregister issued earlier empties the list. Then run `bash <this-skill-dir>/scripts/scratch-db.sh drop <database>` for each: it drops the database and its parallel-testing copies (`<database>_test_<N>`), unregisters what it dropped, and prints `{"dropped":[names],"kept":[{"database","reason"}]}`, exiting 1 when the named database was kept. It keeps a name that is not registered, one a checkout still uses, and one on a host that is not local. Report every `kept` entry: it stays registered. A SQLite database is a file that goes with the checkout; delete one outside it, then `unregister` it.
 
-When `herd_unserve_failed` is set (the Herd app is not running) and its `database_mode` is `clone` or `empty` on a server driver, drop its `database_name` yourself and unregister it.
+When `herd_unserve_failed` is set (the Herd app is not running) and its `database_mode` is `clone` or `empty` on a server driver, its `database_name` is still registered: drop it the same way.
 
 **What is left.** A calling skill removes without asking what it created whose work has landed, and lists each removal. It asks once only about the rest it created (a worktree git refused, unmerged or queued work): a structured question ([harness-tools](../harness-tools/SKILL.md)) with `multiSelect: true`, one option per item naming its worktree, branch, and databases, nothing pre-ticked, at most 4 per question and further questions for the rest; otherwise one yes/no question in chat: "Can I delete these too?". It removes only what the answer selects, by the steps above; on no, nothing. It skips the question when nothing is left, and names everything kept in its report for `repository-cleanup`.
 
@@ -54,7 +54,8 @@ Every skill that creates a worktree or a throwaway database registers each datab
 
 ```bash
 bash <this-skill-dir>/scripts/scratch-db.sh register <pgsql|mysql|sqlite> <database> <worktree path, or ->   # the moment it is created
-bash <this-skill-dir>/scripts/scratch-db.sh unregister <database>                                           # only after a successful drop
+bash <this-skill-dir>/scripts/scratch-db.sh drop <database>                                                 # destructive: DROP it and its _test_<N> copies, then unregister them
+bash <this-skill-dir>/scripts/scratch-db.sh unregister <database>                                           # registry only: after deleting a SQLite file yourself
 bash <this-skill-dir>/scripts/scratch-db.sh list [<worktree path>]                                          # JSON
 ```
 

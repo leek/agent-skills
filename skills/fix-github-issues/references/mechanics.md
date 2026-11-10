@@ -1,7 +1,7 @@
 # Git and GitHub mechanics for fixing issues
 
 `<default>` is the default branch, `<run>` is `date +%Y%m%d-%H%M` taken once per run,
-and `N` is an issue number.
+`N` is an issue number, and `<this-skill-dir>` is the fix-github-issues skill's directory.
 
 ## List the working set
 
@@ -39,7 +39,7 @@ its own (a worktree `.env`, a throwaway test database), name it `<app db>_issues
 never a name the main checkout's `.env`, `.env.testing`, or `phpunit.xml` uses, and
 register it the moment you create it, per `laravel-herd-worktrees`'
 [Scratch database registry](../../laravel-herd-worktrees/SKILL.md#scratch-database-registry)
-(`scratch-db.sh register <pgsql|mysql> <database> <worktree path, or ->`).
+(`bash <this-skill-dir>/../laravel-herd-worktrees/scripts/scratch-db.sh register <pgsql|mysql> <database> <worktree path, or ->`).
 
 ## Land
 
@@ -75,7 +75,6 @@ gh issue view N --json state
 
 At step 6, for each item it removes: from the main checkout, remove
 `.claude/worktrees/issues-<run>` by `laravel-herd-worktrees`' **Remove a served worktree**
-(`remove-worktree.sh`; it never forces, and a refusal means unsaved work, so report it).
-Then drop each database it lists, plus any this run registered with `-` (no worktree), and their parallel-testing copies (`<database>_test_<N>`)
-with the repo's client (`DROP DATABASE IF EXISTS`), and `scratch-db.sh unregister` each
-one after its drop succeeds.
+(`bash <this-skill-dir>/../laravel-herd-worktrees/scripts/remove-worktree.sh <worktree>`; it never forces, and a refusal means unsaved work, so report it).
+Then run `bash <this-skill-dir>/../laravel-herd-worktrees/scripts/scratch-db.sh drop <database>` for each database its `databases` lists, plus any this run registered with `-` (no worktree).
+It drops the database and its parallel-testing copies, unregisters them, and prints `{"dropped":[names],"kept":[{"database","reason"}]}`: report each `kept` entry.
