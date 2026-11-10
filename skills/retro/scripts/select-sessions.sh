@@ -62,15 +62,28 @@ if want claude; then
       id=$(basename "$f" .jsonl)
       kids=$(find "${f%.jsonl}/subagents" -name 'agent-*.jsonl' 2>/dev/null | jq -R . | jq -sc . || echo '[]')
       jq -c --arg path "$f" --arg id "$id" --argjson kids "${kids:-[]}" -n '
+        # The first prompt is the first thing the human sent: plain text, the text beside an
+        # attached image (array content), or a slash command with its arguments. Skill
+        # bodies, image placeholders and session commands (/clear and the like) are not it.
+        def utext: .message.content as $c
+          | if ($c|type)=="string" then $c
+            elif ($c|type)=="array" then ($c | map(select(type=="object" and .type=="text") | .text) | join(" "))
+            else "" end;
+        def prompt: utext as $t
+          | if ($t|test("<command-name>")) then
+              ($t|capture("<command-name>(?<n>[^<]*)</command-name>").n) as $n
+              | if ($n|test("^/(clear|compact|resume|model|config|fast|exit)$")) then empty
+                else $n + " " + (($t|capture("<command-args>(?<a>[\\s\\S]*?)</command-args>")? // {a:""}).a) end
+            elif ($t=="" or ($t|startswith("<")) or ($t|startswith("Base directory for this skill")) or ($t|startswith("[Image"))) then empty
+            else $t end;
         [inputs | select(.type=="user" or .type=="assistant")] as $ev
-        | ($ev | map(select(.type=="user" and (.message.content|type=="string")
-              and ((.message.content|startswith("<"))|not))) | first // null) as $p
+        | ([$ev[] | select(.type=="user") | prompt] | first // "") as $p
         | if ($ev|length)==0 then empty else
           {harness:"claude", id:$id, path:$path, timestamp:($ev|map(.timestamp//empty)|last),
-           children:$kids, first_prompt:(($p.message.content // "")[0:200]),
+           children:$kids, first_prompt:($p[0:200]),
            hint:(if ($ev|map(.entrypoint//empty)|first) as $e | ($e=="sdk-cli" or $e=="sdk-py") then "headless (\($ev|map(.entrypoint//empty)|first))"
-                 elif (($p.message.content // "")|test("^You are one panelist")) then "panelist brief"
-                 elif (($p.message.content // "")|test("^Another Claude session sent a message:")) then "relayed teammate message"
+                 elif ($p|test("^You are one panelist")) then "panelist brief"
+                 elif ($p|test("^Another Claude session sent a message:")) then "relayed teammate message"
                  else null end),
            clue:(if ($path|test("/-private-tmp-")) then "cwd under /private/tmp" else null end)} end' "$f" 2>/dev/null >> "$cands" || echo "$f" >> "$unreadable"
     done

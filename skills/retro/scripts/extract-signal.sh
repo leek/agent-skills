@@ -76,9 +76,10 @@ case "$f" in
       def tail: if length > $max then .[-$max:] else . end;
       # Codex code-mode results open with "Script completed" or "Script failed"; the rest is
       # the script output, which often holds the word "error" without anything failing. A
-      # completed script still failed when a command inside it exited non-zero.
+      # completed script still failed when a command inside it exited non-zero. Exit 1 with
+      # no output is a search that matched nothing (rg, grep), not a failure.
       def codex_failed: (.output | if type=="array" then (.[0].text // "") else tostring end) as $head
-        | if ($head|startswith("Script completed") or startswith("Script running")) then (.output|txt|test("\"exit_code\": ?[1-9]"))
+        | if ($head|startswith("Script completed") or startswith("Script running")) then (.output|txt|test("\"exit_code\": ?(?!0[,}])(?!1, ?\"original_token_count\": ?0,)[0-9]"))
           elif ($head|startswith("Script failed")) then true
           else (.output|tostring|test($errs; "i")) end;
       input_line_number as $n
