@@ -53,7 +53,7 @@ class GuardReviewAgentsTest(unittest.TestCase):
         self.assertAllowed("gh api graphql -f query='\nquery {\n  viewer { login }\n}'")
         self.assertAllowed("sort -u -k2 notes.txt | uniq -c")
         self.assertAllowed("git log --oneline --name-only -5 | grep -c 'a#b'")
-        self.assertAllowed("rg -n 'x' app/Foo#Bar.php")
+        self.assertAllowed("rg -n 'x' 'app/Foo#Bar.php'")
 
     def test_substitution_inside_double_quotes_is_blocked(self):
         self.assertBlocked('echo "$(rm -rf x)"', "command substitution")
@@ -195,7 +195,16 @@ class GuardReviewAgentsTest(unittest.TestCase):
         self.assertBlocked("cat notes{1..3}.txt", "brace expansion")
         self.assertAllowed("rg -n foo app -g '*.php'")
         self.assertAllowed("find app -name '*.php' -o -name \"-de*\"")
-        self.assertAllowed("git log --oneline HEAD@{1}..HEAD@{0}")
+        self.assertAllowed("git log --oneline 'HEAD@{1}..HEAD@{0}' HEAD@{1}")
+        self.assertBlocked("sort {-o,o{u}t.txt} notes.txt", "brace expansion")
+        self.assertBlocked("sort {-o,'x'} notes.txt", "brace expansion")
+        self.assertBlocked("git log HEAD@{1}..HEAD@{0}", "brace expansion")
+        # zsh extended glob: ^x is every file but x, and x~y and x# are patterns too.
+        self.assertBlocked("cat ^notes.txt", "unquoted glob")
+        self.assertBlocked("find . -delete~x", "unquoted glob")
+        self.assertBlocked("rg -n x app/Foo#Bar.php", "unquoted glob")
+        self.assertBlocked("git show HEAD~3", "unquoted glob")
+        self.assertAllowed("git show 'HEAD~3' 'HEAD^' ~/notes.txt")
         self.assertAllowed("rg -n 'a{1,3}' app")
         self.assertAllowed("gh api 'repos/{owner}/{repo}/pulls?per_page=5'")
 

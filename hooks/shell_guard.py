@@ -38,9 +38,6 @@ class Word(str):
     unquoted: str = ""
 
 
-BRACE_EXPANSION = re.compile(r"\{[^{}]*(,|\.\.)[^{}]*\}")
-
-
 def check_expansion(word: "Word") -> None:
     """Refuse a word the shell would expand into arguments this guard never sees.
 
@@ -48,12 +45,18 @@ def check_expansion(word: "Word") -> None:
     can become a file named `-delete` or `-oout`, `a*` can become two files where a check
     counted one argument, and `{-o,out}` becomes `-o out`. So every unquoted glob is refused;
     a quoted one (`-g '*.php'`, `-name '*.php'`) reaches the command as written.
+
+    Braces nest (`{-o,o{u}t}`), so no pattern is matched: any unquoted `{` with an unquoted
+    `,` or `..` in the same word is refused. `^`, `#` and a `~` after the first character are
+    zsh extended-glob operators (`^x` is every file but x), so they are refused too, which
+    means a revision such as `HEAD~3` or `HEAD^` must be quoted.
     """
     live = word.unquoted
-    if BRACE_EXPANSION.search(live):
-        raise Blocked("brace expansion is not allowed; write the arguments out")
-    if any(c in live for c in "*?["):
-        raise Blocked("an unquoted glob is not allowed; quote it, or name the files")
+    if "{" in live and ("," in live or ".." in live):
+        raise Blocked("brace expansion is not allowed; write the arguments out, or quote the word")
+    if any(c in live for c in "*?[^#") or "~" in live[1:]:
+        raise Blocked("an unquoted glob character (* ? [ ^ # ~) is not allowed; quote the word, "
+                      "as in 'HEAD~3' or -g '*.php'")
 
 
 OPERATOR_CHARS = set("();<>|&")
