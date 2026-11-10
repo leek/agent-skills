@@ -23,7 +23,13 @@ GIT_READ = {"log", "show", "diff", "ls-files", "ls-tree", "blame", "grep", "rev-
             "describe", "name-rev", "for-each-ref", "fetch"}
 GH_READ = {("pr", "view"), ("pr", "diff"), ("pr", "checks"), ("pr", "list"),
            ("issue", "view"), ("issue", "list"), ("run", "view"), ("repo", "view")}
-GH_FIELDS = {"-f", "-F", "--field", "--raw-field"}
+# `gh api` flags, by long name. Every flag must be one of these: an unknown flag is refused,
+# because a flag this guard takes for a boolean could swallow `-X GET` as its value.
+GH_API_VALUE = {"--cache", "--header", "--hostname", "--jq", "--method", "--preview",
+                "--raw-field", "--field", "--template"}
+GH_API_BOOL = {"--include", "--paginate", "--silent", "--slurp", "--verbose"}
+GH_API_SHORT = {"H": "--header", "q": "--jq", "X": "--method", "p": "--preview",
+                "f": "--raw-field", "F": "--field", "t": "--template", "i": "--include"}
 
 
 def check_git(args: list[str]) -> None:
@@ -38,52 +44,103 @@ def check_git(args: list[str]) -> None:
     for a in args[1:]:
         if long_option_in(a, ("--output", "--upload-pack", "--ext-diff", "--exec")):
             raise Blocked(f"`git {args[0]} {a}` writes files or runs a program")
+    if args[0] == "fetch":
+        # The first positional is the remote; any later one is a refspec, and `src:dst`
+        # writes a local ref (`git fetch origin pull/1/head:main`).
+        positional = [a for a in args[1:] if not a.startswith("-")]
+        if any(":" in a for a in positional[1:]):
+            raise Blocked("`git fetch <remote> <src>:<dst>` writes a local ref; fetch without a destination")
+
+
+def parse_gh_api(rest: list[str]) -> tuple[list[tuple[str, str]], list[str]]:
+    """Split `gh api` arguments into (long flag, value) pairs and positionals, the way pflag does.
+
+    pflag takes a value attached to its flag (`-XDELETE`, `-X=DELETE`, `-fa=b`, `--field=a=b`)
+    as well as in the next argument, and clusters short booleans (`-iXDELETE`).
+    """
+    flags: list[tuple[str, str]] = []
+    positional: list[str] = []
+    i = 0
+
+    def value_after(name: str) -> str:
+        nonlocal i
+        i += 1
+        if i >= len(rest):
+            raise Blocked(f"`gh api {name}` needs a value")
+        return rest[i]
+
+    while i < len(rest):
+        a = rest[i]
+        if a == "--":
+            positional.extend(rest[i + 1:])
+            break
+        if a.startswith("--"):
+            name, eq, attached = a.partition("=")
+            if name == "--input":
+                raise Blocked("`gh api --input` sends a request body")
+            if name in GH_API_BOOL:
+                flags.append((name, attached))
+            elif name in GH_API_VALUE:
+                flags.append((name, attached if eq else value_after(name)))
+            else:
+                raise Blocked(f"`gh api {name}` is not a flag this guard knows")
+        elif a.startswith("-") and len(a) > 1:
+            j = 1
+            while j < len(a):
+                name = GH_API_SHORT.get(a[j])
+                if name is None:
+                    raise Blocked(f"`gh api -{a[j]}` is not a flag this guard knows")
+                if name in GH_API_BOOL:
+                    flags.append((name, ""))
+                    j += 1
+                    continue
+                attached = a[j + 1:]
+                flags.append((name, attached[1:] if attached.startswith("=") else attached)
+                             if attached else (name, value_after(a[:1] + a[j])))
+                break
+        else:
+            positional.append(a)
+        i += 1
+    return flags, positional
 
 
 def check_gh(args: list[str]) -> None:
     if tuple(args[:2]) in GH_READ:
-        if "--web" in args or "-w" in args:
+        if any(long_option_in(a, ("--web",)) or (a.startswith("-") and not a.startswith("--") and "w" in a)
+               for a in args[2:]):
             raise Blocked("`--web` opens a browser")
         return
     if args[:1] != ["api"]:
         raise Blocked(f"`gh {' '.join(args[:2])}` is not a read-only gh command")
-    rest = args[1:]
-    method, fields, i = "GET", [], 0
-    while i < len(rest):
-        a = rest[i]
-        if a in ("-X", "--method"):
-            method = rest[i + 1].upper() if i + 1 < len(rest) else ""
-            i += 2
-            continue
-        if a.startswith("--method="):
-            method = a.split("=", 1)[1].upper()
-        elif a in GH_FIELDS:
-            fields.append(rest[i + 1] if i + 1 < len(rest) else "")
-            i += 2
-            continue
-        elif a.startswith("--input"):
-            raise Blocked("`gh api --input` sends a request body")
-        i += 1
-    if method != "GET":
-        raise Blocked(f"`gh api` with method {method} is not read-only")
-    if rest[:1] == ["graphql"]:
-        if any("mutation" in f.lower() for f in fields):
-            raise Blocked("GraphQL mutations are not read-only")
+    flags, positional = parse_gh_api(args[1:])
+    methods = [v.upper() for name, v in flags if name == "--method"]
+    fields = [(name, v) for name, v in flags if name in ("--field", "--raw-field")]
+    if any(m != "GET" for m in methods):
+        raise Blocked(f"`gh api` with method {next(m for m in methods if m != 'GET')} is not read-only")
+    if positional[:1] == ["graphql"]:
+        for name, v in fields:
+            if "mutation" in v.lower():
+                raise Blocked("GraphQL mutations are not read-only")
+            if name == "--field" and v.partition("=")[2].startswith("@"):
+                raise Blocked("`gh api graphql -F key=@file` reads the query from a file this guard cannot check")
         return
-    if fields and "-X" not in rest and "--method" not in rest and not any(
-            a.startswith("--method=") for a in rest):
+    if fields and not methods:
         raise Blocked("`gh api` with -f/-F sends a POST; add `-X GET` for a read")
 
 
 def check_rg(args: list[str]) -> None:
-    if any(a.startswith("--pre") for a in args):
-        raise Blocked("`rg --pre` runs a program")
+    for flag in ("--pre", "--hostname-bin"):
+        if any(a.startswith(flag) for a in args):
+            raise Blocked(f"`rg {flag}` runs a program")
 
 
 def check_find(args: list[str]) -> None:
     bad = {"-exec", "-execdir", "-ok", "-okdir", "-delete", "-fprint", "-fprint0", "-fprintf", "-fls"}
     if bad.intersection(args):
         raise Blocked("`find` with -exec, -delete, or -fprint is not read-only")
+    # An unquoted glob that starts with `-` can expand to a file named `-delete`.
+    if any(a.startswith("-") and any(c in a for c in "*?[") for a in args):
+        raise Blocked("`find` primaries cannot contain glob characters")
 
 
 SED_PRINT = re.compile(r"(\d+|\$)(,(\d+|\$))?p")

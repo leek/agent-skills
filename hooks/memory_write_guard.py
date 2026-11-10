@@ -14,7 +14,8 @@ import os
 import sys
 
 MEMORY_ONLY = {"deepening-scout", "dependency-auditor", "finding-verifier",
-               "session-miner", "standards-reviewer"}
+               "release-notes-collector", "session-miner", "standards-reviewer",
+               "upgrade-impact-scout"}
 PATH_KEYS = ("file_path", "path", "target_file")
 
 

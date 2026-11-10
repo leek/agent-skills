@@ -33,6 +33,19 @@ class MemoryWriteGuardTest(unittest.TestCase):
         self.assertEqual(self.run_guard("/repo/app/Foo.php", agent=None), 0)
         self.assertEqual(self.run_guard("/repo/app/Foo.php", agent="leek-skills:researcher"), 0)
 
+    def test_every_memory_agent_is_guarded_or_a_named_writer(self):
+        # `memory:` gives an agent Write and Edit even when its `tools:` line has neither.
+        # `researcher` writes its findings file, so it is the one agent left unguarded.
+        writers = {"researcher"}
+        guard_source = GUARD.read_text()
+        for agent in sorted(GUARD.parent.parent.glob("agents/*.md")):
+            frontmatter = agent.read_text().split("---")[1]
+            if "\nmemory:" in frontmatter and agent.stem not in writers:
+                self.assertIn(f'"{agent.stem}"', guard_source,
+                              f"{agent.stem} has memory: but is not in MEMORY_ONLY")
+        self.assertEqual(self.run_guard("/repo/app/Foo.php", agent="leek-skills:upgrade-impact-scout"), 2)
+        self.assertEqual(self.run_guard("/repo/app/Foo.php", agent="leek-skills:release-notes-collector"), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

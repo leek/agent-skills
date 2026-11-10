@@ -134,6 +134,43 @@ class GuardReviewAgentsTest(unittest.TestCase):
             "gh api graphql -f query='mutation { resolveReviewThread(input:{threadId:\"x\"}) { thread { id } } }'",
             "mutations")
 
+    def test_gh_attached_flag_values_are_parsed(self):
+        self.assertAllowed("gh api -XGET search/code -fq=Foo -fper_page=1")
+        self.assertAllowed("gh api --method=GET search/code --raw-field=q=Foo")
+        self.assertAllowed("gh api -i repos/{owner}/{repo}/pulls/12 -q .title -H 'Accept: application/json'")
+        self.assertAllowed("gh api graphql -fquery='query { viewer { login } }' -F number=12")
+        self.assertBlocked("gh api -XDELETE repos/{owner}/{repo}/issues/comments/1", "method DELETE")
+        self.assertBlocked("gh api -X=DELETE repos/{owner}/{repo}/issues/comments/1", "method DELETE")
+        self.assertBlocked("gh api -iXPOST repos/{owner}/{repo}/issues", "method POST")
+        self.assertBlocked("gh api -X GET -X DELETE repos/{owner}/{repo}/issues/comments/1", "method DELETE")
+        self.assertBlocked("gh api repos/{owner}/{repo}/issues -ftitle=x", "sends a POST")
+        self.assertBlocked("gh api repos/{owner}/{repo}/issues --field=title=x", "sends a POST")
+        self.assertBlocked("gh api repos/{owner}/{repo}/issues --raw-field=title=x", "sends a POST")
+        self.assertBlocked("gh api graphql -fquery='mutation { x }'", "mutations")
+        self.assertBlocked("gh api graphql --field=query='mutation { x }'", "mutations")
+        self.assertBlocked("gh api graphql -F query=@payload.graphql", "from a file")
+        # A value flag swallows the next argument, so `-X GET` here is the jq filter, not a method.
+        self.assertBlocked("gh api -q -X GET repos/{owner}/{repo}/issues -f title=x", "sends a POST")
+        self.assertBlocked("gh api --input body.json repos/{owner}/{repo}/issues", "request body")
+        self.assertBlocked("gh api --unknown-flag repos/{owner}/{repo}", "not a flag this guard knows")
+        self.assertBlocked("gh pr view 12 --web=true", "opens a browser")
+
+    def test_program_and_ref_writing_flags_are_blocked(self):
+        self.assertAllowed("git fetch origin main")
+        self.assertAllowed("git fetch https://github.com/o/r.git pull/12/head")
+        self.assertBlocked("git fetch origin +refs/pull/1/head:refs/heads/main", "writes a local ref")
+        self.assertBlocked("rg --hostname-bin ./evil.sh --hyperlink-format 'file://{host}{path}' foo",
+                           "runs a program")
+        self.assertBlocked("find . -de*", "glob characters")
+
+    def test_a_crashing_guard_blocks(self):
+        payload = {"tool_name": "Bash", "tool_input": {"command": ["not", "a", "string"]},
+                   "agent_type": "leek-skills:pr-reviewer"}
+        result = subprocess.run([sys.executable, str(DISPATCHER)], input=json.dumps(payload),
+                                text=True, capture_output=True)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("guard failed", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

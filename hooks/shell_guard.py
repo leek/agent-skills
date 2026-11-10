@@ -233,13 +233,18 @@ def dispatch(payload: dict) -> int:
         return 0
     hooks_dir = Path(__file__).resolve().parent
     if agent in REVIEW_GUARDED:
-        mod = _load_module("guard_review_agents", hooks_dir / "guard-review-agents.py")
-        return mod.run_payload(payload)
-    if agent in BROWSER_GUARDED:
-        browser_guard = hooks_dir.parent / "skills" / "browser-test" / "scripts" / "guard-browser.py"
-        mod = _load_module("guard_browser", browser_guard)
-        return mod.run_payload(payload)
-    return 0
+        guard = hooks_dir / "guard-review-agents.py"
+    elif agent in BROWSER_GUARDED:
+        guard = hooks_dir.parent / "skills" / "browser-test" / "scripts" / "guard-browser.py"
+    else:
+        return 0
+    try:
+        return _load_module(guard.stem.replace("-", "_"), guard).run_payload(payload)
+    except Exception as error:  # noqa: BLE001
+        # Only exit 2 blocks a tool call, so a guard that crashes must not let the command run.
+        print(f"BLOCKED: the {agent} guard failed ({type(error).__name__}: {error}). "
+              "You are read-only; report what you could not do.", file=sys.stderr)
+        return 2
 
 
 def main() -> int:
