@@ -12,6 +12,15 @@ gh issue list --label <label> --state open --limit 500 --json number,title,creat
 
 If the list holds exactly as many issues as the limit, raise the limit and list again.
 
+An empty list is not yet an empty queue. Before reporting that nothing is open, check the label and the unfiltered count:
+
+```bash
+gh label list --search <label>
+gh issue list --state open --limit 50 --json number,title,labels
+```
+
+When open issues exist but none carries the label (the label is missing here, or the repo names it differently), tell the user the open count and the labels in use, and ask which to work.
+
 ## Branch or worktree
 
 Every run works in a worktree. Record the main checkout, then leave it there, clean tree included:
