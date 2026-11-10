@@ -45,19 +45,29 @@ def check_expansion(word: "Word") -> None:
     """Refuse a word the shell would expand into arguments this guard never sees.
 
     The checks below read the word as typed, but the shell expands it first: `-de*` or `*`
-    can become a file named `-delete` or `-oout`, and `{-o,out}` becomes `-o out`. A glob is
-    safe only behind a literal prefix that does not start with `-` (`app/*.php`, `./*`).
+    can become a file named `-delete` or `-oout`, `a*` can become two files where a check
+    counted one argument, and `{-o,out}` becomes `-o out`. So every unquoted glob is refused;
+    a quoted one (`-g '*.php'`, `-name '*.php'`) reaches the command as written.
     """
     live = word.unquoted
     if BRACE_EXPANSION.search(live):
         raise Blocked("brace expansion is not allowed; write the arguments out")
-    first = next((i for i, c in enumerate(live) if c in "*?["), -1)
-    if first >= 0 and (first == 0 or word.startswith("-")):
-        raise Blocked("an unquoted glob that can expand to a name starting with `-` is not allowed; "
-                      "quote it, or start it with `./`")
+    if any(c in live for c in "*?["):
+        raise Blocked("an unquoted glob is not allowed; quote it, or name the files")
 
 
 OPERATOR_CHARS = set("();<>|&")
+# What makes `$` an expansion in bash or zsh: a name, a special parameter, or `{`.
+PARAMETER_START = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_{@*#?$!-")
+
+
+# `${X:--o}` is `-o` when X is unset, and "$X" is whatever the environment holds: either way
+# the command gets an argument the checks never read.
+PARAMETER_REASON = "parameter expansion ($VAR, ${VAR}) is not allowed; write the value, or single-quote a literal $"
+
+
+def is_parameter(command: str, at: int) -> bool:
+    return command[at] == "$" and at + 1 < len(command) and command[at + 1] in PARAMETER_START
 SEPARATORS = {"&&", "||", ";", "|"}
 
 
@@ -120,6 +130,8 @@ def tokenize(command: str) -> list[str]:
                 # escaped or not, since zsh's (e) flag can re-evaluate an escaped one.
                 if d == "`" or command.startswith(("$(", "$[", "${("), j):
                     raise Blocked("command substitution is not allowed")
+                if is_parameter(command, j):
+                    raise Blocked(PARAMETER_REASON)
                 if d == "\\" and j + 1 < n and command[j + 1] in '"\\$`\n':
                     if command[j + 1] != "\n":
                         quoted(command[j + 1])
@@ -134,6 +146,8 @@ def tokenize(command: str) -> list[str]:
             if command.startswith("$'", i):
                 raise Blocked("$'…' quoting is not allowed")
             raise Blocked("command substitution is not allowed")
+        if is_parameter(command, i):
+            raise Blocked(PARAMETER_REASON)
         if c == "\n":
             raise Blocked("multi-line commands are not allowed")
         if c in " \t":
