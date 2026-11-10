@@ -17,7 +17,7 @@ Treat the current directory as a teaching workspace. Workspace paths (`./lessons
 - `./learning-records/*.md`: A directory of learning records, which capture what the user has learned. These are loosely equivalent to architectural decision records in software development - they capture non-obvious lessons and key insights that may need to be revised later, or drive future sessions. These should be used to calculate the zone of proximal development. They are titled `0001-<dash-case-name>.md`, where the number increments each time. Use the format in [LEARNING-RECORD-FORMAT.md](./LEARNING-RECORD-FORMAT.md).
 - `./lessons/*.html`: A directory of lessons. A **lesson** is a single, self-contained HTML output that teaches one tightly-scoped thing tied to the mission. This is the primary unit of teaching in this workspace.
 - `./assets/*`: Reusable **components** shared across lessons. See [Assets](#assets).
-- `NOTES.md`: A scratchpad for you to jot down user preferences, or working notes.
+- `NOTES.md`: A scratchpad for you to jot down user preferences, or working notes. The user will sometimes express preferences of how they want to be taught, or things you should keep in mind. This is the place to record those preferences, so you can refer back to them when designing lessons or working with the user.
 
 ## Philosophy
 
@@ -69,8 +69,6 @@ Reuse is the default, not the exception. Before authoring a lesson, read `./asse
 A shared stylesheet is the first component every workspace earns: every lesson links it, so the lessons look like one consistent course rather than a pile of one-offs. As the workspace grows, so should the component library.
 
 ## The Mission
-
-Every lesson should be tied into the mission - the reason that the user is interested in learning about the topic.
 
 If the user is unclear about the mission, or the `MISSION.md` is not populated, your first job should be to question the user on why they want to learn this.
 
@@ -126,16 +124,6 @@ While creating lessons, you should also create reference documents. Lessons can 
 
 Lessons will rarely be revisited later - reference documents will be. They should be the compressed essence of the lesson, in a format designed for quick reference.
 
-Some learning topics lend themselves to reference:
-
-- Syntax and code snippets for programming
-- Algorithms and flowcharts for processes
-- Yoga poses and sequences for yoga
-- Exercises and routines for fitness
-- Glossaries for any topic with its own nomenclature
+Some learning topics lend themselves to reference: syntax and code snippets for programming, algorithms and flowcharts for processes, yoga poses and sequences for yoga, exercises and routines for fitness, glossaries for any topic with its own nomenclature.
 
 Glossaries, in particular, are an essential reference. Once one is created, it should be adhered to in every lesson.
-
-## `NOTES.md`
-
-The user will sometimes express preferences of how they want to be taught, or things you should keep in mind. This is the place to record those preferences, so you can refer back to them when designing lessons or working with the user.

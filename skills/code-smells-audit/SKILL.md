@@ -32,22 +32,9 @@ Always exclude dependencies and generated code: `vendor/`, `node_modules/`,
 lock files, build output, and anything the repo's `.gitignore` ignores. Audit
 source, not artifacts.
 
-For a whole-repo sweep, fan out sub-agents by codebase size:
-
-- **Small** (≲100 source files): run the lens passes yourself, sequentially.
-- **Medium** (≲1,000): one sub-agent per occurrence lens, each sweeping the
-  whole target in parallel.
-- **Large**: partition by top-level module or directory, one sub-agent per
-  partition running all lens passes; merge candidate lists before verifying.
-
-Each sub-agent gets the target list, this workflow's sweep instructions, and
-the index section(s) for the lens or lenses it will sweep, nothing more: pass the
-absolute path of [references/index.md](references/index.md) and the lens heading(s)
-to read, so you never load the whole index yourself to dispatch. In Claude
-Code with this plugin installed, dispatch `subagent_type=leek-skills:smell-sweeper`
-(read-only, no project CLAUDE.md, a cheaper model); in other harnesses, dispatch and wait per
-[harness-tools](../harness-tools/SKILL.md), read-only where offered, on the cheapest model the harness lets you pick: the sweep is recall
-only, and verification runs here on the main model.
+For a whole-repo sweep, fan out sub-agents by codebase size: read
+[references/whole-repo-sweep.md](references/whole-repo-sweep.md) before step 2 for
+the size tiers (the smallest sweeps inline) and the sub-agent dispatch.
 
 ### 2. Sweep: one detection pass per occurrence lens
 
@@ -122,22 +109,10 @@ Every finding carries all of:
 - **Obstruction**: the card's obstruction tag
 - **Suggested refactorings**: from the card
 
-Report skeleton:
-
-```markdown
-# Code Smells Audit: <scope>, <date>
-
-Target: <resolved target> · Lenses swept: <n> · Candidates: <n> · Dropped in
-verify: <n> · Findings: <n>
-
-## 1. <Smell Name>: `path/to/file.php:12-84`
-
-- **Severity/leverage**: <rank rationale, one line>
-- **Why it qualifies**: <citation of the card definition + how the code meets it>
-- **Obstruction**: <tag>
-- **Suggested refactorings**: <names from the card>
-- **Card**: references/smells/<slug>.md (in the code-smells-audit skill)
-```
+Report skeleton: [references/audit-file-skeleton.md](references/audit-file-skeleton.md).
+Read it before writing the file, on every run: a header line of counts (target,
+lenses swept, candidates, dropped in verify, findings), then one numbered section
+per finding with its severity/leverage line and its card path.
 
 After writing the file, summarize the top findings in the session and point at
 the artifact. Slicing findings into tickets is out of scope, hand the report
@@ -145,12 +120,6 @@ to the user (or `/to-tickets`) instead.
 
 ## Reference material
 
-- [references/index.md](references/index.md), all 56 smells grouped under the
-  9 occurrence lenses, one line each; detection passes dispatch from here and
-  load full cards only for candidate matches
-- `references/smells/<slug>.md`: one card per smell: taxonomy line,
-  definition, detection heuristics (agnostic + PHP/Laravel + TS/React),
-  example, refactorings, typed related-smell links, aliases
 - [references/refactoring-names.md](references/refactoring-names.md), the
   canonical refactoring vocabulary and the normalization map from upstream's
   103 raw names

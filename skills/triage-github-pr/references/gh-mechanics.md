@@ -49,6 +49,13 @@ This lists CI too. Only a review bot's own check counts as a review in flight; i
 the rest for that purpose. These signals use the main skill's recorded optional-wait
 budget, not an unlimited merge gate. Required human approvals are checked separately.
 
+**Taking the wait.** Each checkpoint spends that budget as one wait: a
+`ScheduleWakeup` where the harness offers it for this run, otherwise one background
+command that exits when the in-flight signals clear or the checkpoint's budget runs
+out (in Claude Code, Bash with `run_in_background`; the harness wakes you when it
+exits). A harness with neither records zero and continues with the reviews already
+submitted.
+
 Verified bot behaviour (2026-10):
 
 - **Both bots review every push.** A new run may start after the push. Resolve completed
@@ -67,6 +74,12 @@ Each failed check on the head is a finding. Mark it LEGIT only when the error po
 code this PR changed and the error reproduces at the head. Flaky tests, infra errors,
 and failures that also happen on the base are not caused by the PR, so mark them
 AUTO-DISMISS.
+
+CI gets **one** fix pass per triage. Include finished failures from the initial
+snapshot in batch 1. If that CI pass is unused, a newly verified BLOCKING or MAJOR
+failure can join bounded batch 2; after the fix budget, classify and carry new
+failures. An actual branch-protection refusal remains a blocker. Exhaustive mode can
+use its one CI fix pass within its round budget.
 
 ## Merge gates
 
@@ -136,6 +149,14 @@ At step 7, once the PR shows merged, `cd` back to the main checkout and remove
 `.claude/worktrees/pr-N` by `laravel-herd-worktrees`' **Remove a served worktree**
 (`remove-worktree.sh`; it never forces, and a refusal means unsaved work, so report it).
 A stopped or `--auto`-queued PR keeps its worktree unless the user selects it at step 7.
+
+## A test failing outside your fix
+
+A test failing outside your fix runs on the starting SHA first: with your work
+committed, `git switch --detach <starting sha>` in the same worktree, run that one test,
+then switch back to your tip. Failing there too, it is a finding against the PR, not a
+defect of your fix to debug: write its step 4 line and publish it now. It joins this
+batch when the shipping budget makes it eligible; otherwise it is carried.
 
 ## Reply and resolve
 
@@ -272,6 +293,11 @@ head movement is a reported concurrency blocker, not another fix round. For othe
 merge failures, inspect the refusal, perform one applicable correction within the
 budget, then report any remaining gate rather than repeating indefinitely.
 
+**Concurrent head changes.** An external head change gets one refreshed
+review/checkpoint attempt, shared across push refusals and the pinned merge. A second
+concurrent head movement or push refusal stops the run with concurrent changes
+reported; it does not restart the batch or snapshot.
+
 Never pass `--delete-branch`, and never delete a branch by any other route
 (`git push --delete`, `gh api -X DELETE .../git/refs/...`). A branch deleted outside a
 merge closes every open PR that uses it as its base. When the repo has "automatically
@@ -284,3 +310,13 @@ repo setting yourself.
 If the merge is refused only because required checks are still pending, re-run it with
 `--auto` (keeping `--match-head-commit`) so GitHub lands it when they pass, and report
 it as queued: `autoMergeRequest` is set. Do not wait.
+
+## Follow-up PR
+
+After the merge, gather the comment surfaces once more for findings that have arrived;
+do not wait for another bot run. Classify new claims, then branch from the merged
+base, fix all verified carried findings, and open a follow-up PR linking the merged PR
+and each finding. Review and validate its fixes before opening it. Report the link;
+leave it open and triage it only when the user names it. If the original is stopped or
+auto-merge queued, record carried findings and the pending follow-up instead of
+branching from an unmerged base.

@@ -58,8 +58,7 @@ Completion criterion: every finding in the working set has a line, and the secon
 ## 3. Fix the legit ones
 
 Work on a new branch `fix/issues-<run>` from `origin/<default>`, always in a worktree
-([Branch or worktree](references/mechanics.md#branch-or-worktree)). The main checkout
-stays on the branch the run found it on, including when that tree is clean.
+([Branch or worktree](references/mechanics.md#branch-or-worktree)).
 
 Per LEGIT finding: make the minimal change, with no drive-by refactors. Prove it per the
 `tdd` skill's [What needs a test](../tdd/SKILL.md#what-needs-a-test-and-what-proves-the-rest): a test for
@@ -88,8 +87,7 @@ user instruction in the input or the conversation ("open a PR", "keep them local
 overrides both. The commands are in [Land](references/mechanics.md#land).
 
 Once they are landed, the main checkout is still the branch recorded at the start
-([The checkout stays](references/mechanics.md#the-checkout-stays)). The fix branch
-stays in its worktree. Do the same check if the run stops early.
+([The checkout stays](references/mechanics.md#the-checkout-stays)). Do the same check if the run stops early.
 
 Completion criterion: the commits are on `<default>`, in an open pull request, or kept
 local by the user's instruction, and `git branch --show-current` in the main checkout
@@ -127,7 +125,6 @@ without asking; a refused worktree, and one whose fixes are in an open pull requ
 kept local, go into the one question. What stays stays registered, for `repository-cleanup`.
 
 Completion criterion: everything removable is removed, any question is answered, or you
-created nothing. Report the tally:
-fixed, stale, auto-dismiss, hallucination, and blocked. Name each fix not yet on
-`<default>`, and each worktree or database kept. Mark the blocked count and each kept
-item ⚠️; no other marks.
+created nothing. Report the tally: fixed, stale, auto-dismiss, hallucination, and blocked.
+Name each fix not yet on `<default>`, and each worktree or database kept. Mark the blocked
+count and each kept item ⚠️; no other marks.

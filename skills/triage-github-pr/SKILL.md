@@ -43,21 +43,17 @@ fix at a checkpoint, merge there rather than spending the unused budget.
 Test failures and defects found while independently reviewing unpushed fixes are
 corrected in the same batch before its push. Optional bot waits share a **20-minute
 total budget per PR**, at most **10 minutes per checkpoint**, before the initial
-snapshot and after batch 1. Each checkpoint spends that budget as one wait: a
-`ScheduleWakeup` where the harness offers it for this run, otherwise one background
-command that exits when the in-flight signals clear or the checkpoint's budget runs
-out (in Claude Code, Bash with `run_in_background`; the harness wakes you when it
-exits). A harness with neither records zero and continues with the reviews already
-submitted. Never a foreground shell sleep, and never watch CI. After batch 2, gather
-once with no wait. A timeout means proceed with available reviews, not request another
-review or reset the timer.
+snapshot and after batch 1. Each checkpoint spends that budget as one wait; when a
+review is in flight there, take it by **Taking the wait** in
+[In-flight signals](references/gh-mechanics.md#in-flight-signals). Never a foreground
+shell sleep, and never watch CI. After batch 2, gather once with no wait. A timeout
+means proceed with available reviews, not request another review or reset the timer.
 
 Record the starting SHA, snapshot, batch number and state (`not needed`, `fixing`,
 or `validated at <sha>`), and total/per-checkpoint optional wait used in the disposition.
 Resume that checkpoint after an interruption; resuming does not reset either budget.
-Count historical pushes from [GitHub activity](references/gh-mechanics.md#count-rounds)
-for the report and reconcile recorded batch SHAs against it. A pending push already
-belongs to its recorded batch; do not mistake its resume for a fresh batch.
+A pending push already belongs to its recorded batch; do not mistake its resume for a
+fresh batch.
 Each push you trigger, including a base-branch update, consumes a batch; combine
 needed updates with its fixes rather than creating an extra push outside the budget.
 A stack's landings into its integration PR are the one exception: see
@@ -66,8 +62,7 @@ A stack's landings into its integration PR are the one exception: see
 **Exhaustive is opt-in.** Only an explicit request such as "exhaustive" or "keep
 iterating until reviews are clean" enables
 [exhaustive review rounds](references/exhaustive-triage.md), capped at five pushes
-after the PR opened. A bare PR number or "all open PRs" uses bounded delivery for
-each named PR.
+after the PR opened.
 
 **Merge now overrides waiting.** On "merge it now; move new findings to another PR",
 finish the exact-head review and required local checks, re-check the hard merge gates,
@@ -79,13 +74,9 @@ A carried finding keeps its grade, is replied to with `<severity>, carried to a
 follow-up PR`, resolved, and listed in the disposition comment. A required human
 review or unresolved owner decision cannot be disposed of by carrying it.
 
-**Follow-up PR.** After the merge, gather the comment surfaces once more for findings
-that have arrived; do not wait for another bot run. Classify new claims, then branch
-from the merged base, fix all verified carried findings, and open a follow-up PR
-linking the merged PR and each finding. Review and validate its fixes before opening
-it. Report the link; leave it open and triage it only when the user names it. If the
-original is stopped or auto-merge queued, record carried findings and the pending
-follow-up instead of branching from an unmerged base.
+**Follow-up PR.** Once the PR is merged, stopped, or queued with `--auto`, handle the
+findings that arrived and the carried ones by
+[Follow-up PR](references/gh-mechanics.md#follow-up-pr).
 
 **Progress.** Report decisions and state changes: review started, findings verified,
 fixes pushed, a blocker, merge, follow-up. Prefer a native task/status surface for
@@ -182,21 +173,15 @@ Your own findings go through the same verification. The shipping budget determin
 which verified findings belong to the current batch and which are carried.
 
 **Publish dispositions now.** As each claim is verified, put its verdict and delivery
-state in the disposition comment and reply to its inline thread. Dismissed claims
-and owner-decided claims are resolved immediately. Eligible current-batch LEGIT findings say
-`verified; fixing in current batch` and stay open until their fix is validated and
-committed. Findings outside the fix budget say `carried to a follow-up PR` and are resolved now.
-QUESTIONs say which decision is pending and stay open. Publish this before starting
-code changes, rather than leaving all findings unexplained until the batch ends.
+state in the disposition comment and reply to its inline thread, with the reply and the
+resolve-or-leave-open that [Reply and resolve](references/gh-mechanics.md#reply-and-resolve)
+gives for its state, at once. Publish this before starting code changes, rather than
+leaving all findings unexplained until the batch ends.
 
 **CI failures.** Read only checks that have finished on the PR head; a running check is
 not a finding, and you never wait for one. Each failed check is a finding, judged by
-[CI failures](references/gh-mechanics.md#ci-failures). CI gets **one** fix pass per
-triage. Include finished failures from the initial snapshot in batch 1. If that CI
-pass is unused, a newly verified BLOCKING or MAJOR failure can join bounded batch 2;
-after the fix budget, classify and carry new failures. An actual branch-protection
-refusal remains a blocker. Exhaustive mode can use its one CI fix pass within its
-round budget. Never watch or re-run CI.
+[CI failures](references/gh-mechanics.md#ci-failures), which also says which batch may
+fix it: CI gets **one** fix pass per triage. Never watch or re-run CI.
 
 **Open questions.** A finding is QUESTION when its fix, or its dismissal, needs a
 decision only the user can make: the kinds in the `grilling` skill's **What still
@@ -205,20 +190,10 @@ reviewer's question that only the author's intent can answer is a QUESTION too. 
 every finding whose fix would reverse a decision the PR made (**Never reverse a
 decision without asking**, at the top); the ladder never settles those. Never guess an answer, and never merge past one.
 
-When step 4 ends with any QUESTION, ping the user first (`PushNotification` where
-available), because the run is often unattended. Then call the Skill tool with
-`grilling` and pass every QUESTION for this PR: the finding, its link, and what each
-answer would change. `grilling` asks one question at a time, frames the situation
-first, and leads with a recommendation. Without the Skill tool, follow
-`skills/grilling/SKILL.md` inline. Each answer turns its finding into LEGIT (fix it in
-step 5) or a dismissal. The dismissal's evidence is `decided by owner: <answer>`. An
-answer to hold, or a decision that belongs to someone else, is a stop case.
-
-**A hold carries its reason.** When a run stops on a hold, the disposition comment
-records the question, the answer, and what is still undecided, in plain words. A later
-run reads that before asking again. If it asks, the question restates what was held,
-why, and what would release it; a bare "keep the hold on #N?" makes the user ask what
-the hold was.
+When step 4 ends with any QUESTION, ping the user, then call the Skill tool with
+`grilling`, by [Open questions](references/open-questions.md). Its **A hold carries
+its reason** applies when a run stops on a hold, and when the disposition comment
+already records one.
 
 Completion criterion: every finding has a published verdict and delivery state, the
 second pass is done, and no QUESTION is left without an answer or a stop.
@@ -234,11 +209,8 @@ Otherwise work on the head branch without disturbing a dirty tree, following
 for presentation), run the tests green, then commit with explicit staging.
 A batch of at least 6 findings that split into at least 2 groups of separate files is
 written in parallel instead, per [Parallel fix batch](references/parallel-fixes.md).
-A test failing outside your fix runs on the starting SHA first: with your work
-committed, `git switch --detach <starting sha>` in the same worktree, run that one test,
-then switch back to your tip. Failing there too, it is a finding against the PR, not a
-defect of your fix to debug: write its step 4 line and publish it now. It joins this
-batch when the shipping budget makes it eligible; otherwise it is carried.
+A test failing outside your fix runs on the starting SHA first, by
+[A test failing outside your fix](references/gh-mechanics.md#a-test-failing-outside-your-fix).
 
 **Review before you push.** Every push buys another round from every bot, and a fix
 that adds a mechanism (a job, a lock, a claim, a retry, an outbox, a stream) is new
@@ -270,19 +242,15 @@ metadata and the comment surfaces once and compare them with the snapshot
 (`pr-comments.sh --since`). Review any head changes since your last covered SHA using
 step 1's re-review range; your own fixes must already be covered before their push.
 Classify new claims in step 4; the shipping budget decides which get a batch in step 5
-and which are carried. Required human review and owner decisions remain gates. An
-unexpected external head change must be reviewed, never silently accepted.
-
-An external head change gets one refreshed review/checkpoint attempt, shared across
-push refusals and the pinned merge. A second concurrent head movement or push refusal
-stops the run with concurrent changes reported; it does not restart the batch or
-snapshot. Follow the merge mechanics' bounded gate retries.
+and which are carried. An unexpected external head change must be reviewed, never
+silently accepted: it, or a push refusal, follows **Concurrent head changes** in
+[Merge](references/gh-mechanics.md#merge). Follow the merge mechanics' bounded gate
+retries.
 
 Merge by [Merge](references/gh-mechanics.md#merge) when your own review and required
 local validation cover the exact head, the current batch is disposed of, no owner
 decision is pending, and no hard [gate](references/gh-mechanics.md#merge-gates) blocks.
-An optional in-flight review does not hold bounded delivery. After merging, open the
-follow-up described in the shipping budget.
+After merging, open the follow-up described in the shipping budget.
 The merge is pinned to the head sha you reviewed. CI status is not a gate: a pending
 required check queues the merge with `--auto`, and you do not come back if that run
 fails. **Never delete a branch**, by any route. Merge a PR whose base is a deploy branch,

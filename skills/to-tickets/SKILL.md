@@ -36,13 +36,7 @@ Give each ticket its **blocking edges**: the tickets that must complete before i
 
 List the **files** each ticket expects to create or edit, from step 2's exploration. Every path is resolved, never guessed: an edited file must exist (`git ls-files <path>`), and a new file sits beside its nearest sibling of the same kind (`rg --files | rg '<SiblingName>'`), so a new test follows where the repo's existing tests for that layer live. Never publish a `(verify path)` placeholder: look it up now. Two tickets with no edge between them that edit the same file conflict when built in parallel, so `implement-spec` builds them one after the other; the list is how it knows. A shared registration line (a route, a provider, a translation key) counts too.
 
-**Wide refactors are the exception to vertical slicing.** A wide refactor is one mechanical change (rename a column, retype a shared value object) whose blast radius fans across the codebase so no vertical slice can land green. Sequence it as **expand–contract**:
-
-1. **Expand**: add the new form beside the old so nothing breaks (new nullable column + dual-write; new method delegating to old).
-2. **Migrate**: move call sites/data over in batches sized by blast radius (per module, per directory), each batch its own ticket blocked by the expand. A data backfill is its own ticket, a one-time operation leaving no permanent infra.
-3. **Contract**: drop the old form once no caller remains, in a ticket blocked by *every* migrate batch. The contract migration is the only destructive step and lands last.
-
-When even batches can't stay green alone, keep the sequence but share an integration branch, all blocking a final integrate-and-verify ticket: green is promised only there.
+**Wide refactors are the exception to vertical slicing.** A wide refactor is one mechanical change (rename a column, retype a shared value object) whose blast radius fans across the codebase so no vertical slice can land green. When the work holds one, read [`references/wide-refactor.md`](references/wide-refactor.md) and sequence it as **expand–contract** (expand, migrate in batches, contract) the way that file says.
 
 **Close every breakdown with a delivery ticket.** The last ticket, blocked by all the others, traces each spec requirement to a ticket and lists the before-merge checks and the after-deploy steps (commands, backfills, flags, smoke checks). A requirement it cannot trace is a gap: add a ticket for it. Draft it per [DELIVERY-TICKET.md](DELIVERY-TICKET.md). On a wide refactor, the integrate-and-verify ticket is this ticket.
 
@@ -122,15 +116,7 @@ Work the **frontier** (any ticket whose blockers are all done) with `implement`,
 
 ## When you're done
 
-Print the end-of-session block using the frame in [`wayfinder/references/pipeline-end-block.md`](../wayfinder/references/pipeline-end-block.md).
-
-```text
----
-Pipeline: decide → spec → **tickets** → build   (3 of 4)
-Done: <how many tickets, how many on the frontier, with refs>
-Next:
-  • <condition> → /<skill> <ref>
-```
+Print the end-of-session block using the frame in [`wayfinder/references/pipeline-end-block.md`](../wayfinder/references/pipeline-end-block.md). Its `Pipeline:` and `Done:` lines here are `Pipeline: decide → spec → **tickets** → build   (3 of 4)` and `Done: <how many tickets, how many on the frontier, with refs>`.
 
 Stage-specific **Next** conditions (only those that apply, most likely first):
 

@@ -113,15 +113,7 @@ Anything else future readers need.
 
 ## When you're done
 
-Print the end-of-session block using the frame in [`wayfinder/references/pipeline-end-block.md`](../wayfinder/references/pipeline-end-block.md).
-
-```text
----
-Pipeline: decide → **spec** → tickets → build   (2 of 4)
-Done: <what exists now, with its reference; whether a map was closed>
-Next:
-  • <condition> → /<skill> <ref>
-```
+Print the end-of-session block using the frame in [`wayfinder/references/pipeline-end-block.md`](../wayfinder/references/pipeline-end-block.md). Its `Pipeline:` and `Done:` lines here are `Pipeline: decide → **spec** → tickets → build   (2 of 4)` and `Done: <what exists now, with its reference; whether a map was closed>`.
 
 Stage-specific **Next** conditions (only those that apply, most likely first):
 

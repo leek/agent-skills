@@ -18,11 +18,6 @@ much the panel agrees.
 Each CLI runs as its own latest/default model. **Never pass `--model` to any of
 them.** The point of the panel is four independent models; pinning a model defeats it.
 
-Two task shapes:
-
-- **Prompt**: the user's text goes to all four, unchanged.
-- **Review**: pin one diff scope and tell all four to review it, read-only, same scope each.
-
 ## Process
 
 ### 1. Read the task and pick the shape
@@ -33,7 +28,9 @@ Two task shapes:
   `main` when the user names none. For uncommitted work in progress, drop the `...HEAD`
   so the diff also covers staged and unsaved changes. Confirm the ref resolves
   (`git rev-parse <fixed-point>`), record `git rev-parse HEAD`, and confirm the diff is non-empty **before** fanning out, 
-  a bad ref should fail here, not inside four subagents.
+  a bad ref should fail here, not inside four subagents. Then read
+  [`references/review-shape.md`](references/review-shape.md): it holds the review task
+  string, step 3's read-only guard, and step 5's `ReportFindings` mapping.
 - **Prompt** otherwise; the user's text is the task, passed word for word.
 
 Write the one task string now. Every CLI receives the identical string, so the four
@@ -61,48 +58,14 @@ Spawn one subagent per present CLI, all in a single message so they run at once 
 Claude Code with this plugin installed, `subagent_type=leek-skills:panelist`: a small,
 cheap wrapper, since the thinking happens inside the CLI it runs; in other harnesses, dispatch
 and wait per [harness-tools](../harness-tools/SKILL.md), one per CLI, all at once). Give each subagent
-the path of the **same** task file and this brief:
+the path of the **same** task file and, in full, the brief in
+[`references/panelist-brief.md`](references/panelist-brief.md), read on every run: launch
+once through [`scripts/launch.sh`](scripts/launch.sh) with literal absolute paths, run it
+detached, wait with one call and never poll, distill, return `{ cli, status, points[] }`.
 
-- **Launch with the launcher script, literal paths only.** Run your CLI **once**, from
-  the repo root (or your worktree), with `bash LAUNCHER <cli> TASK_FILE SCRATCH/panel-<cli>.out`,
-  where `LAUNCHER` is this skill's [`scripts/launch.sh`](scripts/launch.sh), and every path is
-  absolute and written out in full: worktree isolation refuses a command whose words are
-  computed at runtime (`$(cat …)`, `$TASK`, `$PWD`). The script holds each CLI's headless
-  command and flags (no `--model`, ever) and writes all its output to the `.out` file. If a
-  guard still refuses the launch, that is a launch-form problem, not a CLI error: say
-  which word it refused; `bash LAUNCHER --print <cli> …` prints the plain command to run instead.
-- **Run it detached: never let one time out.** These CLIs take many minutes, past the
-  shell tool's 10-minute foreground ceiling, which kills a run before it reports. Launch
-  with the Bash tool's `run_in_background: true`; your turn pauses and you are re-invoked
-  when the CLI exits; then read the `.out` file. Where the shell tool has no background
-  mode and rejects `&` (Grok CLI), run it in the foreground with the tool's timeout set to
-  its maximum (for example `timeout: 900000`), never its default.
-- **Wait with one call, never poll.** No `sleep`, `ps`, `pgrep`, or repeated reads of
-  the output file while the CLI runs: each check spends a turn, and the turn cap ends the
-  subagent while its CLI is still running.
-- Distill the output into a short, normalized result. For each point the CLI makes,
-  capture three things: a one-line **claim**, a **location** (`file:line`, or
-  `general`), and a one-line **reason**. Drop the CLI's logs, thinking, and prose.
-- Return `{ cli, status, points[] }`. `status` is `responded`, or `errored` with a
-  one-line cause (a non-zero exit or an empty `.out`). Return the object only, no narration.
-
-In **review** shape, the task string is this brief. Name the pinned diff from step 1 in
-plain words, with **no backticks**, so nothing is left for a shell to expand:
-
-> Review the change from git diff FIXED-POINT in this repository. Read the diff and any
-> files you need. Report concrete findings only, for each, a one-line claim, the
-> file:line, and a one-line reason. Review only; do not modify any file. Be concise.
-
-**Keep review read-only.** For a committed scope, dispatch each panelist with
-`isolation: "worktree"` where the harness offers it, so a stray write never reaches the
-user's tree; its brief first runs `git checkout --detach <step 1's HEAD sha>`, since the
-worktree may start from another base. A worktree left with uncommitted changes means
-its CLI wrote: name both. For WIP scope, or without isolation, save `git status --porcelain` and `git diff`
-as the baseline before fanning out, and compare after every subagent returns. A path
-the CLIs changed that was clean in the baseline: revert it (`git checkout -- <path>`,
-delete new files) and name that CLI. A path that was already dirty holds the user's
-unsaved work: report it and leave it as it is. This isolation or tree check (not a
-per-CLI flag) is what enforces review-only.
+In **review** shape, apply **Keep review read-only** from
+[`references/review-shape.md`](references/review-shape.md): worktree isolation or a working-tree
+baseline before the fan-out, a check for stray writes after every subagent returns.
 
 Per-CLI notes: why each flag in `scripts/launch.sh` is there, read-only options and their
 traps, structured-output flags, absent-vs-errored, auth: live in
@@ -138,10 +101,7 @@ its **location**, the CLIs that raised it in brackets, e.g. `[claude, codex, gro
 and its one-line **reason**. For a Conflict, state both sides and who holds each.
 
 In review shape, where the host has `ReportFindings`, report the clusters through it
-instead, in one call, most-agreed first: `summary` the claim, `file`/`line` the location,
-`failure_scenario` the reason plus the CLIs in brackets, `category` the grade, `verdict`
-`CONFIRMED` for Unanimous or Majority and `PLAUSIBLE` below that. Print as markdown only
-what it cannot carry: `general` points and Conflicts. Otherwise print every cluster.
+instead, per [`references/review-shape.md`](references/review-shape.md). Otherwise print every cluster.
 
 Then a one-line summary: how many points at each grade, the responder count `N`, and any
 CLI that was absent or errored. Ping the user that it is ready (`PushNotification`
@@ -166,6 +126,5 @@ to re-adjudicate it. Ask only about a point that conflicts with a recorded decis
 Headless mode auto-approves every tool, so each CLI *could* write files even though the
 brief says review only. Two guards, in order: run the panel on a clean working tree, and
 in review shape isolate or revert stray writes per step 3. Per-CLI read-only flags exist
-but behave inconsistently, `codex --sandbox read-only` works, `agy --mode plan` hijacks
-the task into planning, and `grok`'s profile name is machine-specific, so step 3, not a
-flag, is what enforces read-only. See the references file.
+but behave inconsistently (see [`references/cli-invocations.md`](references/cli-invocations.md)),
+so step 3, not a flag, is what enforces read-only.

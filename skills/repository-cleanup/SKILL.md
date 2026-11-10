@@ -60,11 +60,10 @@ Without those tools, show the same tabs as numbered lists in chat, and take the 
 One read-only script covers steps 1–3's git and GitHub state as one JSON object: working tree, stashes with their files, remotes, stale remote-tracking refs, worktrees (locked, prunable, dirty), local branches (upstream, gone upstream, last commit, merged into origin's default branch), and open and last 30 closed PRs:
 
 ```bash
-bash scripts/inventory.sh               # fetches first, never pruning
-bash scripts/inventory.sh --graph 80    # adds the recent `git log --all --graph`, when commit topology matters
+bash scripts/inventory.sh    # fetches first, never pruning; `--graph 80` adds the recent `git log --all --graph`, when commit topology matters
 ```
 
-Its fetch is `--no-prune --no-prune-tags` even when the user's config sets `fetch.prune` or `fetch.pruneTags`: a pruning fetch deletes stale remote-tracking refs and local-only tags (an `archive/*` tag made to preserve work) that nobody selected. Never fetch with pruning yourself; `stale_remote_refs` lists those refs as candidates instead. Dig into one item with plain git (`git stash show -p stash@{N}`, `git log <base>..<branch>`).
+Its fetch is `--no-prune --no-prune-tags` even when the user's config sets `fetch.prune` or `fetch.pruneTags`: a pruning fetch deletes stale remote-tracking refs and local-only tags (an `archive/*` tag made to preserve work) that nobody selected. Never fetch with pruning yourself; `stale_remote_refs` lists those refs as candidates instead. Dig into one item with plain git (`git stash show -p stash@{N}`, `git log <base>..<branch>`). When `prs` is `null` (`gh` unavailable, or the repository is not on GitHub), use the equivalent provider CLI, web UI, or local Git evidence and report the PR visibility gap.
 
 Worktrees whose PR merged, and the databases left behind, come from one script. With no arguments it changes nothing and prints the candidates as JSON. It removes only the names you pass, after the user selected them, and it refuses the whole run, changing nothing, if one name is not a candidate:
 
@@ -75,24 +74,15 @@ bash scripts/prune-merged-worktrees.sh --remove <worktree path> --drop pgsql:<da
 
 A worktree's database can be dropped only in the same run that removes that worktree. Never pass a name the user did not select, and never build the arguments from the whole list.
 
-When `prs` is `null` (`gh` unavailable, or the repository is not on GitHub), use the equivalent provider CLI, web UI, or local Git evidence and report the PR visibility gap.
-
 ## Databases
 
-Worktrees and one-off test runs leave local databases behind: a per-worktree `DB_DATABASE`, throwaway test databases (`<app>_pr42`, `<app>_triage_<date>`), and Laravel parallel testing's `<db>_test_N` copies of each. The script's `databases` list holds, with sizes, each candidate database by exact name, a parallel-testing copy as an item of its own. Its `source` says why: `worktree` (registered for, or named by, a candidate worktree), `registry` (a registered database whose worktree is gone), or `orphan` (named `<app db>_*` and named by no `.env`, `.env.testing`, or `phpunit.xml` of the main checkout or a remaining worktree). It never lists a database in use, or a parallel-testing copy of one.
-
-Classify each listed database by its name: a PR number, branch, worktree, or date that maps to merged or removed work is **abandoned**; a name that reads as a deliberate copy (`_backup`, `_snapshot`, `_pre_migration`) or maps to nothing is **uncertain**. Show the list grouped that way, with sizes, in the step 7 selection, and drop only the selected names, through the script's `--drop`. Each drop is irreversible: offer a `pg_dump`/`mysqldump` first for anything uncertain.
+When the `databases` list of `scripts/prune-merged-worktrees.sh` is not empty, read [Database candidates](references/mechanics.md#database-candidates) first: where these databases come from, what the list holds, and what each `source` means. Classify each listed database by its name: a PR number, branch, worktree, or date that maps to merged or removed work is **abandoned**; a name that reads as a deliberate copy (`_backup`, `_snapshot`, `_pre_migration`) or maps to nothing is **uncertain**. Show the list grouped that way, with sizes, in the step 7 selection, and drop only the selected names, through the script's `--drop`. Each drop is irreversible: offer a `pg_dump`/`mysqldump` first for anything uncertain.
 
 ## PR screenshots
 
-The `pr` skill uploads PR screenshots to the orphan `pr-assets` branch, one folder per PR branch, and nothing else ever removes them: every clone downloads the whole branch. One script lists the folders whose PR merged or closed more than 90 days ago (`--days N` to change it), or, with no PR found, whose last upload is that old. An open PR's folder is never a candidate. With no arguments it changes nothing:
+The `pr` skill uploads PR screenshots to the orphan `pr-assets` branch, one folder per PR branch, and nothing else ever removes them: every clone downloads the whole branch. One script lists the folders whose PR merged or closed more than 90 days ago (`--days N` to change it), or, with no PR found, whose last upload is that old. An open PR's folder is never a candidate. With no arguments it changes nothing: `bash scripts/prune-pr-assets.sh` prints the plan (tip, candidates, kept, with sizes).
 
-```bash
-bash scripts/prune-pr-assets.sh                                        # plan: tip, candidates, kept, with sizes
-bash scripts/prune-pr-assets.sh --tip <plan tip> --drop <folder>...    # selected folders only
-```
-
-Offer the candidates as one `Remote` option, with their count, total size and folder names, and `cannot recover` in its description: dropping rewrites `pr-assets` as a fresh orphan commit with a force push, leased on the plan's tip, so those images leave every future clone. A kept folder's `…/blob/pr-assets/…` links keep working; links pinned to a commit (`…/blob/<sha>/…`, from older uploads) point at unreachable commits that GitHub may stop serving once it garbage-collects them. A tip that moved since the plan refuses the run; list again.
+Offer the candidates as one `Remote` option, with their count, total size and folder names, and `cannot recover` in its description: dropping rewrites `pr-assets` as a fresh orphan commit with a force push, leased on the plan's tip, so those images leave every future clone. When the plan has a candidate, read [Dropping pr-assets folders](references/mechanics.md#dropping-pr-assets-folders) before you offer it: the drop command, for the selected folders only, which image links keep working, and a tip that moved since the plan.
 
 ## Classification Guide
 
