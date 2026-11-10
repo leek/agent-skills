@@ -24,8 +24,11 @@
 # 2 usage, or a manager other than composer or npm; 3 jq is missing.
 #
 # What it runs (flags confirmed with --help on Composer 2.10.3 and npm 11.20.0):
-#   composer outdated --direct --format=json --no-interaction
-#   composer audit --format=json --locked --no-interaction     only with composer.lock
+#   Composer runs with --no-plugins --no-scripts: the project under audit is not trusted, and a
+#   plugin or a script in its composer.json would otherwise run on these read-only commands.
+#   npm outdated and npm audit run no lifecycle scripts, so npm needs no such flag.
+#   composer outdated --direct --format=json --no-interaction --no-plugins --no-scripts
+#   composer audit --format=json --locked --no-interaction --no-plugins --no-scripts     only with composer.lock
 #   npm outdated --json
 #   npm audit --json                  only with package-lock.json or npm-shrinkwrap.json
 # No lockfile: "lockfile" is null, the security audit is not run, "advisories" is [].
@@ -123,7 +126,7 @@ audit_composer() {
   : > "$abandoned"
   note "composer outdated"
   rc=0
-  composer outdated --direct --format=json --no-interaction > "$out" 2> "$err" || rc=$?
+  composer outdated --direct --format=json --no-interaction --no-plugins --no-scripts > "$out" 2> "$err" || rc=$?
   if jq -e 'type == "object" and (.installed | type == "array")' "$out" >/dev/null 2>&1; then
     res=$(jq "$JQ_LIB"'[.installed[] | select(.latest != null and .latest != .version)
       | {package: .name, current: .version, latest: .latest,
@@ -142,7 +145,7 @@ audit_composer() {
   if [ -n "$lock" ]; then
     note "composer audit"
     rc=0
-    composer audit --format=json --locked --no-interaction > "$out" 2> "$err" || rc=$?
+    composer audit --format=json --locked --no-interaction --no-plugins --no-scripts > "$out" 2> "$err" || rc=$?
     if jq -e 'type == "object" and has("advisories")' "$out" >/dev/null 2>&1; then
       advisories=$(jq "$JQ_LIB"'[.advisories | .. | objects | select(has("advisoryId"))
         | {package: .packageName, severity: (.severity // null), id: .advisoryId,

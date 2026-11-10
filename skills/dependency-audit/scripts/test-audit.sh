@@ -90,8 +90,8 @@ eq "composer: advisories, most severe first" "$(jq -c '[.managers[0].advisories[
 eq "composer: advisory" "$(jq -c '.managers[0].advisories[0]' "$tmp/out.json")" \
   '{"package":"twig/twig","severity":"critical","id":"PKSA-h8hf-ytnd-5t9q","title":"PHP code injection via `{% use %}` template name","url":"https://symfony.com/cve-2026-46633"}'
 eq "composer: errors" "$(jq -c '.managers[0].errors' "$tmp/out.json")" '[]'
-eq "composer: calls" "$(cat "$STUB_LOG")" "composer outdated --direct --format=json --no-interaction
-composer audit --format=json --locked --no-interaction"
+eq "composer: calls" "$(cat "$STUB_LOG")" "composer outdated --direct --format=json --no-interaction --no-plugins --no-scripts
+composer audit --format=json --locked --no-interaction --no-plugins --no-scripts"
 echo "ok composer patch/minor/major grouping and advisories"
 
 # --- npm: exit 1 from outdated and audit is data ---------------------------------------
@@ -163,7 +163,7 @@ eq "no lockfile: lockfiles" "$(jq -c '[.managers[].lockfile]' "$tmp/out.json")" 
 eq "no lockfile: advisories" "$(jq -c '[.managers[].advisories]' "$tmp/out.json")" '[[],[]]'
 eq "no lockfile: composer major" "$(names 0 major)" '["psr/log","twig/twig"]'
 eq "no lockfile: npm major" "$(names 1 major)" '["chalk"]'
-eq "no lockfile: calls" "$(cat "$STUB_LOG")" "composer outdated --direct --format=json --no-interaction
+eq "no lockfile: calls" "$(cat "$STUB_LOG")" "composer outdated --direct --format=json --no-interaction --no-plugins --no-scripts
 npm outdated --json"
 echo "ok a missing lockfile skips the security audit"
 
