@@ -26,18 +26,62 @@ read_lock_owner() {
   fi
 }
 
-acquire_runner_lock() {
-  if ! mkdir "$LOCK_DIR" 2>/dev/null; then
-    read_lock_owner "$LOCK_DIR/pid"
-    if pid_is_alive "$LOCK_OWNER_PID" "$LOCK_OWNER_STARTED"; then
-      runner_failure "another Autopilot process is active for this root (pid $LOCK_OWNER_PID)"
-    fi
-    rm -f -- "$LOCK_DIR/pid"
-    rmdir "$LOCK_DIR" 2>/dev/null || runner_failure "could not recover stale runner lock: $LOCK_DIR"
-    mkdir "$LOCK_DIR" || runner_failure "could not acquire runner lock: $LOCK_DIR"
+# A lock directory with no recorded owner is held while it is this young: its
+# owner is between `mkdir` and writing the pid file.
+LOCK_PENDING_SECONDS=10
+
+# True when the lock directory belongs to a live runner, or to one still
+# recording its ownership. Sets LOCK_OWNER_PID and LOCK_OWNER_STARTED.
+lock_dir_is_held() {
+  local lock_dir="$1" age
+  read_lock_owner "$lock_dir/pid"
+  if [[ -n "$LOCK_OWNER_PID" ]]; then
+    pid_is_alive "$LOCK_OWNER_PID" "$LOCK_OWNER_STARTED"
+    return
   fi
-  LOCK_OWNED="true"
+  [[ -d "$lock_dir" ]] || return 1
+  age=$(( $(now_epoch) - $(file_mtime "$lock_dir") ))
+  [[ "$age" -lt "$LOCK_PENDING_SECONDS" ]]
+}
+
+acquire_runner_lock() {
+  local stale_dir="$LOCK_DIR.stale.$$" recovery_dir="$LOCK_DIR.recover" attempt=0
   RUNNER_PROCESS_STARTED="$(process_started_at "$$")"
+  while ! mkdir "$LOCK_DIR" 2>/dev/null; do
+    attempt=$((attempt + 1))
+    [[ "$attempt" -le 100 ]] || runner_failure "could not acquire runner lock: $LOCK_DIR"
+    if lock_dir_is_held "$LOCK_DIR"; then
+      runner_failure "another Autopilot process is active for this root (pid ${LOCK_OWNER_PID:-not yet recorded})"
+    fi
+    # Stale. Only the process that creates the recovery directory may remove
+    # the lock, and it checks again once it holds that directory: a recoverer
+    # acting on an earlier check cannot remove a lock someone has since taken.
+    if ! mkdir "$recovery_dir" 2>/dev/null; then
+      if [[ $(( $(now_epoch) - $(file_mtime "$recovery_dir") )) -ge "$LOCK_PENDING_SECONDS" ]]; then
+        rmdir "$recovery_dir" 2>/dev/null || true
+      else
+        sleep 0.1
+      fi
+      continue
+    fi
+    if lock_dir_is_held "$LOCK_DIR"; then
+      rmdir "$recovery_dir" 2>/dev/null || true
+      runner_failure "another Autopilot process is active for this root (pid ${LOCK_OWNER_PID:-not yet recorded})"
+    fi
+    if [[ -d "$LOCK_DIR" ]]; then
+      # Rename aside before removing, so the stale lock disappears in one step.
+      rm -f -- "$stale_dir/pid"
+      rmdir "$stale_dir" 2>/dev/null || true
+      if [[ -e "$stale_dir" ]] || ! mv -- "$LOCK_DIR" "$stale_dir" 2>/dev/null; then
+        rmdir "$recovery_dir" 2>/dev/null || true
+        runner_failure "could not recover stale runner lock: $LOCK_DIR"
+      fi
+      rm -f -- "$stale_dir/pid"
+      rmdir "$stale_dir" 2>/dev/null || true
+    fi
+    rmdir "$recovery_dir" 2>/dev/null || true
+  done
+  LOCK_OWNED="true"
   printf '%s\n%s\n' "$$" "$RUNNER_PROCESS_STARTED" >"$LOCK_DIR/pid" || runner_failure "could not record runner lock ownership"
 }
 

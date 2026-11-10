@@ -412,6 +412,7 @@ run_autopilot_loop() {
             '.status = $status | .reason = $reason | .summary = $summary | .next_ref = ""' \
             "$result_file" >"$result_file.gated" && mv -- "$result_file.gated" "$result_file"
           cp -- "$result_file" "$RESULT_FILE_STATE" || true
+          NEXT_REF_STATE=""
           announce_activity "$SUMMARY"
           terminal_exit="$(terminal_exit_for_status "$result_status")"
         fi

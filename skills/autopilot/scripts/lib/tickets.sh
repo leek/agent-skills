@@ -182,6 +182,8 @@ set_default_tracker_parent() {
       [[ -f "$(dirname "$TRACKER_WORK_DIR")/spec.md" ]] && TRACKER_PARENT_FILE="$(dirname "$TRACKER_WORK_DIR")/spec.md"
       ;;
   esac
+  # A missing parent is fine: the ticket's own `## Parent` link may still name one.
+  return 0
 }
 
 read_linked_tracker_dir() {
@@ -300,6 +302,7 @@ resolve_tracker_scope() {
     TRACKER_WORK_DIR="$(dirname "$root")"
   fi
   [[ -n "$TRACKER_PARENT_FILE" ]] || set_default_tracker_parent
+  return 0
 }
 
 resolve_link_target() {
@@ -670,27 +673,40 @@ tracker_refresh() {
   fi
 }
 
+# Snapshot rows are `ref<US>status<US>claim`. The unit separator is not
+# whitespace, so `read` keeps an empty status in its own field.
+SNAPSHOT_FIELD_SEPARATOR=$'\x1f'
+
 snapshot_work_items() {
-  local out_file="$1" effort_dir file relative
+  local out_file="$1" effort_dir work_dir file relative
   : >"$out_file"
   effort_dir="$(effort_dir_for_ref "$ROOT_REF")" || return 0
+  # The effort directory two levels deep, plus the directory the frontier is
+  # selected from: a suffixed spec's tickets/<suffix>/ or a linked directory
+  # sits outside that depth. The subshell keeps the TRACKER_* globals untouched.
+  work_dir="$(resolve_tracker_scope >/dev/null 2>&1 || true; printf '%s' "$TRACKER_WORK_DIR")"
   while IFS= read -r file; do
     [[ -n "$file" ]] || continue
     read_work_item_state "$file" || continue
     relative="${file#"$REPO_ROOT"/}"
-    printf '%s\t%s\t%s\n' "$relative" "$WORK_ITEM_STATUS" "$WORK_ITEM_CLAIM" >>"$out_file"
-  done < <(find "$effort_dir" -maxdepth 2 -type f -name '*.md' 2>/dev/null | sort)
+    printf '%s%s%s%s%s\n' "$relative" "$SNAPSHOT_FIELD_SEPARATOR" "$WORK_ITEM_STATUS" "$SNAPSHOT_FIELD_SEPARATOR" "$WORK_ITEM_CLAIM" >>"$out_file"
+  done < <({
+    find "$effort_dir" -maxdepth 2 -type f -name '*.md' 2>/dev/null
+    if [[ -n "$work_dir" && -d "$work_dir" ]]; then
+      find "$work_dir" -maxdepth 1 -type f -name '*.md' 2>/dev/null
+    fi
+  } | sort -u)
 }
 
 # Announces every work item whose status changed while the worker ran.
 announce_work_item_changes() {
   local before="$1" after="$2" relative status claim previous changed=0
   [[ -f "$after" ]] || return 0
-  while IFS=$'\t' read -r relative status claim; do
+  while IFS="$SNAPSHOT_FIELD_SEPARATOR" read -r relative status claim; do
     [[ -n "$relative" ]] || continue
     previous=""
     if [[ -f "$before" ]]; then
-      previous="$(awk -F'\t' -v key="$relative" '$1 == key { print $2; exit }' "$before")"
+      previous="$(awk -F"$SNAPSHOT_FIELD_SEPARATOR" -v key="$relative" '$1 == key { print $2; exit }' "$before")"
     fi
     [[ "$previous" != "$status" ]] || continue
     changed=1
@@ -728,7 +744,7 @@ verify_completed_ref_selected() {
 warn_open_claims() {
   local snapshot="$1" completed_ref="$2" relative status claim
   [[ -f "$snapshot" ]] || return 0
-  while IFS=$'\t' read -r relative status claim; do
+  while IFS="$SNAPSHOT_FIELD_SEPARATOR" read -r relative status claim; do
     [[ -n "$relative" ]] || continue
     [[ "$relative" != "$completed_ref" && "$REPO_ROOT/$relative" != "$completed_ref" ]] || continue
     if [[ "$status" == *"$RUN_ID"* || "$claim" == *"$RUN_ID"* ]]; then

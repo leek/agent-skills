@@ -12,6 +12,40 @@ TMUX_STATE_RUN_ID=""
 TMUX_STATE_LOG_FILE=""
 TMUX_STATE_LOG_MIRROR_FILE=""
 
+# A tmux session starts with the tmux server's environment, not the launcher's.
+# These are the variables that change which executables, configuration, and
+# credentials the provider CLIs resolve; the launcher's values go to the child.
+TMUX_FORWARDED_VARIABLES=(
+  PATH
+  CLAUDE_CONFIG_DIR CODEX_HOME GROK_HOME
+  ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL CLAUDE_CODE_OAUTH_TOKEN
+  OPENAI_API_KEY OPENAI_BASE_URL CODEX_API_KEY
+  XAI_API_KEY GROK_CODE_XAI_API_KEY
+)
+
+# Values may be secrets, so they never go on a command line (`ps` shows it) or
+# into the log or state: the launcher writes them to an owner-only file with the
+# `printf` builtin, and the child reads the file once and removes it.
+write_tmux_environment() {
+  local env_file="$1" name
+  (umask 077 && : >"$env_file") || return 1
+  for name in "${TMUX_FORWARDED_VARIABLES[@]}"; do
+    [[ -n "${!name+set}" ]] || continue
+    printf 'export %s=%q\n' "$name" "${!name}" >>"$env_file" || return 1
+  done
+}
+
+load_tmux_environment() {
+  local env_file="${AUTOPILOT_TMUX_ENV_FILE:-}" load_status=0
+  [[ "${AUTOPILOT_TMUX_CHILD:-}" == "1" && -n "$env_file" ]] || return 0
+  unset AUTOPILOT_TMUX_ENV_FILE
+  [[ -f "$env_file" && -O "$env_file" ]] || runner_failure "tmux launch environment file is missing: $env_file"
+  # shellcheck disable=SC1090 # written by write_tmux_environment at launch
+  source "$env_file" || load_status=$?
+  rm -f -- "$env_file"
+  [[ "$load_status" -eq 0 ]] || runner_failure "could not load the tmux launch environment: $env_file"
+}
+
 tmux_launch_failure() {
   local session_name="$1" reason="$2"
   tmux kill-session -t "$session_name" 2>/dev/null || true
@@ -52,9 +86,16 @@ launch_tmux() {
     runner_failure "tmux session already exists: $session_name"
   fi
 
+  # The EXIT trap removes TEMP_DIR, so the file cannot outlive a failed launch.
+  local env_file
+  TEMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/autopilot.XXXXXX")" || runner_failure "could not create a temporary directory"
+  env_file="$TEMP_DIR/tmux-env"
+  write_tmux_environment "$env_file" || runner_failure "could not write the tmux launch environment: $env_file"
+
   local command_args=(
     env
     "AUTOPILOT_TMUX_CHILD=1"
+    "AUTOPILOT_TMUX_ENV_FILE=$env_file"
     "AUTOPILOT_TMUX_SESSION=$session_name"
     "AUTOPILOT_TMUX_LAUNCH_ID=$launch_id"
     "AUTOPILOT_HEARTBEAT_SECONDS=$HEARTBEAT_SECONDS"

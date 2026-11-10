@@ -201,6 +201,8 @@ trap 'handle_signal 129' HUP
 trap 'handle_signal 130' INT
 trap 'handle_signal 143' TERM
 
+load_tmux_environment
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --provider)
@@ -287,9 +289,18 @@ command -v git >/dev/null 2>&1 || runner_failure "git is required"
 ORIGINAL_DIR="$(cd "$REPO_DIR" 2>/dev/null && pwd -P)" || runner_failure "repository directory not found: $REPO_DIR"
 REPO_ROOT="$(git -C "$ORIGINAL_DIR" rev-parse --show-toplevel 2>/dev/null)" || runner_failure "not a Git repository: $ORIGINAL_DIR"
 
-if [[ "$ROOT_REF" != /* && -e "$ORIGINAL_DIR/$ROOT_REF" ]]; then
-  ROOT_PARENT="$(cd "$(dirname "$ORIGINAL_DIR/$ROOT_REF")" && pwd -P)"
-  ROOT_REF="$ROOT_PARENT/$(basename "$ROOT_REF")"
+# One canonical spelling per root, so every way of naming it hashes to the same
+# STATE_KEY: no trailing slash, physical path (a file keeps its own basename).
+while [[ "$ROOT_REF" == */ && "$ROOT_REF" != "/" ]]; do
+  ROOT_REF="${ROOT_REF%/}"
+done
+ROOT_CANDIDATE="$ROOT_REF"
+[[ "$ROOT_CANDIDATE" == /* ]] || ROOT_CANDIDATE="$ORIGINAL_DIR/$ROOT_REF"
+if [[ -d "$ROOT_CANDIDATE" ]]; then
+  ROOT_REF="$(cd "$ROOT_CANDIDATE" && pwd -P)" || runner_failure "could not resolve root: $ROOT_REF"
+elif [[ -e "$ROOT_CANDIDATE" ]]; then
+  ROOT_PARENT="$(cd "$(dirname "$ROOT_CANDIDATE")" && pwd -P)" || runner_failure "could not resolve root: $ROOT_REF"
+  ROOT_REF="$ROOT_PARENT/$(basename "$ROOT_CANDIDATE")"
 fi
 
 GIT_DIR="$(git -C "$REPO_ROOT" rev-parse --absolute-git-dir 2>/dev/null)" || runner_failure "could not resolve the repository Git directory"
