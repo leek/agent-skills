@@ -49,7 +49,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | `implement` | user | Implement one work item end to end: scope and claim it when trackable, TDD at agreed seams, commit, review, verify, and resolve it. |
 | `implement-spec` | user | Build a whole spec fast: parallel implementer subagents work the ticket frontier, each in its own worktree, merging onto one integration branch; then one review, one verification pass, and one PR or a stack of PRs (it asks). Cuts the tickets first when the spec has none. |
 | `improve-codebase-architecture` | user | Scan a codebase for deepening opportunities, present them as a visual HTML report, then grill through whichever one you pick. |
-| `laravel-herd-worktrees` | model | Use when working with Laravel projects served by Laravel Herd alongside git worktrees on macOS. |
+| `laravel-herd-worktrees` | model | Create, serve, or remove git worktrees for Laravel projects served by Laravel Herd on macOS. |
 | `panel` | user | Convene a panel of agent CLIs (grok, claude, codex, agy) on a prompt or a code review, each in its own headless subagent, then report one consensus grouped by how much they agree. |
 | `pr` | model | The pull request body format, built for fast human review: the smallest visual of the change, before/after evidence, and a one-way or two-way door call with its blast radius. |
 | `prototype` | model | Build a throwaway prototype to answer a design question. |
@@ -58,7 +58,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | `repository-cleanup` | user | Audit and clean Git repository state, including the local databases old worktrees left behind. |
 | `research` | model | Investigate a question against high-trust primary sources and capture the findings as a cited Markdown file. |
 | `resolve-review-comments` | model | Triage, fix or rebut, then reply-and-resolve every review comment on a PR (including AI-review bot findings). |
-| `resolving-merge-conflicts` | model | "Use when you need to resolve an in-progress git merge/rebase conflict." |
+| `resolving-merge-conflicts` | model | Resolve an in-progress git merge or rebase conflict while preserving both sides' intent. |
 | `retro` | user | Mine Claude Code, Codex (including compressed rollouts), Grok, and agy parent sessions for corrections and workflow friction; compare current guidance and loaded versions before proposing fixes. |
 | `run-after` | user | Run this session's waiting steps (a backfill after deploy, a command after commit or merge) once their trigger lands: start the deploy, run it, and it confirms the steps, watches the deploy, and runs them. |
 | `scratch-cleanup` | user | Sweep a dusty .scratch/: file research into docs/, remove finished efforts, and report the work still open. |
@@ -83,7 +83,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 
 ## Subagents
 
-Installing the Claude Code or Grok plugin also loads the subagents in [`agents/`](./agents) as `leek-skills:<name>`. The skills dispatch them where they already fan out work: `code-review` → `standards-reviewer` + `spec-reviewer`, `codebase-design` (design-it-twice) → `module-designer`, `improve-codebase-architecture` → `deepening-scout`, `retro` → `session-miner`, `panel` → `panelist`, `browser-test` → `browser-test-planner` + `browser-tester` + `browser-writer`, `chatter-scout` → `chatter-sweeper` + `chatter-verifier`, `code-smells-audit` → `smell-sweeper`, `prune-tests` → `test-auditor`, `fix-github-issues` + `triage-github-pr` → `finding-verifier`, `triage-github-pr` → `pr-reviewer`, `upgrade-plan` → `release-notes-collector` + `upgrade-impact-scout`, `ui-design` → `ui-reviewer`; `research` and `dependency-audit` fork into `researcher` and `dependency-auditor`. The one plugin hook, [`hooks/hooks.json`](./hooks/hooks.json), guards `browser-tester` and `browser-test-planner` so they can only run read-only browser commands. Codex does not load the directory; its skills fall back to inline or generic sub-agents. Conventions in [`docs/authoring.md`](./docs/authoring.md#subagents-agents).
+Installing the Claude Code or Grok plugin also loads the subagents in [`agents/`](./agents) as `leek-skills:<name>`. The skills dispatch them where they already fan out work: `code-review` → `pr-reviewer` + `standards-reviewer` + `spec-reviewer`, `codebase-design` (design-it-twice) → `module-designer`, `improve-codebase-architecture` → `deepening-scout`, `retro` → `session-miner`, `panel` → `panelist`, `browser-test` → `browser-test-planner` + `browser-tester` + `browser-writer`, `chatter-scout` → `chatter-sweeper` + `chatter-verifier`, `code-smells-audit` → `smell-sweeper`, `prune-tests` → `test-auditor`, `fix-github-issues` + `triage-github-pr` + `resolve-review-comments` → `finding-verifier`, `triage-github-pr` → `pr-reviewer`, `upgrade-plan` → `release-notes-collector` + `upgrade-impact-scout`, `ui-design` → `ui-reviewer`; `research` and `dependency-audit` fork into `researcher` and `dependency-auditor`, and `wayfinder` map runs dispatch `researcher` too. The plugin hooks in [`hooks/hooks.json`](./hooks/hooks.json) hold the agents that read untrusted input to read-only work: `browser-tester` and `browser-test-planner` run only read-only browser commands, `finding-verifier` and `pr-reviewer` run only read-only git, gh, rg, and text commands, and read-only agents with memory write only under `.claude/agent-memory/`. Two more hooks are conveniences: a notice in a bare Laravel worktree, and a terminal bell in Ghostty when Claude waits on you. Codex does not load the directory; its skills fall back to inline or generic sub-agents. Conventions in [`docs/authoring.md`](./docs/authoring.md#subagents-agents).
 
 ## Mods (Claude Code)
 
@@ -165,7 +165,8 @@ Each skill is a folder under `skills/`:
 ```
 skills/
   <skill-name>/
-    SKILL.md         # required: frontmatter + instructions
+    SKILL.md            # required: frontmatter + instructions
+    agents/openai.yaml  # required: the same metadata for Codex
     scripts/         # optional: helper scripts
     references/      # optional: supporting docs
 ```
@@ -189,9 +190,10 @@ See [`template/SKILL.md.example`](./template/SKILL.md.example) for a starting po
 
 1. Copy `template/SKILL.md.example` to `skills/<skill-name>/SKILL.md`.
 2. Fill in `SKILL.md`: follow the authoring principles in AGENTS.md and the writing-for-agents skill.
-3. Add the skill to `.claude-plugin/marketplace.json` under the `leek-skills` plugin.
-4. Update the **Available Skills** section above.
-5. Open a PR.
+3. Add `skills/<skill-name>/agents/openai.yaml` ([format](./docs/authoring.md#2-directory-structure)); the verifier fails without it.
+4. Add the skill to `.claude-plugin/marketplace.json` under the `leek-skills` plugin.
+5. Update the **Available Skills** section above.
+6. Run `bash scripts/verify-skills-collection.sh`, then open a PR.
 
 ## License
 

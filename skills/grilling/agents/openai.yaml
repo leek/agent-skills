@@ -1,5 +1,5 @@
 interface:
   display_name: "Grilling"
-  short_description: "Interview the user one decision at a time until reaching shared understanding, resolving each branch of the decision tree with recommended options and..."
+  short_description: "Interview the user one decision at a time until you reach shared understanding"
 policy:
   allow_implicit_invocation: true

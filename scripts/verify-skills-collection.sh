@@ -7,6 +7,10 @@ export ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 fail=0
 
+# Without PyYAML the frontmatter checks fall back to regex and skip YAML validity, which CI
+# (PyYAML installed) still enforces. Say so, or a local pass hides a CI failure.
+python3 -c "import yaml" 2>/dev/null || echo "WARN: PyYAML is not installed; YAML validity is not checked here (CI checks it). Run: python3 -m pip install pyyaml" >&2
+
 check() {
   local name="$1"
   shift
@@ -203,7 +207,8 @@ check "every relative markdown link resolves on disk" \
   python3 -c '
 import glob, os, re, sys
 bad = []
-files = sorted(glob.glob("skills/**/*.md", recursive=True)) + ["README.md", "AGENTS.md"]
+files = (sorted(glob.glob("skills/**/*.md", recursive=True)) + sorted(glob.glob("docs/**/*.md", recursive=True))
+         + sorted(glob.glob("agents/*.md")) + ["README.md", "AGENTS.md"])
 for root_file in files:
     content = open(root_file, encoding="utf-8").read()
     content = re.sub(r"```.*?```", "", content, flags=re.S)
@@ -326,7 +331,8 @@ check "forked skills name an existing agent and wait for the result" \
     done'
 check "skills naming an agent keep a non-Claude fallback" \
   bash -c '
-    for f in $(rg -l "subagent_type=leek-skills:" skills); do
+    names=$(ls agents | sed "s/\.md$//" | paste -sd "|" -)
+    for f in $(rg -l "leek-skills:($names)\b" skills --glob "*.md"); do
       rg -qi "elsewhere|inline|other harness|plain Claude Code" "$f" || { echo "$f: names an agent without a fallback clause" >&2; exit 1; }
     done'
 
@@ -453,6 +459,10 @@ check "scratch-state.sh classifies open, mismatched, and done efforts" \
       printf -- "---\ntitle: S\nstatus: closed\n---\n" > .scratch/bad/spec.md
       printf -- "---\ntitle: T\nstatus: closed\n---\n## Resolution\ndeadbeef1\n" > .scratch/bad/tickets/01-a.md
       printf -- "---\ntitle: T\nstatus: ready-for-agent\n---\n" > .scratch/open/tickets/01-a.md
+      # A spec built through tickets is never closed itself: all tickets closed means done.
+      mkdir -p .scratch/built/tickets
+      printf -- "---\ntitle: S\nstatus: ready-for-agent\n---\n" > .scratch/built/spec.md
+      printf -- "---\ntitle: T\nstatus: closed\n---\n## Resolution\n%s\n" "$sha" > .scratch/built/tickets/01-a.md
       mkdir -p .agents .scratch/shut/tickets sub
       printf -- "| Role | Status | Meaning |\n| \`wontfix\` | \`not-planned\` | Will not be actioned |\n" > .agents/triage-labels.md
       printf -- "---\ntitle: T\nstatus: duplicate\n---\n" > .scratch/shut/tickets/01-a.md
@@ -460,7 +470,7 @@ check "scratch-state.sh classifies open, mismatched, and done efforts" \
       printf -- "---\ntitle: T\nstatus: closed\n---\n## Comments\nCI run 18234567890 green\n" > .scratch/shut/tickets/03-c.md
     )
     out=$(cd "$t/sub" && bash "$ROOT/skills/scratch-status/scripts/scratch-state.sh")
-    python3 -c "import json, sys; d = json.loads(sys.argv[1]); assert d[\"counts\"] == {\"open\": 1, \"stale\": 0, \"mismatched\": 1, \"done\": 2}, d[\"counts\"]; assert \"⚠\" not in sys.argv[1]" "$out"'
+    python3 -c "import json, sys; d = json.loads(sys.argv[1]); assert d[\"counts\"] == {\"open\": 1, \"stale\": 0, \"mismatched\": 1, \"done\": 3}, d[\"counts\"]; assert \"⚠\" not in sys.argv[1]" "$out"'
 
 if [[ "$fail" -ne 0 ]]; then
   echo "verify-skills-collection: FAILED" >&2

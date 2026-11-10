@@ -1,5 +1,5 @@
 interface:
   display_name: "Verify"
-  short_description: "Exercise a change end to end in the running application (hit the route, run the command, click through the page) and report what actually happened. Use..."
+  short_description: "Exercise a change end to end in the running application and report what actually happened"
 policy:
   allow_implicit_invocation: true
