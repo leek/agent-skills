@@ -232,6 +232,16 @@ class GuardReviewAgentsTest(unittest.TestCase):
         self.assertBlocked("gh repo view git@other.example:o/r", "only OWNER/REPO")
         self.assertBlocked("gh pr view other.example/o/r/pull/1", "only OWNER/REPO")
         self.assertAllowed("gh repo view o/r --json name")
+        # A value flag takes the next token whatever it looks like: here the jq filter is
+        # `-q`, and the host is a positional.
+        self.assertBlocked("gh repo view -q -q other.example/o/r", "only OWNER/REPO")
+        self.assertBlocked("gh repo view --jq --json other.example/o/r", "only OWNER/REPO")
+        self.assertBlocked("gh repo view 'other.example/o/r x'", "only OWNER/REPO")
+        self.assertBlocked("gh pr view 1 --unknown-flag x", "not a flag this guard knows")
+        self.assertBlocked("gh pr view 1 -Rother.example/o/r", "OWNER/REPO")
+        self.assertAllowed("gh pr checks 12 --watch --fail-fast -i 30")
+        self.assertAllowed("gh pr list -s open -L 5 -S 'is:pr author:@me' --json number")
+        self.assertAllowed("gh run view 123 --log-failed --job 456")
         self.assertAllowed("gh pr view https://github.com/o/r/pull/1")
         self.assertAllowed("gh pr view feature/login --json title")
         self.assertAllowed("gh pr list --json number --jq '.[] | \"\\(.a)/\\(.b)/\\(.c)\"'")

@@ -69,11 +69,14 @@ def check_git(args: list[str]) -> None:
             raise Blocked("`git fetch <remote> <src>:<dst>` and `tag <name>` write a local ref; fetch without a destination")
 
 
-def parse_gh_api(rest: list[str]) -> tuple[list[tuple[str, str]], list[str]]:
-    """Split `gh api` arguments into (long flag, value) pairs and positionals, the way pflag does.
+def parse_pflags(rest: list[str], value_flags: set, bool_flags: set, short: dict,
+                 what: str) -> tuple[list[tuple[str, str]], list[str]]:
+    """Split gh arguments into (long flag, value) pairs and positionals, the way pflag does.
 
     pflag takes a value attached to its flag (`-XDELETE`, `-X=DELETE`, `-fa=b`, `--field=a=b`)
-    as well as in the next argument, and clusters short booleans (`-iXDELETE`).
+    as well as in the next argument, and clusters short booleans (`-iXDELETE`). A value flag
+    consumes the next token whatever it looks like, so `-q -q host/o/r` is a jq filter `-q`
+    and a positional: only a real parse tells the two apart. An unknown flag is refused.
     """
     flags: list[tuple[str, str]] = []
     positional: list[str] = []
@@ -83,7 +86,7 @@ def parse_gh_api(rest: list[str]) -> tuple[list[tuple[str, str]], list[str]]:
         nonlocal i
         i += 1
         if i >= len(rest):
-            raise Blocked(f"`gh api {name}` needs a value")
+            raise Blocked(f"`{what} {name}` needs a value")
         return rest[i]
 
     while i < len(rest):
@@ -94,20 +97,20 @@ def parse_gh_api(rest: list[str]) -> tuple[list[tuple[str, str]], list[str]]:
         if a.startswith("--"):
             name, eq, attached = a.partition("=")
             if name == "--input":
-                raise Blocked("`gh api --input` sends a request body")
-            if name in GH_API_BOOL:
+                raise Blocked(f"`{what} --input` sends a request body")
+            if name in bool_flags:
                 flags.append((name, attached))
-            elif name in GH_API_VALUE:
+            elif name in value_flags:
                 flags.append((name, attached if eq else value_after(name)))
             else:
-                raise Blocked(f"`gh api {name}` is not a flag this guard knows")
+                raise Blocked(f"`{what} {name}` is not a flag this guard knows")
         elif a.startswith("-") and len(a) > 1:
             j = 1
             while j < len(a):
-                name = GH_API_SHORT.get(a[j])
+                name = short.get(a[j])
                 if name is None:
-                    raise Blocked(f"`gh api -{a[j]}` is not a flag this guard knows")
-                if name in GH_API_BOOL:
+                    raise Blocked(f"`{what} -{a[j]}` is not a flag this guard knows")
+                if name in bool_flags:
                     flags.append((name, ""))
                     j += 1
                     continue
@@ -128,20 +131,22 @@ def other_host(value: str) -> bool:
     return value.startswith("//")
 
 
-# Flags of the gh read commands whose next argument is free text (a jq filter, a template,
-# a search): a slash there is not a repository.
-GH_TEXT_FLAGS = {"-q", "--jq", "-t", "--template", "--json", "-S", "--search", "-L", "--limit"}
-SCP_STYLE = re.compile(r"[^/\s]+@[^/\s]+:")
-
-
-def names_other_host(value: str) -> bool:
-    """True for a positional that gh would read as a repository or URL on another host:
-    HOST/OWNER/REPO, an scp-style `git@host:owner/repo`, or a URL that is not github.com."""
-    if value.startswith("https://github.com/"):
-        return False
-    if other_host(value) or SCP_STYLE.match(value):
-        return True
-    return value.count("/") >= 2 and not any(c.isspace() for c in value)
+# Every flag the gh read commands in GH_READ may carry. Anything else is refused, so a flag
+# this guard does not know cannot swallow, or pose as, a positional.
+GH_READ_VALUE = {"--repo", "--jq", "--template", "--json", "--search", "--limit", "--state",
+                 "--base", "--head", "--label", "--author", "--assignee", "--app", "--mention",
+                 "--milestone", "--job", "--attempt", "--interval", "--branch", "--color"}
+GH_READ_BOOL = {"--comments", "--patch", "--name-only", "--log", "--log-failed", "--verbose",
+                "--exit-status", "--required", "--watch", "--fail-fast", "--draft"}
+GH_READ_SHORT = {"R": "--repo", "q": "--jq", "t": "--template", "S": "--search", "L": "--limit",
+                 "s": "--state", "B": "--base", "H": "--head", "l": "--label", "A": "--author",
+                 "a": "--assignee", "m": "--milestone", "j": "--job", "i": "--interval",
+                 "b": "--branch", "c": "--comments", "v": "--verbose", "d": "--draft"}
+NAME = r"[A-Za-z0-9_][A-Za-z0-9_.-]*"
+OWNER_REPO = re.compile(NAME + "/" + NAME)
+# A PR or issue number, a branch (one slash at most), OWNER/REPO, or a github.com URL. A
+# third path segment would be HOST/OWNER/REPO, and `git@host:o/r` has characters not listed.
+READ_POSITIONAL = re.compile(NAME + "(/" + NAME + ")?")
 
 
 def check_gh(args: list[str]) -> None:
@@ -150,28 +155,22 @@ def check_gh(args: list[str]) -> None:
         if any(long_option_in(a, ("--web",)) or (a.startswith("-") and not a.startswith("--") and "w" in a)
                for a in rest):
             raise Blocked("`--web` opens a browser")
-        for i, a in enumerate(rest):
-            repo = None
-            if a in ("-R", "--repo"):
-                repo = rest[i + 1] if i + 1 < len(rest) else ""
-            elif a.startswith("--repo="):
-                repo = a.split("=", 1)[1]
-            elif a.startswith("-R") and not a.startswith("--"):
-                repo = a[2:].lstrip("=")
-            # OWNER/REPO only: HOST/OWNER/REPO and a URL send the call to another host.
-            if repo is not None and (repo.count("/") != 1 or "://" in repo):
-                raise Blocked("`-R` takes OWNER/REPO on github.com, never a host or a URL")
+        flags, positional = parse_pflags(rest, GH_READ_VALUE, GH_READ_BOOL, GH_READ_SHORT,
+                                         "gh " + " ".join(args[:2]))
+        # OWNER/REPO only: HOST/OWNER/REPO and a URL send the call to another host.
+        if any(name == "--repo" and not OWNER_REPO.fullmatch(v) for name, v in flags):
+            raise Blocked("`-R` takes OWNER/REPO on github.com, never a host or a URL")
+        # `gh repo view host/owner/repo` and `gh pr view git@host:o/r` reach another host
+        # with no -R at all, so every positional is held to the same shapes.
+        for a in positional:
             if other_host(a):
                 raise Blocked("only github.com URLs are allowed")
-            # `gh repo view host/owner/repo` and `gh pr view git@host:o/r` reach another
-            # host with no -R at all, so every positional gets the same rule.
-            is_value = i > 0 and rest[i - 1] in GH_TEXT_FLAGS | {"-R", "--repo"}
-            if not a.startswith("-") and not is_value and names_other_host(a):
+            if not a.startswith("https://github.com/") and not READ_POSITIONAL.fullmatch(a):
                 raise Blocked("only OWNER/REPO, a number, a branch, or a github.com URL is allowed here")
         return
     if args[:1] != ["api"]:
         raise Blocked(f"`gh {' '.join(args[:2])}` is not a read-only gh command")
-    flags, positional = parse_gh_api(args[1:])
+    flags, positional = parse_pflags(args[1:], GH_API_VALUE, GH_API_BOOL, GH_API_SHORT, "gh api")
     methods = [v.upper() for name, v in flags if name == "--method"]
     fields = [(name, v) for name, v in flags if name in ("--field", "--raw-field")]
     if any(m != "GET" for m in methods):
