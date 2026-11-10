@@ -228,6 +228,13 @@ class GuardReviewAgentsTest(unittest.TestCase):
         self.assertBlocked("gh pr view 1 --repo=other.example/o/r", "OWNER/REPO")
         self.assertBlocked("gh pr view https://other.example/o/r/pull/1", "only github.com")
         self.assertAllowed("gh pr view 1 -R o/r --json title")
+        self.assertBlocked("gh repo view other.example/o/r", "only OWNER/REPO")
+        self.assertBlocked("gh repo view git@other.example:o/r", "only OWNER/REPO")
+        self.assertBlocked("gh pr view other.example/o/r/pull/1", "only OWNER/REPO")
+        self.assertAllowed("gh repo view o/r --json name")
+        self.assertAllowed("gh pr view https://github.com/o/r/pull/1")
+        self.assertAllowed("gh pr view feature/login --json title")
+        self.assertAllowed("gh pr list --json number --jq '.[] | \"\\(.a)/\\(.b)/\\(.c)\"'")
         # A 2 that is quoted, or apart from the operator, is an argument, not a file descriptor.
         self.assertAllowed("git log --oneline -5 2>/dev/null")
         self.assertAllowed("git log 2>&1 | head -5")

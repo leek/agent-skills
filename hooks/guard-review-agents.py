@@ -128,6 +128,22 @@ def other_host(value: str) -> bool:
     return value.startswith("//")
 
 
+# Flags of the gh read commands whose next argument is free text (a jq filter, a template,
+# a search): a slash there is not a repository.
+GH_TEXT_FLAGS = {"-q", "--jq", "-t", "--template", "--json", "-S", "--search", "-L", "--limit"}
+SCP_STYLE = re.compile(r"[^/\s]+@[^/\s]+:")
+
+
+def names_other_host(value: str) -> bool:
+    """True for a positional that gh would read as a repository or URL on another host:
+    HOST/OWNER/REPO, an scp-style `git@host:owner/repo`, or a URL that is not github.com."""
+    if value.startswith("https://github.com/"):
+        return False
+    if other_host(value) or SCP_STYLE.match(value):
+        return True
+    return value.count("/") >= 2 and not any(c.isspace() for c in value)
+
+
 def check_gh(args: list[str]) -> None:
     if tuple(args[:2]) in GH_READ:
         rest = args[2:]
@@ -147,6 +163,11 @@ def check_gh(args: list[str]) -> None:
                 raise Blocked("`-R` takes OWNER/REPO on github.com, never a host or a URL")
             if other_host(a):
                 raise Blocked("only github.com URLs are allowed")
+            # `gh repo view host/owner/repo` and `gh pr view git@host:o/r` reach another
+            # host with no -R at all, so every positional gets the same rule.
+            is_value = i > 0 and rest[i - 1] in GH_TEXT_FLAGS | {"-R", "--repo"}
+            if not a.startswith("-") and not is_value and names_other_host(a):
+                raise Blocked("only OWNER/REPO, a number, a branch, or a github.com URL is allowed here")
         return
     if args[:1] != ["api"]:
         raise Blocked(f"`gh {' '.join(args[:2])}` is not a read-only gh command")
