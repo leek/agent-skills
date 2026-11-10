@@ -29,14 +29,19 @@ merged PRs via `gh api`, `git cherry`, and commit subject match), and emits one 
 ranking efforts most urgent first:
 
 - **done**: every file's status is closed or the wontfix role string, every cited commit is on
-  `default_branch`, and nothing contradicts (`mismatch` is `null`).
-- **mismatched**: fails the contradiction check (`spec` still `ready-for-agent` while every ticket
-  is closed, `map` still open while `spec.md` exists, a closed ticket whose cited commit is
-  missing from `default_branch`, or a file with no readable status).
-- **open**: has any open file, with `stale: true` when its newest file is older than 30 days.
+  `default_branch`, and nothing contradicts (`mismatch` is `null`). A spec with tickets is
+  closed by derivation: it is complete (`spec.complete`) once every ticket is closed, whatever
+  its own status, because nothing writes `closed` onto it. A spec with no tickets was
+  implemented directly and needs its own closed status.
+- **mismatched**: fails the contradiction check (`map` still open while `spec.md` exists, a
+  closed ticket whose cited commit is missing from `default_branch`, or a file with no readable
+  status).
+- **open**: has any open file, with `stale: true` when its newest file is older than 30 days
+  (a tracked file's last commit, an untracked file's modification time).
 
 These rules are the source of truth; the `/scratch` board's `hooks/mods/scratch-scan.ts` must
-change with them, so a drift shows as the board and this report disagreeing.
+change with them, so a drift shows as the board and this report disagreeing. Two things stay
+skill-only: the cited-commit check, and the `also` alternatives.
 
 Done when `scripts/scratch-state.sh` has returned the JSON state for every effort in scope.
 
@@ -49,10 +54,12 @@ one line:
 effort gets the full block:
 
 ```markdown
-### `.scratch/<slug>/`: <open | ⚠️ mismatched> · last change <date><, ⚠️ stale>
+### `.scratch/<slug>/`: <open | mismatched> · last change <date><, stale>
+
+<⚠️ mismatched: <mismatch> | ⚠️ stale: no change in <stale_days> days>
 
 **Map**: <title>, <status>. Destination: <one line>.
-**Spec**: <title>, <status>. <problem, one line>. <n> open questions.
+**Spec**: <title>, <status | complete>. <problem, one line>. <n> open questions.
 
 **Decisions**: <n> open of <n>
 | # | Decision | Status | Resolution or blocker |
@@ -86,9 +93,14 @@ Section rules:
   ticket its cited `commits` (`<sha>, on <default_branch>` or `⚠️ <sha> missing`). Empty when
   there is nothing to say. A decision's last column is its `resolution` once closed, its
   `open_blockers` or `claimed_by` while open.
+- The heading carries the plain words `mismatched` and `stale`, never a mark. The ⚠️ status
+  line under it appears only for a mismatched or stale effort; an effort that is neither has
+  no such line.
+- **Spec** prints `complete` in place of the status when `spec.complete` is true and the
+  spec's own status is not closed.
 - Mark nothing else with ⚠️: only stale, mismatched, unreadable, and missing commits.
-- **Next** uses `next` and `next_why`; when mismatched, `next` is the contradiction, printed
-  as `⚠️ <mismatch>`;
+- **Next** uses `next` and `next_why`; when mismatched, `next` is the contradiction already on
+  the ⚠️ status line, so **Next** prints `next_why` alone.
   **Also** prints the entries in `also` when non-empty.
 
 After the last block, one line naming any path in `unreadable_efforts`, then a one-line total

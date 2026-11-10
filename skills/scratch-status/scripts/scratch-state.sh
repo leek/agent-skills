@@ -41,6 +41,9 @@ done
 top=$(git rev-parse --show-toplevel 2>/dev/null) && cd "$top"
 
 python3 - "$days" "$slug" <<'PY'
+# Annotations stay unevaluated, so `dict | None` loads on the macOS system Python 3.9.
+from __future__ import annotations
+
 from datetime import datetime, timezone
 import json
 import os
@@ -392,10 +395,17 @@ def analyze_effort(slug_name: str, effort_dir: Path) -> dict | None:
     tickets = [f for f in files if f["kind"] == "ticket"]
     requests = [f for f in files if f["kind"] == "request"]
 
+    # A spec built through tickets is complete when every ticket is closed: nothing writes
+    # `closed` onto it, so its own status never keeps the effort open. A spec with no tickets
+    # was implemented directly and needs its own closed status.
+    spec_complete = spec_f is not None and (
+        is_closed(spec_f) or (bool(tickets) and all(is_closed(t) for t in tickets))
+    )
+    if spec_f is not None:
+        spec_f["complete"] = spec_complete
+
     if unread is not None:
         mismatch = f"no readable status: {unread['path']}"
-    elif spec_f and not is_closed(spec_f) and spec_f["status"] != "in-progress" and tickets and all(is_closed(t) for t in tickets):
-        mismatch = f"spec still {spec_f['status']} while every ticket is closed"
     elif map_f and not is_closed(map_f) and spec_f is not None:
         mismatch = "map still open though spec.md exists"
     else:
@@ -407,7 +417,7 @@ def analyze_effort(slug_name: str, effort_dir: Path) -> dict | None:
 
     last_ts = max(f["mtime_ts"] for f in files)
     last_date = max(files, key=lambda f: f["mtime_ts"])["last_change"]
-    open_files = [f for f in files if not is_closed(f)]
+    open_files = [f for f in files if not is_closed(f) and not (f is spec_f and spec_complete)]
 
     if mismatch is not None:
         state = "mismatched"
@@ -432,7 +442,7 @@ def analyze_effort(slug_name: str, effort_dir: Path) -> dict | None:
         next_why = "settle the contradiction before removing or advancing"
     elif state == "done":
         next_cmd = "/scratch-cleanup"
-        next_why = "all artifacts are closed and cited commits are on the default branch"
+        next_why = "nothing is left open and cited commits are on the default branch"
     else:
         ready_decisions = [d for d in decisions if d["derived_status"] == "ready"]
         ready_tickets = [t for t in tickets if t["derived_status"] == "ready"]
@@ -441,7 +451,11 @@ def analyze_effort(slug_name: str, effort_dir: Path) -> dict | None:
 
         if ready_decisions:
             pick = ready_decisions[0]
-            next_cmd = f"/grill-me {at(pick['path'])}"
+            # An open map's decisions are worked through wayfinder, which picks the frontier ticket.
+            if map_f and not is_closed(map_f):
+                next_cmd = f"/wayfinder {at(map_f['path'])}"
+            else:
+                next_cmd = f"/grill-me {at(pick['path'])}"
             next_why = f"lowest-numbered ready decision ({pick['number']})"
             if len(ready_decisions) >= 2 and map_f:
                 also.append(f"/wayfinder {at(map_f['path'])} all")
@@ -450,7 +464,7 @@ def analyze_effort(slug_name: str, effort_dir: Path) -> dict | None:
             next_cmd = f"/wayfinder {at(map_f['path'])}"
             next_why = "map has no decision tickets yet"
         elif map_f and not is_closed(map_f) and decisions and all(is_closed(d) for d in decisions) and not spec_f:
-            next_cmd = "/to-spec"
+            next_cmd = f"/to-spec {at(map_f['path'])}"
             next_why = "every decision is closed and no spec exists yet"
         elif spec_f and not is_closed(spec_f) and spec_f.get("open_questions", 0) > 0 and not any(is_closed(t) or t["derived_status"] == "in progress" for t in tickets):
             next_cmd = f"/grill-me {at(spec_f['path'])}"

@@ -14,11 +14,13 @@ export function describeTool(tool: string, input: Record<string, unknown>): stri
 }
 
 export function duration(ms: number): string {
-  if (ms < 60_000) {
-    return `${Math.round(ms / 1000)}s`
+  // Round once, to whole seconds, then split: rounding each part alone gives `60s` and `1m60s`.
+  const seconds = Math.round(ms / 1000)
+  if (seconds < 60) {
+    return `${seconds}s`
   }
 
-  return `${Math.floor(ms / 60_000)}m${String(Math.round((ms % 60_000) / 1000)).padStart(2, '0')}s`
+  return `${Math.floor(seconds / 60)}m${String(seconds % 60).padStart(2, '0')}s`
 }
 
 export const isFailed = (w: Worker) => w.outcome === 'error' || w.outcome === 'refusal' || w.outcome === 'aborted'

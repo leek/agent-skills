@@ -19,7 +19,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { BoardTicket, ScratchEffort, TicketBoard, Worker } from '../../types'
-import { isClosed, scan, summary, tally } from './scratch-scan'
+import { normalizeSlug, openFiles, scan, summary, tally } from './scratch-scan'
 import {
   SCHEMA,
   apply,
@@ -56,12 +56,55 @@ let only = ''
 // The person closed the ticket pane; later updates for the same board leave it closed.
 let isTicketsDismissed = false
 
+// Last commit time of each tracked path, as scratch-state.sh reads it: `git ls-files` once
+// per scan, then one `git log -1` per tracked file. Any failure leaves the path to its mtime.
+function commitTimes($: EngineInterface, cwd: string) {
+  let tracked: Promise<Set<string>> | undefined
+  const listTracked = async () => {
+    const ls = await $.process.run(['git', 'ls-files', '-z', '.scratch'], { cwd })
+
+    return new Set(ls.exitCode === 0 ? ls.stdout.split('\0').filter(Boolean) : [])
+  }
+
+  return async (paths: readonly string[]) => {
+    const times = new Map<string, number>()
+    tracked ??= listTracked().catch(() => new Set<string>())
+    const known = await tracked
+    await Promise.all(
+      paths
+        .filter(p => known.has(p))
+        .map(async p => {
+          try {
+            const log = await $.process.run(['git', 'log', '-1', '--format=%ct', '--', p], { cwd })
+            const seconds = Number(log.stdout.trim())
+            if (log.exitCode === 0 && seconds > 0) {
+              times.set(p, seconds * 1000)
+            }
+          } catch {
+            // This file falls back to its mtime.
+          }
+        }),
+    )
+
+    return times
+  }
+}
+
 async function refresh($: EngineInterface) {
-  const root = `${await $.session.cwd()}/.scratch`
+  const cwd = await $.session.cwd()
+  const root = `${cwd}/.scratch`
   if (!(await $.fs.exists(root))) {
+    // .scratch/ is gone: an open pane shows an empty board, not the last one it drew.
+    const now = await $.clock.now()
+    await update($, board, shown => (shown === null ? null : { root, scannedAt: now, efforts: [] }))
+
     return null
   }
-  const reader = { list: (path: string) => $.fs.list(path), read: (path: string) => $.fs.read(path) }
+  const reader = {
+    list: (path: string) => $.fs.list(path),
+    read: (path: string) => $.fs.read(path),
+    commitTimes: commitTimes($, cwd),
+  }
   const result = await scan(reader, root, await $.clock.now(), only)
   await update($, board, () => result)
 
@@ -111,7 +154,7 @@ export const register: Register = on => {
   }).catch(($, e, next) => next(e))
 
   on('command.run', { command: 'scratch' }, async ($, e) => {
-    only = e.args.trim()
+    only = normalizeSlug(e.args)
     const result = await refresh($)
     if (result === null) {
       return { text: 'No .scratch/ directory here.' }
@@ -252,7 +295,7 @@ export const register: Register = on => {
     const now = await $.clock.now()
 
     const row = (effort: ScratchEffort) => {
-      const open = effort.files.filter(f => !isClosed(f))
+      const open = openFiles(effort.files)
       const color = effort.state === 'mismatched' ? 'warning' : effort.state === 'done' ? undefined : 'success'
       const sign =
         effort.state === 'done' ? '✓' : effort.state === 'mismatched' ? '!' : effort.frontier.length > 0 ? '●' : '○'

@@ -15,6 +15,8 @@ export type ScratchFile = {
   blockedBy: string[]
   /** `delivery: true`: the spec's last ticket, which proves the spec shipped. */
   delivery: boolean
+  /** Non-empty lines under a spec's `## Open Questions`; 0 for every other kind. */
+  openQuestions: number
 }
 
 export type ScratchEffort = {
@@ -23,7 +25,7 @@ export type ScratchEffort = {
   lastChangeMs: number
   state: 'open' | 'done' | 'mismatched'
   isStale: boolean
-  /** Open files whose blockers are all closed, unclaimed, ticket or decision. */
+  /** Open tickets and decisions ready to start: blockers all closed, unclaimed, not `in-progress`. */
   frontier: string[]
   next: string
 }

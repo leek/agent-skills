@@ -85,6 +85,59 @@ test('/scratch draws the board and answers with a tally, or the table where no p
   expect(await pane.find({ type: 'Text', text: /01 Login form/ })).toBeDefined()
 })
 
+test('/scratch takes a path as the slug, ages a tracked file by its last commit, and empties the pane when .scratch/ is gone', async ($, on) => {
+  const DAY = 86_400_000
+  const now = 100 * DAY
+  const files: Record<string, string> = {
+    '/repo/.scratch/auth/tickets/01-login.md': '---\ntitle: Login form\nstatus: ready-for-agent\n---\n',
+    '/repo/.scratch/billing/tickets/01-invoice.md': '---\ntitle: Invoice\nstatus: ready-for-agent\n---\n',
+  }
+  let hasScratch = true
+  on('ui.render', async ($, e) => engineDraw($, e))
+  mock.clock(on, { now })
+  on('session.cwd', async () => ({ value: '/repo' }) as never)
+  on('fs.exists', async () => ({ value: hasScratch }) as never)
+  on('fs.read', async (_$, e) => ({ value: files[(e as { path: string }).path] ?? '' }) as never)
+  on('fs.list', async (_$, e) => {
+    const names = new Map<string, 'file' | 'dir'>()
+    for (const full of Object.keys(files)) {
+      if (!full.startsWith(`${e.path}/`)) continue
+      const parts = full.slice(e.path.length + 1).split('/')
+      names.set(parts[0] ?? '', parts.length > 1 ? 'dir' : 'file')
+    }
+    // Every file was touched just now; only git knows the auth ticket is 40 days old.
+    const value = [...names].map(([name, kind]) => ({ name, kind, size: 1, mtimeMs: now, isLink: false }))
+    return { value } as never
+  })
+  on('process.run', async (_$, e) => {
+    const argv = (e as { argv: readonly string[] }).argv
+    const stdout =
+      argv[1] === 'ls-files'
+        ? '.scratch/auth/tickets/01-login.md\0'
+        : argv[1] === 'log' && argv.at(-1) === '.scratch/auth/tickets/01-login.md'
+          ? `${(now - 40 * DAY) / 1000}\n`
+          : ''
+    return { value: { exitCode: 0, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } } as never
+  })
+  on('ui.open', async () => ({ value: { isPlaced: true } }) as never)
+  on('tool.call', async () => ({ result: 'ok' }) as never)
+
+  const all = await $.command.run({ command: 'scratch', args: '' } as never)
+  expect(all.text).toBe('2 open, 1 stale, 0 mismatched, 0 done. Commit checks: /scratch-status.')
+
+  const one = await $.command.run({ command: 'scratch', args: ' .scratch/auth/ ' } as never)
+  expect(one.text).toBe('1 open, 1 stale, 0 mismatched, 0 done. Commit checks: /scratch-status.')
+  const pane = await $.ui.mount({ plugin: 'leek-skills', surface: 'terminal', ...PANE } as never)
+  expect(await pane.find({ type: 'Text', text: /01 Login form/ })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: /01 Invoice/ })).toBeUndefined()
+
+  // .scratch/ is removed while the pane is open: the next rescan must not leave the old board up.
+  hasScratch = false
+  await $.tool.call({ tool: 'Bash', command: 'rm -r .scratch/', tool_use_id: 't1' } as never)
+  expect(await pane.find({ type: 'Text', text: /01 Login form/ })).toBeUndefined()
+  expect(await pane.find({ type: 'Text', text: /No efforts in \.scratch\// })).toBeDefined()
+})
+
 test('ticket_board draws each ticket beside its running implementer, or asks for chat lines where no pane draws', async ($, on) => {
   mock.clock(on, { now: 0 })
   on('ui.render', async ($, e) => engineDraw($, e))
