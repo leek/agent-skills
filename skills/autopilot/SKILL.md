@@ -13,13 +13,13 @@ Run approved pipeline work until it is complete or reaches a genuine human gate.
 
 1. Require a reference to a `wayfinder` map, a spec, or a ticket. Run from the target Git repository.
 2. Select the current harness as the provider: `claude` in Claude Code, `codex` in Codex, `grok` in Grok. When running directly from a terminal, require the user to choose.
-3. Resolve this skill's installed directory, then run the bundled script by absolute path while keeping the target repository as the working directory:
+3. Resolve this skill's installed directory (`<this-skill-dir>`), then run the bundled script by absolute path while keeping the target repository as the working directory:
 
 ```bash
-bash <autopilot-skill-dir>/scripts/autopilot.sh --provider <claude|codex|grok> --root <ref>
+bash <this-skill-dir>/scripts/autopilot.sh --provider <claude|codex|grok> --root <ref>
 ```
 
-`bash <autopilot-skill-dir>/scripts/autopilot.sh --help` is the reference for every flag (`--repo`, `--max-iterations`, `--model`, `--effort`, `--log-file`, `--tmux`), the observer modes and what each prints, the model and effort sources, and the exit codes.
+`bash <this-skill-dir>/scripts/autopilot.sh --help` is the reference for every flag (`--repo`, `--max-iterations`, `--model`, `--effort`, `--log-file`, `--tmux`), the observer modes and what each prints, the model and effort sources, and the exit codes.
 
 Run the script as a background task: one iteration is a full build lifecycle and routinely outlasts a foreground shell-command timeout. Its exit is the completion signal (for a `--tmux` run, one background `--wait`). Immediately report the run ID, worker session model and effort, log path, and printed observer commands. Then report worker milestones and five-minute heartbeats as they arrive; leave routine tool events in the log. Stream them by running `--follow 2>&1 | grep --line-buffered -E 'Autopilot: (iteration |selected |next |worker(:| alive)|ticket )|quiet threshold|gate|failed|invalid|interrupted|stopped'` under `Monitor` where available (re-arm when it expires; every `--follow` line is `<timestamp> Autopilot: <message>`); otherwise read `--status` and the log tail each time the turn resumes, and when the run exits. On exit `2` (needs input), `3` (blocked), `4`, or `5` (failure), ping the user (`PushNotification` where available, otherwise in the chat report) with the status and reason.
 
@@ -43,7 +43,7 @@ Use the installed workflow skills as the single source of truth. The script loca
 
 ## Ticket status
 
-Every unit is marked in progress before work starts and closed after it is verified and committed, so the markdown tracker under `.scratch/` always reflects reality. The worker writes the transition into the file's YAML frontmatter (`status: in-progress` plus `claimed-by: autopilot:<run-id>`, then `status: closed` plus `## Resolution`) for build tickets and directly implemented specs; a `wayfinder` decision ticket gets only the claim, its `status` staying `open` until it closes.
+Every unit is marked in progress before work starts and closed after it is verified and committed, so the markdown tracker under `.scratch/` always reflects reality. The worker writes the transition into the file's YAML frontmatter (`status: in-progress` plus `claimed-by: autopilot:<run-id>`, then the tracker's Resolve operation: `status: closed` plus `## Resolution`, the claim cleared) for build tickets and directly implemented specs; a `wayfinder` decision ticket gets only the claim, its `status` staying `open` until it closes.
 
 The runner does not take that on trust. It snapshots every work item beside the root before each iteration, announces each status change afterwards (`ticket .scratch/x/tickets/01-y.md: ready-for-agent -> closed`), and fails the run when a successful result names a different unit or one whose file is not closed. It then rereads the tracker itself and replaces the worker's `status` and `next_ref` with the authoritative next frontier, completion, human gate, or blocked state. A unit this run claimed and left open is announced as an open claim.
 

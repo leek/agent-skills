@@ -20,7 +20,7 @@ The script walks `.scratch/`, checks git tracking (`tracked` and `untracked_file
 - **`efforts`**: each `.scratch/<slug>/` directory, classified as:
   - **done**: every artifact (`map`, `decisions`, `spec`, `tickets`/`issues`, `requests`) is closed or wontfix, every cited commit is on `default_branch`, and `mismatch` is `null`. A spec with tickets counts as closed when every ticket is: no skill writes `closed` onto it.
   - **mismatched**: has an unreadable status (`unreadable_efforts` or `mismatch`) or a contradiction (e.g., a map still open though its spec exists, or a closed ticket whose cited commit is missing). Goes in the plan as a question, never a removal.
-  - **open**: has any open file, with `stale: true` when its newest file is older than `--days`. Any `claimed_by` in a stale effort is a stale claim to release in step 3 (the session is gone), with the tracker's **Release** operation: clear `claimed-by`, and set a build ticket's `status: in-progress` back to `ready-for-agent`, so the ticket returns to the frontier.
+  - **open**: has any open file, with `stale: true` when its newest file is older than `--days`. Any `claimed_by` in a stale effort is a stale claim by the tracker's **Stale claim** rule (clearly abandoned: its session is gone), to release in step 3 so the ticket returns to the frontier.
 - **`research`**: findings files under `.scratch/research/` or loose `.md` files ending in **What this unblocks**.
 - **`unclassified`**: everything else outside an effort (wizards, loose notes, questionnaires, and `.DS_Store` entries marked `junk: true`, which go in the plan as deletions with no question).
 
@@ -46,7 +46,7 @@ Apply only what the user approved, in this order:
 1. **ADRs first**, while the source files still exist: write each picked candidate as an ADR through the `domain-modeling` skill's format and location (`docs/adr/` in a single-context repo).
 2. **File research**: `git mv` for tracked files, `mv` for untracked ones, creating `docs/` folders as needed. Rewrite every inbound link found in step 2 to the new path.
 3. **Remove**: `git rm -r -- <path>` for committed efforts and files; `rm` for approved untracked ones and `.DS_Store`.
-4. **Release stale claims** found in step 1.
+4. **Release stale claims** found in step 1, with the tracker's **Release** operation: `bash <this-skill-dir>/../setup/scripts/ticket.sh release <path>` for each (`<this-skill-dir>` is this skill's directory). It clears `claimed-by` and returns an `in-progress` build ticket to the AFK-ready status. A file it refuses (exit 1: no frontmatter block) stays as it is; name it in the report.
 5. **Stage** every changed path by explicit path (`git add -- <path> …`); the commit waits for the user's yes in step 4.
 
 Done when `rg -n --fixed-strings` finds no reference to any moved or removed path, and `git status --short` shows only the approved changes.

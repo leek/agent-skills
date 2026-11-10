@@ -19,7 +19,7 @@ Next:
 Rules:
 
 1. Bold the current pipeline stage on the `decide → spec → tickets → build` line (or note a supporting role, e.g. review runs inside build).
-2. Fill **Done** from live state: never guess at frontiers; query the markdown tracker when the skill owns one. Count a built item done only when you observed its result in the output (the rendered page, the response, a passing test that asserts it); an item edited but not observed is listed as unchecked. A text change is observed by searching the built output for the old wording too.
+2. Fill **Done** from live state: never guess at frontiers; run the tracker's Frontier operation (`ticket.sh frontier <slug>`, for its `frontier`, `next`, and `counts`) when the skill owns one. Count a built item done only when you observed its result in the output (the rendered page, the response, a passing test that asserts it); an item edited but not observed is listed as unchecked. A text change is observed by searching the built output for the old wording too.
 3. List only **Next** conditions that actually apply, most likely first. A condition applies while its trigger is still open, so a finished effort or a closed map adds none. When the user already made the choice (build on the current branch and commit there), the only Next line is that action, with no alternatives beside it. When nothing remains, leave out the Next line.
 4. Never tell the user to `/clear`, compact, or start a fresh session, in **Next** or anywhere in the block. Each **Next** line is the command alone; when and whether to clear is the user's call.
 5. Prefix the **Done** line with ✅ (⚠️ on a stop or dead end) and the **Next** line with 👉. No other marks in the block.

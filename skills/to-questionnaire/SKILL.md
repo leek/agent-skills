@@ -72,6 +72,6 @@ Stage-specific **Next** conditions (only those that apply, most likely first):
 
 - **Questionnaire written, answers not back yet** → nothing to run; send it, then `/grill-me` on the blocked branch once answers land. Name the branch so the next session knows what was waiting.
 - **Answers already in hand** → if they were given online, read them back first (Claude Docs `read`, or `ArtifactData` `list` on the page's `answers`) into the `.md` file's answer stubs; then `/grill-me` on the blocked branch, feeding the answers in
-- **It unblocks a `wayfinder` ticket** → Release that ticket (clear its claim) and leave a `## Comments` note saying it waits on this questionnaire, so it stays visible on the frontier rather than stranded under a dead claim; `/wayfinder <map>` to re-claim and resolve it once the answers land
+- **It unblocks a `wayfinder` ticket** → Release that ticket with a note that it waits on this questionnaire (`bash <this-skill-dir>/../setup/scripts/ticket.sh release <ticket path> --note "<text>"`; `<this-skill-dir>` is this skill's directory), so it stays visible on the frontier rather than stranded under a dead claim; `/wayfinder <map>` to re-claim and resolve it once the answers land
 - **Part of the gap is a documented fact, not a person's knowledge** → `/research` on that part in parallel
 - **Stopped before finishing** → say what the draft covers and which of the user's needs have no question yet

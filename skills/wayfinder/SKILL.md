@@ -31,7 +31,7 @@ Every map and ticket has a **name**: its title. In everything the human reads, r
 
 The map is the canonical wayfinding artifact under `.scratch/`. Its tickets are children of the map. The map is an **index**, not a store: it lists decisions made and points at the tickets that hold their detail; a decision lives in exactly one place, its ticket. Build work never appears here; that is the spec's job.
 
-Maps, tickets, and specs are markdown files under `.scratch/`. Read the layout once per session from `.agents/issue-tracker.md` (written by `/setup`). If it's missing, try `docs/agents/issue-tracker.md` (legacy), then the `setup` skill's seed; suggest running `/setup` once to make the paths durable. Its **Wayfinding operations** are the single source of truth for creating maps and children, recording types, wiring blockers, claiming, querying the frontier, resolving, and linking assets.
+Maps, tickets, and specs are markdown files under `.scratch/`. Read the layout once per session from `.agents/issue-tracker.md` (written by `/setup`). If it's missing, try `docs/agents/issue-tracker.md` (legacy), then the `setup` skill's seed; suggest running `/setup` once to make the paths durable. Its **Wayfinding operations** are the single source of truth for creating maps and children, recording types, wiring blockers, claiming, querying the frontier, resolving, and linking assets. The mechanical ones are calls to `bash <this-skill-dir>/../setup/scripts/ticket.sh`, written `ticket.sh` below (`<this-skill-dir>` is this skill's directory).
 
 Map body template, ticket body, claim/block/resolve mechanics: [references/map-and-tickets.md](references/map-and-tickets.md). Ticket types (research / prototype / grilling / task): [references/ticket-types.md](references/ticket-types.md). Fog of war and out-of-scope rules: [references/fog-and-scope.md](references/fog-and-scope.md). Load each when charting or resolving.
 
@@ -59,17 +59,17 @@ User invokes with a loose idea.
 User invokes with a map (its path or title). A ticket is optional, without one, you pick the next. With `all` after the map, this is a **map run**: read [references/map-run.md](references/map-run.md) first, it loops the steps below over the whole frontier.
 
 1. Load the **map**: the low-res view, not every ticket body.
-2. Choose the ticket. If the user named one, use it; otherwise take the first frontier ticket. **Claim it** through the tracker's Claim operation before any work.
+2. Choose the ticket. If the user named one, use it; otherwise take `next` from `ticket.sh frontier <slug> --kind decisions`. **Claim it** before any work: `ticket.sh claim <path> --as <session-unique id>`.
 3. Resolve it per its type: zoom as needed: fetch full bodies of related or closed tickets on demand; consult the skills the map's Notes name. If in doubt, grill.
-4. Record the answer through the tracker's Resolve operation, which closes the ticket. The map's Decisions so far is derived from the closed, resolved tickets, don't hand-append it.
-5. Add newly surfaced tickets (create-then-wire); graduate any fog the answer made specifiable, clearing each graduated patch from Not yet specified. If the answer reveals a ticket sits beyond the destination, use the tracker's Close operation to rule it out of scope (not Resolve, so it stays out of Decisions so far). Update tickets that remain valid; Close invalidated tickets as superseded with a short reason so their history remains intact.
-6. **Say whether the map is clear.** It is clear when no ticket is open and nothing remains in Not yet specified. Say so plainly, because that is the signal to run `to-spec`: once.
+4. Record the answer through the tracker's Resolve operation (`ticket.sh resolve <path> --body-file <file>`), which closes the ticket. The map's Decisions so far is derived from the closed, resolved tickets, don't hand-append it.
+5. Add newly surfaced tickets (create-then-wire); graduate any fog the answer made specifiable, clearing each graduated patch from Not yet specified. If the answer reveals a ticket sits beyond the destination, use the tracker's Close operation (`ticket.sh close <path> --reason-file <file>`) to rule it out of scope (not Resolve, so it stays out of Decisions so far). Update tickets that remain valid; Close invalidated tickets as superseded with a short reason so their history remains intact.
+6. **Say whether the map is clear.** It is clear when no ticket is open (`frontier`'s `counts.open` is 0) and nothing remains in Not yet specified. Say so plainly, because that is the signal to run `to-spec`: once.
 
 The user may run unblocked tickets in parallel, so expect other sessions to be editing the tracker concurrently.
 
 ## When you're done
 
-Print the end-of-session block using the frame in [`references/pipeline-end-block.md`](references/pipeline-end-block.md). Refer to the map and tickets **by name**, per **Refer by name** above. Query the markdown tracker for the current frontier before writing the block, don't guess at what's open.
+Print the end-of-session block using the frame in [`references/pipeline-end-block.md`](references/pipeline-end-block.md). Refer to the map and tickets **by name**, per **Refer by name** above. Run `ticket.sh frontier <slug> --kind decisions` for the current frontier and `counts` before writing the block, don't guess at what's open.
 
 ```text
 ---

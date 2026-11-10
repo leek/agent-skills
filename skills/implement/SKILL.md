@@ -33,14 +33,14 @@ Classify the input and make its acceptance criteria explicit:
 - **Spec**: fetch its full body and comments. If it holds more than one independently deliverable ticket or cannot fit one session, it needs tickets: with its `tickets/` published, the scope question picks the next ticket or a spec run; with none, stop and tell the user to run `to-tickets`. A spec that fits one session is itself the work item.
 - **Conversation**: restate the scope and behavior criteria in a few lines. It has no tracker claim or resolution.
 
-Work items are markdown files under `.scratch/`: there is no external tracker. When launch context already identifies the selected file, its status, and blockers, revalidate those exact files rather than rereading the tracker layout. Otherwise read the layout once through `.agents/issue-tracker.md` (written by `/setup`). If it's missing, try `docs/agents/issue-tracker.md` (legacy), then the `setup` skill's seed. Confirm every direct blocker is closed through the item's `blocked-by` frontmatter, and stop before claiming if any remain open. Then claim before building:
+Work items are markdown files under `.scratch/`: there is no external tracker. When launch context already identifies the selected file, its status, and blockers, revalidate those exact files rather than rereading the tracker layout. Otherwise read the layout once through `.agents/issue-tracker.md` (written by `/setup`). If it's missing, try `docs/agents/issue-tracker.md` (legacy), then the `setup` skill's seed. Its operations are calls to `bash <this-skill-dir>/../setup/scripts/ticket.sh`, written `ticket.sh` below (`<this-skill-dir>` is this skill's directory). Then claim before building, with the tracker's **Claim** operation: `ticket.sh claim <path> --as <session-unique id>`. It prints `won`; on `false`, its `reason` and `open_blockers` say why, nothing was written, and you stop: every direct blocker must be closed first.
 
-- On a ticket from `to-tickets`, or a directly implemented spec, set its frontmatter `status: in-progress` and `claimed-by:` to a session-unique value, then re-read to confirm you won the claim (compare-after-write, see the tracker's Working in parallel rules). A spec built directly is claimed exactly like a ticket; it is the file you build from, not a parent to leave alone.
-- On a `wayfinder` decision ticket, use the Wayfinding **Claim** operation (`claimed-by`).
+- On a ticket from `to-tickets`, or a directly implemented spec, the claim sets `status: in-progress` and `claimed-by`. A spec built directly is claimed exactly like a ticket; it is the file you build from, not a parent to leave alone.
+- On a `wayfinder` decision ticket, the claim sets only `claimed-by`.
 
 A ticket or spec is **trackable**: its frontmatter `status` is the state of record. Some repos also keep a ledger or prose summary of efforts in their tracker doc; update it when the repo asks, but it never replaces the frontmatter write. Building in a linked worktree changes nothing: write and commit the frontmatter there, and it reaches the main checkout when the branch merges.
 
-If the item is already claimed or in progress, stop; treat the claim as stale only when its work is visibly committed or clearly abandoned.
+If the claim is refused as `claimed` or `in-progress`, stop; treat the claim as stale only when its work is visibly committed or clearly abandoned (the tracker's **Stale claim** rule). Take a stale one over with `ticket.sh release <path>`, then claim it.
 
 After claiming, or after scoping conversation-only work, record the output of `git rev-parse HEAD` as immutable `base_sha`. Use that exact SHA for review and for proving failures pre-existing.
 
@@ -90,19 +90,19 @@ If an external dependency prevents verification, keep the committed implementati
 
 After successful verification, record what was built, any justified deviation, verification evidence, the implementation commit SHA or SHAs, and any public seam a direct successor should reuse; check off every satisfied acceptance criterion. This `Resolution` is the successor handoff, so keep the seam and evidence concrete without retelling the parent spec. Resolve the work item according to its branch:
 
-- **Ticket, or a directly implemented spec**: set its frontmatter `status: closed` and append `## Resolution`. Write `closed` exactly, never an invented value such as `built` or `done`. A delivery ticket with after-deploy steps left goes to `ready-for-human` instead, per its file.
-- **`wayfinder` decision ticket**: use the Wayfinding **Resolve** operation.
+- **Ticket, or a directly implemented spec**: write the Resolution to a temporary file and run `ticket.sh resolve <path> --body-file <file>` (the tracker's **Resolve** operation): it appends `## Resolution`, sets `status: closed`, and clears the claim. Never hand-write an invented status such as `built` or `done`. A delivery ticket with after-deploy steps left goes to `ready-for-human` instead, per its file.
+- **`wayfinder` decision ticket**: the same `resolve` call.
 - **Conversation**: report the result without touching any file under `.scratch/`.
 
 Leave every parent open; a ticket never closes its spec, and `implement` never touches the map (the map was already closed by `to-spec`, or by a spec-less `to-tickets`, when the spec or tickets were written). A spec is **complete** when every ticket in its `tickets/` is closed; a derived state you report, not a status you write onto the spec. When the spec itself was the one-session work item, close that spec directly. Keep the resolution write out of code commits: if `.scratch/` is tracked, commit it separately; never fold it into an implementation commit. Resolution text cites the implementation commits, never its own closure commit.
 
-For trackable work, re-read the markdown file after writing it and verify its frontmatter reads `status: closed` with a `## Resolution` section.
+For trackable work, confirm the call printed `status: closed`. A refusal (exit 1) names its reason and wrote nothing.
 
 Finish when the implementation commits and any separate resolution commit are recorded and the tracker's final state is verified, or the conversation-only result is reported. Then stop; the next work item is a new `implement` run, never a continuation of this one.
 
 ## When you're done
 
-Print the end-of-session block using the frame in [`wayfinder/references/pipeline-end-block.md`](../wayfinder/references/pipeline-end-block.md). For a trackable work item with a parent, check the markdown tracker for the remaining frontier before writing the block, don't guess at what's left.
+Print the end-of-session block using the frame in [`wayfinder/references/pipeline-end-block.md`](../wayfinder/references/pipeline-end-block.md). For a trackable work item with a parent, run `ticket.sh frontier <slug>` for the remaining frontier (`frontier`, `next`, `counts`) before writing the block, don't guess at what's left.
 
 ```text
 ---

@@ -1,6 +1,6 @@
 # Map body and tickets
 
-Open tickets are **not** listed on the map: find them through the tracker's Frontier operation.
+Open tickets are **not** listed on the map: find them through the tracker's Frontier operation, `bash <this-skill-dir>/../setup/scripts/ticket.sh frontier <slug> --kind decisions` (`<this-skill-dir>` is the `wayfinder` skill's directory; written `ticket.sh` below).
 
 ## Map body
 
@@ -44,8 +44,8 @@ Each ticket is a **child file** of the map. Sized to one fresh ~100K-token agent
 
 Each ticket records one type (`research`, `prototype`, `grilling`, or `task`) through the configured tracker's wayfinding operations.
 
-A session **claims** a ticket through the tracker's Claim operation **first**, before any work, so concurrent sessions skip it. A ticket with no claim is unclaimed.
+A session **claims** a ticket through the tracker's Claim operation (`ticket.sh claim <path> --as <session-unique id>`) **first**, before any work, so concurrent sessions skip it. A ticket with no claim is unclaimed.
 
-Wire blocking through the tracker's Wire blocking operation. A ticket is **unblocked** when every ticket blocking it is closed; the **frontier** is the open, unblocked, unclaimed children, the edge of the known.
+Wire blocking through the tracker's Wire blocking operation. A ticket is **unblocked** when every ticket blocking it is closed; the **frontier** is the open, unblocked, unclaimed children, the edge of the known: the Frontier call's `frontier`, lowest number first.
 
-Record the answer only through the tracker's Resolve operation, rather than duplicating it in the initial question. Link assets created while resolving through its Assets operation.
+Record the answer only through the tracker's Resolve operation (`ticket.sh resolve <path> --body-file <file>`), rather than duplicating it in the initial question. Link assets created while resolving through its Assets operation.

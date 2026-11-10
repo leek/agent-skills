@@ -25,25 +25,25 @@ For a wayfinder map, run only an AFK research or task ticket. Return `needs_inpu
 
 For build work, read `implement` completely and follow its full lifecycle for the selected ticket or one-session spec: claim, test at chosen seams, review through its subagents, verify end to end, explicitly stage, commit, and close. Complete no second unit in this process. Its delivery shape is **Current branch**: commit on the branch the run started on, and skip `implement`'s delivery question. Nobody can answer its step 6 full-suite question either: follow the repo's rule or the user's saved preference when one settles it, and otherwise skip the full run, let the focused tests stand, and say so in the result.
 
-A delivery ticket (`delivery: true`) runs only its pass 1, per `to-tickets/DELIVERY-TICKET.md`. When its After deploy list is not `None`, set `status: ready-for-human`, clear the claim, commit the tracker, and return `needs_input` naming the deploy and the after-deploy steps. A coverage gap is a new ticket per that file: release this ticket and commit the tracker as that file says, then return `needs_input` naming the new ticket. These are the two cases where `needs_input` does not leave the claim in place.
+A delivery ticket (`delivery: true`) runs only its pass 1, per `to-tickets/DELIVERY-TICKET.md`. When its After deploy list is not `None`, set `status: ready-for-human` and clear the claim with that file's two `ticket.sh` calls, commit the tracker, and return `needs_input` naming the deploy and the after-deploy steps. A coverage gap is a new ticket per that file: release this ticket and commit the tracker as that file says, then return `needs_input` naming the new ticket. These are the two cases where `needs_input` does not leave the claim in place.
 
 ## Keep the tracker current
 
 The tracker is the loop's only memory: the next process recomputes the frontier from these files alone. Write the status transition into the work item at both ends of the unit, in the shape its tracker uses.
 
-Mark it in progress **before** changing any code or dispatching any subagent:
+Mark it in progress **before** changing any code or dispatching any subagent, with the tracker's Claim operation: `bash <this-skill-dir>/../setup/scripts/ticket.sh claim <path> --as autopilot:<run-id>`. Go on only when it prints `"won": true`.
 
-- Build ticket from `to-tickets`, or a directly implemented spec, set the frontmatter `status: in-progress` and `claimed-by: autopilot:<run-id>`.
-- `wayfinder` decision ticket: set `claimed-by: autopilot:<run-id>` in the frontmatter and leave `status: open`.
+- Build ticket from `to-tickets`, or a directly implemented spec: it sets `status: in-progress` and `claimed-by: autopilot:<run-id>`.
+- `wayfinder` decision ticket: it sets `claimed-by: autopilot:<run-id>` and leaves `status: open`.
 
-Mark it done as the last step of the unit, after verification and the durable commit:
+Mark it done as the last step of the unit, after verification and the durable commit, with the tracker's Resolve operation: write the Resolution to a temporary file and run `bash <this-skill-dir>/../setup/scripts/ticket.sh resolve <path> --body-file <file>` (`<this-skill-dir>` is the `autopilot` skill's directory). It appends `## Resolution`, sets `status: closed`, and clears the claim.
 
-- Build ticket or directly implemented spec: set the frontmatter `status: closed` and append `## Resolution` per `implement`.
-- `wayfinder` decision ticket: set `status: closed` and append `## Resolution` per the tracker's Resolve operation.
+- Build ticket or directly implemented spec: the Resolution holds what `implement` step 8 says.
+- `wayfinder` decision ticket: the Resolution holds the answer, per `wayfinder`.
 
 Rules that hold in every branch:
 
-- Re-read the file after writing it and confirm the marker on disk matches what you are about to return. Autopilot reads the same file and fails the run when a `continue` or `complete` result names a unit that is not closed.
+- Confirm the call printed `status: closed` (after a hand write, read the file again), so the marker on disk matches what you are about to return. Autopilot reads the same file and fails the run when a `continue` or `complete` result names a unit that is not closed.
 - Leave parents alone: a ticket never closes its spec, and the worker never touches the map (it was closed at the spec/tickets handoff).
 - On `needs_input` (except a delivery ticket's two cases above), `blocked`, or `failed`, leave the in-progress marker and the `autopilot:<run-id>` claim in place; that marker is how a later process recognizes its own resumable work. Never mark an unfinished unit closed, and never leave a finished unit in progress.
 
