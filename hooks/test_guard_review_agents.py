@@ -158,10 +158,28 @@ class GuardReviewAgentsTest(unittest.TestCase):
     def test_program_and_ref_writing_flags_are_blocked(self):
         self.assertAllowed("git fetch origin main")
         self.assertAllowed("git fetch https://github.com/o/r.git pull/12/head")
-        self.assertBlocked("git fetch origin +refs/pull/1/head:refs/heads/main", "writes a local ref")
+        self.assertBlocked("git fetch origin +refs/pull/1/head:refs/heads/main", "write a local ref")
         self.assertBlocked("rg --hostname-bin ./evil.sh --hyperlink-format 'file://{host}{path}' foo",
                            "runs a program")
-        self.assertBlocked("find . -de*", "glob characters")
+        self.assertBlocked("git fetch origin tag v1", "write a local ref")
+        self.assertBlocked("git fetch --stdin origin", "is not allowed")
+        self.assertBlocked("git fetch --refmap=x:refs/heads/main origin main", "is not allowed")
+        self.assertBlocked("git fetch --ref=x:refs/heads/main origin main", "is not allowed")
+        self.assertAllowed("git fetch -q --depth=50 origin main")
+
+    def test_expansions_that_hide_arguments_are_blocked(self):
+        # The shell expands these before the command runs; the guard only sees what was typed.
+        self.assertBlocked("find . -de*", "unquoted glob")
+        self.assertBlocked("sort *", "unquoted glob")
+        self.assertBlocked("rg -n foo *.php", "unquoted glob")
+        self.assertBlocked("cat [a-z]*", "unquoted glob")
+        self.assertBlocked("sort {-o,out.txt} notes.txt", "brace expansion")
+        self.assertBlocked("cat notes{1..3}.txt", "brace expansion")
+        self.assertAllowed("rg -n foo app/*.php ./*.md")
+        self.assertAllowed("find app -name '*.php' -o -name \"-de*\"")
+        self.assertAllowed("git log --oneline HEAD@{1}..HEAD@{0}")
+        self.assertAllowed("rg -n 'a{1,3}' app")
+        self.assertAllowed("gh api repos/{owner}/{repo}/pulls?per_page=5")
 
     def test_a_crashing_guard_blocks(self):
         payload = {"tool_name": "Bash", "tool_input": {"command": ["not", "a", "string"]},

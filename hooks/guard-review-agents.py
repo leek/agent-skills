@@ -32,6 +32,11 @@ GH_API_SHORT = {"H": "--header", "q": "--jq", "X": "--method", "p": "--preview",
                 "f": "--raw-field", "F": "--field", "t": "--template", "i": "--include"}
 
 
+FETCH_FLAGS = {"-q", "--quiet", "-v", "--verbose", "--all", "--no-tags", "--dry-run",
+               "--no-recurse-submodules"}
+FETCH_DEPTH = re.compile(r"--(depth|deepen)=\d+")
+
+
 def check_git(args: list[str]) -> None:
     while args[:1] == ["--no-pager"] or args[:1] == ["-C"]:
         args = args[2:] if args[0] == "-C" else args[1:]
@@ -45,11 +50,17 @@ def check_git(args: list[str]) -> None:
         if long_option_in(a, ("--output", "--upload-pack", "--ext-diff", "--exec")):
             raise Blocked(f"`git {args[0]} {a}` writes files or runs a program")
     if args[0] == "fetch":
-        # The first positional is the remote; any later one is a refspec, and `src:dst`
-        # writes a local ref (`git fetch origin pull/1/head:main`).
-        positional = [a for a in args[1:] if not a.startswith("-")]
-        if any(":" in a for a in positional[1:]):
-            raise Blocked("`git fetch <remote> <src>:<dst>` writes a local ref; fetch without a destination")
+        # Flags are an allowlist, none taking a separate value, so the positionals are exact:
+        # `--stdin` and `--refmap` add refspecs this guard would not see. The first positional
+        # is the remote; a later `src:dst` or `tag <name>` writes a local ref.
+        positional = []
+        for a in args[1:]:
+            if not a.startswith("-"):
+                positional.append(a)
+            elif a not in FETCH_FLAGS and not FETCH_DEPTH.fullmatch(a):
+                raise Blocked(f"`git fetch {a}` is not allowed; use only {', '.join(sorted(FETCH_FLAGS))}, --depth=<n>")
+        if any(":" in a or a == "tag" for a in positional[1:]):
+            raise Blocked("`git fetch <remote> <src>:<dst>` and `tag <name>` write a local ref; fetch without a destination")
 
 
 def parse_gh_api(rest: list[str]) -> tuple[list[tuple[str, str]], list[str]]:
@@ -138,9 +149,6 @@ def check_find(args: list[str]) -> None:
     bad = {"-exec", "-execdir", "-ok", "-okdir", "-delete", "-fprint", "-fprint0", "-fprintf", "-fls"}
     if bad.intersection(args):
         raise Blocked("`find` with -exec, -delete, or -fprint is not read-only")
-    # An unquoted glob that starts with `-` can expand to a file named `-delete`.
-    if any(a.startswith("-") and any(c in a for c in "*?[") for a in args):
-        raise Blocked("`find` primaries cannot contain glob characters")
 
 
 SED_PRINT = re.compile(r"(\d+|\$)(,(\d+|\$))?p")

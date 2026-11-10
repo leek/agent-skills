@@ -16,6 +16,7 @@ Grok loads the same hooks.json; normalize() maps its payload onto Claude's keys.
 import importlib.util
 import json
 from pathlib import Path
+import re
 import sys
 
 SAFE_REDIRECTS = {("2", ">", "/dev/null"), ("2", ">&", "1")}
@@ -31,6 +32,31 @@ class Op(str):
     """An unquoted shell operator run (`&&`, `|`, `>`, `(` …), as opposed to a word."""
 
 
+class Word(str):
+    """A shell word, with `unquoted` marking which of its characters the shell may still expand."""
+
+    unquoted: str = ""
+
+
+BRACE_EXPANSION = re.compile(r"\{[^{}]*(,|\.\.)[^{}]*\}")
+
+
+def check_expansion(word: "Word") -> None:
+    """Refuse a word the shell would expand into arguments this guard never sees.
+
+    The checks below read the word as typed, but the shell expands it first: `-de*` or `*`
+    can become a file named `-delete` or `-oout`, and `{-o,out}` becomes `-o out`. A glob is
+    safe only behind a literal prefix that does not start with `-` (`app/*.php`, `./*`).
+    """
+    live = word.unquoted
+    if BRACE_EXPANSION.search(live):
+        raise Blocked("brace expansion is not allowed; write the arguments out")
+    first = next((i for i, c in enumerate(live) if c in "*?["), -1)
+    if first >= 0 and (first == 0 or word.startswith("-")):
+        raise Blocked("an unquoted glob that can expand to a name starting with `-` is not allowed; "
+                      "quote it, or start it with `./`")
+
+
 OPERATOR_CHARS = set("();<>|&")
 SEPARATORS = {"&&", "||", ";", "|"}
 
@@ -44,14 +70,21 @@ def tokenize(command: str) -> list[str]:
     """
     tokens: list[str] = []
     word: list[str] = []
+    live: list[str] = []  # the same word with every quoted or escaped character blanked
     in_word = False
     i, n = 0, len(command)
 
     def flush() -> None:
-        nonlocal word, in_word
+        nonlocal word, live, in_word
         if in_word:
-            tokens.append("".join(word))
-        word, in_word = [], False
+            token = Word("".join(word))
+            token.unquoted = "".join(live)
+            tokens.append(token)
+        word, live, in_word = [], [], False
+
+    def quoted(text: str) -> None:
+        word.append(text)
+        live.append("\0" * len(text))
 
     while i < n:
         c = command[i]
@@ -63,7 +96,7 @@ def tokenize(command: str) -> list[str]:
             if command[i + 1] == "\n":  # line continuation
                 i += 2
                 continue
-            word.append(command[i + 1])
+            quoted(command[i + 1])
             in_word = True
             i += 2
             continue
@@ -71,7 +104,7 @@ def tokenize(command: str) -> list[str]:
             end = command.find("'", i + 1)
             if end < 0:
                 raise Blocked("could not parse the command (no closing quotation)")
-            word.append(command[i + 1:end])
+            quoted(command[i + 1:end])
             in_word = True
             i = end + 1
             continue
@@ -89,10 +122,10 @@ def tokenize(command: str) -> list[str]:
                     raise Blocked("command substitution is not allowed")
                 if d == "\\" and j + 1 < n and command[j + 1] in '"\\$`\n':
                     if command[j + 1] != "\n":
-                        word.append(command[j + 1])
+                        quoted(command[j + 1])
                     j += 2
                     continue
-                word.append(d)
+                quoted(d)
                 j += 1
             in_word = True
             i = j + 1
@@ -120,6 +153,7 @@ def tokenize(command: str) -> list[str]:
             i = j
             continue
         word.append(c)
+        live.append(c)
         in_word = True
         i += 1
     flush()
@@ -151,6 +185,10 @@ def segments(command: str) -> list[list[str]]:
             current.append(str(token))
     if current:
         out.append(current)
+    # After the operator checks, so an operator is reported before the glob beside it.
+    for token in cleaned:
+        if isinstance(token, Word):
+            check_expansion(token)
     return out
 
 
