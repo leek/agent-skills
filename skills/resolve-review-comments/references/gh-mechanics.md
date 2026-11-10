@@ -41,9 +41,15 @@ from `pr-comments.sh`; `body` is sent exactly as written.
 bash <this-skill-dir>/../triage-github-pr/scripts/pr-reply.sh PR <scratch>/pr-PR-replies.json
 ```
 
-It prints each item's `reply_url`, `resolved`, and `error`, then `threads_open`. An
-invalid file exits 2 with nothing sent. On exit 1, send only the items with an `error`
-again.
+It prints each item's `reply_url`, `replied`, `resolved`, and `error`, then
+`threads_open`. An invalid file exits 2 with nothing sent. On exit 1, retry only the items
+with an `error`, never the whole file: an item with `replied: false` goes again as it was;
+an item with `replied: true, resolved: false` already has its reply on GitHub, so send it
+resolve-only, which posts nothing:
+
+```json
+[{"comment_id": 3790734403, "thread": "PRRT_kwDO…0W", "body": null, "resolve": true}]
+```
 
 ## Confirm
 
@@ -65,6 +71,6 @@ log's path); `[]` means no completed run on that commit failed.
 
 - A reply from a bot's own account is not needed; your reply + resolve is the record.
 - An `error` on an item's resolve means you lack write access or the thread id is stale:
-  run `pr-comments.sh PR` again.
+  run `pr-comments.sh PR` again for the thread id, then send the resolve-only item.
 - Outdated comments (the code moved) still resolve the same way; resolving marks the
   conversation done regardless of the diff position.

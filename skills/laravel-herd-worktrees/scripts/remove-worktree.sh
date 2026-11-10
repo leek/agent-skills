@@ -4,6 +4,19 @@
 # After git removes the worktree it also deletes that worktree's Pest cache (~/.pest/tia).
 # Run it from the main checkout (or the checkout `git branch -d` should check against).
 #
+# Herd is touched only when git will agree. Every reason `git worktree remove` refuses
+# without --force is checked first, and each leaves the worktree, its site and its
+# databases as they were ("removed": false, with the reason):
+#   - the path is not a worktree of this repository, or is the main checkout
+#   - the worktree is locked
+#   - it holds submodules (git's own test: a modules/ directory in the worktree's git
+#     directory, or a checked-out submodule)
+#   - `git status --porcelain --ignore-submodules=none` prints a line (git's own test), or
+#     fails; untracked files count here even when status.showUntrackedFiles hides them
+# What cannot be seen up front: a file written between the check and the removal, and a
+# failure while git deletes the directory (a permission, a file in use). Then the site is
+# already unserved, and "reason" is "git worktree remove refused".
+#
 # It never drops a database a calling skill created: it prints those still registered
 # for the worktree, so the caller runs `scratch-db.sh drop <database>` for each.
 # A database Herd created (`--database=clone|empty`) Herd drops itself; this script
@@ -43,16 +56,39 @@ removed=0; reason=""; branch_deleted=0; branch_reason=""; herd_failed=null
 wt_state=$(git worktree list --porcelain | W="$wt" awk '
   BEGIN { w = ENVIRON["W"] }   # not -v, which would rewrite a backslash in the path
   /^worktree / { n++; p = substr($0, 10) }
+  p == w { found = 1 }
   p == w && n == 1 { main = 1 }
   p == w && /^locked/ { locked = 1 }
-  END { if (main) print "main"; else if (locked) print "locked" }')
+  END { if (main) print "main"; else if (locked) print "locked"; else if (found) print "linked" }')
 
-if [ -n "$(git -C "$wt" status --porcelain)" ]; then
+# git refuses a worktree with submodules: its git directory has a modules/ directory, or
+# the index holds a gitlink whose directory is checked out (it has a .git).
+has_submodules() {
+  local gd entry
+  gd=$(cd "$wt" && cd "$(git rev-parse --git-dir)" && pwd -P) || return 1
+  [ ! -d "$gd/modules" ] || return 0
+  while IFS= read -r -d '' entry; do   # "<mode> <sha> <stage><TAB><path>"
+    case "$entry" in
+      "160000 "*) [ ! -e "$wt/${entry#*$'\t'}/.git" ] || return 0 ;;
+    esac
+  done < <(git -C "$wt" ls-files -z -s)
+  return 1
+}
+
+status_rc=0
+dirty=$(git -C "$wt" status --porcelain --ignore-submodules=none --untracked-files=normal 2>/dev/null) || status_rc=$?
+if [ "$status_rc" != 0 ]; then
+  reason="git status failed in the worktree"
+elif [ -n "$dirty" ]; then
   reason="uncommitted or untracked changes"
 elif [ "$wt_state" = locked ]; then
   reason="worktree is locked"
 elif [ "$wt_state" = main ]; then
   reason="this is the main checkout, not a linked worktree"
+elif [ "$wt_state" != linked ]; then
+  reason="not a worktree of this repository"
+elif has_submodules; then
+  reason="worktree holds submodules, which git worktree remove refuses"
 else
   # The site comes from Herd's own state for this exact path, never from the checkout:
   # a branch could commit a .herd-workspace.json naming another site. The database
@@ -101,7 +137,7 @@ fi
 
 if [ -n "$branch" ]; then
   if [ "$removed" = 1 ]; then
-    if git branch -d "$branch" >&2; then branch_deleted=1; else branch_reason="git branch -d refused (not merged here)"; fi
+    if git branch -d -- "$branch" >&2; then branch_deleted=1; else branch_reason="git branch -d refused (not merged here)"; fi
   else
     branch_reason="worktree kept, so the branch stays"
   fi

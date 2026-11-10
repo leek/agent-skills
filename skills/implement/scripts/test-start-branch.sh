@@ -285,3 +285,114 @@ run feat --branch other --default nope
 eq usage-no-default "$code" 2
 git -C "$repo" rev-parse --verify -q refs/heads/other >/dev/null && fail "usage error created a branch"
 echo "ok refusals and usage errors"
+
+# a slug that is not one directory name; a trailing slash is dropped
+new_repo
+for bad in .. . ../x a/b -x; do
+  run "$bad" --branch other
+  eq "slug '$bad' exit" "$code" 2
+done
+git -C "$repo" rev-parse --verify -q refs/heads/other >/dev/null && fail "a bad slug created a branch"
+spec_on_docs_branch
+run feat/ --branch feat --worktree
+eq slash-exit "$code" 0
+eq slash-source "$(field .scratch_source)" docs/feat-spec
+eq slash-subject "$(git -C "$repo" log -1 --format=%s feat)" "docs(scratch): feat"
+echo "ok a slug of .., ., ../x or a/b exits 2; a trailing slash is dropped"
+
+# .scratch ignored by a directory-only rule: a fresh worktree has no .scratch yet, and a
+# ref that holds the spec (force-added) must still carry nothing
+for rule in ".scratch/" ".scratch/*"; do
+  new_repo
+  commit_file .gitignore "$rule" "ignore scratch"
+  git -C "$repo" push -q origin main
+  spec_on_docs_branch
+  run feat --branch feat --worktree
+  eq "ignored '$rule' exit" "$code" 0
+  eq "ignored '$rule' rest" "$(field '[.scratch_source, .scratch_commit] | @csv')" '"",""'
+  eq "ignored '$rule' base" "$(field .base_sha)" "$(sha origin/main)"
+done
+echo "ok .scratch ignored by .scratch/ or .scratch/*: nothing carried into a fresh worktree"
+
+# --existing --stack with staged changes: no commit, no push, no PR
+new_repo
+run feat --branch feat
+echo staged > "$repo/secret.txt"
+git -C "$repo" add -- secret.txt
+before=$(sha feat)
+: > "$GH_LOG"
+run feat --branch feat --stack --title "T" --existing
+eq staged-exit "$code" 1
+eq staged-stdout "$out" ""
+grep -q 'staged changes' "$T/err" || fail "staged: stderr does not say so"
+eq staged-tip "$(sha feat)" "$before"
+eq staged-still "$(git -C "$repo" diff --cached --name-only)" "secret.txt"
+git -C "$origin" rev-parse --verify -q refs/heads/feat >/dev/null && fail "staged: the branch was pushed"
+eq staged-no-gh "$(cat "$GH_LOG")" ""
+git -C "$repo" reset -q -- secret.txt
+rm "$repo/secret.txt"
+run feat --branch feat --stack --title "T" --existing
+eq unstaged-exit "$code" 0
+eq unstaged-files "$(git -C "$repo" show --name-only --format= feat)" ""
+echo "ok --existing --stack refuses a staged index; the empty commit is empty"
+
+# the source deleted one ticket and renamed another: neither old file stays on the new branch
+new_repo
+commit_file .scratch/feat/spec.md "the spec" "docs(scratch): feat spec"
+commit_file .scratch/feat/tickets/01-old.md "ticket one" "docs(scratch): feat tickets"
+commit_file .scratch/feat/tickets/02-gone.md "ticket two" "docs(scratch): feat tickets"
+git -C "$repo" push -q origin main
+git -C "$repo" switch -q -c docs/feat-spec
+git -C "$repo" mv .scratch/feat/tickets/01-old.md .scratch/feat/tickets/01-new.md
+git -C "$repo" rm -q .scratch/feat/tickets/02-gone.md
+git -C "$repo" commit -q -m "docs(scratch): feat tickets renamed and dropped"
+git -C "$repo" switch -q main
+run feat --branch feat --worktree
+eq overlay-exit "$code" 0
+eq overlay-source "$(field .scratch_source)" docs/feat-spec
+eq overlay-tree "$(git -C "$repo" ls-tree -r --name-only feat -- .scratch/feat | tr '\n' ' ')" ".scratch/feat/spec.md .scratch/feat/tickets/01-new.md "
+eq overlay-same-as-source "$(sha feat:.scratch/feat)" "$(sha docs/feat-spec:.scratch/feat)"
+[ ! -e "$repo/.claude/worktrees/feat/.scratch/feat/tickets/02-gone.md" ] || fail "overlay: the deleted ticket is still in the worktree"
+eq overlay-clean "$(git -C "$repo/.claude/worktrees/feat" status --porcelain)" ""
+echo "ok a ticket the source deleted or renamed does not stay on the new branch"
+
+# untracked copy with a regular file where the branch holds a symlink: diff -r calls them
+# equal, but they are not the same files, so the copy stays
+new_repo
+git -C "$repo" switch -q -c docs/feat-spec
+mkdir -p "$repo/.scratch/feat"
+echo "the spec" > "$repo/.scratch/feat/spec.md"
+ln -s spec.md "$repo/.scratch/feat/alias.md"
+git -C "$repo" add -f -- .scratch/feat
+git -C "$repo" commit -q -m "docs(scratch): feat spec"
+git -C "$repo" switch -q main
+mkdir -p "$repo/.scratch/feat"
+echo "the spec" > "$repo/.scratch/feat/spec.md"
+echo "the spec" > "$repo/.scratch/feat/alias.md"
+run feat --branch feat --worktree
+eq symlink-exit "$code" 0
+eq symlink-field "$(field .untracked_copy)" differs
+[ -f "$repo/.scratch/feat/alias.md" ] || fail "symlink: the untracked copy was deleted"
+echo "ok untracked copy kept when a symlink makes diff -r read two different trees as equal"
+
+# untracked copy in a directory with a space in its path: only .scratch/<slug> goes
+n=$((n + 1)); mkdir -p "$T/$n"
+origin="$T/$n/origin.git"; repo="$T/$n/my repo"
+git init -q --bare -b main "$origin"
+git init -q -b main "$repo"
+git -C "$repo" remote add origin "$origin"
+echo one > "$repo/README.md"
+git -C "$repo" add -- README.md
+git -C "$repo" commit -q -m "init"
+git -C "$repo" push -q -u origin main
+spec_on_docs_branch
+mkdir -p "$repo/.scratch/feat" "$repo/.scratch/other"
+echo "the spec" > "$repo/.scratch/feat/spec.md"
+echo "keep me" > "$repo/.scratch/other/spec.md"
+run feat --branch feat --worktree
+eq space-exit "$code" 0
+eq space-field "$(field .untracked_copy)" deleted
+[ ! -e "$repo/.scratch/feat" ] || fail "space: the untracked copy is still there"
+eq space-other "$(cat "$repo/.scratch/other/spec.md")" "keep me"
+eq space-readme "$(cat "$repo/README.md")" one
+echo "ok untracked copy deleted under a path with a space; nothing else goes"

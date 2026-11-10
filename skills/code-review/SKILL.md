@@ -2,7 +2,7 @@
 name: code-review
 description: "Three-axis review of the diff since a fixed point: Correctness (bugs, failure modes, security), Standards (repo conventions) and Spec (ticket/PRD fidelity). Use when the user wants to review a branch, PR, WIP changes, or asks to \"review since X\"."
 argument-hint: "since <ref>, or a PR or branch (omit for WIP changes)"
-allowed-tools: "Bash(bash *code-review/scripts/review-scope.sh *) Bash(git diff *) Bash(git log *) Bash(git merge-base *)"
+allowed-tools: "Bash(bash *code-review/scripts/review-scope.sh *) Bash(git diff *) Bash(git log *) Bash(git merge-base *) Bash(git status *)"
 ---
 
 # Code Review
@@ -19,9 +19,13 @@ The axes run **separately** so they don't pollute each other's context, then thi
 
 ### 1. Pin the fixed point
 
-Whatever the user said is the fixed point: a commit SHA, branch name, tag, `main`, `HEAD~5`, etc. If they didn't specify one, ask for it (a structured question ([harness-tools](../harness-tools/SKILL.md)), otherwise in chat; when invoked from `implement`, it's the ticket's base commit).
+Whatever the user said is the fixed point: a commit SHA, branch name, tag, `main`, `HEAD~5`, etc. If they named none and asked for WIP or uncommitted changes, it is `HEAD`. Otherwise ask for it (a structured question ([harness-tools](../harness-tools/SKILL.md)), otherwise in chat; when invoked from `implement`, it's the ticket's base commit).
 
-Pin it once, from inside the repo: `bash <this-skill-dir>/scripts/review-scope.sh <fixed-point>`. When the caller passes a **path scope** (as `implement` does, so parallel sessions sharing one branch don't pollute the range), append ` -- <paths>`: the script adds it to both commands. It prints one JSON object: `diff_cmd` (`git diff <fixed-point>...HEAD`: three-dot, so the comparison is against the merge-base) and `commits` (from `log_cmd`) are the diff command and commit list every brief carries, `files` the changed paths, and `size` what step 4 reads.
+**WIP is in scope** when the user asked for WIP or uncommitted changes, or asked to review "my changes" (or similar words for their own work) while `git status --porcelain` prints anything. A range a caller names (`implement`'s base commit, a re-review's head) is committed work only, so WIP stays out of it.
+
+Pin it once, from inside the repo: `bash <this-skill-dir>/scripts/review-scope.sh <fixed-point>`, with `--wip` after the fixed point when WIP is in scope. When the caller passes a **path scope** (as `implement` does, so parallel sessions sharing one branch don't pollute the range), append ` -- <paths>`: the script adds it to both commands. It prints one JSON object: `diff_cmd` (`git diff <fixed-point>...HEAD`: three-dot, so the comparison is against the merge-base) and `commits` (from `log_cmd`) are the diff command and commit list every brief carries, `files` the changed paths, and `size` what step 4 reads.
+
+With `--wip`, `diff_cmd` is `git diff <merge-base>`: the working tree against the merge-base, so it also prints staged and unstaged changes. It prints no untracked file. `untracked` lists those, and every brief carries that list beside the diff command, each file to be read whole as new code.
 
 Exit 1 is a fixed point that does not resolve, or an empty diff (`"empty": true`): stop here, not inside three parallel reviews.
 

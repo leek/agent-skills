@@ -33,7 +33,8 @@ case "$args" in
   "api repos/"*"/comments/"*"/replies"*)
     id=${args#*/comments/}; id=${id%%/replies*}
     cp "$input" "$GH_FIX/sent-$id.json"
-    jq -n --arg id "$id" '{id: 9, html_url: "https://github.com/o/r/pull/7#discussion_r\($id)9"}' ;;
+    if [ -f "$GH_FIX/reply.json" ]; then cat "$GH_FIX/reply.json"
+    else jq -n --arg id "$id" '{id: 9, html_url: "https://github.com/o/r/pull/7#discussion_r\($id)9"}'; fi ;;
   *) echo "stub gh: unexpected call: $args" >&2; exit 97 ;;
 esac
 STUB
@@ -44,7 +45,7 @@ fail() { echo "FAIL $1" >&2; exit 1; }
 ok() { echo "ok $1"; }
 eq() { [ "$2" = "$3" ] || fail "$1: expected '$3', got '$2'"; }
 reset() {
-  rm -f "$GH_FIX"/sent-*.json "$GH_FIX/resolved-threads"
+  rm -f "$GH_FIX"/sent-*.json "$GH_FIX/resolved-threads" "$GH_FIX/reply.json"
   : > "$GH_LOG"
   echo '{"nameWithOwner":"o/r"}' > "$GH_FIX/repo-view.json"
   echo '{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}' > "$GH_FIX/resolve.json"
@@ -68,6 +69,8 @@ eq "batch exit" "$rc" 0
 eq "batch shape" "$(echo "$out" | jq -c 'keys')" '["pr","replies","threads_open"]'
 eq "batch pr" "$(echo "$out" | jq -c '.pr')" 7
 eq "batch replies" "$(echo "$out" | jq -c '[.replies[] | [.comment_id, .resolved, .error]]')" '[[111,true,null],[222,false,null],[3790734403,true,null]]'
+eq "batch row keys" "$(echo "$out" | jq -c '.replies[0] | keys')" '["comment_id","error","replied","reply_url","resolved"]'
+eq "batch replied" "$(echo "$out" | jq -c '[.replies[].replied]')" '[true,true,true]'
 eq "batch reply_url" "$(echo "$out" | jq -r '.replies[1].reply_url')" 'https://github.com/o/r/pull/7#discussion_r2229'
 eq "batch threads_open" "$(echo "$out" | jq -c '.threads_open')" 1
 eq "batch body kept byte for byte" "$(jq -r .body "$GH_FIX/sent-3790734403.json")" "$tricky"
@@ -94,6 +97,10 @@ bad() { # <case name> <json text> <expected stderr fragment>
 bad "non-numeric id" '[{"comment_id":111,"thread":"PRRT_a","body":"x","resolve":true},{"comment_id":"12a","thread":null,"body":"x","resolve":false}]' 'item 1: comment_id must be a number'
 bad "empty body" '[{"comment_id":111,"thread":"PRRT_a","body":"  \n","resolve":true}]' 'item 0: body must be a non-empty string'
 bad "missing body" '[{"comment_id":111,"thread":"PRRT_a","resolve":true}]' 'item 0: body must be a non-empty string'
+bad "absent body is not resolve-only" '[{"comment_id":111,"thread":"PRRT_a","resolve":true},{"comment_id":222,"thread":"PRRT_b","body":"x","resolve":true}]' 'item 0: body must be a non-empty string'
+bad "null body without resolve" '[{"comment_id":111,"thread":"PRRT_a","body":null,"resolve":false}]' 'item 0: body is null (resolve-only) but resolve is not true'
+bad "null body, resolve absent" '[{"comment_id":111,"thread":"PRRT_a","body":null}]' 'item 0: body is null (resolve-only) but resolve is not true'
+bad "null body without thread" '[{"comment_id":111,"thread":null,"body":null,"resolve":true}]' 'item 0: resolve is true but thread is null'
 bad "resolve without thread" '[{"comment_id":111,"thread":null,"body":"x","resolve":true}]' 'item 0: resolve is true but thread is null'
 bad "resolve not boolean" '[{"comment_id":111,"thread":"PRRT_a","body":"x","resolve":"yes"}]' 'item 0: resolve must be true or false'
 bad "thread not an id" '[{"comment_id":111,"thread":"PRRT_a\"}) { x }","body":"x","resolve":true}]' 'item 0: thread must be a thread id'
@@ -115,15 +122,45 @@ jq '.[1].thread = "PRRT_b" | .[1].resolve = true' "$work/batch.json" > "$work/ba
 reset; GH_FAIL='comments/222/replies' run 7 "$work/batch2.json" --repo o/r
 eq "failed reply exit" "$rc" 1
 eq "failed reply rows" "$(echo "$out" | jq -c '[.replies[] | [.comment_id, .reply_url != null, .resolved, .error != null]]')" '[[111,true,true,false],[222,false,false,true],[3790734403,true,true,false]]'
+eq "failed reply replied" "$(echo "$out" | jq -c '[.replies[].replied]')" '[true,false,true]'
 echo "$out" | jq -e '.replies[1].error | test("reply failed: HTTP 403")' >/dev/null || fail "failed reply: error text"
 eq "failed reply thread left open" "$(tr '\n' ' ' < "$GH_FIX/resolved-threads")" 'PRRT_a PRRT_c '
 ok "failed reply continues and exits 1"
 
-# --- a failed resolve keeps the reply url and reports the error ---
+# --- a resolve that fails after a posted reply: replied true, error set, exit 1 ---
 reset; GH_FAIL='resolveReviewThread' run 7 "$work/batch.json" --repo o/r
 eq "failed resolve exit" "$rc" 1
-eq "failed resolve rows" "$(echo "$out" | jq -c '[.replies[] | [.reply_url != null, .resolved, .error != null]]')" '[[true,false,true],[true,false,false],[true,false,true]]'
-ok "failed resolve is recorded"
+eq "failed resolve rows" "$(echo "$out" | jq -c '[.replies[] | [.reply_url != null, .replied, .resolved, .error != null]]')" '[[true,true,false,true],[true,true,false,false],[true,true,false,true]]'
+echo "$out" | jq -e '.replies[0].error | test("resolve failed: HTTP 403")' >/dev/null || fail "failed resolve: error text"
+ok "resolve fails after a successful reply: replied true, error set, exit 1"
+
+# --- the retry of that run, built by the header's rule, posts no reply a second time ---
+echo "$out" | jq '[.replies[] | select(.error != null and .replied and (.resolved | not))
+  | {comment_id, thread: (if .comment_id == 111 then "PRRT_a" else "PRRT_c" end), body: null, resolve: true}]' > "$work/retry.json"
+reset; run 7 "$work/retry.json" --repo o/r
+eq "resolve-only exit" "$rc" 0
+eq "resolve-only posts nothing" "$(grep -c '/replies' "$GH_LOG" || true)" 0
+eq "resolve-only sent files" "$(find "$GH_FIX" -name 'sent-*' | wc -l | tr -d ' ')" 0
+eq "resolve-only resolved threads" "$(tr '\n' ' ' < "$GH_FIX/resolved-threads")" 'PRRT_a PRRT_c '
+eq "resolve-only rows" "$(echo "$out" | jq -c '[.replies[] | [.comment_id, .reply_url, .replied, .resolved, .error]]')" '[[111,null,false,true,null],[3790734403,null,false,true,null]]'
+ok "resolve-only item posts nothing"
+
+# --- a resolve-only item whose resolve fails stays replied false, so it is re-sent as it was ---
+reset; GH_FAIL='resolveReviewThread' run 7 "$work/retry.json" --repo o/r
+eq "resolve-only failure exit" "$rc" 1
+eq "resolve-only failure rows" "$(echo "$out" | jq -c '[.replies[] | [.replied, .resolved, .error != null]]')" '[[false,false,true],[false,false,true]]'
+eq "resolve-only failure posts nothing" "$(grep -c '/replies' "$GH_LOG" || true)" 0
+ok "resolve-only failure is recorded"
+
+# --- a posted reply whose response has no html_url is a posted reply, and still resolves ---
+reset; echo '{"id": 9}' > "$GH_FIX/reply.json"; run 7 "$work/batch.json" --repo o/r
+eq "no html_url exit" "$rc" 0
+eq "no html_url rows" "$(echo "$out" | jq -c '[.replies[] | [.reply_url, .replied, .resolved, .error]]')" '[[null,true,true,null],[null,true,false,null],[null,true,true,null]]'
+eq "no html_url resolved threads" "$(tr '\n' ' ' < "$GH_FIX/resolved-threads")" 'PRRT_a PRRT_c '
+reset; : > "$GH_FIX/reply.json"; run 7 "$work/batch.json" --repo o/r
+eq "empty reply response exit" "$rc" 0
+eq "empty reply response replied" "$(echo "$out" | jq -c '[.replies[] | [.replied, .error]]')" '[[true,null],[true,null],[true,null]]'
+ok "missing html_url is not an error"
 
 # --- a resolve that returns nothing is an error, not a success ---
 reset; echo '{"data":{"resolveReviewThread":null}}' > "$GH_FIX/resolve.json"; run 7 "$work/batch.json" --repo o/r

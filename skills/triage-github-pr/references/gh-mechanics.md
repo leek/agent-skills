@@ -191,9 +191,13 @@ bash <this-skill-dir>/scripts/pr-reply.sh N <scratch>/pr-N-replies.json
 
 `comment_id` is the thread's root comment (`reply_to` null) and `thread` its `thread` in
 [`pr-comments.sh`](../scripts/pr-comments.sh)'s output; `body` is sent exactly as written,
-and `resolve` follows the table below. It prints each item's `reply_url`, `resolved`, and
-`error`, then `threads_open`. On exit 1, send only the items with an `error` again; an
-`error` on the resolve means no write access or a stale thread id: run `pr-comments.sh N` again.
+and `resolve` follows the table below. It prints each item's `reply_url`, `replied`,
+`resolved`, and `error`, then `threads_open`. On exit 1, retry only the items with an
+`error`, never the whole file: an item with `replied: false` goes again as it was; an item
+with `replied: true, resolved: false` already has its reply on GitHub, so send it
+resolve-only (`"body": null`, the same `thread`, `"resolve": true`), which posts nothing.
+An `error` on the resolve means no write access or a stale thread id: run
+`pr-comments.sh N` again for the thread id first.
 
 Bodies and resolution by delivery state:
 

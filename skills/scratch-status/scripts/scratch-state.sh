@@ -17,8 +17,12 @@
 #   "claimed_by", "blocked_by", "open_blockers", "derived_status", "type", "delivery",
 #   "deploy_gate", "last_change", and "last_change_ts" (epoch seconds: the last commit when
 #   tracked, else the modification time).
-#   An effort's "next" names the lowest-numbered ready ticket; "next_why" says how many
-#   open tickets it unblocks.
+#   An effort's "next" names the lowest-numbered ready ticket an agent may build; "next_why"
+#   says how many open tickets it unblocks. "frontier" is a status view: every unblocked,
+#   unclaimed ticket, those at a human-gate status (the repo's string for ready-for-human,
+#   needs-info or needs-triage) included. "next" never names one of those as `/implement`
+#   work: it reads "waiting on a human: <path> (<status>)", or "after deploy: /implement
+#   <path>" for the delivery ticket. ticket.sh's `frontier` leaves them out.
 # Stderr: status/error messages. Read-only.
 #
 # This file holds the tracker's one frontmatter reader. skills/setup/scripts/ticket.sh calls
@@ -142,6 +146,8 @@ def load_closed_vocabulary() -> tuple[set[str], set[str], dict[str, str]]:
 
 
 CLOSED_SET, WONTFIX_SET, ROLE_STRINGS = load_closed_vocabulary()
+# The statuses that wait on a person: ticket.sh refuses a claim on them, and autopilot stops.
+HUMAN_STATUSES = {ROLE_STRINGS[role] for role in ("ready-for-human", "needs-info", "needs-triage")}
 DEFAULT_BRANCH = detect_default_branch()
 HAS_GH = shutil.which("gh") is not None
 
@@ -320,7 +326,8 @@ def parse_md(full_path: Path, rel_in_effort: str, kind: str) -> dict:
 
     claimed_by = field("claimed-by")
     if not claimed_by:
-        m_cl = re.search(r"^(?:\*\*Claimed by:\*\*|Claimed by:)\s*(.+)$", body, re.M | re.I)
+        # The value sits on the line itself: an emptied `**Claimed by:**` names nobody.
+        m_cl = re.search(r"^(?:\*\*Claimed by:\*\*|Claimed by:)[ \t]*(\S.*)$", body, re.M | re.I)
         if m_cl:
             val = m_cl.group(1).strip()
             if val.lower() not in ("none", "null", "-"):
@@ -511,8 +518,13 @@ def analyze_effort(slug_name: str, effort_dir: Path) -> dict | None:
             (d for d in decisions if d["derived_status"] == "ready"), key=lambda d: number_key(d["number"])
         )
         ready_tickets = [t for t in tickets if t["derived_status"] == "ready"]
-        buildable_tickets = [t for t in ready_tickets if not (t["delivery"] and t["status"] == "ready-for-human")]
-        delivery_waiting = [t for t in ready_tickets if t["delivery"] and t["status"] == "ready-for-human"]
+        waits_on_deploy = lambda t: t["delivery"] and t["status"] == ROLE_STRINGS["ready-for-human"]
+        buildable_tickets = [t for t in ready_tickets if t["status"] not in HUMAN_STATUSES]
+        delivery_waiting = [t for t in ready_tickets if waits_on_deploy(t)]
+        human_waiting = sorted(
+            (t for t in ready_tickets if t["status"] in HUMAN_STATUSES and not waits_on_deploy(t)),
+            key=lambda t: number_key(t["number"]),
+        )
 
         if ready_decisions:
             pick = ready_decisions[0]
@@ -551,6 +563,10 @@ def analyze_effort(slug_name: str, effort_dir: Path) -> dict | None:
             pick = delivery_waiting[0]
             next_cmd = f"after deploy: /implement {at(pick['path'])}"
             next_why = "only the delivery ticket remains at ready-for-human"
+        elif human_waiting:
+            pick = human_waiting[0]
+            next_cmd = f"waiting on a human: {at(pick['path'])} ({pick['status']})"
+            next_why = "every unblocked ticket is at a human-gate status, which no agent claims"
         elif any(not is_closed(r) for r in requests):
             next_cmd = "/triage"
             next_why = "open triage request awaiting categorisation"

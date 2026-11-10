@@ -1,6 +1,6 @@
 #!/bin/bash
-# Offline test of remove-worktree.sh: the refusals (dirty tree, locked, main checkout), the
-# removal, and valid JSON for a path and a branch argument holding a space, a double quote
+# Offline test of remove-worktree.sh: the refusals (dirty tree, locked, main checkout,
+# submodules, a path that is not a worktree), each before Herd is touched, the removal, and valid JSON for a path and a branch argument holding a space, a double quote
 # and a tab. `herd` is a stub first on PATH that records its calls; HOME is a temp directory.
 # Run: bash test-remove-worktree.sh
 
@@ -161,3 +161,39 @@ run "$t/wt-plain" --branch plain
 jqt '.removed == true and .branch_deleted == true and .databases == []' "unserved worktree"
 unserved "unserved worktree"
 ok "a worktree Herd does not serve is removed without workspace:delete"
+
+# --- submodules: git would refuse, so it is refused before Herd is touched ---------------------
+git init -q -b main "$t/sub"
+git -C "$t/sub" commit -q --allow-empty -m sub
+git worktree add -q -b with-sub "$t/wt-sub"
+git -C "$t/wt-sub" -c protocol.file.allow=always submodule add -q "$t/sub" lib 2>/dev/null
+git -C "$t/wt-sub" commit -q -m "add a submodule"
+[ -z "$(git -C "$t/wt-sub" status --porcelain)" ] || fail "submodules: the fixture is not clean"
+serve "$t/wt-sub" sub.app.test
+bash "$here/scratch-db.sh" register pgsql app_sub "$t/wt-sub" 2>/dev/null
+: > "$STUB_LOG"
+run "$t/wt-sub" --branch with-sub
+[ "$rc" = 0 ] || fail "submodules: exit $rc"
+jqt '.removed == false and (.reason | test("submodules")) and .branch_deleted == false and .herd_unserve_failed == null and .databases == []' "submodules"
+[ -d "$t/wt-sub" ] || fail "submodules: the worktree is gone"
+[ ! -s "$STUB_LOG" ] || fail "submodules: Herd was called before the refusal: $(cat "$STUB_LOG")"
+grep -q "	app_sub	" "$registry" || fail "submodules: its database was unregistered"
+set +e
+git worktree remove "$t/wt-sub" 2> "$t/err"; git_rc=$?
+set -e
+[ "$git_rc" != 0 ] || fail "submodules: git itself removed this fixture, so the case proves nothing"
+ok "a worktree with a checked-out submodule is refused before Herd is touched"
+
+# --- a directory inside a worktree is not a worktree ---------------------------------------------
+git worktree add -q -b inner "$t/wt-inner"
+mkdir "$t/wt-inner/dir"
+echo x > "$t/wt-inner/dir/file"
+git -C "$t/wt-inner" add dir
+git -C "$t/wt-inner" commit -q -m "a directory"
+serve "$t/wt-inner/dir" inner.app.test
+: > "$STUB_LOG"
+run "$t/wt-inner/dir"
+jqt '.removed == false and .reason == "not a worktree of this repository"' "not a worktree"
+[ ! -s "$STUB_LOG" ] || fail "not a worktree: Herd was called: $(cat "$STUB_LOG")"
+[ -f "$t/wt-inner/dir/file" ] || fail "not a worktree: the directory is gone"
+ok "a path that is not a worktree is refused before Herd is touched"

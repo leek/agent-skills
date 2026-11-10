@@ -36,7 +36,8 @@ case_name="patch"
 repo; commit "chore: init"; tag v1.2.3; commit "fix: a bug"; commit "docs: words"
 plan
 [ "$code" -eq 0 ] || fail "$case_name: exit $code: $(cat "$T/stderr")"
-want '[.last_tag, .tag_style, .branch, .behind, .authenticated]' '["v1.2.3","v","main",0,true]'
+want '[.last_tag, .tag_style, .branch, .authenticated]' '["v1.2.3","v","main",true]'
+want 'has("upstream") and has("behind")' 'true'
 want '[.bump, .next, .tag_free]' '["patch","v1.2.4",true]'
 want '.commits | map(.subject)' '["docs: words","fix: a bug"]'
 want '.commits[0].sha | test("^[0-9a-f]{7,}$")' 'true'
@@ -115,8 +116,46 @@ git remote add origin "$T/remote.git"; git push -q -u origin main v1.2.3
 git clone -q "$T/remote.git" "$T/other"
 (cd "$T/other" && commit "fix: theirs" && commit "fix: theirs too" && git push -q origin main)
 plan
-want '[.behind, .branch]' '[2,"main"]'
+want '[.behind, .branch, .upstream]' '[2,"main","origin/main"]'
 ok "behind the remote is counted after a fetch"
+
+case_name="up to date"
+(cd "$T/other" && git pull -q origin main) ; cd "$T/other"
+plan
+want '[.behind, .upstream]' '[0,"origin/main"]'
+ok "an upstream that has nothing new is behind 0"
+
+case_name="no upstream"
+repo; commit "chore: init"; tag v1.2.3; commit "fix: mine"
+plan
+[ "$code" -eq 0 ] || fail "$case_name: exit $code: $(cat "$T/stderr")"
+want '[.behind, .upstream, .next]' '[null,null,"v1.2.4"]'
+git remote add origin "$T/remote.git"; git fetch -q origin
+plan
+want '[.behind, .upstream]' '[null,null]'
+ok "no upstream is behind null, not 0"
+
+case_name="non-version tag sorts highest"
+repo; commit "chore: init"; tag v1.2.3; tag weekly; commit "fix: a bug"
+[ "$(git tag --sort=-v:refname | sed -n 1p)" = weekly ] || fail "$case_name: fixture: weekly must sort above v1.2.3"
+plan
+[ "$code" -eq 0 ] || fail "$case_name: exit $code: $(cat "$T/stderr")"
+want '[.last_tag, .tag_style, .next]' '["v1.2.3","v","v1.2.4"]'
+ok "a non-version tag does not set the tag style"
+
+case_name="non-version tag nearest"
+repo; commit "chore: init"; tag v1.2.3; commit "fix: a bug"; tag nightly-2026-01-01; tag v1.2.4-rc1; commit "feat: more"
+plan
+[ "$code" -eq 0 ] || fail "$case_name: exit $code: $(cat "$T/stderr")"
+want '[.last_tag, .tag_style, .next]' '["v1.2.3","v","v1.3.0"]'
+want '.commits | length' '2'
+ok "a nearer non-version tag is not the last tag"
+
+case_name="highest reachable version"
+repo; commit "chore: init"; tag v1.9.0; commit "fix: a"; tag v1.10.0; commit "fix: b"
+plan
+want '[.last_tag, .next]' '["v1.10.0","v1.10.1"]'
+ok "the last tag is the highest version, compared as numbers"
 
 case_name="fetch fails"
 repo; commit "chore: init"; tag v1.2.3; commit "fix: mine"
@@ -168,11 +207,19 @@ want '[.commits, .bump, .next, .tag_free]' '[[],null,null,null]'
 want '.rule' '"No commits since v1.2.3: nothing to release."'
 ok "no commits since the tag is nothing to release"
 
-case_name="odd tag"
+case_name="only non-version tags"
 repo; commit "chore: init"; tag release-5; commit "fix: a bug"
 plan
+[ "$code" -eq 0 ] || fail "$case_name: exit $code, want 0"
+want '[.last_tag, .tag_style, .bump, .next]' '[null,"v",null,"v0.1.0"]'
+want '.rule | test("no version tag exists") and test("1 tag\\(s\\) that are not MAJOR.MINOR.PATCH were ignored")' 'true'
+ok "only non-version tags is a first release, and the rule says they were ignored"
+
+case_name="unreachable version tags"
+repo; commit "chore: init"; git checkout -q -b side; commit "fix: elsewhere"; tag v1.2.3; git checkout -q main; commit "fix: here"
+plan
 [ "$code" -eq 1 ] || fail "$case_name: exit $code, want 1"
-ok "a last tag that is not MAJOR.MINOR.PATCH stops the plan"
+ok "version tags HEAD cannot reach stop the plan"
 
 case_name="usage"
 repo; commit "chore: init"

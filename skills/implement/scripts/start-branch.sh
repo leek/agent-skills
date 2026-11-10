@@ -10,25 +10,30 @@
 #                   --existing [--base-sha <sha>]
 #   <slug> is the work's directory name under .scratch/ (it also goes in the stack's commit
 #   subject, PR title and body); <name> is the branch to create. Run inside the repository.
-#   Needs jq, and gh with --stack.
+#   A trailing slash on <slug> is dropped; a slug that is empty or ".", starts with "-", or
+#   holds "/" or ".." is a usage error. Needs jq, and gh with --stack.
 #
 # What it does:
 #   2. git fetch origin, then <name> from origin/<default>: with --worktree in
 #      <main checkout>/.claude/worktrees/<name>, otherwise `git switch -c` in this checkout,
 #      which must be clean (any `git status --porcelain` line refuses: pass --worktree).
-#   3. Carries .scratch/<slug> from the newest commit that added or changed it among local
-#      <default>, docs/<slug>-spec and the main checkout's branch, and commits it as
-#      "docs(scratch): <slug>". Nothing is carried when the new branch already holds that
-#      content or a newer copy, or the repo ignores .scratch.
-#      An untracked copy in the main checkout is deleted when `diff -r` shows it equals the
-#      new branch's copy; otherwise it stays ("differs").
+#   3. Carries .scratch/<slug> from the newest commit that changed it (a deletion or a
+#      rename counts) among local <default>, docs/<slug>-spec and the main checkout's branch,
+#      and commits it as "docs(scratch): <slug>". The new branch then holds exactly the
+#      source's files: one the source deleted or renamed does not stay. Nothing is carried
+#      when the new branch already holds that content or a newer copy, or the repo ignores
+#      .scratch/<slug>/.
+#      An untracked copy in the main checkout is deleted when nothing under it is tracked
+#      there, the new branch's copy is as committed, neither copy holds a symlink (`diff`
+#      follows them), and `diff -r` shows the two equal; otherwise it stays ("differs").
 #      --reset-default (the user said yes): when local <default> is ahead of origin/<default>
 #      only by commits touching .scratch/<slug>, and the new branch holds the same
 #      .scratch/<slug>, moves <default> back to origin/<default> (`git reset --keep` in the
 #      checkout that has it, else `git branch -f`). Otherwise it stays, with the reason on
 #      stderr.
 #   4. --stack: an empty commit "chore(<slug>): open integration branch" when the branch has
-#      no commit of its own.
+#      no commit of its own. Refused (exit 1) when the checkout's index holds staged
+#      changes: the commit would carry them, and step 6 would push them.
 #   5. base_sha = the new branch's tip.
 #   6. --stack: git push origin <base_sha>:refs/heads/<name>, then a draft PR
 #      "[<slug>] <title>" into <default>.
@@ -56,8 +61,9 @@ usage() {
 }
 
 slug=${1:-}
+while [ "${slug%/}" != "$slug" ]; do slug=${slug%/}; done
 case "$slug" in
-  "" | -* | */* | *..*) usage ;;
+  "" | . | -* | */* | *..*) usage ;;
 esac
 shift
 name=""; default=""; worktree=0; reset=0; stack=0; title=""; existing=0; given_base=""
@@ -139,6 +145,12 @@ on_exit() {
 }
 trap on_exit EXIT
 
+open_commit() {  # open_commit <checkout>: step 4's empty commit, and nothing else in it
+  git -C "$1" diff --cached --quiet \
+    || { echo "$1 has staged changes, which the commit \"chore($slug): open integration branch\" would carry and step 6 would push. Commit or unstage them, then run again." >&2; return 1; }
+  git -C "$1" commit -q --allow-empty -m "chore($slug): open integration branch" >&2
+}
+
 open_integration_pr() {  # step 6
   if [ "$existing" = 1 ] && git ls-remote --exit-code origin "refs/heads/$name" >/dev/null 2>&1; then
     echo ">> origin/$name already exists; not pushed again" >&2
@@ -184,7 +196,7 @@ if [ "$existing" = 1 ]; then
   else
     if [ "$(git rev-list --count "origin/$default..refs/heads/$name")" = 0 ]; then
       [ -n "$co" ] || { echo "$name has no commit of its own and no checkout holds it; check it out first" >&2; exit 1; }
-      git -C "$co" commit -q --allow-empty -m "chore($slug): open integration branch" >&2
+      open_commit "$co"
       emptied=1; created=1
     fi
     base=$(git rev-parse "refs/heads/$name")
@@ -226,16 +238,18 @@ consider() {  # consider <label> <ref>
   local c
   git -C "$main" rev-parse --verify -q "$2^{commit}" >/dev/null || return 0
   git -C "$main" rev-parse --verify -q "$2:$dir" >/dev/null || return 0
-  c=$(git -C "$main" log -1 --format=%H --diff-filter=AM "$2" -- "$dir")
+  c=$(git -C "$main" log -1 --format=%H "$2" -- "$dir")   # any change: a deletion or a rename too
   [ -n "$c" ] || return 0
   newer "$c" "$best" || return 0
   best=$c; src=$1; src_ref=$2
 }
-if git -C "$co" check-ignore -q .scratch; then
-  echo ">> .scratch is ignored here; nothing carried" >&2
+# The slug's own directory, with the slash: a directory-only rule (.scratch/) matches it
+# although a fresh checkout has no .scratch yet, and a contents rule (.scratch/*) does too.
+if git -C "$co" check-ignore -q -- "$dir/"; then
+  echo ">> $dir is ignored here; nothing carried" >&2
 else
   # The new branch's own copy competes too: a newer one there is never replaced.
-  best=$(git -C "$main" log -1 --format=%H --diff-filter=AM "refs/heads/$name" -- "$dir")
+  best=$(git -C "$main" log -1 --format=%H "refs/heads/$name" -- "$dir")
   consider "$default" "refs/heads/$default"
   consider "docs/$slug-spec" "refs/heads/docs/$slug-spec"
   consider "$cur" "$cur_ref"
@@ -246,6 +260,10 @@ else
       echo ">> $name already holds $dir as $src has it; nothing carried" >&2
       src=""
     else
+      # `git checkout <ref> -- <dir>` only adds and overwrites, so the branch's own copy
+      # goes first (git rm refuses a locally modified file). This form needs no
+      # --no-overlay (Git 2.22).
+      git -C "$co" rm -r -q --ignore-unmatch -- "$dir" >&2
       git -C "$co" checkout "$src_ref" -- "$dir" >&2
       if git -C "$co" diff --cached --quiet -- "$dir"; then
         echo ">> $dir from $src changes nothing on $name; nothing carried" >&2
@@ -262,7 +280,17 @@ fi
 if [ "$co" != "$main" ]; then
   loose=$(git -C "$main" status --porcelain --untracked-files=all -- "$dir" | grep '^??' || true)
   if [ -n "$loose" ]; then
-    if [ -z "$(git -C "$main" ls-files -- "$dir")" ] && [ -d "$co/$dir" ] && diff -r "$main/$dir" "$co/$dir" >/dev/null 2>&1; then
+    # Deleted only when it is byte for byte what the new branch holds: nothing tracked
+    # under it in the main checkout, the branch's copy as committed (no changed, untracked
+    # or ignored file), no symlink on either side (diff follows them, so a link and a file
+    # with the same content would read as equal), and diff -r silent.
+    links=1
+    if [ ! -L "$main/.scratch" ] && [ ! -L "$main/$dir" ] && [ -d "$co/$dir" ]; then
+      links=$(find "$main/$dir" "$co/$dir" -type l -print 2>/dev/null | grep -c . || true)
+    fi
+    if [ "$links" = 0 ] && [ -z "$(git -C "$main" ls-files -- "$dir")" ] \
+      && [ -z "$(git -C "$co" status --porcelain --ignored -- "$dir")" ] \
+      && diff -r "$main/$dir" "$co/$dir" >/dev/null 2>&1; then
       rm -rf "${main:?}/$dir"
       untracked=deleted
     else
@@ -296,7 +324,7 @@ fi
 
 # Steps 4 and 5.
 if [ "$stack" = 1 ] && [ "$(git -C "$co" rev-list --count "origin/$default..HEAD")" = 0 ]; then
-  git -C "$co" commit -q --allow-empty -m "chore($slug): open integration branch" >&2
+  open_commit "$co"
 fi
 base=$(git -C "$co" rev-parse HEAD)
 

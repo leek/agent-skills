@@ -5,20 +5,28 @@
 # no shell quoting touches them (apostrophes, backticks, and markdown are safe).
 #
 # Usage: pr-reply.sh <pr> <file.json> [--repo OWNER/REPO]
-#   <file.json>  [{"comment_id": 123, "thread": "PRRT_..." | null, "body": "...", "resolve": true | false}]
+#   <file.json>  [{"comment_id": 123, "thread": "PRRT_..." | null, "body": "..." | null, "resolve": true | false}]
 #     comment_id  the thread's root inline comment (pr-comments.sh: `inline[].id` with `reply_to` null)
 #     thread      that comment's `thread` in pr-comments.sh's output; needed only to resolve
+#     body        the reply text. An explicit `"body": null` makes the item resolve-only: no
+#                 reply is posted; it needs `thread` and `"resolve": true`
 #     resolve     true resolves the thread after the reply; false (or absent) leaves it open
-# The whole file is checked before the first write: a non-numeric comment_id, an empty body,
-# a non-boolean resolve, or `resolve: true` without a thread exits 2 with nothing sent.
+# The whole file is checked before the first write: a non-numeric comment_id, an empty or
+# absent body, a null body without `resolve: true`, a non-boolean resolve, or `resolve: true`
+# without a thread exits 2 with nothing sent.
 #
-# Output: {"pr": N, "replies": [{"comment_id", "reply_url", "resolved": bool, "error": null | "..."}],
-#          "threads_open": n | null}
-#   A failed reply skips its resolve (an unanswered thread is never resolved) and the run
-#   goes on to the next item. `threads_open` is re-queried once at the end (review-threads.sh,
-#   as pr-comments.sh --count does); null when that query failed, which means not checked.
-# Exit: 0 every item sent, 1 any item has an `error` (send only those items again: a rerun
-#   of the whole file posts the successful replies twice), 2 usage or an invalid file.
+# Output: {"pr": N, "replies": [{"comment_id", "reply_url": "..." | null, "replied": bool,
+#          "resolved": bool, "error": null | "..."}], "threads_open": n | null}
+#   `replied` is true when this run posted the item's reply (`reply_url` may still be null:
+#   GitHub accepted the reply but the response had no html_url). A failed reply skips its
+#   resolve (an unanswered thread is never resolved) and the run goes on to the next item.
+#   `threads_open` is re-queried once at the end (review-threads.sh, as pr-comments.sh
+#   --count does); null when that query failed, which means not checked.
+# Exit: 0 every item sent, 1 any item has an `error`, 2 usage or an invalid file.
+# Retry after exit 1, items with an `error` only, never the whole file:
+#   `replied: false`                    send the item again as it was
+#   `replied: true, resolved: false`    the reply is on GitHub: send it resolve-only
+#                                       (`"body": null`, same thread, `"resolve": true`)
 set -e
 set -o pipefail
 
@@ -51,7 +59,11 @@ if ! jq -r '
        elif (($v.comment_id | type) == "number" and $v.comment_id > 0 and ($v.comment_id | floor) == $v.comment_id
              or (($v.comment_id | type) == "string" and ($v.comment_id | test("^[0-9]+$")))) | not
          then "comment_id must be a number"
-       elif (($v.body | type) == "string" and ($v.body | test("\\S"))) | not then "body must be a non-empty string"
+       elif ($v | has("body")) and $v.body == null and $v.resolve != true
+         then "body is null (resolve-only) but resolve is not true"
+       elif (($v | has("body")) and $v.body == null) | not
+            and ((($v.body | type) == "string" and ($v.body | test("\\S"))) | not)
+         then "body must be a non-empty string"
        elif ($v | has("resolve")) and ($v.resolve | type) != "boolean" then "resolve must be true or false"
        elif ($v.thread != null) and ((($v.thread | type) == "string" and ($v.thread | test("^[A-Za-z0-9_=-]+$"))) | not)
          then "thread must be a thread id (PRRT_...) or null"
@@ -72,7 +84,7 @@ fi
 case "$repo" in */*) ;; *) echo "could not resolve OWNER/REPO" >&2; exit 2 ;; esac
 
 count=$(jq length "$file")
-echo ">> $count replies on PR #$pr in $repo" >&2
+echo ">> $count items on PR #$pr in $repo" >&2
 failed=0
 i=0
 while [ "$i" -lt "$count" ]; do
@@ -80,12 +92,17 @@ while [ "$i" -lt "$count" ]; do
   id=$(jq -r '.comment_id | tostring' "$tmp/item.json")
   thread=$(jq -r '.thread // ""' "$tmp/item.json")
   resolve=$(jq -r '.resolve // false' "$tmp/item.json")
-  jq '{body}' "$tmp/item.json" > "$tmp/body.json"
-  url=""; resolved=false; error=""
+  resolve_only=$(jq -r '.body == null' "$tmp/item.json")
+  url=""; replied=false; resolved=false; error=""
 
-  if gh api "repos/$repo/pulls/$pr/comments/$id/replies" --input "$tmp/body.json" > "$tmp/reply.json" 2> "$tmp/err"; then
+  if [ "$resolve_only" = true ]; then
+    : # the reply is already on GitHub (an earlier run posted it); only the resolve is sent
+  elif jq '{body}' "$tmp/item.json" > "$tmp/body.json" \
+      && gh api "repos/$repo/pulls/$pr/comments/$id/replies" --input "$tmp/body.json" > "$tmp/reply.json" 2> "$tmp/err"; then
+    # An exit-0 POST is a posted reply, with or without an html_url in the response.
+    replied=true
     url=$(jq -r '.html_url // ""' "$tmp/reply.json" 2>/dev/null || true)
-    [ -n "$url" ] || error="reply returned no html_url"
+    [ -n "$url" ] || echo ">> comment $id: reply posted, but the response had no html_url" >&2
   else
     error="reply failed: $(tr '\n' ' ' < "$tmp/err" | cut -c1-300)"
   fi
@@ -109,9 +126,11 @@ mutation($threadId: ID!) { resolveReviewThread(input: {threadId: $threadId}) { t
     failed=$((failed + 1))
     echo ">> comment $id: $error" >&2
   fi
-  jq -n --slurpfile item "$tmp/item.json" --arg url "$url" --argjson resolved "$resolved" --arg error "$error" \
+  jq -n --slurpfile item "$tmp/item.json" --arg url "$url" --argjson replied "$replied" \
+      --argjson resolved "$resolved" --arg error "$error" \
     '{comment_id: ($item[0].comment_id | tonumber),
       reply_url: (if $url == "" then null else $url end),
+      replied: $replied,
       resolved: $resolved,
       error: (if $error == "" then null else $error end)}' > "$tmp/$(printf %05d "$i").out"
   i=$((i + 1))

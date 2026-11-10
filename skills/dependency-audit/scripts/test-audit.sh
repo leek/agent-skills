@@ -226,12 +226,32 @@ jq '.installed += [{"name": "acme/dev", "direct-dependency": true, "version": "d
 run
 eq "odd: npm null current" "$(jq -c '.managers[1].outdated.major' "$tmp/out.json")" \
   '[{"package":"chalk","current":null,"latest":"6.0.1","direct":true}]'
-eq "odd: npm transitive" "$(jq -c '.managers[1].outdated.minor' "$tmp/out.json")" \
+eq "odd: npm package not in the root manifest" "$(jq -c '.managers[1].outdated.minor' "$tmp/out.json")" \
   '[{"package":"left-pad","current":"1.0.0","latest":"1.3.0","direct":false}]'
 jq -e '.managers[1].errors | any(test("not installed"))' "$tmp/out.json" >/dev/null || fail "odd: no not-installed error"
 eq "odd: composer non-numeric under major" "$(names 0 major)" '["psr/log","twig/twig","acme/dev"]'
 jq -e '.managers[0].errors | any(test("cannot compare acme/dev"))' "$tmp/out.json" >/dev/null || fail "odd: no compare error"
 echo "ok missing current and non-numeric versions"
+
+# --- npm workspaces: a package installed in several places is an array; one entry per version -----
+stubs workspaces
+echo '{"left-pad": [{"current": "1.0.0", "wanted": "1.0.0", "latest": "1.3.0", "dependent": "a", "location": "/x/node_modules/left-pad"},
+                    {"current": "1.0.0", "wanted": "1.0.0", "latest": "1.3.0", "dependent": "b", "location": "/x/node_modules/left-pad"},
+                    {"current": "1.1.0", "wanted": "1.1.0", "latest": "1.3.0", "dependent": "c", "location": "/x/packages/c/node_modules/left-pad"}],
+       "lodash": {"current": "4.17.20", "wanted": "4.17.20", "latest": "4.18.1", "dependent": "root"}}' > "$STUB_DIR/npm-outdated.out"
+cd "$tmp/npm-only"
+run
+eq "workspaces: exit" "$rc" 0
+eq "workspaces: one entry per version, direct from the root manifest" "$(jq -c '.managers[0].outdated.minor' "$tmp/out.json")" \
+  '[{"package":"left-pad","current":"1.0.0","latest":"1.3.0","direct":false},{"package":"left-pad","current":"1.1.0","latest":"1.3.0","direct":false},{"package":"lodash","current":"4.17.20","latest":"4.18.1","direct":true}]'
+echo "ok npm workspace dependencies are kept, once per installed version, with direct false"
+
+# --- the real npm outdated capture lists no transitive package -----------------------------------
+# `npm help outdated` (11.20.0): "By default, only the direct dependencies of the root project
+# and direct dependencies of your configured workspaces are shown." The capture agrees: it
+# holds only the four packages the project's package.json names, none of their dependencies.
+eq "fixture: only direct dependencies" "$(jq -c 'keys' "$fixtures/npm-outdated.json")" '["chalk","lodash","minimist","semver"]'
+echo "ok the npm outdated fixture holds direct dependencies only"
 
 # --- nothing but read-only subcommands ever ran ----------------------------------------------------
 [ -s "$tmp/all-calls.log" ] || fail "no calls were logged"

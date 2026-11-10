@@ -5,10 +5,13 @@
 # Usage: release-plan.sh [major|minor|patch]      (run inside the repository to release)
 #
 # Stdout (one JSON object):
-#   {"last_tag": "v1.2.3" | null,          null: no tag exists, this is a first release
-#    "tag_style": "v" | "",                prefix of the newest tag; "v" on a first release
+#   {"last_tag": "v1.2.3" | null,          the highest version tag HEAD reaches; null: no version
+#                                          tag exists, this is a first release
+#    "tag_style": "v" | "",                prefix of last_tag; "v" on a first release
 #    "branch": "main",                     "" on a detached HEAD
-#    "behind": 0,                          commits the upstream has that HEAD lacks; 0 with no upstream
+#    "upstream": "origin/main" | null,     the branch HEAD tracks; null when it tracks none
+#    "behind": 0 | null,                   commits the upstream has that HEAD lacks; null with no
+#                                          upstream, which means not checked, never "not behind"
 #    "authenticated": true,                false when `gh auth status` fails or gh is missing
 #    "commits": [{"sha": "abc1234", "subject": "fix: ..."}],   last_tag..HEAD, newest first
 #    "bump": "major" | "minor" | "patch" | null,
@@ -17,6 +20,9 @@
 #    "tag_free": true | null,              false when the tag `next` already exists locally
 #    "version_files": [{"path": ".claude-plugin/plugin.json", "matches": 1}],
 #    "dirty": ["path", ...]}               paths from `git status --porcelain`
+#
+# A version tag is MAJOR.MINOR.PATCH with an optional "v" (v1.2.3, 1.2.3). Every other tag
+# (weekly, release-5, v1.2.3-rc1) is ignored: it is never last_tag and never sets tag_style.
 #
 # bump, next and tag_free are null when there are no commits since last_tag (nothing to
 # release). On a first release bump is null and next is the version file's version, else v0.1.0.
@@ -30,8 +36,8 @@
 # the last tag's version (the tag without its "v"), with how many times. A count other than 1
 # is reported as it is; bump-version.sh refuses such a file.
 #
-# Exit 0 with the JSON; 1 when the plan cannot be made (not a repository, fetch failed, a last
-# tag that is not MAJOR.MINOR.PATCH, tags that HEAD cannot reach); 2 on a usage error.
+# Exit 0 with the JSON; 1 when the plan cannot be made (not a repository, fetch failed,
+# version tags that HEAD cannot reach); 2 on a usage error.
 set -e
 set -o pipefail
 
@@ -40,7 +46,7 @@ usage() { echo "usage: release-plan.sh [major|minor|patch]" >&2; }
 explicit="${1:-}"
 case "$explicit" in
   ""|major|minor|patch) ;;
-  -h|--help) sed -n '2,31p' "$0" >&2; exit 0 ;;
+  -h|--help) sed -n '2,40p' "$0" >&2; exit 0 ;;
   *) usage; exit 2 ;;
 esac
 if [ $# -gt 1 ]; then usage; exit 2; fi
@@ -59,7 +65,12 @@ authenticated=false
 if command -v gh >/dev/null && gh auth status >/dev/null 2>&1; then authenticated=true; fi
 
 branch="$(git symbolic-ref --short -q HEAD || true)"
-behind="$(git rev-list --count 'HEAD..@{u}' 2>/dev/null || echo 0)"
+# No upstream is "not checked" (null), never 0: 0 would read as "not behind".
+upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)"
+behind=null
+if [ -n "$upstream" ]; then
+  behind="$(git rev-list --count 'HEAD..@{u}' 2>/dev/null || echo null)"
+fi
 
 # How many times the version stands alone in the file: not inside a longer number, so 1.2.3
 # does not match 11.2.3 or 1.2.30. Keep in step with bump-version.sh.
@@ -84,10 +95,18 @@ file_version() { # $1 file -> the version it declares, or nothing
   esac
 }
 
-newest_tag="$(git tag --sort=-v:refname | sed -n 1p)"
-last_tag="$(git describe --tags --abbrev=0 2>/dev/null || true)"
 have_head=false
 if git rev-parse -q --verify HEAD >/dev/null; then have_head=true; fi
+
+# Version tags only: a tag such as `weekly` sorts above v1.2.3 and must not be read as the
+# newest version, nor decide the tag style.
+version_tags() { grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' || true; }
+newest_tag="$(git tag --sort=-v:refname | version_tags | sed -n 1p)"
+last_tag=""
+if $have_head; then
+  last_tag="$(git tag --merged HEAD --sort=-v:refname | version_tags | sed -n 1p)"
+fi
+other_tags="$(git tag | grep -c -v -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' || true)"
 
 bump=""
 next=""
@@ -108,18 +127,21 @@ $VERSION_FILES
 EOF
   if [ -n "$old_version" ]; then
     next="v$old_version"
-    rule="First release: no tag exists, so the version is the one in $source_file."
+    rule="First release: no version tag exists, so the version is the one in $source_file."
   else
     next="v0.1.0"
-    rule="First release: no tag exists and no version file declares a version, so v0.1.0."
+    rule="First release: no version tag exists and no version file declares a version, so v0.1.0."
+  fi
+  if [ "$other_tags" -gt 0 ]; then
+    rule="$rule $other_tags tag(s) that are not MAJOR.MINOR.PATCH were ignored."
   fi
   if [ -n "$explicit" ]; then rule="$rule The argument '$explicit' is not applied."; fi
 else
   if [ -z "$last_tag" ]; then
-    echo "release-plan: tags exist but HEAD reaches none of them" >&2
+    echo "release-plan: version tags exist but HEAD reaches none of them" >&2
     exit 1
   fi
-  case "$newest_tag" in v*) tag_style="v" ;; *) tag_style="" ;; esac
+  case "$last_tag" in v*) tag_style="v" ;; *) tag_style="" ;; esac
   range="$last_tag..HEAD"
   old_version="${last_tag#v}"
   if [[ ! "$old_version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
@@ -195,7 +217,7 @@ git status --porcelain -z | tr '\0' '\n' \
   > "$tmp/dirty"
 
 jq -n \
-  --arg last_tag "$last_tag" --arg tag_style "$tag_style" --arg branch "$branch" \
+  --arg last_tag "$last_tag" --arg tag_style "$tag_style" --arg branch "$branch" --arg upstream "$upstream" \
   --argjson behind "$behind" --argjson authenticated "$authenticated" \
   --arg bump "$bump" --arg rule "$rule" --arg next "$next" --argjson tag_free "$tag_free" \
   --rawfile commits "$tmp/commits.tsv" --rawfile files "$tmp/version-files.tsv" --rawfile dirty "$tmp/dirty" \
@@ -204,6 +226,7 @@ jq -n \
    {last_tag: ($last_tag | nullable),
     tag_style: $tag_style,
     branch: $branch,
+    upstream: ($upstream | nullable),
     behind: $behind,
     authenticated: $authenticated,
     commits: ($commits | lines | map(split("\t") | {sha: .[0], subject: (.[1:] | join("\t"))})),

@@ -16,7 +16,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": "Bash|run_terminal_command",
         "hooks": [
           {
             "type": "command",

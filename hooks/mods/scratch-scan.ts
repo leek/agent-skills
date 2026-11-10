@@ -22,6 +22,23 @@ export type Reader = {
 // Mirrors load_closed_vocabulary in skills/scratch-status/scripts/scratch-state.sh.
 const WONTFIX = ['wontfix', 'declined', 'duplicate']
 const CLOSED = new Set(['closed', 'done', 'resolved', ...WONTFIX])
+const TRIAGE_ROLES = ['needs-triage', 'needs-info', 'ready-for-agent', 'ready-for-human', 'wontfix']
+// The roles that wait on a person (HUMAN_STATUSES in scratch-state.sh): never `/implement` work.
+const HUMAN_ROLES = ['ready-for-human', 'needs-info', 'needs-triage']
+
+export type Vocabulary = {
+  /** Each triage role's status string in this repo; a role the table leaves out keeps its name. */
+  roles: Record<string, string>
+  /** The repo's own wontfix strings, closed like the built-in words. */
+  wontfix: string[]
+}
+
+export const DEFAULT_VOCABULARY: Vocabulary = { roles: Object.fromEntries(TRIAGE_ROLES.map(r => [r, r])), wontfix: [] }
+
+// The wontfix strings of the repo last scanned. A file keeps the status it has on disk, as
+// scratch-state.sh reports it, so `isClosed` and `openFiles` (which the pane calls with a
+// stored board and no vocabulary) ask here whether that string is a closed one.
+let repoClosed: ReadonlySet<string> = new Set()
 const STALE_MS = 30 * 24 * 60 * 60 * 1000
 const TICKET_DIRS: Record<string, ScratchKind> = {
   decisions: 'decision',
@@ -30,7 +47,7 @@ const TICKET_DIRS: Record<string, ScratchKind> = {
 }
 const NO_VALUE = ['none', 'null', '-']
 
-export const isClosed = (file: ScratchFile) => CLOSED.has(file.status)
+export const isClosed = (file: ScratchFile) => CLOSED.has(file.status) || repoClosed.has(file.status)
 
 // Code-point order, as Python sorts strings; localeCompare would order by locale.
 const byText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
@@ -96,7 +113,8 @@ export function parseFile(path: string, kind: ScratchKind, text: string): Scratc
   // Older files carry the claim and the blockers as body lines, not frontmatter.
   let claimedBy = field('claimed-by')
   if (claimedBy === '') {
-    const legacy = body.match(/^(?:\*\*Claimed by:\*\*|Claimed by:)\s*(.+)$/im)?.[1]?.trim() ?? ''
+    // The value sits on the line itself: an emptied `**Claimed by:**` names nobody.
+    const legacy = body.match(/^(?:\*\*Claimed by:\*\*|Claimed by:)[ \t]*(\S.*)$/im)?.[1]?.trim() ?? ''
     claimedBy = NO_VALUE.includes(legacy.toLowerCase()) ? '' : legacy
   }
   let blockedBy = parseList(front, 'blocked-by').map(blockerId)
@@ -159,7 +177,15 @@ export function openFiles(files: readonly ScratchFile[]): ScratchFile[] {
   return files.filter(f => !isClosed(f) && !(f.kind === 'spec' && isSpecComplete))
 }
 
-export function classify(slug: string, files: ScratchFile[], lastChangeMs: number, now: number): ScratchEffort {
+export function classify(
+  slug: string,
+  files: ScratchFile[],
+  lastChangeMs: number,
+  now: number,
+  roles: Record<string, string> = DEFAULT_VOCABULARY.roles,
+): ScratchEffort {
+  const human = new Set(HUMAN_ROLES.map(role => roles[role] ?? role))
+  const deployHold = roles['ready-for-human'] ?? 'ready-for-human'
   const at = (path: string) => `.scratch/${slug}/${path}`
   const byKind = (kind: ScratchKind) => files.filter(f => f.kind === kind)
   const isWork = (file: ScratchFile) => file.kind === 'decision' || file.kind === 'ticket'
@@ -206,11 +232,15 @@ export function classify(slug: string, files: ScratchFile[], lastChangeMs: numbe
   const isMapOpen = map !== undefined && !isClosed(map)
   const isSpecOpen = spec !== undefined && !isClosed(spec)
   const readyDecision = decisions.filter(isReady).sort((a, b) => byNumber(a.number, b.number))[0]
-  const isWaitingOnDeploy = (t: ScratchFile) => t.delivery && t.status === 'ready-for-human'
+  const isWaitingOnDeploy = (t: ScratchFile) => t.delivery && t.status === deployHold
   // Lowest number first, the tracker's Frontier rule (scratch-state.sh adds the unblock count
-  // to `next_why`, which the board does not show).
-  const buildable = tickets.filter(t => isReady(t) && !isWaitingOnDeploy(t)).sort((a, b) => byNumber(a.number, b.number))
+  // to `next_why`, which the board does not show). A ticket at a human-gate status stays on
+  // the frontier, a status view, but is never the next thing to `/implement`.
+  const buildable = tickets.filter(t => isReady(t) && !human.has(t.status)).sort((a, b) => byNumber(a.number, b.number))
   const waiting = tickets.find(t => isReady(t) && isWaitingOnDeploy(t))
+  const held = tickets
+    .filter(t => isReady(t) && human.has(t.status) && !isWaitingOnDeploy(t))
+    .sort((a, b) => byNumber(a.number, b.number))[0]
 
   // The same order as scratch-state.sh's `next` chain; change both together.
   let next = ''
@@ -230,6 +260,8 @@ export function classify(slug: string, files: ScratchFile[], lastChangeMs: numbe
   } else if (waiting) {
     // The delivery ticket waits at ready-for-human for its after-deploy pass.
     next = `after deploy: /implement ${at(waiting.path)}`
+  } else if (held) {
+    next = `waiting on a human: ${at(held.path)} (${held.status})`
   } else if (byKind('request').some(f => !isClosed(f))) {
     next = '/triage'
   } else {
@@ -266,25 +298,39 @@ function rank(effort: ScratchEffort): number {
   return effort.frontier.length > 0 ? 0 : 1
 }
 
-// The repo's own wontfix status string, from the setup table row | `wontfix` | `<string>` | … |.
-export function wontfixLabels(labelsText: string): string[] {
-  return [...labelsText.matchAll(/^\|\s*`wontfix`\s*\|\s*`([^`]+)`/gim)].map(m => (m[1] ?? '').trim().toLowerCase())
+// The repo's status strings, from the setup table's rows | `<role>` | `<status string>` | … |:
+// load_closed_vocabulary in scratch-state.sh.
+export function vocabulary(labelsText: string): Vocabulary {
+  const roles = { ...DEFAULT_VOCABULARY.roles }
+  const wontfix: string[] = []
+  for (const m of labelsText.matchAll(/^\|\s*`([a-z-]+)`\s*\|\s*`([^`]+)`/gim)) {
+    const role = (m[1] ?? '').toLowerCase()
+    const label = (m[2] ?? '').trim().toLowerCase()
+    if (role in roles) {
+      roles[role] = label
+    }
+    if (role === 'wontfix') {
+      wontfix.push(label)
+    }
+  }
+
+  return { roles, wontfix }
 }
 
-async function readLabels(fs: Reader, root: string): Promise<string[]> {
+async function readVocabulary(fs: Reader, root: string): Promise<Vocabulary> {
   const repo = root.replace(/\/\.scratch\/?$/, '')
   for (const candidate of ['.agents/triage-labels.md', 'docs/agents/triage-labels.md']) {
     try {
       const text = await fs.read(`${repo}/${candidate}`)
       if (text !== '') {
-        return wontfixLabels(text)
+        return vocabulary(text)
       }
     } catch {
       // Missing file: try the next location.
     }
   }
 
-  return []
+  return DEFAULT_VOCABULARY
 }
 
 // A directory that cannot be listed (removed mid-scan, no permission) reads as empty, and the
@@ -308,7 +354,8 @@ async function readText(fs: Reader, path: string): Promise<string> {
 
 export async function scan(fs: Reader, root: string, now: number, only = ''): Promise<ScratchBoard> {
   const efforts: ScratchEffort[] = []
-  const customWontfix = new Set((await readLabels(fs, root)).filter(label => !CLOSED.has(label)))
+  const vocab = await readVocabulary(fs, root)
+  repoClosed = new Set(vocab.wontfix)
   const dirs = (await listSorted(fs, root)).filter(
     d => d.kind === 'dir' && d.name !== 'research' && !d.name.startsWith('.') && (only === '' || d.name === only),
   )
@@ -336,11 +383,8 @@ export async function scan(fs: Reader, root: string, now: number, only = ''): Pr
     const files: ScratchFile[] = []
     const kept: { rel: string; mtimeMs: number }[] = []
     for (const f of found) {
+      // The status stays as the file has it (`not-planned`), as scratch-state.sh prints it.
       const parsed = parseFile(f.path, f.kind, await readText(fs, `${base}/${f.path}`))
-      if (customWontfix.has(parsed.status)) {
-        // The repo's custom wontfix string plays the wontfix role.
-        parsed.status = 'wontfix'
-      }
       // A loose markdown file with no status is a note, not a triage request: it is dropped,
       // and its age does not count toward the effort's last change.
       if (f.kind !== 'request' || parsed.status !== '') {
@@ -349,7 +393,7 @@ export async function scan(fs: Reader, root: string, now: number, only = ''): Pr
       }
     }
     if (files.length > 0) {
-      efforts.push(classify(dir.name, files, await lastChange(fs, kept), now))
+      efforts.push(classify(dir.name, files, await lastChange(fs, kept), now, vocab.roles))
     }
   }
 

@@ -25,7 +25,8 @@ GH_READ = {("pr", "view"), ("pr", "diff"), ("pr", "checks"), ("pr", "list"),
            ("issue", "view"), ("issue", "list"), ("run", "view"), ("repo", "view")}
 # `gh api` flags, by long name. Every flag must be one of these: an unknown flag is refused,
 # because a flag this guard takes for a boolean could swallow `-X GET` as its value.
-GH_API_VALUE = {"--cache", "--header", "--hostname", "--jq", "--method", "--preview",
+# `--hostname` is left out on purpose: with it, or a full URL, a call goes to another host.
+GH_API_VALUE = {"--cache", "--header", "--jq", "--method", "--preview",
                 "--raw-field", "--field", "--template"}
 GH_API_BOOL = {"--include", "--paginate", "--silent", "--slurp", "--verbose"}
 GH_API_SHORT = {"H": "--header", "q": "--jq", "X": "--method", "p": "--preview",
@@ -34,7 +35,9 @@ GH_API_SHORT = {"H": "--header", "q": "--jq", "X": "--method", "p": "--preview",
 
 FETCH_FLAGS = {"-q", "--quiet", "-v", "--verbose", "--all", "--no-tags", "--dry-run",
                "--no-recurse-submodules"}
-FETCH_DEPTH = re.compile(r"--(depth|deepen)=\d+")
+# A configured remote's name. A URL, an scp-style host, a path, or `ext::<command>` is not one:
+# fetching from those sends data to a host of the agent's choosing, or runs a program.
+REMOTE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 
 
 def check_git(args: list[str]) -> None:
@@ -47,7 +50,7 @@ def check_git(args: list[str]) -> None:
             for a in args[1:]):
         raise Blocked("`git grep -O` runs a program")
     for a in args[1:]:
-        if long_option_in(a, ("--output", "--upload-pack", "--ext-diff", "--exec")):
+        if long_option_in(a, ("--output", "--upload-pack", "--ext-diff", "--exec", "--textconv", "--filters")):
             raise Blocked(f"`git {args[0]} {a}` writes files or runs a program")
     if args[0] == "fetch":
         # Flags are an allowlist, none taking a separate value, so the positionals are exact:
@@ -57,8 +60,11 @@ def check_git(args: list[str]) -> None:
         for a in args[1:]:
             if not a.startswith("-"):
                 positional.append(a)
-            elif a not in FETCH_FLAGS and not FETCH_DEPTH.fullmatch(a):
-                raise Blocked(f"`git fetch {a}` is not allowed; use only {', '.join(sorted(FETCH_FLAGS))}, --depth=<n>")
+            elif a not in FETCH_FLAGS:
+                # --depth and --deepen are refused too: they rewrite the repository as shallow.
+                raise Blocked(f"`git fetch {a}` is not allowed; use only {', '.join(sorted(FETCH_FLAGS))}")
+        if positional and not REMOTE_NAME.fullmatch(positional[0]):
+            raise Blocked("`git fetch` takes a configured remote's name (origin), never a URL, a host, or a path")
         if any(":" in a or a == "tag" for a in positional[1:]):
             raise Blocked("`git fetch <remote> <src>:<dst>` and `tag <name>` write a local ref; fetch without a destination")
 
@@ -115,11 +121,32 @@ def parse_gh_api(rest: list[str]) -> tuple[list[tuple[str, str]], list[str]]:
     return flags, positional
 
 
+def other_host(value: str) -> bool:
+    """True when a repo or endpoint argument names a host other than github.com."""
+    if "://" in value:
+        return not value.startswith("https://github.com/")
+    return value.startswith("//")
+
+
 def check_gh(args: list[str]) -> None:
     if tuple(args[:2]) in GH_READ:
+        rest = args[2:]
         if any(long_option_in(a, ("--web",)) or (a.startswith("-") and not a.startswith("--") and "w" in a)
-               for a in args[2:]):
+               for a in rest):
             raise Blocked("`--web` opens a browser")
+        for i, a in enumerate(rest):
+            repo = None
+            if a in ("-R", "--repo"):
+                repo = rest[i + 1] if i + 1 < len(rest) else ""
+            elif a.startswith("--repo="):
+                repo = a.split("=", 1)[1]
+            elif a.startswith("-R") and not a.startswith("--"):
+                repo = a[2:].lstrip("=")
+            # OWNER/REPO only: HOST/OWNER/REPO and a URL send the call to another host.
+            if repo is not None and (repo.count("/") != 1 or "://" in repo):
+                raise Blocked("`-R` takes OWNER/REPO on github.com, never a host or a URL")
+            if other_host(a):
+                raise Blocked("only github.com URLs are allowed")
         return
     if args[:1] != ["api"]:
         raise Blocked(f"`gh {' '.join(args[:2])}` is not a read-only gh command")
@@ -128,21 +155,26 @@ def check_gh(args: list[str]) -> None:
     fields = [(name, v) for name, v in flags if name in ("--field", "--raw-field")]
     if any(m != "GET" for m in methods):
         raise Blocked(f"`gh api` with method {next(m for m in methods if m != 'GET')} is not read-only")
+    if any(other_host(p) for p in positional):
+        raise Blocked("`gh api` takes a path on github.com, never a URL on another host")
+    # -F key=@file sends a local file's content (and @- reads stdin): on graphql it would be
+    # a query this guard cannot check, and on any endpoint it carries the file off the machine.
+    if any(name == "--field" and v.partition("=")[2].startswith("@") for name, v in fields):
+        raise Blocked("`gh api -F key=@file` sends a local file; pass the value itself")
     if positional[:1] == ["graphql"]:
-        for name, v in fields:
-            if "mutation" in v.lower():
-                raise Blocked("GraphQL mutations are not read-only")
-            if name == "--field" and v.partition("=")[2].startswith("@"):
-                raise Blocked("`gh api graphql -F key=@file` reads the query from a file this guard cannot check")
+        if any("mutation" in v.lower() for _, v in fields):
+            raise Blocked("GraphQL mutations are not read-only")
         return
     if fields and not methods:
         raise Blocked("`gh api` with -f/-F sends a POST; add `-X GET` for a read")
 
 
 def check_rg(args: list[str]) -> None:
-    for flag in ("--pre", "--hostname-bin"):
+    for flag in ("--pre", "--hostname-bin", "--search-zip"):
         if any(a.startswith(flag) for a in args):
             raise Blocked(f"`rg {flag}` runs a program")
+    if any(a.startswith("-") and not a.startswith("--") and "z" in a for a in args):
+        raise Blocked("`rg -z` runs decompression programs")
 
 
 def check_find(args: list[str]) -> None:

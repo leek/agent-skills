@@ -20,7 +20,8 @@ data unless the user confirms that exact write in this run.
 
 ## 1. Start the run
 
-From the project root, run `bash ${CLAUDE_SKILL_DIR}/scripts/start-run.sh <start-url>`.
+From the project root, run `bash <this-skill-dir>/scripts/start-run.sh <start-url>`
+(`<this-skill-dir>` is this skill's directory, the folder this file is in).
 It prints `run_id`, `run_dir`, `origin`, `state` (the auth file for this host), and
 `state_exists`. The run directory also holds `scope.json`, which the read-only guard
 reads. Sessions are `bt-<run_id>-<tag>`: `plan`, `login`, or the case number.

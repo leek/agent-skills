@@ -12,11 +12,17 @@ session's uncommitted work. One release, one version, one tag, one GitHub releas
 
 ## Process
 
-1. **Preflight.** Run `bash <this-skill-dir>/scripts/release-plan.sh [major|minor|patch]`,
-   passing `$0` when given. It fetches, changes nothing else, and prints one JSON object;
-   this step reads `authenticated`, `behind`, and `last_tag` (null on a first release).
-   Stop when `authenticated` is false, or when `behind` is not 0: a release must not race
-   someone else's push. Done when you are authenticated and the branch is not behind.
+1. **Preflight.** The skill's arguments are an optional bump (`major`, `minor`, or `patch`,
+   when that is the first word) and then an optional summary (the rest). Run
+   `bash <this-skill-dir>/scripts/release-plan.sh [major|minor|patch]`, passing the bump
+   when the user gave one (`<this-skill-dir>` is the folder this file is in). It fetches,
+   changes nothing else, and prints one JSON object; this step reads `authenticated`,
+   `upstream`, `behind`, and `last_tag` (null on a first release). Stop when `authenticated`
+   is false, or when `behind` is above 0: a release must not race someone else's push. A null
+   `upstream` means the branch tracks nothing, so `behind` is null, which is not checked:
+   run `git rev-list --count HEAD..origin/<branch>` and stop when it is above 0; when
+   `origin/<branch>` does not exist, the branch was never pushed and nothing is ahead of it.
+   Done when you are authenticated and the branch is known not to be behind.
 2. **Commit this session's work.** Only files *you* created, edited, or deleted in this
    conversation; `git status --porcelain` lines you did not touch belong to a parallel
    session and stay out. Changes under `.claude/agent-memory/` are always yours too, whoever wrote them: they are the notes of agents with `memory: project`, not a parallel session's work in progress, so they ride along in your commit (`git add -- .claude/agent-memory`). `git add -- <new-path>` each new file, then
@@ -24,7 +30,8 @@ session's uncommitted work. One release, one version, one tag, one GitHub releas
    Never `git add -A`, `git add .`, or `commit -a`. A file that mixes your hunks with
    foreign ones is left out and named in the report. Skip this step when there is nothing
    of yours to commit. Done when `git status --porcelain` shows none of your files.
-3. **Choose the version.** Run `release-plan.sh` again when step 2 committed. Empty
+3. **Choose the version.** Run `release-plan.sh` again when step 2 committed, with the same
+   bump argument as step 1, every time this step runs it. Empty
    `commits` means nothing to release. When step 2 left changes out as not this session's, ask once which
    to commit (they are often the user's own earlier work): a structured question ([harness-tools](../harness-tools/SKILL.md)),
    `multiSelect: true` with one option per file (at most 4 per question, further
@@ -40,7 +47,7 @@ session's uncommitted work. One release, one version, one tag, one GitHub releas
    when a file does not hold `<old>` exactly once (`matches` other than 1): bump that file
    by hand and rerun for the rest. Commit them alone, in one commit:
    `git commit --only -m "chore(release): <version>: <summary>" -- <file> …`.
-   The summary is `$1` when given, otherwise the headline change in six words or fewer,
+   The summary is the one in the arguments when given, otherwise the headline change in six words or fewer,
    matching the style of earlier release commits. A repo with no version file is
    versioned by its tags alone, and a first release's file already holds `next`: skip the
    bump and the commit. Done when `HEAD` is the release commit or there was nothing to bump.

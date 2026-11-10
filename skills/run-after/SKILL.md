@@ -63,7 +63,7 @@ Done when the user approved a set of steps, or cancelled (stop).
 Watch with a command that ends by itself when the gate passes or fails, and let its end wake you. Never a foreground sleep, and never a poll loop in the turn.
 
 - A command that blocks until done (`gh run watch <id> --exit-status`): run it in the background (Claude Code: Bash with `run_in_background`).
-- Any other check: wrap it in [`scripts/wait-until.sh`](scripts/wait-until.sh) `--interval 30 --timeout <limit> -- bash -c '<check>'` and run that in the background. The check exits 0 when passed, 1 when not yet, and 2 when failed (a failed workflow, a closed PR, a rollback). The script prints one JSON verdict: `passed`, `failed`, or `timeout`.
+- Any other check: wrap it as `bash <this-skill-dir>/scripts/wait-until.sh --interval 30 --timeout <limit> -- bash -c '<check>'` (`<this-skill-dir>` is this skill's directory) and run that in the background. The check exits 0 when passed, 1 when not yet, and 2 when failed (a failed workflow, a closed PR, a rollback). The script prints one JSON verdict: `passed`, `failed`, or `timeout`.
 - A harness with no background commands: run `wait-until.sh` in the foreground with the same limit, or, when a wake-up tool exists (`ScheduleWakeup` in Claude Code), schedule one check every 5 minutes up to the limit.
 - "I will tell you": end the turn and wait for the user.
 

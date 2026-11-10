@@ -16,6 +16,11 @@
 #      "lockfile": "composer.lock" | "npm-shrinkwrap.json" | "package-lock.json" | null,
 #      "outdated": {"patch": [E], "minor": [E], "major": [E]},
 #          E = {"package", "current", "latest", "direct": bool}
+#          Both managers list direct dependencies only, never transitive ones. Composer:
+#          `--direct`, so "direct" is always true. npm: `npm outdated` without --all prints
+#          the direct dependencies of the root project and of its workspaces; "direct" is
+#          true when the root package.json names the package, and false for a package only
+#          a workspace member depends on. One entry per package and installed version.
 #      "advisories": [{"package", "severity", "id", "title", "url"}],   most severe first
 #      "errors": ["..."]
 #   }]}
@@ -47,8 +52,9 @@
 #   composer outdated  .installed[] | .name .version .latest ."direct-dependency"
 #   composer audit     .advisories{"<package>": [ .advisoryId .packageName .title .link
 #                      .severity ]}   (.advisories is [] when there are none)
-#   npm outdated       {"<package>": {.current .wanted .latest}}; "direct" is membership
-#                      in package.json's dependency sections
+#   npm outdated       {"<package>": {.current .wanted .latest}}, or an array of such
+#                      objects when workspaces install the package in several places;
+#                      "direct" is membership in the root package.json's dependency sections
 #   npm audit          .auditReportVersion, .vulnerabilities{"<package>": {.via[]}}; each
 #                      object in .via is one advisory: .source .name .title .url .severity
 #                      (a string in .via names another vulnerable package, not an advisory)

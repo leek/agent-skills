@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { classify, normalizeSlug, parseFile, scan, summary } from './scratch-scan'
+import { classify, normalizeSlug, openFiles, parseFile, scan, summary } from './scratch-scan'
 import type { Entry, Reader } from './scratch-scan'
 
 const DAY = 86_400_000
@@ -46,6 +46,11 @@ describe('parseFile', () => {
     expect(file.status).toBe('closed')
     expect(file.claimedBy).toBe('')
     expect(file.blockedBy).toEqual(['01'])
+  })
+
+  test('a claim id written in double quotes reads back without them', async () => {
+    const file = parseFile('tickets/01-x.md', 'ticket', ticket('in-progress', 'claimed-by: "alice: session"\n'))
+    expect(file.claimedBy).toBe('alice: session')
   })
 
   test('falls back to a legacy Status line', async () => {
@@ -134,6 +139,34 @@ test('scan counts every closed word, and the repo\'s custom wontfix string, as c
   expect(board.efforts[0]?.state).toBe('done')
 })
 
+// pinned: `remap` in skills/scratch-status/scripts/test-scratch-state.sh, the same files and
+// the answers scratch-state.sh printed for them.
+test('scan keeps the repo\'s own wontfix string as the status, and follows its human-gate strings', async () => {
+  const labels =
+    '| Role | Status | Meaning |\n| `wontfix` | `not-planned` | x |\n| `ready-for-agent` | `afk-ready` | x |\n' +
+    '| `needs-info` | `waiting` | x |\n| `ready-for-human` | `hitl` | x |\n'
+  const files = {
+    '/r/.agents/triage-labels.md': labels,
+    '/r/.scratch/remap/tickets/01-a.md': md('not-planned'),
+    '/r/.scratch/remap/tickets/02-b.md': md('waiting'),
+    '/r/.scratch/remap/tickets/03-ship.md': md('hitl', 'blocked-by: [01]\ndelivery: true\n'),
+  }
+  const effort = (await scan(reader(files), '/r/.scratch', NOW)).efforts[0]
+  expect(effort?.files.map(f => f.status)).toEqual(['not-planned', 'waiting', 'hitl'])
+  expect(effort?.frontier).toEqual(['tickets/02-b.md', 'tickets/03-ship.md'])
+  expect(effort?.next).toBe('after deploy: /implement .scratch/remap/tickets/03-ship.md')
+  // What the pane counts as open: the wontfix ticket is closed under its own string.
+  expect(openFiles(effort?.files ?? []).map(f => f.path)).toEqual(['tickets/02-b.md', 'tickets/03-ship.md'])
+
+  const shipped = { ...files, '/r/.scratch/remap/tickets/03-ship.md': md('closed') }
+  const after = (await scan(reader(shipped), '/r/.scratch', NOW)).efforts[0]
+  expect(after?.next).toBe('waiting on a human: .scratch/remap/tickets/02-b.md (waiting)')
+
+  // A repo with no table: `not-planned` is an open status again.
+  const plain = (await scan(reader({ '/r/.scratch/p/tickets/01-a.md': md('not-planned') }), '/r/.scratch', NOW)).efforts[0]
+  expect(plain?.state).toBe('open')
+})
+
 // The cases where the board once disagreed with skills/scratch-status/scripts/scratch-state.sh.
 // Each expected row is what scratch-state.sh printed for the same files on disk (`oldcommit`
 // committed 40 days before the run, `oldnote`'s ticket modified 40 days before it, the rest
@@ -193,6 +226,18 @@ const SHARED: Record<string, string> = {
   'wayf/decisions/02-r.md': md('open', 'blocked-by: [01]\n'),
   'tospec/map.md': md('open'),
   'tospec/decisions/01-q.md': md('closed'),
+  // A human-gate status stays on the frontier and is never the /implement pick.
+  'gated/spec.md': md('ready-for-agent'),
+  'gated/tickets/01-a.md': md('closed'),
+  'gated/tickets/02-b.md': md('needs-info'),
+  'gated/tickets/03-c.md': md('needs-triage'),
+  'gated/tickets/04-d.md': md('ready-for-human'),
+  'gated/tickets/05-e.md': md('ready-for-agent', 'blocked-by: [02]\n'),
+  'gatedmix/tickets/01-a.md': md('needs-info'),
+  'gatedmix/tickets/02-b.md': md('ready-for-agent'),
+  // An emptied legacy claim line names nobody, not the next line's text.
+  'emptyclaim/tickets/01-a.md': '---\ntitle: T\nstatus: ready-for-agent\n---\n\n**Claimed by:**\n\nnext line\n',
+  'emptyclaim/tickets/02-b.md': '---\ntitle: T\nstatus: ready-for-agent\n---\n\n**Claimed by:** ann-1\n',
   // Finding 5: a tracked file's age is its last commit; a dropped note's age does not count.
   'oldcommit/tickets/01-a.md': md('ready-for-agent'),
   'oldnote/tickets/01-a.md': md('ready-for-agent'),
@@ -234,6 +279,19 @@ const FROM_SCRATCH_STATE: Record<string, { state: string; stale: boolean; fronti
   directdone: { state: 'done', stale: false, frontier: [], next: '/scratch-cleanup' },
   wayf: { state: 'open', stale: false, frontier: ['decisions/01-q.md'], next: '/wayfinder .scratch/wayf/map.md' },
   tospec: { state: 'open', stale: false, frontier: [], next: '/to-spec .scratch/tospec/map.md' },
+  gated: {
+    state: 'open',
+    stale: false,
+    frontier: ['tickets/02-b.md', 'tickets/03-c.md', 'tickets/04-d.md'],
+    next: 'waiting on a human: .scratch/gated/tickets/02-b.md (needs-info)',
+  },
+  gatedmix: {
+    state: 'open',
+    stale: false,
+    frontier: ['tickets/01-a.md', 'tickets/02-b.md'],
+    next: '/implement .scratch/gatedmix/tickets/02-b.md',
+  },
+  emptyclaim: { state: 'open', stale: false, frontier: ['tickets/01-a.md'], next: '/implement .scratch/emptyclaim/tickets/01-a.md' },
   oldcommit: { state: 'open', stale: true, frontier: ['tickets/01-a.md'], next: '/implement .scratch/oldcommit/tickets/01-a.md' },
   oldnote: { state: 'open', stale: true, frontier: ['tickets/01-a.md'], next: '/implement .scratch/oldnote/tickets/01-a.md' },
 }

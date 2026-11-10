@@ -162,3 +162,47 @@ eq nojq-exit "$code" 1
 grep -q 'needs jq' "$T/err" || fail "missing jq: no clear message"
 eq nojq-no-commit "$(sha HEAD)" "$(sha origin/main)"
 echo "ok usage errors and missing jq"
+
+# a slug that would reach outside .scratch/<slug> is a usage error, and nothing is committed
+new_repo
+echo "not the spec" > "$repo/other.txt"
+before=$(sha HEAD)
+for bad in .. ../repo . feat/../.. a/b -x "feat/.."; do
+  run "$bad" -m "docs(scratch): feat spec"
+  eq "slug '$bad' exit" "$code" 2
+  eq "slug '$bad' stdout" "$out" ""
+  eq "slug '$bad' head" "$(sha HEAD)" "$before"
+  eq "slug '$bad' untracked" "$(git -C "$repo" status --porcelain | sort | tr '\n' ' ')" "?? .scratch/ ?? other.txt "
+done
+echo "ok a slug of .., ., ../x or a/b exits 2 and commits nothing"
+
+# a trailing slash is dropped
+run feat/ -m "docs(scratch): feat spec"
+eq slash-exit "$code" 0
+eq slash-files "$(git -C "$repo" show --name-only --format= HEAD)" ".scratch/feat/spec.md"
+echo "ok a trailing slash on the slug is dropped"
+
+# .scratch ignored by a directory-only rule, and by a contents rule
+for rule in ".scratch/" "/.scratch/" ".scratch/*"; do
+  new_repo
+  commit_file .gitignore "$rule" "ignore scratch"
+  before=$(sha HEAD)
+  run feat -m "docs(scratch): feat spec"
+  eq "ignored '$rule' exit" "$code" 0
+  eq "ignored '$rule' json" "$out" '{"where":"ignored","branch":"","sha":""}'
+  eq "ignored '$rule' head" "$(sha HEAD)" "$before"
+done
+echo "ok ignored .scratch by the rules .scratch/, /.scratch/ and .scratch/*"
+
+# detached HEAD: the commit goes on the docs branch, never on no branch
+new_repo
+git -C "$repo" switch -q --detach
+before=$(sha HEAD)
+run feat -m "docs(scratch): feat spec"
+eq detached-exit "$code" 0
+eq detached-values "$(field '[.where, .branch] | @csv')" '"docs-branch","docs/feat-spec"'
+eq detached-sha "$(field .sha)" "$(sha docs/feat-spec)"
+eq detached-head "$(sha HEAD)" "$before"
+eq detached-still "$(git -C "$repo" branch --show-current)" ""
+[ ! -e "$(wt)" ] || fail "detached: temporary worktree left behind"
+echo "ok detached HEAD commits on the docs branch"

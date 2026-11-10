@@ -19,7 +19,7 @@ In Claude Code with the leek-skills plugin, `/scratch [slug]` shows the effort b
 
 ## 1. Scan `.scratch/`
 
-From inside the repository, run [`scripts/scratch-state.sh`](scripts/scratch-state.sh) `$ARGUMENTS` once.
+From inside the repository, run `bash <this-skill-dir>/scripts/scratch-state.sh $ARGUMENTS` once (`<this-skill-dir>` is this skill's directory).
 
 The script walks `.scratch/` (or `.scratch/<slug>/` when scoped), reads `.agents/triage-labels.md`
 (fallback `docs/agents/triage-labels.md`) when present, parses frontmatter and legacy `Status:`

@@ -69,14 +69,14 @@ Worktrees whose PR merged, and the databases left behind, come from one script. 
 
 ```bash
 bash <this-skill-dir>/scripts/prune-merged-worktrees.sh    # list: merged clean worktrees, their databases, orphans
-bash <this-skill-dir>/scripts/prune-merged-worktrees.sh --remove <worktree path> --drop pgsql:<database>   # selected items only
+bash <this-skill-dir>/scripts/prune-merged-worktrees.sh --remove <worktree path> --drop pgsql:<database>   # selected items only; add --allow-prefix-only when a selected database's source is prefix-only
 ```
 
 A worktree's database can be dropped only in the same run that removes that worktree. Never pass a name the user did not select, and never build the arguments from the whole list.
 
 ## Databases
 
-When the `databases` list of `prune-merged-worktrees.sh` is not empty, read [Database candidates](references/mechanics.md#database-candidates) first: where these databases come from, what the list holds, and what each `source` means. Classify each listed database by its name: a PR number, branch, worktree, or date that maps to merged or removed work is **abandoned**; a name that reads as a deliberate copy (`_backup`, `_snapshot`, `_pre_migration`) or maps to nothing is **uncertain**. Show the list grouped that way, with sizes, in the step 7 selection, and drop only the selected names, through the script's `--drop`. Each drop is irreversible: offer a `pg_dump`/`mysqldump` first for anything uncertain.
+When the `databases` list of `prune-merged-worktrees.sh` is not empty, read [Database candidates](references/mechanics.md#database-candidates) first: where these databases come from, what the list holds, and what each `source` means. Classify each listed database by its `source` and name: a PR number, branch, worktree, or date that maps to merged or removed work is **abandoned**; a `prefix-only` one (only the app database's prefix ties it to this repository), a name that reads as a deliberate copy (`_backup`, `_snapshot`, `_pre_migration`), or one that maps to nothing is **uncertain**. Show the list grouped that way, with sizes, in the step 7 selection, and drop only the selected names, through the script's `--drop`. Each drop is irreversible: offer a `pg_dump`/`mysqldump` first for anything uncertain.
 
 ## PR screenshots
 

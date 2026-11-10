@@ -4,8 +4,9 @@
 These agents read untrusted input (PR comments, transcripts, diffs), so they stay
 read-only, but `memory:` needs Write and Edit to keep its notes. Wired from
 hooks/hooks.json on the file-write tools. For an agent in MEMORY_ONLY, a write passes
-only when its path lies under a `.claude/agent-memory/` directory (project memory) or
-`~/.claude/agent-memory/` (user memory); anything else exits 2. Every other caller
+only when its real path lies under `.claude/agent-memory/` of the working directory or one
+of its parents (project memory) or `~/.claude/agent-memory/` (user memory); anything else,
+a symlink that leads out of those included, exits 2. Every other caller
 passes. Grok's `search_replace` sends the same `file_path` key, so it is covered too.
 """
 
@@ -19,11 +20,25 @@ MEMORY_ONLY = {"deepening-scout", "dependency-auditor", "finding-verifier",
 PATH_KEYS = ("file_path", "path", "target_file")
 
 
+def memory_roots(cwd: str) -> list[str]:
+    """The memory directories this session owns: the working directory's and each parent's
+    (project memory sits at the repo or worktree root), and the user's."""
+    roots, here = [os.path.expanduser("~")], os.path.abspath(cwd)
+    while True:
+        roots.append(here)
+        parent = os.path.dirname(here)
+        if parent == here:
+            break
+        here = parent
+    return [os.path.realpath(os.path.join(r, ".claude", "agent-memory")) for r in roots]
+
+
 def memory_path(path: str, cwd: str) -> bool:
-    full = os.path.normpath(os.path.join(cwd or os.getcwd(), os.path.expanduser(path)))
-    parts = full.split(os.sep)
-    return any(parts[i:i + 2] == [".claude", "agent-memory"] and len(parts) > i + 2
-               for i in range(len(parts) - 1))
+    cwd = cwd or os.getcwd()
+    # realpath, not normpath: a symlink inside the memory directory must not lead a write
+    # elsewhere, and `/anywhere/.claude/agent-memory/x` is not this session's memory.
+    full = os.path.realpath(os.path.join(cwd, os.path.expanduser(path)))
+    return any(full.startswith(root + os.sep) for root in memory_roots(cwd))
 
 
 def run_payload(payload: dict) -> int:

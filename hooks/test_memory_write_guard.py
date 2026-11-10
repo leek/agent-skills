@@ -1,6 +1,8 @@
 import json
+import os
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -28,6 +30,21 @@ class MemoryWriteGuardTest(unittest.TestCase):
         self.assertEqual(self.run_guard("/repo/.claude/settings.json", tool="search_replace",
                                         agent="leek-skills:finding-verifier"), 2)
         self.assertEqual(self.run_guard(""), 2)
+
+    def test_memory_must_be_this_sessions_own(self):
+        # A `.claude/agent-memory` segment somewhere else is not this session's memory.
+        self.assertEqual(self.run_guard("/elsewhere/.claude/agent-memory/x.md"), 2)
+        self.assertEqual(self.run_guard("/repo/sub/.claude/agent-memory/x.md"), 2)
+        # A parent's memory directory is fine: the agent may run from a subdirectory.
+        self.assertEqual(self.run_guard("/repo/.claude/agent-memory/x.md", cwd="/repo/app/deep"), 0)
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = os.path.realpath(tmp)
+            memory = os.path.join(repo, ".claude", "agent-memory")
+            os.makedirs(memory)
+            os.makedirs(os.path.join(repo, "app"))
+            os.symlink(os.path.join(repo, "app"), os.path.join(memory, "out"))
+            self.assertEqual(self.run_guard(os.path.join(memory, "notes.md"), cwd=repo), 0)
+            self.assertEqual(self.run_guard(os.path.join(memory, "out", "Foo.php"), cwd=repo), 2)
 
     def test_other_callers_pass_through(self):
         self.assertEqual(self.run_guard("/repo/app/Foo.php", agent=None), 0)

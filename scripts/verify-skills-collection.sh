@@ -147,17 +147,17 @@ for d in sorted(os.listdir("skills")):
     f = f"skills/{d}/SKILL.md"
     if not os.path.isfile(f):
         continue
-    parts = open(f, encoding="utf-8").read().split("---")
-    if len(parts) < 3:
+    m = re.match(r"^---\n(.*?)\n---\n", open(f, encoding="utf-8").read(), re.S)
+    if not m:
         continue
-    fm = parts[1]
-    if "disable-model-invocation" not in fm:
+    fm = m.group(1)
+    if not re.search(r"^disable-model-invocation:\s*true\s*$", fm, re.M):
         continue
-    for line in fm.splitlines():
-        if line.startswith("description:") and re.search(
-            r"Use this when|Use when the user|Triggers on", line, re.I
-        ):
-            bad.append(d)
+    # The whole description value: its first line and every indented continuation line
+    # (a folded or literal block scalar, or a plain scalar wrapped over several lines).
+    desc = re.search(r"^description:(.*(?:\n[ \t]+.*|\n[ \t]*(?=\n[ \t]))*)", fm, re.M)
+    if desc and re.search(r"Use this when|Use when the user|Triggers on", " ".join(desc.group(1).split()), re.I):
+        bad.append(d)
 if bad:
     print("bad:", ", ".join(bad), file=sys.stderr)
     sys.exit(1)
@@ -292,8 +292,37 @@ check "marketplace description not Claude-only product claim" \
 # 7. Pipeline end-block SSOT and code-review portability
 check "pipeline-end-block reference exists" \
   test -f skills/wayfinder/references/pipeline-end-block.md
+# The eight skills pipeline-end-block.md names as its users, by name: each one points at the
+# file, the file names each one, and no other SKILL.md points at it without being added here
+# and there.
 check "pipeline skills point at end-block" \
-  bash -c 'n=$(rg -l "pipeline-end-block.md" skills --glob "**/SKILL.md" | wc -l | tr -d " "); test "$n" -ge 6'
+  python3 -c '
+import glob, sys
+USERS = ["code-review", "grill-me", "implement", "implement-spec", "to-questionnaire", "to-spec", "to-tickets", "wayfinder"]
+ref = "skills/wayfinder/references/pipeline-end-block.md"
+try:
+    owner = open(ref, encoding="utf-8").read()
+except OSError:
+    sys.exit(ref + " is missing")
+bad = []
+for d in USERS:
+    try:
+        text = open(f"skills/{d}/SKILL.md", encoding="utf-8").read()
+    except OSError:
+        bad.append(f"skills/{d}/SKILL.md is missing (a pipeline skill)")
+        continue
+    if "pipeline-end-block.md" not in text:
+        bad.append(f"skills/{d}/SKILL.md does not point at pipeline-end-block.md")
+    if f"`{d}`" not in owner:
+        bad.append(f"{ref} does not name `{d}` as one of its users")
+for md in sorted(glob.glob("skills/*/SKILL.md")):
+    d = md.split("/")[1]
+    if d not in USERS and "pipeline-end-block.md" in open(md, encoding="utf-8").read():
+        bad.append(f"{md} points at pipeline-end-block.md but is not a named pipeline skill (add it to USERS here and to the list in {ref})")
+if bad:
+    print("\n".join(bad), file=sys.stderr)
+    sys.exit(1)
+'
 check "code-review has inline fallback" \
   rg -q 'sub-agents are unavailable|run both reviews inline' skills/code-review/SKILL.md
 check "code-review AGENTS-first" \
@@ -334,12 +363,40 @@ check "forked skills name an existing agent and wait for the result" \
       test -n "$a" && test -f "agents/$a.md" || { echo "$f: context: fork without a resolvable agent:" >&2; exit 1; }
       rg -q "^background: false" "$f" || { echo "$f: forked skill must set background: false" >&2; exit 1; }
     done'
+# The fallback sits beside the agent it covers: in the same paragraph (the run of non-blank
+# lines around the reference), not merely somewhere in the file. A reference in frontmatter
+# (`agent:` on a forked skill) has no paragraph, so its fallback may be anywhere in the body.
 check "skills naming an agent keep a non-Claude fallback" \
-  bash -c '
-    names=$(ls agents | sed "s/\.md$//" | paste -sd "|" -)
-    for f in $(rg -l "leek-skills:($names)\b" skills --glob "*.md"); do
-      rg -qi "elsewhere|inline|other harness|plain Claude Code" "$f" || { echo "$f: names an agent without a fallback clause" >&2; exit 1; }
-    done'
+  python3 -c '
+import glob, os, re, sys
+names = "|".join(sorted(re.escape(os.path.basename(f)[:-3]) for f in glob.glob("agents/*.md")))
+ref = re.compile(rf"leek-skills:({names})\b")
+fallback = re.compile(r"elsewhere|inline|other harness|plain Claude Code", re.I)
+bad = []
+for p in sorted(glob.glob("skills/**/*.md", recursive=True)):
+    lines = open(p, encoding="utf-8").read().splitlines()
+    body = 0
+    if lines and lines[0] == "---" and "---" in lines[1:]:
+        body = lines.index("---", 1) + 1
+    for i, line in enumerate(lines):
+        if not ref.search(line):
+            continue
+        if i < body:
+            scope = lines[body:]
+        else:
+            a = i
+            while a > body and lines[a - 1].strip():
+                a -= 1
+            b = i
+            while b + 1 < len(lines) and lines[b + 1].strip():
+                b += 1
+            scope = lines[a:b + 1]
+        if not fallback.search("\n".join(scope)):
+            bad.append(f"{p}:{i + 1}: names an agent without a fallback clause in the same paragraph")
+if bad:
+    print("\n".join(bad), file=sys.stderr)
+    sys.exit(1)
+'
 
 # 9. which-skill names every skill a user can start (user-invoked or model-invoked; only
 #    `user-invocable: false` protocols are left out), and harness tool names live only in harness-tools.
@@ -520,14 +577,18 @@ check "every skills/*/scripts/test-*.sh passes" run_skill_script_tests
 check "code-smells-audit cards pass validate-cards.sh" \
   bash -c 'out=$(bash skills/code-smells-audit/scripts/validate-cards.sh 2>&1 >/dev/null) || { printf "%s\n" "$out" | grep "^FAIL" >&2; exit 1; }'
 
-# A skill with allowed-tools whose SKILL.md body names one of its own scripts/*.sh runs that
-# script, so allowed-tools must cover it (docs/authoring.md), or every run stops for a prompt.
+# A skill with allowed-tools that names one of its own scripts/*.sh, in SKILL.md or in any
+# other .md file of the skill (references/, skill-root companions), runs that script, so
+# allowed-tools must cover it (docs/authoring.md), or every run stops for a prompt.
 # EXEMPT holds "<skill>/<script>" for a script that must keep its prompt: a write the body says
 # to ask about first, or a maintainer-only script. Each entry carries its reason.
 check "allowed-tools covers each script a skill body runs" \
   python3 -c '
 import glob, os, re, sys
-EXEMPT = set()
+EXEMPT = {
+    # Maintainer-only: references/maintaining.md runs it after a card edit, never a skill run.
+    "code-smells-audit/validate-cards.sh",
+}
 bad = []
 for md in sorted(glob.glob("skills/*/SKILL.md")):
     d = md.split("/")[1]
@@ -537,14 +598,25 @@ for md in sorted(glob.glob("skills/*/SKILL.md")):
     allowed = re.search(r"^allowed-tools:\s*(.+)$", m.group(1), re.M)
     if not allowed:
         continue
+    # SKILL.md body first (line numbers count from the top of the file), then every other
+    # .md file of the skill.
+    texts = [(md, m.group(2), m.group(1).count("\n") + 3)]
+    for other in sorted(glob.glob(f"skills/{d}/**/*.md", recursive=True)):
+        if other != md:
+            texts.append((other, open(other, encoding="utf-8").read(), 1))
     for script in sorted(glob.glob(f"skills/{d}/scripts/*.sh")):
         name = os.path.basename(script)
         if name.startswith("test-") or f"{d}/{name}" in EXEMPT:
             continue
+        if f"scripts/{name}" in allowed.group(1):
+            continue
         # Its own script: scripts/<name> with no other skill folder in front of it.
-        own = re.search(rf"(?:(?<![A-Za-z0-9_-]/)|(?<=/{re.escape(d)}/)|(?<=\*{re.escape(d)}/))scripts/{re.escape(name)}(?![A-Za-z0-9_.-])", m.group(2))
-        if own and f"scripts/{name}" not in allowed.group(1):
-            bad.append(f"{md}: body runs scripts/{name} but allowed-tools does not cover it (add Bash(bash *{d}/scripts/{name} *), or exempt it in the verifier with the reason)")
+        own = re.compile(rf"(?:(?<![A-Za-z0-9_-]/)|(?<=/{re.escape(d)}/)|(?<=\*{re.escape(d)}/))scripts/{re.escape(name)}(?![A-Za-z0-9_.-])")
+        for path, text, first in texts:
+            hit = next((n for n, line in enumerate(text.splitlines(), first) if own.search(line)), None)
+            if hit is not None:
+                bad.append(f"{path}:{hit}: names scripts/{name} but {md} allowed-tools does not cover it (add Bash(bash *{d}/scripts/{name} *), or exempt it in the verifier with the reason)")
+                break
 if bad:
     print("\n".join(bad), file=sys.stderr)
     sys.exit(1)
@@ -568,6 +640,12 @@ if bad:
 # <this-skill-dir>/scripts/<name>.sh. A markdown link to a script and a mention in prose are
 # fine; a command is `bash scripts/x.sh`, a code-block line that starts with scripts/x.sh, or
 # an inline code span that starts with scripts/x.sh and goes on with arguments.
+# A link used AS the command is a command too: a link to scripts/x.sh followed by an inline
+# code span (its arguments), or one after "run"/"bash" in a file that never spells the full
+# <this-skill-dir>/scripts/x.sh command. The agent reads "run scripts/x.sh <args>" and its
+# shell is in the target repo.
+# LINK_EXEMPT holds "<file>:<script>" for link-form commands in files outside the
+# panel-findings file set; each is a TODO for its owner, to be rewritten and removed here.
 check "script commands name the skill directory, not a bare scripts/ path" \
   python3 -c '
 import glob, re, sys
@@ -576,16 +654,31 @@ with_shell = re.compile(r"(?<![A-Za-z0-9_>}/.*-])(?:bash|sh|zsh)\s+" + script)
 line_start = re.compile(r"^\s*(?:\$\s+)?" + script + r"(?![A-Za-z0-9_.-])")
 span = re.compile(r"`" + script + r"\s+[^`]+`")
 link = re.compile(r"\[[^\]]*\]\([^)]*\)")
+script_link = re.compile(r"\[[^\]]*\]\((?:\.\.?/)*scripts/([A-Za-z0-9_.-]+\.sh)\)")
+LINK_EXEMPT = set()
 bad = []
 for p in sorted(glob.glob("skills/**/*.md", recursive=True)):
     fenced = False
-    for n, line in enumerate(open(p, encoding="utf-8").read().splitlines(), 1):
+    whole = open(p, encoding="utf-8").read()
+    for n, line in enumerate(whole.splitlines(), 1):
         if line.lstrip().startswith("```"):
             fenced = not fenced
             continue
         text = link.sub("LINK", line)
         if with_shell.search(text) or span.search(text) or (fenced and line_start.search(text)):
             bad.append(f"{p}:{n}: {line.strip()[:110]}")
+            continue
+        if fenced:
+            continue
+        for m in script_link.finditer(line):
+            name = m.group(1)
+            if f"{p}:{name}" in LINK_EXEMPT:
+                continue
+            with_args = re.match(r"\s+`[^`]+`", line[m.end():])
+            told_to_run = re.search(r"\b(?:run|bash)\s+$", line[:m.start()], re.I)
+            spelled = re.search(r"<this-skill-dir>/(?:\.\./[A-Za-z0-9_-]+/)?scripts/" + re.escape(name), whole)
+            if with_args or (told_to_run and not spelled):
+                bad.append(f"{p}:{n}: a link used as the command: {line.strip()[:90]}")
 if bad:
     print("bare scripts/ path in a command (write <this-skill-dir>/scripts/<name>.sh):", file=sys.stderr)
     print("\n".join(bad), file=sys.stderr)

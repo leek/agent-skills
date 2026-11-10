@@ -18,9 +18,12 @@
 #      "claimed","in_progress","human"}}
 #     "number" is the file's number as written ("01"); "path" is relative to the root.
 #     "derived" is closed | ready | blocked | claimed (claimed-by set) | in-progress
-#     (status in-progress, no claimant) | human (unblocked, unclaimed, at the ready-for-human
-#     string) | unreadable (no status). "frontier" lists the ready numbers, lowest first;
-#     "next" is the first of them or null. "claim_age_seconds" is the seconds since the
+#     (status in-progress, no claimant) | human (a build ticket, unblocked and unclaimed,
+#     at the repo's string for ready-for-human, needs-info or needs-triage) | unreadable
+#     (no status). "frontier" lists the ready numbers, lowest first; "next" is the first of
+#     them or null. Frontier here is what an agent may claim: scratch-state.sh's own
+#     "frontier" is a status view and also lists the unblocked human-gated tickets.
+#     "claim_age_seconds" is the seconds since the
 #     file last changed (its last commit when tracked, else its modification time) on a
 #     claimed or in-progress ticket, else null: whether a claim is stale is the caller's
 #     call. --kind defaults to tickets when the effort has build tickets, else decisions.
@@ -30,16 +33,21 @@
 #
 #   claim <path> --as <id> [--built <n>[,<n>...]]
 #     <id> may hold letters, digits, and . _ @ / + : - and inner spaces (autopilot:<run-id>).
+#     An id that plain YAML would misread (it holds ": " or ends in ":") is written in
+#     double quotes; every reader returns it without them.
 #     --built is as for frontier: those blockers do not refuse the claim.
 #     Build ticket or spec: sets status: in-progress and claimed-by: <id>. Decision ticket:
-#     sets claimed-by only. Writes, reads the file again, and prints
+#     sets claimed-by only. An older ticket's body line `**Claimed by:**` gets the id too.
+#     Writes, reads the file again, and prints
 #     {"won":true,"path","status","claimed_by"}. A second claim with the same id changes
 #     nothing and wins. Refused, exit 1, nothing written:
 #     {"won":false,"reason","path","status","claimed_by","open_blockers":[..]} with reason
-#     closed | claimed | in-progress | blocked | unreadable | lost.
+#     closed | claimed | in-progress | human (a build ticket or spec at a human-gate
+#     status, see frontier) | blocked | unreadable | lost.
 #
 #   release <path> [--note <text>]
-#     Clears claimed-by. A build ticket or spec at in-progress goes back to the AFK-ready
+#     Clears claimed-by, and the value of an older ticket's body line `**Claimed by:**`
+#     (the line stays). A build ticket or spec at in-progress goes back to the AFK-ready
 #     string (ready-for-agent, or what .agents/triage-labels.md maps that role to); any
 #     other status (ready-for-human) stays. --note appends the text under ## Comments,
 #     adding the heading when missing. Prints {"path","status","claimed_by":""}.
@@ -47,7 +55,8 @@
 #   resolve <path> --body-file <file>
 #     Appends ## Resolution with the file's content (fills an empty ## Resolution heading),
 #     sets status: closed, clears claimed-by. Prints {"path","status":"closed","claimed_by":""}.
-#     Refused when the item is closed or already has a ## Resolution with content.
+#     On an open item that already has ## Resolution text (a reopened ticket) the content
+#     goes under that heading, after a blank line. Refused when the item is closed.
 #
 #   close <path> --reason-file <file>
 #     Out-of-scope or superseded close: appends ## Closed with the reason, sets
@@ -55,8 +64,10 @@
 #
 #   set-status <path> <status>
 #     Writes status only. Legal: open | closed on a map or decision ticket; a triage role's
-#     status string, in-progress, or closed on a spec or build ticket.
-#     Prints {"path","status","previous"}.
+#     status string, in-progress, or closed on a spec or build ticket. On a spec or build
+#     ticket <status> may also be a triage role's canonical name (ready-for-agent): the
+#     repo's string for that role is written. Prints {"path","status","previous"}, where
+#     "status" is the value written.
 #
 #   lint <slug>                                                             read-only
 #     {"ok":bool,"errors":[{"file","rule","detail"}]}, exit 1 when not ok. Rules:
@@ -66,11 +77,17 @@
 #
 # A refusal of release, resolve, close or set-status prints
 # {"error","detail","path","status","claimed_by"} (set-status adds "legal":[..]).
-# A write changes only the status / claimed-by frontmatter lines and the appended section;
-# every other byte of the file stays, and the file is replaced atomically.
+# A write changes only the status / claimed-by frontmatter lines, the value of an older
+# body line `**Claimed by:**`, and the appended section; every other byte of the file
+# stays, and the file is replaced atomically.
+# claim, release, resolve, close and set-status hold an exclusive advisory lock (flock on
+# the effort's directory, no lock file) from before their first read until after their
+# last, so of two sessions that write one effort at the same time the second sees the
+# first one's result. The read-only subcommands take no lock.
 #
 # Stdout: one JSON object. Stderr: messages.
-# Exit: 0 done, 1 refused or lint errors, 2 usage error or unreadable tracker.
+# Exit: 0 done, 1 refused or lint errors, 2 usage error, unreadable tracker, or a lock
+# another session held for more than 120 seconds.
 set -e
 
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -102,6 +119,9 @@ USAGE = """usage: ticket.sh [--root DIR] <subcommand> ...
   set-status <path> <status>
   lint <slug>"""
 TICKET_DIRS = {"decisions": "decision", "tickets": "ticket", "issues": "ticket"}
+HUMAN_ROLES = ("ready-for-human", "needs-info", "needs-triage")
+LOCK_WAIT_SECONDS = 120
+HELD_LOCKS: list[int] = []
 
 
 def usage(message: str) -> None:
@@ -184,6 +204,35 @@ def number_key(number: str) -> tuple[float, str]:
     return (float(int(number)) if number.isdigit() else float("inf"), number)
 
 
+def lock_effort(directory: str) -> None:
+    """Exclusive advisory lock on the effort's directory, held until this process exits."""
+    import errno
+    import fcntl
+
+    fd = os.open(directory, os.O_RDONLY)
+    deadline = time.time() + LOCK_WAIT_SECONDS
+    while True:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            break
+        except OSError as exc:
+            if exc.errno not in (errno.EWOULDBLOCK, errno.EAGAIN, errno.EINTR):
+                # A filesystem without flock: go on unlocked, as claim's compare-after-write allows.
+                print(f"ticket.sh: no lock on {directory} ({exc.strerror}); writing without one", file=sys.stderr)
+                break
+            if time.time() > deadline:
+                print(f"ticket.sh: another session held the lock on {directory} for {LOCK_WAIT_SECONDS}s", file=sys.stderr)
+                sys.exit(2)
+            time.sleep(0.05)
+    HELD_LOCKS.append(fd)
+
+
+def human_statuses(state: dict) -> set:
+    """The repo's status strings for the roles that wait on a person."""
+    roles = state["vocabulary"]["roles"]
+    return {roles[r] for r in HUMAN_ROLES}
+
+
 def legal_statuses(kind: str, state: dict) -> list[str]:
     if kind in ("map", "decision"):
         return ["open", "closed"]
@@ -195,7 +244,7 @@ def legal_statuses(kind: str, state: dict) -> list[str]:
 class Target:
     """One tracker file named on the command line, read through scratch-state.sh."""
 
-    def __init__(self, root: str, arg: str) -> None:
+    def __init__(self, root: str, arg: str, write: bool = False) -> None:
         candidates = [arg] if os.path.isabs(arg) else [arg, os.path.join(root, arg)]
         found = next((c for c in candidates if os.path.isfile(c)), None)
         if found is None:
@@ -217,6 +266,9 @@ class Target:
         self.is_build = self.kind in ("ticket", "spec")
         self.state: dict = {}
         self.item: dict = {}
+        if write:
+            # Before the first read: the checks and the write then see one state.
+            lock_effort(os.path.join(root, ".scratch", self.slug))
         self.reload()
 
     def reload(self) -> None:
@@ -238,6 +290,10 @@ class Target:
     @property
     def is_closed(self) -> bool:
         return self.item.get("derived_status") == "closed"
+
+    @property
+    def is_human_gate(self) -> bool:
+        return self.is_build and self.status in human_statuses(self.state)
 
     def facts(self) -> dict:
         return {"path": self.path, "status": self.status, "claimed_by": self.claimed_by}
@@ -283,15 +339,64 @@ def eol_of(lines: list[str]) -> str:
     return "\r\n" if lines and lines[0].endswith("\r\n") else "\n"
 
 
+def yaml_scalar(value: str) -> str:
+    """The value as YAML reads it back unchanged: double-quoted when a plain scalar would
+    be invalid or cut (`: ` inside, a trailing `:`, ` #`, or a leading indicator)."""
+    plain = (
+        value == value.strip()
+        and ": " not in value
+        and " #" not in value
+        and not value.endswith(":")
+        and value[:1] not in tuple("!&*|>'\"%@`#[]{},")
+        and not value.startswith(("- ", "? ", ": "))
+        and value not in ("-", "?", ":")
+    )
+    if plain:
+        return value
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
 def set_key(lines: list[str], key: str, value: str) -> None:
     """Rewrite `key:` inside the frontmatter, or add it before the closing `---`."""
     close = front_end(lines)
-    new = f"{key}: {value}" if value else f"{key}:"
+    new = f"{key}: {yaml_scalar(value)}" if value else f"{key}:"
     for i in range(1, close):
         if lines[i].startswith(f"{key}:"):
             lines[i] = new + lines[i][len(bare(lines[i])):]
             return
     lines.insert(close, new + eol_of(lines))
+
+
+LEGACY_CLAIM = re.compile(r"^(\*\*Claimed by:\*\*|Claimed by:)[ \t]*(.*)$", re.I)
+NO_CLAIM = ("", "none", "null", "-")
+
+
+def has_key(lines: list[str], key: str) -> bool:
+    return any(lines[i].startswith(f"{key}:") for i in range(1, front_end(lines)))
+
+
+def set_legacy_claim(lines: list[str], value: str) -> None:
+    """The body line `**Claimed by:** <x>` of an older ticket, which scratch-state.sh reads
+    when the frontmatter names no claimant. With a value: write it on the first such line.
+    Without: empty every such line that names a claimant. The line itself stays."""
+    for i in range(front_end(lines) + 1, len(lines)):
+        text = bare(lines[i])
+        m = LEGACY_CLAIM.match(text)
+        if m is None:
+            continue
+        if value:
+            lines[i] = f"{m.group(1)} {value}" + lines[i][len(text):]
+            return
+        if m.group(2).strip().lower() not in NO_CLAIM:
+            lines[i] = m.group(1) + lines[i][len(text):]
+
+
+def clear_claim(lines: list[str]) -> None:
+    """No claimant in the frontmatter or on an older body line. A file with no
+    `claimed-by` key gets none: a missing key already reads as unclaimed."""
+    if has_key(lines, "claimed-by"):
+        set_key(lines, "claimed-by", "")
+    set_legacy_claim(lines, "")
 
 
 def heading_index(lines: list[str], title: str | None, start: int) -> int:
@@ -320,11 +425,6 @@ def section_bounds(lines: list[str], title: str) -> tuple[int, int]:
         return -1, -1
     nxt = heading_index(lines, None, head + 1)
     return head, (nxt if nxt >= 0 else len(lines))
-
-
-def section_has_content(lines: list[str], title: str) -> bool:
-    head, end = section_bounds(lines, title)
-    return head >= 0 and any(ln.strip() for ln in lines[head + 1:end])
 
 
 def content_lines(text: str, eol: str) -> list[str]:
@@ -410,14 +510,15 @@ def cmd_frontier(root: str, args: list[str]) -> None:
     decisions_in = effort["decisions"] if effort else []
     if kind is None:
         kind = "tickets" if tickets_in or not decisions_in else "decisions"
-    human = state["vocabulary"]["roles"]["ready-for-human"]
+    # A human gate is a build-ticket status: a decision ticket is open or closed.
+    human = human_statuses(state) if kind == "tickets" else set()
     now = time.time()
 
     def derive(item: dict) -> str:
         raw = item["derived_status"]
         if raw == "in progress":
             return "claimed" if item["claimed_by"] else "in-progress"
-        if raw == "ready" and item["status"] == human:
+        if raw == "ready" and item["status"] in human:
             return "human"
         return raw
 
@@ -427,7 +528,7 @@ def cmd_frontier(root: str, args: list[str]) -> None:
         derived = derive(item)
         open_blockers = still_open(item["open_blockers"], built)
         if derived == "blocked" and not open_blockers:
-            derived = "human" if item["status"] == human else "ready"
+            derived = "human" if item["status"] in human else "ready"
         rows.append({
             "number": item["number"],
             "path": f".scratch/{slug}/{item['path']}",
@@ -470,7 +571,7 @@ def cmd_claim(root: str, args: list[str]) -> None:
     if not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9._@/+: -]*[A-Za-z0-9._@/+:-])?", claim_id):
         usage("--as wants letters, digits, and . _ @ / + : - or inner spaces")
     built = built_set(opts)
-    target = Target(root, rest[0])
+    target = Target(root, rest[0], write=True)
     if target.kind == "map":
         usage("a map is not claimed")
 
@@ -489,6 +590,8 @@ def cmd_claim(root: str, args: list[str]) -> None:
         lose("claimed", f"{target.path} is claimed by {target.claimed_by}")
     if target.is_build and target.status == "in-progress":
         lose("in-progress", f"{target.path} is in-progress with no claimant; release it first to take it over")
+    if target.is_human_gate:
+        lose("human", f"{target.path} is at {target.status}, which waits on a person; an agent does not claim it")
     waiting = still_open(target.item["open_blockers"], built)
     if waiting:
         lose("blocked", f"{target.path} waits on {', '.join(waiting)}")
@@ -497,9 +600,11 @@ def cmd_claim(root: str, args: list[str]) -> None:
     if target.is_build:
         set_key(lines, "status", "in-progress")
     set_key(lines, "claimed-by", claim_id)
+    set_legacy_claim(lines, claim_id)
     write_lines(target.abs, lines)
 
-    # Compare after write: another session may have saved its own claim over this one.
+    # Compare after write: a hand edit, or a session on a filesystem with no flock, may
+    # have saved over this claim.
     target.reload()
     if target.claimed_by != claim_id:
         lose("lost", f"{target.path} now reads claimed-by {target.claimed_by or '(empty)'}")
@@ -513,7 +618,7 @@ def cmd_release(root: str, args: list[str]) -> None:
     note = opts.get("--note")
     if note is not None and not note.strip():
         usage("--note is empty")
-    target = Target(root, rest[0])
+    target = Target(root, rest[0], write=True)
     if target.kind == "map":
         usage("a map is not claimed or released")
     if target.is_closed:
@@ -523,7 +628,7 @@ def cmd_release(root: str, args: list[str]) -> None:
     if target.is_build and target.status == "in-progress":
         set_key(lines, "status", target.state["vocabulary"]["roles"]["ready-for-agent"])
     if target.claimed_by:
-        set_key(lines, "claimed-by", "")
+        clear_claim(lines)
     if note is not None:
         add_to_section(lines, "Comments", note)
     if lines != before:
@@ -539,20 +644,16 @@ def cmd_finish(root: str, args: list[str], option: str, heading: str) -> None:
     if len(rest) != 1 or option not in opts:
         usage(f"{name} takes one path and {option} <file>")
     text = read_text_arg(opts[option], option)
-    target = Target(root, rest[0])
+    target = Target(root, rest[0], write=True)
     if target.kind == "map":
         usage(f"a map is closed with set-status, not {name}")
     if target.is_closed:
         refuse({"error": "closed", "detail": f"already {target.status}", **target.facts()}, f"{target.path} is already closed")
     lines = editable_lines(target)
-    if heading == "Resolution" and section_has_content(lines, "Resolution"):
-        refuse(
-            {"error": "has-resolution", "detail": "the item already has a ## Resolution", **target.facts()},
-            f"{target.path} already has a ## Resolution",
-        )
     set_key(lines, "status", "closed")
     if target.claimed_by:
-        set_key(lines, "claimed-by", "")
+        clear_claim(lines)
+    # A reopened ticket keeps its earlier ## Resolution: the new text goes below it.
     add_to_section(lines, heading, text)
     write_lines(target.abs, lines)
     target.reload()
@@ -563,9 +664,13 @@ def cmd_set_status(root: str, args: list[str]) -> None:
     rest, _ = take_options(args, ())
     if len(rest) != 2:
         usage("set-status takes one path and one status")
-    target = Target(root, rest[0])
+    target = Target(root, rest[0], write=True)
     wanted = rest[1].strip().lower()
     legal = legal_statuses(target.kind, target.state)
+    roles = target.state["vocabulary"]["roles"]
+    if wanted not in legal and target.is_build and wanted in roles:
+        # A triage role's canonical name: write the repo's string for it.
+        wanted = roles[wanted]
     if wanted not in legal:
         refuse(
             {

@@ -3,13 +3,17 @@
 # checkout or carrying another session's commits.
 #
 # Usage: publish-spec.sh <slug> -m <message> [--own <sha>]... [--default <branch>]
+#   <slug>: one directory name under .scratch/ (a trailing slash is dropped). A slug that
+#          is empty or ".", starts with "-", or holds "/" or ".." is a usage error: it
+#          would reach a path outside .scratch/<slug>.
 #   --own: a commit this session made on the current branch (repeat per sha). A fresh
 #          session passes none.
 #
 # Where it commits:
-#   - "ignored": `git check-ignore -q .scratch` holds; nothing is committed.
+#   - "ignored": `git check-ignore -q .scratch/<slug>/` holds; nothing is committed.
 #   - "docs-branch": the branch docs/<slug>-spec exists, or origin/<default>..HEAD holds a
-#     commit not passed as --own. The commit goes on docs/<slug>-spec (created from
+#     commit not passed as --own, or HEAD is detached (a commit there would be on no
+#     branch). The commit goes on docs/<slug>-spec (created from
 #     origin/<default> when missing) through the temporary worktree
 #     .claude/worktrees/docs-<slug>-spec, removed again without --force; the checkout
 #     stays where it is.
@@ -19,8 +23,13 @@
 
 set -e
 
+usage() { echo "Usage: publish-spec.sh <slug> -m <message> [--own <sha>]... [--default <branch>]" >&2; exit 2; }
 slug=${1:-}
-[ -n "$slug" ] || { echo "Usage: publish-spec.sh <slug> -m <message> [--own <sha>]... [--default <branch>]" >&2; exit 2; }
+while [ "${slug%/}" != "$slug" ]; do slug=${slug%/}; done
+# The same rule as implement's start-branch.sh: the slug is one directory name.
+case "$slug" in
+  "" | . | -* | */* | *..*) [ -z "$slug" ] || echo "Not a slug (one directory name under .scratch/): $slug" >&2; usage ;;
+esac
 shift
 msg=""; own=(); default=""
 while [ $# -gt 0 ]; do
@@ -40,7 +49,9 @@ dir=".scratch/$slug"
 
 out() { jq -cn --arg where "$1" --arg branch "$2" --arg sha "$3" '{where: $where, branch: $branch, sha: $sha}'; }
 
-if git check-ignore -q .scratch; then
+# The slug's own directory, with the slash: a directory-only rule (.scratch/) and a
+# contents rule (.scratch/*) both match it, whether or not the directory exists yet.
+if git check-ignore -q -- "$dir/"; then
   echo ">> .scratch is ignored here; nothing committed" >&2
   out ignored "" ""; exit 0
 fi
@@ -63,7 +74,9 @@ for s in $revs; do
   [ "$mine" = 1 ] || { foreign=$s; break; }
 done
 
-if [ -z "$foreign" ] && ! git rev-parse --verify -q "refs/heads/$docs" >/dev/null; then
+detached=0
+git symbolic-ref -q HEAD >/dev/null || detached=1
+if [ -z "$foreign" ] && [ "$detached" = 0 ] && ! git rev-parse --verify -q "refs/heads/$docs" >/dev/null; then
   git add -- "$dir"
   if git diff --cached --quiet -- "$dir"; then
     echo ">> $dir unchanged; nothing committed" >&2
@@ -74,6 +87,7 @@ if [ -z "$foreign" ] && ! git rev-parse --verify -q "refs/heads/$docs" >/dev/nul
 fi
 
 [ -z "$foreign" ] || echo ">> HEAD carries $foreign, not this session's; committing on $docs" >&2
+[ "$detached" = 0 ] || echo ">> HEAD is detached; committing on $docs" >&2
 main=$(git worktree list --porcelain | awk '/^worktree /{ print substr($0, 10); exit }')
 wt="$main/.claude/worktrees/docs-$slug-spec"
 src=$(pwd -P)/$dir

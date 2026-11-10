@@ -70,6 +70,47 @@ run 1.2.3 1.2.4 good.json
 [ "$(ls -l good.json | cut -c1-10)" = "-rw-r-----" ] || fail "mode: $(ls -l good.json)"
 ok "keeps the file mode"
 
+printf '#!/bin/sh\necho 1.2.3\n' > tool.sh; chmod 755 tool.sh
+run 1.2.3 1.2.4 tool.sh
+[ "$code" -eq 0 ] || fail "mode 755: exit $code"
+[ "$(ls -l tool.sh | cut -c1-10)" = "-rwxr-xr-x" ] || fail "mode 755: $(ls -l tool.sh)"
+ok "keeps an executable mode"
+
+# A failure while writing, after every file passed the match check, must change nothing.
+if [ "$(id -u)" -eq 0 ]; then
+  ok "a read-only second file changes nothing (skipped: root writes read-only files)"
+else
+  printf '{"version": "1.2.3"}\n' > first.json
+  printf '{"version": "1.2.3"}\n' > readonly.json; chmod 444 readonly.json
+  printf '{"version": "1.2.3"}\n' > third.json
+  run 1.2.3 1.2.4 first.json readonly.json third.json
+  [ "$code" -eq 1 ] || fail "read-only: exit $code, want 1"
+  grep -q '"1.2.3"' first.json || fail "read-only: first.json was written (a partial bump)"
+  grep -q '"1.2.3"' readonly.json || fail "read-only: readonly.json was written"
+  grep -q '"1.2.3"' third.json || fail "read-only: third.json was written"
+  [ "$(ls -l readonly.json | cut -c1-10)" = "-r--r--r--" ] || fail "read-only: mode changed: $(ls -l readonly.json)"
+  [ "$(printf '%s' "$out" | jq -c .)" = '{"changed":[],"refused":[{"path":"readonly.json","matches":1,"error":"not writable"}]}' ] || fail "read-only: output $out"
+  [ -z "$(find . -name '.bump-version.*')" ] || fail "read-only: a temporary file was left behind: $(ls -A)"
+  ok "a read-only second file changes nothing"
+
+  mkdir locked; printf '{"version": "1.2.3"}\n' > locked/in.json; chmod 555 locked
+  run 1.2.3 1.2.4 first.json locked/in.json
+  chmod 755 locked
+  [ "$code" -eq 1 ] || fail "read-only directory: exit $code, want 1"
+  grep -q '"1.2.3"' first.json || fail "read-only directory: first.json was written"
+  [ "$(printf '%s' "$out" | jq -c '.refused[0].path')" = '"locked/in.json"' ] || fail "read-only directory: output $out"
+  [ -z "$(find . -name '.bump-version.*')" ] || fail "read-only directory: a temporary file was left behind"
+  ok "a read-only directory changes nothing"
+fi
+
+mkdir real; printf '{"version": "1.2.3"}\n' > real/target.json; ln -s real/target.json link.json
+run 1.2.3 1.2.4 link.json first.json
+[ "$code" -eq 0 ] || fail "symlink: exit $code: $(cat "$T/stderr")"
+[ -L link.json ] || fail "symlink: link.json is no longer a symlink"
+grep -q '"1.2.4"' real/target.json || fail "symlink: the target was not bumped"
+[ -z "$(find . -name '.bump-version.*')" ] || fail "symlink: a temporary file was left behind"
+ok "follows a symlink and keeps it"
+
 run 1.2.3 1.2.4
 [ "$code" -eq 2 ] || fail "usage (no file): exit $code, want 2"
 run 1.2.4 1.2.4 good.json

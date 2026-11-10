@@ -85,9 +85,8 @@ work_item_is_deploy_gate() {
 
 # A frontmatter value without its quotes or an unquoted trailing ` # comment`: the same rule
 # as clean_value in skills/scratch-status/scripts/scratch-state.sh. Change them together.
-strip_yaml_comment() {
-  awk '{
-    v = $0
+YAML_CLEAN_AWK='
+  function clean(v,   q, e, rest) {
     sub(/^[ \t]+/, "", v); sub(/[ \t\r]+$/, "", v)
     q = substr(v, 1, 1)
     if (q == "\"" || q == "\047") {
@@ -95,15 +94,113 @@ strip_yaml_comment() {
       if (e > 0) {
         rest = substr(v, e + 2)
         sub(/^[ \t]+/, "", rest)
-        if (rest == "" || substr(rest, 1, 1) == "#") { print substr(v, 2, e - 1); next }
+        if (rest == "" || substr(rest, 1, 1) == "#") return substr(v, 2, e - 1)
       }
     }
     if (substr(v, 1, 1) == "#") v = ""
     else if (match(v, /[ \t]#/)) v = substr(v, 1, RSTART - 1)
     sub(/[ \t]+$/, "", v)
     gsub(/^["\047]+|["\047]+$/, "", v)
-    print v
-  }'
+    return v
+  }
+'
+
+strip_yaml_comment() {
+  awk "$YAML_CLEAN_AWK"'{ print clean($0) }'
+}
+
+# The items of a frontmatter list, one per line, in the three spellings parse_list in
+# scratch-state.sh accepts: an inline `key: [a, "b"]` (the brackets may span lines), a block
+# list (`key:` then `  - a` lines), and a bare `key: a, b`. A bare none, null, ~ or [] is an
+# empty list. Change them together.
+frontmatter_list_items() {
+  local file="$1" key="$2"
+  awk -v key="$key" "$YAML_CLEAN_AWK"'
+    function trim_quotes(s) {
+      gsub(/^[ \t\r]+|[ \t\r]+$/, "", s)
+      gsub(/^["\047]+|["\047]+$/, "", s)
+      return s
+    }
+    function print_items(s,   n, parts, i, item) {
+      n = split(s, parts, ",")
+      for (i = 1; i <= n; i++) {
+        item = trim_quotes(parts[i])
+        if (item != "") print item
+      }
+    }
+    function print_bare(s,   value, lowered) {
+      value = clean(s)
+      lowered = tolower(value)
+      if (lowered == "none" || lowered == "null" || lowered == "~" || lowered == "[]") return
+      print_items(value)
+    }
+    NR == 1 && $0 !~ /^---[[:space:]]*$/ { exit }
+    NR == 1 { next }
+    /^---[[:space:]]*$/ { exit }
+    in_flow {
+      line = $0
+      sub(/\r$/, "", line)
+      close_at = index(line, "]")
+      if (close_at == 0) { flow = flow " " line; next }
+      print_items(flow " " substr(line, 1, close_at - 1))
+      in_flow = 0
+      exit
+    }
+    in_block {
+      if ($0 !~ /^[ \t]*-/) exit
+      item = $0
+      sub(/^[ \t]*-[ \t]*/, "", item)
+      item = clean(item)
+      if (item != "") print item
+      next
+    }
+    index($0, key ":") == 1 {
+      rest = substr($0, length(key) + 2)
+      sub(/^[ \t]+/, "", rest); sub(/[ \t\r]+$/, "", rest)
+      if (rest == "") { in_block = 1; next }
+      if (substr(rest, 1, 1) == "[") {
+        close_at = index(rest, "]")
+        if (close_at > 0) { print_items(substr(rest, 2, close_at - 2)); exit }
+        in_flow = 1; flow = substr(rest, 2); unclosed = rest
+        next
+      }
+      print_bare(rest)
+      exit
+    }
+    END { if (in_flow) print_bare(unclosed) }
+  ' "$file" 2>/dev/null
+}
+
+# The value of the first legacy body line `**<Label>:** value` or `<Label>: value`, any
+# letter case, below the frontmatter: the lines scratch-state.sh reads for `Claimed by` and
+# `Blocked by`. The label is given in lower case. Prints nothing when no line carries a value.
+legacy_body_value() {
+  local file="$1" label="$2"
+  awk -v label="$label" '
+    NR == 1 && /^---[[:space:]]*$/ { in_front = 1; next }
+    in_front { if ($0 ~ /^---[[:space:]]*$/) in_front = 0; next }
+    {
+      line = $0
+      sub(/\r$/, "", line)
+      lowered = tolower(line)
+      bold = "**" label ":**"
+      plain = label ":"
+      if (index(lowered, bold) == 1) rest = substr(line, length(bold) + 1)
+      else if (index(lowered, plain) == 1) rest = substr(line, length(plain) + 1)
+      else next
+      gsub(/^[ \t]+|[ \t]+$/, "", rest)
+      if (rest == "") next
+      print rest
+      exit
+    }
+  ' "$file" 2>/dev/null
+}
+
+# True when a legacy body value says "nobody" or "nothing", as scratch-state.sh reads it.
+legacy_value_is_empty() {
+  local lowered
+  lowered="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+  [[ -z "$lowered" || "$lowered" == "none" || "$lowered" == "null" || "$lowered" == "-" ]]
 }
 
 # The status string the repo's triage table maps a role to (`| `role` | `string` | … |` in
@@ -136,7 +233,8 @@ status_word() {
 }
 
 # Reads status/claim from YAML frontmatter (all pipeline files now use it),
-# falling back to a legacy bold "**Status:**" line for older files.
+# falling back to a legacy bold "**Status:**" line and a legacy "**Claimed by:**"
+# body line for older files.
 read_work_item_state() {
   local file="$1" status="" claim=""
   WORK_ITEM_STATUS=""
@@ -160,6 +258,10 @@ read_work_item_state() {
 
   WORK_ITEM_STATUS="$(printf '%s' "$status" | tr -d '\r' | strip_yaml_comment)"
   WORK_ITEM_CLAIM="$(printf '%s' "$claim" | tr -d '\r' | strip_yaml_comment)"
+  if [[ -z "$WORK_ITEM_CLAIM" ]]; then
+    claim="$(legacy_body_value "$file" "claimed by")" || true
+    legacy_value_is_empty "$claim" || WORK_ITEM_CLAIM="$claim"
+  fi
   [[ -n "$WORK_ITEM_STATUS$WORK_ITEM_CLAIM" ]]
 }
 
@@ -202,10 +304,11 @@ work_item_is_human_gate() {
   normalized_type="$(printf '%s' "$type" | tr '[:upper:]' '[:lower:]')"
   normalized_status="$(status_word "$normalized_status")"
   case "$normalized_status" in
-    ready-for-human|needs-info) return 0 ;;
+    ready-for-human|needs-info|needs-triage) return 0 ;;
     "") ;;
     *)
-      if [[ "$normalized_status" == "$(triage_role_string ready-for-human)" || "$normalized_status" == "$(triage_role_string needs-info)" ]]; then
+      # The same three statuses ticket.sh refuses to claim as `human`.
+      if [[ "$normalized_status" == "$(triage_role_string ready-for-human)" || "$normalized_status" == "$(triage_role_string needs-info)" || "$normalized_status" == "$(triage_role_string needs-triage)" ]]; then
         return 0
       fi
       ;;
@@ -396,27 +499,69 @@ resolve_link_target() {
   return 1
 }
 
+# The one ticket beside the source file whose leading number is the first run of digits in
+# the token, as written or zero-padded to the width of the source file's own number: how
+# scratch-state.sh matches a blocker id to a ticket.
+resolve_blocker_number() {
+  local source_file="$1" token="$2" number padded width=2 candidate name matches=()
+  [[ "$token" =~ ([0-9]+) ]] || return 1
+  number="${BASH_REMATCH[1]}"
+  name="$(basename "$source_file")"
+  if [[ "$name" =~ ^([0-9]+) ]]; then
+    width="${#BASH_REMATCH[1]}"
+  fi
+  padded="$number"
+  while [[ "${#padded}" -lt "$width" ]]; do
+    padded="0$padded"
+  done
+  for candidate in "$(dirname "$source_file")"/*.md; do
+    [[ -f "$candidate" ]] || continue
+    name="${candidate##*/}"
+    [[ "$name" =~ ^([0-9]+) ]] || continue
+    if [[ "${BASH_REMATCH[1]}" == "$padded" || "${BASH_REMATCH[1]}" == "$number" ]]; then
+      matches+=("$candidate")
+    fi
+  done
+  [[ ${matches[0]+present} && "${#matches[@]}" -eq 1 ]] || return 1
+  canonical_existing_file "${matches[0]}"
+}
+
+# The whole numbers in a legacy `Blocked by` line (`\b\d+\b` in scratch-state.sh), one per line.
+whole_numbers() {
+  printf '%s\n' "$1" | awk '{
+    s = $0
+    while (match(s, /[0-9]+/)) {
+      before = RSTART > 1 ? substr(s, RSTART - 1, 1) : ""
+      after = substr(s, RSTART + RLENGTH, 1)
+      if (before !~ /[A-Za-z_]/ && after !~ /[A-Za-z_]/) print substr(s, RSTART, RLENGTH)
+      s = substr(s, RSTART + RLENGTH)
+    }
+  }'
+}
+
 read_work_item_blockers() {
-  local file="$1" mode="$2" raw="" line token resolved
+  local file="$1" mode="$2" raw="" line token resolved by_number="true"
   local tokens=()
   RESOLVED_BLOCKERS=()
   BLOCKER_ERROR=""
 
   # Every ticket now carries blockers in `blocked-by` frontmatter (decision and
-  # build alike). Read that first; fall back to a legacy "## Blocked by" body
-  # section only when the frontmatter list is absent or empty.
-  raw="$(awk '
-    NR == 1 && $0 !~ /^---[[:space:]]*$/ { exit }
-    NR > 1 && /^---[[:space:]]*$/ { exit }
-    /^blocked-by:[[:space:]]*/ { sub(/^blocked-by:[[:space:]]*/, ""); print; exit }
-  ' "$file" 2>/dev/null)" || true
-  raw="$(printf '%s' "$raw" | tr -d '\r' | strip_yaml_comment | tr -d '[]')"
-  if [[ -n "$(printf '%s' "$raw" | tr -d '[:space:]')" ]]; then
-    while IFS= read -r token || [[ -n "$token" ]]; do
-      token="$(printf '%s' "$token" | sed -E 's/^[[:space:]]+//;s/[[:space:]]+$//')"
-      [[ -n "$token" ]] && tokens+=("$token")
-    done < <(printf '%s' "$raw" | tr ',' '\n')
-  else
+  # build alike), as an inline list, a block list, or a bare value. Read that
+  # first; fall back to a legacy "**Blocked by:**" body line, then to a legacy
+  # "## Blocked by" body section, only when the frontmatter list is absent or empty.
+  while IFS= read -r token; do
+    [[ -n "$token" ]] && tokens+=("$token")
+  done < <(frontmatter_list_items "$file" "blocked-by")
+  if [[ ! ${tokens[0]+present} ]]; then
+    raw="$(legacy_body_value "$file" "blocked by")" || true
+    if ! legacy_value_is_empty "$raw"; then
+      while IFS= read -r token; do
+        [[ -n "$token" ]] && tokens+=("$token")
+      done < <(whole_numbers "$raw")
+    fi
+  fi
+  if [[ ! ${tokens[0]+present} ]]; then
+    by_number="false"
     while IFS= read -r line; do
       [[ -n "$line" ]] || continue
       if printf '%s' "$line" | grep -Eiq 'none|nothing|no blockers'; then
@@ -439,7 +584,11 @@ read_work_item_blockers() {
 
   if [[ ${tokens[0]+present} ]]; then
     for token in "${tokens[@]}"; do
-      if ! resolved="$(resolve_link_target "$file" "$token")"; then
+      if resolved="$(resolve_link_target "$file" "$token")"; then
+        :
+      elif [[ "$by_number" == "true" ]] && resolved="$(resolve_blocker_number "$file" "$token")"; then
+        :
+      else
         BLOCKER_ERROR="missing or ambiguous blocker '$token' referenced by $(repo_relative_ref "$file")"
         return 1
       fi

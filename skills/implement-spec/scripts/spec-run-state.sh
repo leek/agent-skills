@@ -3,8 +3,9 @@
 # from git by hand. Changes nothing.
 #
 # Usage: spec-run-state.sh <slug> [--default <branch>] [--default-only]
-#   Run from the main checkout. <slug> is the spec's directory name under .scratch/.
-#   Needs jq.
+#   Run from the main checkout. <slug> is the spec's directory name under .scratch/ (a
+#   trailing slash is dropped). A slug that is empty or ".", starts with "-", or holds "/"
+#   or ".." is a usage error (exit 2): it also names the notes directory. Needs jq.
 #
 # Output: JSON
 #   {"slug", "branch", "mode": "fresh"|"resume", "finished": [branches already landed],
@@ -27,7 +28,13 @@
 set -e
 
 slug=${1:-}
-[ -n "$slug" ] || { echo "Usage: spec-run-state.sh <slug> [--default <branch>] [--default-only]" >&2; exit 2; }
+while [ "${slug%/}" != "$slug" ]; do slug=${slug%/}; done
+# The same rule as implement's start-branch.sh: the slug is one directory name.
+case "$slug" in
+  "" | . | -* | */* | *..*)
+    [ -z "$slug" ] || echo "Not a slug (one directory name under .scratch/): $slug" >&2
+    echo "Usage: spec-run-state.sh <slug> [--default <branch>] [--default-only]" >&2; exit 2 ;;
+esac
 shift
 default=""
 default_only=0
@@ -61,7 +68,8 @@ if [ "$default_only" = 1 ]; then
   exit 0
 fi
 
-common=$(git rev-parse --path-format=absolute --git-common-dir)
+# Not --path-format=absolute: that needs Git 2.31, and an older git reads it as a path.
+common=$(cd "$(git rev-parse --git-common-dir)" && pwd -P)
 
 # A branch that still sits on its recorded base_sha has no ticket merged yet. It is an
 # ancestor of origin/<default> too, but it is a run that stopped early, not one that landed.

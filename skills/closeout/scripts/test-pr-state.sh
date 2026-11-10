@@ -178,6 +178,38 @@ eq "two PRs" "$rc $(echo "$out" | jq -c '[.[] | .in_flight]')" '1 [false,true]'
 rm -f "$GH_FIX/pr-view-9.json"
 ok "in-flight: several PRs"
 
+# --- more than 100 check contexts: every page is read, so a required check on page 2 counts ---
+page2() { # the detail query as gh --paginate prints it: page 1, then a page holding "deploy"
+  jq -c '.data.repository.pullRequest.statusCheckRollup.contexts += {totalCount: 6, pageInfo: {hasNextPage: true, endCursor: "c1"}}' "$GH_FIX/detail.json" > "$work/p1.json"
+  jq -c '.data.repository.pullRequest.statusCheckRollup.contexts = {totalCount: 6, pageInfo: {hasNextPage: false, endCursor: "c2"},
+         nodes: [{"__typename":"CheckRun","name":"deploy","isRequired":true}]}' "$GH_FIX/detail.json" > "$work/p2.json"
+}
+late='.statusCheckRollup = [{"__typename":"CheckRun","name":"deploy","status":"IN_PROGRESS","conclusion":""}]'
+fixtures; pr7 "$late"; page2; cat "$work/p1.json" "$work/p2.json" > "$GH_FIX/detail.json"; run 7 --in-flight
+eq "page 2 required check" "$rc $(echo "$out" | jq -c '.[0].counted')" '1 ["check deploy"]'
+grep -q '^api graphql --paginate .*endCursor' "$GH_LOG" || fail "paginated: the detail query must paginate on endCursor"
+run 7; p=$(echo "$out" | jq -c '.[0]')
+eq "page 2 snapshot" "$(echo "$p" | jq -c '[.checks_pending, .unchecked, .stacked_above, .repo.name]')" '[[{"name":"deploy","required":true}],[],[9,12],"o/r"]'
+ok "check contexts beyond the first page are read"
+
+# --- a required-check list that came back short is unknown: unchecked, and --in-flight exits 2 ---
+fixtures; pr7 "$late"; page2; cp "$work/p1.json" "$GH_FIX/detail.json"; run 7 --in-flight
+eq "hasNextPage left exit" "$rc" 2
+eq "hasNextPage left row" "$(echo "$out" | jq -c '.[0] | [.in_flight, .checks_pending]')" '[false,[{"name":"deploy","required":null}]]'
+grep -q 'required checks are not fully known' "$work/stderr" || fail "short list: stderr"
+run 7; p=$(echo "$out" | jq -c '.[0]')
+eq "short list snapshot" "$rc $(echo "$p" | jq -c '[.unchecked, .checks_pending[0].required, .repo.name]')" '0 [["checks"],null,"o/r"]'
+fixtures; pr7 "$late"; jq -c '.data.repository.pullRequest.statusCheckRollup.contexts += {totalCount: 140, pageInfo: {hasNextPage: false, endCursor: null}}' "$GH_FIX/detail.json" > "$work/p1.json"
+cp "$work/p1.json" "$GH_FIX/detail.json"; run 7 --in-flight
+eq "totalCount above nodes exit" "$rc" 2
+fixtures; jq -c '.data.repository.pullRequest.statusCheckRollup.contexts += {totalCount: 5, pageInfo: {hasNextPage: false, endCursor: null}}' "$GH_FIX/detail.json" > "$work/p1.json"
+cp "$work/p1.json" "$GH_FIX/detail.json"; run 7 --in-flight
+eq "complete list exit" "$rc" 0
+fixtures; jq -c '.data.repository.pullRequest.statusCheckRollup = null' "$GH_FIX/detail.json" > "$work/p1.json"
+cp "$work/p1.json" "$GH_FIX/detail.json"; run 7 --in-flight
+eq "no checks at all exit" "$rc" 0
+ok "a short required-check list is unchecked and exits 2 in flight"
+
 fixtures; GH_FAIL='deleteBranchOnMerge' run 7 --in-flight;  eq "in-flight graphql 403" "$rc" 2
 fixtures; GH_FAIL='/reactions' run 7 --in-flight;           eq "in-flight reactions 403" "$rc" 2
 fixtures; GH_FAIL='^pr view' run 7 --in-flight;             eq "in-flight pr view 403" "$rc" 2

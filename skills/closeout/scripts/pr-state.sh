@@ -24,6 +24,9 @@
 #   unchecked            the reads that failed: "threads", "repo", "rounds", "reactions". Each one
 #                        leaves its fields null (threads_open; repo, stacked_above and every
 #                        `required`; rounds; bot_reactions). null means not checked, never zero.
+#                        "checks" means the required-check list came back short of GitHub's own
+#                        count (every page is read, 100 contexts a page): a pending check missing
+#                        from it has `required: null`.
 # A PR that gh cannot read prints {"number", "error"}. Exit 0 either way.
 # Calls per PR: gh pr view, one GraphQL query, the activity feed, the reactions, and the
 # review-thread query (triage-github-pr's scripts/review-threads.sh, installed beside this
@@ -31,7 +34,8 @@
 #
 # --in-flight  Is a review or a required check still running? Prints one line, a JSON array of
 #     {"pr", "in_flight", "reviewers", "bot_reactions", "checks_pending", "counted"}
-#   and exits 0 when nothing is in flight on any PR, 1 when something is, 2 on any error.
+#   and exits 0 when nothing is in flight on any PR, 1 when something is, 2 on any error
+#   (a failed read, or a short required-check list: unknown is never "clear").
 #   Counted: every requested reviewer, every bot `eyes` reaction, and every pending required
 #   check. --no-required leaves required checks out; --check <name> also counts that pending
 #   check, required or not (repeatable). `checks_pending` lists every pending check by name,
@@ -80,20 +84,37 @@ for n in "${prs[@]}"; do
   head=$(jq -r '.headRefName' "$tmp/pr.json")
   : > "$tmp/unchecked"
 
-  # Repo settings, the PRs stacked on this head, and which checks are required: one query.
+  # Repo settings, the PRs stacked on this head, and which checks are required: one query,
+  # paginated over the check contexts (gh prints one JSON object per page; a PR can carry
+  # more than 100 contexts, and a required one past the first page must not be dropped).
   # shellcheck disable=SC2016  # $owner and friends are GraphQL variables, not shell ones
-  if ! gh api graphql -f owner="${repo%/*}" -f repo="${repo#*/}" -F pr="$n" -f head="$head" -f query='
-query($owner: String!, $repo: String!, $pr: Int!, $head: String!) {
+  if ! gh api graphql --paginate -f owner="${repo%/*}" -f repo="${repo#*/}" -F pr="$n" -f head="$head" -f query='
+query($owner: String!, $repo: String!, $pr: Int!, $head: String!, $endCursor: String) {
   repository(owner: $owner, name: $repo) {
     nameWithOwner deleteBranchOnMerge mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed
     defaultBranchRef { name }
     pullRequests(baseRefName: $head, states: OPEN, first: 100) { nodes { number } }
-    pullRequest(number: $pr) { statusCheckRollup { contexts(first: 100) { nodes {
-      __typename
-      ... on CheckRun { name isRequired(pullRequestNumber: $pr) }
-      ... on StatusContext { context isRequired(pullRequestNumber: $pr) } } } } } } }' > "$tmp/detail.json" \
-     || ! jq -e '.data.repository.pullRequest' "$tmp/detail.json" >/dev/null 2>&1; then
+    pullRequest(number: $pr) { statusCheckRollup { contexts(first: 100, after: $endCursor) {
+      totalCount pageInfo { hasNextPage endCursor }
+      nodes {
+        __typename
+        ... on CheckRun { name isRequired(pullRequestNumber: $pr) }
+        ... on StatusContext { context isRequired(pullRequestNumber: $pr) } } } } } } }' > "$tmp/detail.raw" \
+     || ! jq -se 'length > 0 and all(.[]; .data.repository.pullRequest != null)' "$tmp/detail.raw" >/dev/null 2>&1; then
     echo "null" > "$tmp/detail.json"; echo repo >> "$tmp/unchecked"
+  else
+    # Join the pages: the first page's repository, with every page's contexts.
+    jq -s '([.[] | .data.repository.pullRequest.statusCheckRollup.contexts.nodes[]?]) as $nodes
+           | (.[0].data.repository.pullRequest.statusCheckRollup.contexts) as $first
+           | (.[-1].data.repository.pullRequest.statusCheckRollup.contexts) as $last
+           | .[0]
+           | if $first == null then . else .data.repository.pullRequest.statusCheckRollup.contexts.nodes = $nodes end
+           | .checks_short = (($last.pageInfo.hasNextPage // false) or (($first.totalCount // 0) > ($nodes | length)))' \
+      "$tmp/detail.raw" > "$tmp/detail.json"
+    if [ "$(jq -r '.checks_short' "$tmp/detail.json")" = true ]; then
+      echo "PR #$n: the required-check list is shorter than GitHub's count; required checks are not fully known" >&2
+      echo checks >> "$tmp/unchecked"
+    fi
   fi
 
   if ! gh api --paginate "repos/$repo/issues/$n/reactions?per_page=100" > "$tmp/reactions.raw" \

@@ -40,7 +40,7 @@ Work items are markdown files under `.scratch/`: there is no external tracker. W
 
 A ticket or spec is **trackable**: its frontmatter `status` is the state of record. Some repos also keep a ledger or prose summary of efforts in their tracker doc; update it when the repo asks, but it never replaces the frontmatter write. Building in a linked worktree changes nothing: write and commit the frontmatter there, and it reaches the main checkout when the branch merges.
 
-If the claim is refused as `claimed` or `in-progress`, stop; treat the claim as stale only when its work is visibly committed or clearly abandoned (the tracker's **Stale claim** rule). Take a stale one over with `ticket.sh release <path>`, then claim it.
+If the claim is refused as `claimed` or `in-progress`, stop; treat the claim as stale only when its work is visibly committed or clearly abandoned (the tracker's **Stale claim** rule). Take a stale one over with `ticket.sh release <path>`, then claim it. If it is refused as `human`, stop: the ticket is at a status that waits on a person (`ready-for-human`, `needs-info`, `needs-triage`).
 
 After claiming, or after scoping conversation-only work, record the output of `git rev-parse HEAD` as immutable `base_sha`. Use that exact SHA for review and for proving failures pre-existing.
 

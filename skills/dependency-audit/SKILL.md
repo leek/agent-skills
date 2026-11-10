@@ -23,6 +23,7 @@ In Claude Code with this plugin installed, this skill runs in its own `dependenc
 
 - Exit 1: the named manager's manifest is missing, or the directory is not a Composer or npm project. Stop and report that.
 - Exit 2: it names any other manager. Stop and report that only Composer and npm are supported.
+- Exit 3: `jq` is not installed, so nothing was audited. Stop and report that.
 
 ## Run
 
@@ -30,6 +31,7 @@ The script runs each manager's outdated and security-audit commands (read-only) 
 
 - `lockfile` is `null`: the security audit did not run, because only a lockfile (`composer.lock`, `package-lock.json`, or `npm-shrinkwrap.json`) makes its result meaningful. Say so in the report.
 - `errors` is not empty: each line names a command that returned no result, a package the script could not compare, or an abandoned Composer package (with its replacement when Composer names one). The first kind is the blocker in **Guardrails**; carry the second into the report.
+- `outdated` holds direct dependencies only, for both managers; transitive packages are never listed. An npm entry with `direct: false` is a package that only a workspace member depends on, not the root `package.json`: report it too, and say so.
 - The grouping is numeric. Whether a 0.x minor bump breaks like a major is yours to judge.
 
 ### Major bumps

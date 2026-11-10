@@ -52,7 +52,7 @@ run() {  # run <args>: sets $out and $code; stderr in $T/err
   out=$(cd "$repo" && bash "$script" "$@" 2>"$T/err") || code=$?
 }
 sha() { git -C "$repo" rev-parse "$1"; }
-common() { git -C "$repo" rev-parse --path-format=absolute --git-common-dir; }
+common() { (cd "$repo" && cd "$(git rev-parse --git-common-dir)" && pwd -P); }
 
 # fresh
 new_repo
@@ -167,3 +167,16 @@ eq nojq-exit "$code" 1
 eq nojq-stdout "$out" ""
 grep -q 'needs jq' "$T/err" || fail "missing jq: no clear message"
 echo "ok usage errors and missing jq"
+
+# a slug that is not one directory name is a usage error; a trailing slash is dropped
+new_repo
+for bad in .. . ../x a/b -x; do
+  run "$bad"
+  eq "slug '$bad' exit" "$code" 2
+  eq "slug '$bad' stdout" "$out" ""
+done
+run feat/
+eq slash-exit "$code" 0
+eq slash-slug "$(field '[.slug, .branch] | @csv')" '"feat","feat"'
+eq slash-notes "$(field .notes)" "$(common)/implement-spec/feat"
+echo "ok a slug of .., ., ../x or a/b exits 2; a trailing slash is dropped"

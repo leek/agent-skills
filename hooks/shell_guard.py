@@ -36,6 +36,7 @@ class Word(str):
     """A shell word, with `unquoted` marking which of its characters the shell may still expand."""
 
     unquoted: str = ""
+    glued: bool = False  # an operator follows with no space between: `2>` but not `2 >`
 
 
 def check_expansion(word: "Word") -> None:
@@ -114,11 +115,12 @@ def tokenize(command: str) -> list[str]:
     in_word = False
     i, n = 0, len(command)
 
-    def flush() -> None:
+    def flush(glued: bool = False) -> None:
         nonlocal word, live, in_word
         if in_word:
             token = Word("".join(word))
             token.unquoted = "".join(live)
+            token.glued = glued
             tokens.append(token)
         word, live, in_word = [], [], False
 
@@ -189,7 +191,7 @@ def tokenize(command: str) -> list[str]:
             # not from this tokenizer: `echo # '<newline>rm x #'` would run `rm x`.
             raise Blocked("comments are not allowed")
         if c in OPERATOR_CHARS:
-            flush()
+            flush(glued=True)
             j = i
             while j < n and command[j] in OPERATOR_CHARS:
                 j += 1
@@ -209,8 +211,12 @@ def segments(command: str) -> list[list[str]]:
     cleaned, i = [], 0
     while i < len(tokens):
         window = tokens[i:i + 3]
+        # `2>/dev/null` is a redirect only when the 2 is unquoted and touches the operator.
+        # `"2">/dev/null` and `2 >/dev/null` pass 2 as an argument and redirect stdout, so
+        # stripping them would hide an argument from the checks (`uniq -f "2">/dev/null in out`).
         if (len(window) == 3 and not isinstance(window[0], Op) and isinstance(window[1], Op)
-                and not isinstance(window[2], Op) and tuple(window) in SAFE_REDIRECTS):
+                and not isinstance(window[2], Op) and tuple(window) in SAFE_REDIRECTS
+                and window[0].glued and window[0].unquoted == str(window[0])):
             i += 3
             continue
         cleaned.append(tokens[i])
@@ -274,7 +280,9 @@ def check_filter(name: str, args: list[str]) -> None:
                 ended = True
             elif not ended and a in UNIQ_VALUE_FLAGS:
                 skip = True
-            elif ended or a == "-" or not a.startswith("-"):
+            elif ended or positional or a == "-" or not a.startswith("-"):
+                # BSD uniq stops reading options at the first operand, so in
+                # `uniq in -out` the second word is the output file.
                 positional += 1
         if positional > 1:
             raise Blocked("`uniq <in> <out>` writes a file")

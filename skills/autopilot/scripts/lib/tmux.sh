@@ -25,13 +25,18 @@ TMUX_FORWARDED_VARIABLES=(
 
 # Values may be secrets, so they never go on a command line (`ps` shows it) or
 # into the log or state: the launcher writes them to an owner-only file with the
-# `printf` builtin, and the child reads the file once and removes it.
+# `printf` builtin, and the child reads the file once and removes it. A variable
+# the launcher does not have is unset in the child, so the child never keeps the
+# value the tmux server inherited when it started.
 write_tmux_environment() {
   local env_file="$1" name
   (umask 077 && : >"$env_file") || return 1
   for name in "${TMUX_FORWARDED_VARIABLES[@]}"; do
-    [[ -n "${!name+set}" ]] || continue
-    printf 'export %s=%q\n' "$name" "${!name}" >>"$env_file" || return 1
+    if [[ -n "${!name+set}" ]]; then
+      printf 'export %s=%q\n' "$name" "${!name}" >>"$env_file" || return 1
+    else
+      printf 'unset %s\n' "$name" >>"$env_file" || return 1
+    fi
   done
 }
 
@@ -78,9 +83,8 @@ launch_tmux() {
 
   local session_name="autopilot-${STATE_KEY:0:10}" launch_id
   launch_id="tmux-$(printf '%s\0%s\0%s' "$STATE_KEY" "$(timestamp)" "$$-$RANDOM" | git hash-object --stdin)"
-  read_lock_owner "$LOCK_DIR/pid"
-  if pid_is_alive "$LOCK_OWNER_PID" "$LOCK_OWNER_STARTED"; then
-    runner_failure "another Autopilot process is active for this root (pid $LOCK_OWNER_PID)"
+  if lock_dir_is_held "$LOCK_DIR"; then
+    runner_failure "another Autopilot process is active for this root (pid ${LOCK_OWNER_PID:-not yet recorded})"
   fi
   if tmux has-session -t "$session_name" 2>/dev/null; then
     runner_failure "tmux session already exists: $session_name"

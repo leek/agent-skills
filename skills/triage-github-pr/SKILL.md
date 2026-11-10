@@ -3,7 +3,7 @@ name: triage-github-pr
 description: Review and merge a pull request with up to two fix rounds, carrying later findings into a follow-up PR.
 disable-model-invocation: true
 argument-hint: "One or more PR numbers, then optional instructions (\"don't merge\", \"exhaustive\", merge method)"
-allowed-tools: "Bash(gh pr view *) Bash(gh pr diff *) Bash(gh pr checks *) Bash(gh run view *) Bash(gh api repos/{owner}/{repo}/pulls/*) Bash(gh api repos/{owner}/{repo}/issues/*) Bash(gh api --paginate repos/{owner}/{repo}/activity*) Bash(bash *triage-github-pr/scripts/pr-comments.sh *) Bash(bash *closeout/scripts/pr-state.sh *) Bash(bash *fix-ci-failures/scripts/failed-jobs.sh *) Bash(bash *run-after/scripts/wait-until.sh * -- bash *closeout/scripts/pr-state.sh * --in-flight*)"
+allowed-tools: "Bash(gh pr view *) Bash(gh pr diff *) Bash(gh pr checks *) Bash(gh run view *) Bash(gh api repos/{owner}/{repo}/pulls/*) Bash(gh api repos/{owner}/{repo}/issues/*) Bash(gh api --paginate repos/{owner}/{repo}/activity*) Bash(bash *triage-github-pr/scripts/pr-comments.sh *) Bash(bash *triage-github-pr/scripts/pr-reply.sh *) Bash(bash *closeout/scripts/pr-state.sh *) Bash(bash *fix-ci-failures/scripts/failed-jobs.sh *) Bash(bash *run-after/scripts/wait-until.sh * -- bash *closeout/scripts/pr-state.sh * --in-flight*)"
 ---
 
 # Triage GitHub PR

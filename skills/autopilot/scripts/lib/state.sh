@@ -14,6 +14,70 @@ json_failure() {
   fi
 }
 
+# The physical path of an existing file or directory: every symbolic link
+# resolved, in the directories and in the file itself.
+physical_path() {
+  local target="$1" parent name link hops=0
+  while :; do
+    if [[ -d "$target" ]]; then
+      (cd "$target" && pwd -P)
+      return
+    fi
+    [[ -e "$target" ]] || return 1
+    parent="$(cd "$(dirname "$target")" && pwd -P)" || return 1
+    name="$(basename "$target")"
+    if [[ ! -L "$parent/$name" ]]; then
+      printf '%s/%s\n' "${parent%/}" "$name"
+      return 0
+    fi
+    hops=$((hops + 1))
+    [[ "$hops" -le 40 ]] || return 1
+    link="$(readlink "$parent/$name")" || return 1
+    [[ "$link" == /* ]] || link="$parent/$link"
+    target="$link"
+  done
+}
+
+# One spelling per root, so every way of naming one tracker gives one STATE_KEY
+# and one LOCK_DIR: no trailing slash, absolute, physical. A relative root is
+# read against the --repo directory (the current directory by default), then
+# against the repository root when it exists only there. A root that does not
+# exist keeps its name under its physical parent directory.
+canonical_root_ref() {
+  local ref="$1" candidate parent
+  while [[ "$ref" == */ && "$ref" != "/" ]]; do
+    ref="${ref%/}"
+  done
+  if [[ "$ref" == /* ]]; then
+    candidate="$ref"
+  else
+    candidate="$ORIGINAL_DIR/$ref"
+    if [[ ! -e "$candidate" && -e "$REPO_ROOT/$ref" ]]; then
+      candidate="$REPO_ROOT/$ref"
+    fi
+  fi
+  if [[ -e "$candidate" ]]; then
+    physical_path "$candidate"
+    return
+  fi
+  parent="$(dirname "$candidate")"
+  if [[ -d "$parent" ]]; then
+    parent="$(cd "$parent" && pwd -P)" || return 1
+    printf '%s/%s\n' "${parent%/}" "$(basename "$candidate")"
+  else
+    printf '%s\n' "$candidate"
+  fi
+}
+
+# Sets the state, lock, and run paths for REPO_ROOT and the canonical ROOT_REF.
+resolve_state_paths() {
+  STATE_DIR="$GIT_DIR/autopilot"
+  STATE_KEY="$(printf '%s\0%s' "$REPO_ROOT" "$ROOT_REF" | git hash-object --stdin)"
+  STATE_FILE="$STATE_DIR/$STATE_KEY.json"
+  LOCK_DIR="$STATE_DIR/$STATE_KEY.lock"
+  RUNS_DIR="$STATE_DIR/runs"
+}
+
 read_state_fields() {
   local state_file="$1" query="$2" sentinel="__AUTOPILOT_STATE_END__" snapshot last_index
   snapshot="$(jq -jr --arg sentinel "$sentinel" \
