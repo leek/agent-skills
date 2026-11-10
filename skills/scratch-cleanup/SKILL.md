@@ -47,7 +47,7 @@ Apply only what the user approved, in this order:
 2. **File research**: `git mv` for tracked files, `mv` for untracked ones, creating `docs/` folders as needed. Rewrite every inbound link found in step 2 to the new path.
 3. **Remove**: `git rm -r -- <path>` for committed efforts and files; `rm` for approved untracked ones and `.DS_Store`.
 4. **Release stale claims** found in step 1.
-5. **Stage** every changed path by explicit path (`git add -- <path> …`); leave the commit to the user.
+5. **Stage** every changed path by explicit path (`git add -- <path> …`); the commit waits for the user's yes in step 4.
 
 Done when `rg -n --fixed-strings` finds no reference to any moved or removed path, and `git status --short` shows only the approved changes.
 
@@ -59,4 +59,4 @@ End with the table of everything that stayed in `.scratch/`, one row per effort 
 |---|---|---|---|---|---|
 | `.scratch/<slug>/` | open ticket or decision files, by number | open blockers, or the question the user left open | date | yes/no | the skill that moves it forward (`/implement <ticket>`, `/wayfinder <map>`, `/to-tickets <spec>`) |
 
-Under the table, give one line each for: files filed (old → new path), ADRs written, paths removed, claims released. Then suggest `/commit` for the staged changes.
+Under the table, give one line each for: files filed (old → new path), ADRs written, paths removed, claims released. Then ask whether to commit the staged changes now (a structured question ([harness-tools](../harness-tools/SKILL.md)), otherwise in chat), and on a yes make the commit yourself, following the commit skill when it is installed. Never hand the user a `/commit` to run.
