@@ -223,8 +223,36 @@ if bad:
     sys.exit(1)
 '
 
-# 6. Junk
-check "no skills/.DS_Store" test ! -e skills/.DS_Store
+# 5b. Frontmatter inside a template (a ```markdown block that opens with ---) is what a
+# skill writes into every file it generates, so it must be valid YAML with a quoted title.
+check "every template frontmatter block is valid YAML with a quoted title" \
+  python3 -c '
+import glob, re, sys
+try:
+    import yaml
+except ImportError:
+    yaml = None
+bad = []
+for p in sorted(glob.glob("skills/**/*.md", recursive=True)):
+    text = open(p, encoding="utf-8").read()
+    for m in re.finditer(r"```markdown\n---\n(.*?)\n---\n", text, flags=re.S):
+        fm = m.group(1)
+        for line in fm.splitlines():
+            if re.match(r"title:\s*[^\"\x27\s]", line):
+                bad.append(f"{p}: unquoted title in template frontmatter: {line}")
+        if yaml is not None:
+            try:
+                if not isinstance(yaml.safe_load(fm), dict):
+                    bad.append(f"{p}: template frontmatter is not a mapping")
+            except yaml.YAMLError as e:
+                bad.append(f"{p}: template frontmatter is not valid YAML ({str(e).splitlines()[0]})")
+if bad:
+    print("\n".join(bad), file=sys.stderr)
+    sys.exit(1)
+'
+
+# 6. Junk (.DS_Store is gitignored, so only a tracked one ships)
+check "no tracked skills/.DS_Store" bash -c '! git ls-files --error-unmatch skills/.DS_Store >/dev/null 2>&1'
 check "no skills/.gitkeep" test ! -e skills/.gitkeep
 
 # 6b. Earlier audit regressions: each once shipped, so each stays pinned
