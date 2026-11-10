@@ -1,6 +1,7 @@
 #!/bin/bash
 # Remove one worktree a run created, in the safe order: clean check, unserve from Herd,
 # `git worktree remove` (never --force), then `git branch -d` of the branch when named.
+# After git removes the worktree it also deletes that worktree's Pest cache (~/.pest/tia).
 # Run it from the main checkout (or the checkout `git branch -d` should check against).
 #
 # It never drops a database a calling skill created: it prints those still registered
@@ -68,6 +69,19 @@ else
     removed=1
     echo ">> removed $wt" >&2
     command -v herd >/dev/null 2>&1 && { herd workspaces --all >/dev/null 2>&1 || true; }
+    # Pest keeps a test-impact cache folder per project root under ~/.pest/tia and never
+    # deletes it. A linked worktree has no .git/config, so Pest names its folder
+    # <slug of basename>-<first 16 hex of sha256(realpath)>. Delete exactly that folder.
+    tia_root="${HOME:-}/.pest/tia"
+    if [ -n "${HOME:-}" ] && [ -d "$tia_root" ]; then
+      tia_slug=$(basename "$wt" | tr '[:upper:]' '[:lower:]' | sed -E -e 's/[^a-z0-9]+/-/g' -e 's/^-+//' -e 's/-+$//')
+      if command -v shasum >/dev/null 2>&1; then tia_hash=$(printf '%s' "$wt" | shasum -a 256 | cut -c1-16)
+      else tia_hash=$(printf '%s' "$wt" | sha256sum | cut -c1-16); fi
+      if printf '%s' "$tia_hash" | grep -Eq '^[0-9a-f]{16}$'; then
+        tia_dir="$tia_root/${tia_slug:+$tia_slug-}$tia_hash"
+        if [ -d "$tia_dir" ]; then rm -rf -- "$tia_dir" && echo ">> removed Pest cache $tia_dir" >&2 || true; fi
+      fi
+    fi
   else
     reason="git worktree remove refused"
   fi
