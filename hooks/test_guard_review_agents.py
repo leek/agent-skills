@@ -179,6 +179,15 @@ class GuardReviewAgentsTest(unittest.TestCase):
         self.assertBlocked('sort "${X:--o}" out.txt notes.txt', "parameter expansion")
         self.assertBlocked("git log $GIT_FLAGS", "parameter expansion")
         self.assertBlocked('git log "$@"', "parameter expansion")
+        self.assertBlocked("echo $=X", "parameter expansion")
+        self.assertBlocked("echo $~X $^X $+X", "parameter expansion")
+        # The shell joins a backslash-newline before it expands, so the guard must too.
+        self.assertBlocked("echo $\\\n(rm -rf x)", "command substitution")
+        self.assertBlocked('echo "$\\\n(rm -rf x)"', "command substitution")
+        self.assertBlocked("sort $\\\n{X:--o} out.txt notes.txt", "parameter expansion")
+        self.assertBlocked("echo `\\\nrm x`", "command substitution")
+        self.assertAllowed("rg -n 'a\\\nb' app")
+        self.assertAllowed("rg -n foo$ app")
         self.assertAllowed("rg -n 'total: \\$[0-9]+' app")
         self.assertAllowed('rg -n "foo$" app')
         self.assertAllowed("gh api graphql -f query='query($n: Int!) { viewer { login } }' -F n=1")
@@ -191,7 +200,7 @@ class GuardReviewAgentsTest(unittest.TestCase):
         self.assertAllowed("gh api 'repos/{owner}/{repo}/pulls?per_page=5'")
 
     def test_a_crashing_guard_blocks(self):
-        payload = {"tool_name": "Bash", "tool_input": {"command": ["not", "a", "string"]},
+        payload = {"tool_name": "Bash", "tool_input": {"command": 5},
                    "agent_type": "leek-skills:pr-reviewer"}
         result = subprocess.run([sys.executable, str(DISPATCHER)], input=json.dumps(payload),
                                 text=True, capture_output=True)

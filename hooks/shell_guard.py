@@ -57,8 +57,6 @@ def check_expansion(word: "Word") -> None:
 
 
 OPERATOR_CHARS = set("();<>|&")
-# What makes `$` an expansion in bash or zsh: a name, a special parameter, or `{`.
-PARAMETER_START = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_{@*#?$!-")
 
 
 # `${X:--o}` is `-o` when X is unset, and "$X" is whatever the environment holds: either way
@@ -67,7 +65,35 @@ PARAMETER_REASON = "parameter expansion ($VAR, ${VAR}) is not allowed; write the
 
 
 def is_parameter(command: str, at: int) -> bool:
-    return command[at] == "$" and at + 1 < len(command) and command[at + 1] in PARAMETER_START
+    """True for a `$` the shell may expand. Deny by default: zsh has more forms (`$=x`, `$~x`,
+    `$^x`, `$+x`) than any list holds, so `$` is literal only at the end of a word or quote."""
+    return command[at] == "$" and at + 1 < len(command) and command[at + 1] not in ' \t\n"'
+
+
+def join_continuations(command: str) -> str:
+    """Drop every backslash-newline the shell would drop, before anything else looks.
+
+    The shell joins the lines first, so `$`, backslash-newline, `(rm x)` is `$(rm x)`, and
+    `$`, backslash-newline, `X` is `$X`; a check that reads one character ahead must see the joined text. Single quotes
+    keep a backslash-newline as data.
+    """
+    out: list[str] = []
+    i, n, quote = 0, len(command), ""
+    while i < n:
+        c = command[i]
+        if quote == "'":
+            if c == "'":
+                quote = ""
+        elif c == "\\" and i + 1 < n:
+            if command[i + 1] != "\n":
+                out.append(command[i:i + 2])
+            i += 2
+            continue
+        elif c in "'\"":
+            quote = "" if quote == c else (quote or c)
+        out.append(c)
+        i += 1
+    return "".join(out)
 SEPARATORS = {"&&", "||", ";", "|"}
 
 
@@ -78,6 +104,7 @@ def tokenize(command: str) -> list[str]:
     newline stays data inside its word, while the same character unquoted becomes an
     operator or blocks the command. Anything this tokenizer is unsure of is blocked.
     """
+    command = join_continuations(command)
     tokens: list[str] = []
     word: list[str] = []
     live: list[str] = []  # the same word with every quoted or escaped character blanked
