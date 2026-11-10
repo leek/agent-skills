@@ -241,6 +241,14 @@ needs its own (a worktree `.env`, a throwaway test database), name it
 [Scratch database registry](../../laravel-herd-worktrees/SKILL.md#scratch-database-registry)
 (`scratch-db.sh register <pgsql|mysql> <database> <worktree path, or ->`).
 
+A browser check needs a database at the PR branch's schema. The main checkout's
+development database is often behind the base branch, and a login that fails on a
+missing column is that stale schema, not a PR defect. So before opening the browser,
+point the worktree at a scratch database as above, then migrate and seed it with the
+repo's own commands (`php artisan migrate --seed` unless its docs name another). Never
+migrate the main checkout's database for a review. Record a browser check as skipped
+only after this was tried and failed, with the error.
+
 At step 7, once the PR shows merged (or the user selected it), drop the database and
 its parallel-testing copies (`<database>_test_<N>`) with the repo's client
 (`DROP DATABASE IF EXISTS`), then `scratch-db.sh unregister <database>`. A database the
