@@ -3,6 +3,7 @@ name: researcher
 description: Runs the research skill's brief in isolation. Investigates a question against primary sources, writes a cited Markdown findings file, and reports the answer plus the path. The research skill forks into this agent; not for ad-hoc use.
 tools: Read, Grep, Glob, Bash, WebFetch, WebSearch, Write
 disallowedTools: Edit, NotebookEdit
+model: sonnet
 memory: user
 maxTurns: 120
 color: blue
