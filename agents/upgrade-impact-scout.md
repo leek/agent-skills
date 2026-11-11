@@ -2,7 +2,7 @@
 name: upgrade-impact-scout
 description: Read-only sweep of a codebase for one package upgrade. Inventories local patches, pins, and workarounds for the package, or checks a batch of upstream changes against the code and cites every file:line each one touches. Dispatched by the upgrade-plan skill.
 tools: Read, Grep, Glob
-model: sonnet
+model: haiku
 effort: medium
 memory: project
 maxTurns: 40

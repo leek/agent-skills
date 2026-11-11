@@ -2,7 +2,7 @@
 name: smell-sweeper
 description: One detection pass of the code-smells-audit skill. Sweeps a target list against the one-line smell descriptions of one or more occurrence lenses and returns candidates for verification. Read-only. Dispatched by the code-smells-audit skill for medium and large sweeps.
 tools: Read, Grep, Glob
-model: sonnet
+model: haiku
 omitClaudeMd: true
 maxTurns: 30
 color: pink

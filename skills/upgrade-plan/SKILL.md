@@ -52,8 +52,8 @@ a breaking change the collector misses is the costliest miss.
    `subagent_type=leek-skills:release-notes-collector` and
    `leek-skills:upgrade-impact-scout` (the scout keeps notes under this repo's
    `.claude/agent-memory/`, the collector under `~/.claude/agent-memory/`). In plain Claude Code, use `general-purpose` with
-   `model: haiku` for collectors and `model: sonnet` for scouts. In other harnesses,
-   dispatch in the background per [harness-tools](../harness-tools/SKILL.md), on the cheapest model for collectors and a mid-tier one for scouts, or run
+   `model: haiku` for collectors and scouts. In other harnesses,
+   dispatch in the background per [harness-tools](../harness-tools/SKILL.md), on the cheapest model for collectors and scouts, or run
    them inline one after another. While they run, fetch the official upgrade guide for
    each major version crossed, and run
    `bash <this-skill-dir>/../dependency-audit/scripts/audit.sh` from the project root: its
