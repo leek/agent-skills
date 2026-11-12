@@ -137,12 +137,6 @@ eq "unreadable exit" "$rc" 0
 eq "unreadable rows" "$(echo "$out" | jq -c '[.[0], .[1].number]')" '[{"number":8,"error":"gh pr view failed"},7]'
 ok "unreadable PR"
 
-# --- the review-thread helper missing: threads_open is not checked ---
-mkdir -p "$work/alone/closeout/scripts"; cp "$script" "$work/alone/closeout/scripts/"
-fixtures; rc=0; out=$(bash "$work/alone/closeout/scripts/pr-state.sh" 7 2> "$work/stderr") || rc=$?
-eq "no helper" "$rc $(echo "$out" | jq -c '[.[0].threads_open, .[0].unchecked]')" '0 [null,["threads"]]'
-ok "missing triage-github-pr helper"
-
 # --- --in-flight ---
 fixtures; run 7 --in-flight
 eq "clear exit" "$rc" 0

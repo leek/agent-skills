@@ -20,7 +20,7 @@
 #   `replied` is true when this run posted the item's reply (`reply_url` may still be null:
 #   GitHub accepted the reply but the response had no html_url). A failed reply skips its
 #   resolve (an unanswered thread is never resolved) and the run goes on to the next item.
-#   `threads_open` is re-queried once at the end (review-threads.sh, as pr-comments.sh
+#   `threads_open` is re-queried once at the end (review_threads, as pr-comments.sh
 #   --count does); null when that query failed, which means not checked.
 # Exit: 0 every item sent, 1 any item has an `error`, 2 usage or an invalid file.
 # Retry after exit 1, items with an `error` only, never the whole file:
@@ -50,6 +50,27 @@ command -v jq >/dev/null || { echo "jq is required" >&2; exit 1; }
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
+# Every review thread of the PR, all pages, as one JSON array on stdout:
+#   [{"thread": "PRRT_...", "resolved": bool, "ids": [<comment databaseId>, ...]}]
+# `ids` holds every comment in the thread, so a reply maps to its thread as well as the root.
+# The same function sits in pr-comments.sh, pr-reply.sh, and closeout's pr-state.sh: keep the
+# three in step. A shared file would need a path computed at run time, which the plugin
+# directory refuses in a pre-approved script. Fails (never an empty list) when gh fails or a
+# page lacks the thread list, so a 403 never reads as "no threads".
+review_threads() {
+  local rc=0
+  # shellcheck disable=SC2016  # $owner and friends are GraphQL variables, not shell ones
+  gh api graphql --paginate -f owner="${1%/*}" -f repo="${1#*/}" -F pr="$2" -f query='
+query($owner: String!, $repo: String!, $pr: Int!, $endCursor: String) {
+  repository(owner: $owner, name: $repo) { pullRequest(number: $pr) {
+    reviewThreads(first: 100, after: $endCursor) {
+      pageInfo { hasNextPage endCursor }
+      nodes { id isResolved comments(first: 100) { nodes { databaseId } } } } } } }' > "$tmp/review-threads.raw" || return 1
+  jq -s '[.[] | .data.repository.pullRequest.reviewThreads.nodes[]
+          | {thread: .id, resolved: .isResolved, ids: [.comments.nodes[].databaseId]}]' "$tmp/review-threads.raw" || rc=$?
+  return "$rc"
+}
+
 # Validate everything before the first write.
 if ! jq -r '
   if type != "array" then "the file must hold a JSON array"
@@ -57,7 +78,7 @@ if ! jq -r '
   else to_entries[] | .key as $i | .value as $v
     | (if ($v | type) != "object" then "is not an object"
        elif (($v.comment_id | type) == "number" and $v.comment_id > 0 and ($v.comment_id | floor) == $v.comment_id
-             or (($v.comment_id | type) == "string" and ($v.comment_id | test("^[0-9]+$")))) | not
+             or (($v.comment_id | type) == "string" and ($v.comment_id | test("^(?:[0-9]+$)")))) | not
          then "comment_id must be a number"
        elif ($v | has("body")) and $v.body == null and $v.resolve != true
          then "body is null (resolve-only) but resolve is not true"
@@ -65,7 +86,7 @@ if ! jq -r '
             and ((($v.body | type) == "string" and ($v.body | test("\\S"))) | not)
          then "body must be a non-empty string"
        elif ($v | has("resolve")) and ($v.resolve | type) != "boolean" then "resolve must be true or false"
-       elif ($v.thread != null) and ((($v.thread | type) == "string" and ($v.thread | test("^[A-Za-z0-9_=-]+$"))) | not)
+       elif ($v.thread != null) and ((($v.thread | type) == "string" and ($v.thread | test("^(?:[A-Za-z0-9_=-]+$)"))) | not)
          then "thread must be a thread id (PRRT_...) or null"
        elif $v.resolve == true and $v.thread == null then "resolve is true but thread is null"
        else empty end)
@@ -137,7 +158,7 @@ mutation($threadId: ID!) { resolveReviewThread(input: {threadId: $threadId}) { t
 done
 
 open=null
-if bash "$(dirname "$0")/review-threads.sh" "$repo" "$pr" > "$tmp/threads.json" 2> "$tmp/err"; then
+if review_threads "$repo" "$pr" > "$tmp/threads.json" 2> "$tmp/err"; then
   open=$(jq '[.[] | select(.resolved | not)] | length' "$tmp/threads.json")
 else
   echo ">> thread re-query failed; threads_open is not checked: $(tr '\n' ' ' < "$tmp/err" | cut -c1-300)" >&2

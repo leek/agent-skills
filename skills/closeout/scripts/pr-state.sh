@@ -29,8 +29,7 @@
 #                        from it has `required: null`.
 # A PR that gh cannot read prints {"number", "error"}. Exit 0 either way.
 # Calls per PR: gh pr view, one GraphQL query, the activity feed, the reactions, and the
-# review-thread query (triage-github-pr's scripts/review-threads.sh, installed beside this
-# skill; without it threads_open is null).
+# review-thread query (review_threads, below; when it fails, threads_open is null).
 #
 # --in-flight  Is a review or a required check still running? Prints one line, a JSON array of
 #     {"pr", "in_flight", "reviewers", "bot_reactions", "checks_pending", "counted"}
@@ -49,6 +48,27 @@ usage() { echo "usage: pr-state.sh <number> [<number> ...] [--in-flight [--no-re
 in_flight=0; no_required=0; prs=()
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
+
+# Every review thread of the PR, all pages, as one JSON array on stdout:
+#   [{"thread": "PRRT_...", "resolved": bool, "ids": [<comment databaseId>, ...]}]
+# `ids` holds every comment in the thread, so a reply maps to its thread as well as the root.
+# The same function sits in pr-comments.sh, pr-reply.sh, and closeout's pr-state.sh: keep the
+# three in step. A shared file would need a path computed at run time, which the plugin
+# directory refuses in a pre-approved script. Fails (never an empty list) when gh fails or a
+# page lacks the thread list, so a 403 never reads as "no threads".
+review_threads() {
+  local rc=0
+  # shellcheck disable=SC2016  # $owner and friends are GraphQL variables, not shell ones
+  gh api graphql --paginate -f owner="${1%/*}" -f repo="${1#*/}" -F pr="$2" -f query='
+query($owner: String!, $repo: String!, $pr: Int!, $endCursor: String) {
+  repository(owner: $owner, name: $repo) { pullRequest(number: $pr) {
+    reviewThreads(first: 100, after: $endCursor) {
+      pageInfo { hasNextPage endCursor }
+      nodes { id isResolved comments(first: 100) { nodes { databaseId } } } } } } }' > "$tmp/review-threads.raw" || return 1
+  jq -s '[.[] | .data.repository.pullRequest.reviewThreads.nodes[]
+          | {thread: .id, resolved: .isResolved, ids: [.comments.nodes[].databaseId]}]' "$tmp/review-threads.raw" || rc=$?
+  return "$rc"
+}
 : > "$tmp/check-names"
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -67,7 +87,6 @@ fi
 command -v gh >/dev/null || { echo "gh is required" >&2; exit 1; }
 command -v jq >/dev/null || { echo "jq is required" >&2; exit 1; }
 
-threads_helper="$(dirname "$0")/../../triage-github-pr/scripts/review-threads.sh"
 errors=0
 
 i=0
@@ -124,8 +143,7 @@ query($owner: String!, $repo: String!, $pr: Int!, $head: String!, $endCursor: St
 
   echo "null" > "$tmp/threads.json"; echo "null" > "$tmp/rounds.json"
   if [ "$in_flight" = 0 ]; then
-    if [ ! -f "$threads_helper" ] || ! bash "$threads_helper" "$repo" "$n" > "$tmp/threads.raw"; then
-      [ -f "$threads_helper" ] || echo "triage-github-pr/scripts/review-threads.sh is not installed beside closeout" >&2
+    if ! review_threads "$repo" "$n" > "$tmp/threads.raw"; then
       echo threads >> "$tmp/unchecked"
     else
       jq '[.[] | select(.resolved | not)] | length' "$tmp/threads.raw" > "$tmp/threads.json"

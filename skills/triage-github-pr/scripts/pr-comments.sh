@@ -15,7 +15,7 @@
 #            whose `at` changed (bots edit summaries in place). Your own items are dropped.
 #   --count  print only {"pr","head","threads_open"}: the re-query before a push or merge.
 # Save a full run to a file as the snapshot (`> <scratch>/pr-<N>-snapshot.json`).
-# Read-only: GET calls and one GraphQL query (review-threads.sh, beside this script).
+# Read-only: GET calls and one GraphQL query (review_threads, below).
 # pipefail: every `gh api … | jq -s .` must fail when gh does, or a 403 reads as "no threads".
 set -e
 set -o pipefail
@@ -40,11 +40,32 @@ command -v jq >/dev/null || { echo "jq is required" >&2; exit 1; }
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
+# Every review thread of the PR, all pages, as one JSON array on stdout:
+#   [{"thread": "PRRT_...", "resolved": bool, "ids": [<comment databaseId>, ...]}]
+# `ids` holds every comment in the thread, so a reply maps to its thread as well as the root.
+# The same function sits in pr-comments.sh, pr-reply.sh, and closeout's pr-state.sh: keep the
+# three in step. A shared file would need a path computed at run time, which the plugin
+# directory refuses in a pre-approved script. Fails (never an empty list) when gh fails or a
+# page lacks the thread list, so a 403 never reads as "no threads".
+review_threads() {
+  local rc=0
+  # shellcheck disable=SC2016  # $owner and friends are GraphQL variables, not shell ones
+  gh api graphql --paginate -f owner="${1%/*}" -f repo="${1#*/}" -F pr="$2" -f query='
+query($owner: String!, $repo: String!, $pr: Int!, $endCursor: String) {
+  repository(owner: $owner, name: $repo) { pullRequest(number: $pr) {
+    reviewThreads(first: 100, after: $endCursor) {
+      pageInfo { hasNextPage endCursor }
+      nodes { id isResolved comments(first: 100) { nodes { databaseId } } } } } } }' > "$tmp/review-threads.raw" || return 1
+  jq -s '[.[] | .data.repository.pullRequest.reviewThreads.nodes[]
+          | {thread: .id, resolved: .isResolved, ids: [.comments.nodes[].databaseId]}]' "$tmp/review-threads.raw" || rc=$?
+  return "$rc"
+}
+
 echo ">> PR #$pr in $repo" >&2
 gh pr view "$pr" -R "$repo" --json headRefOid -q .headRefOid > "$tmp/head"
 
 # Every thread with all its comment ids, so a reply maps to its thread as well as the root.
-bash "$(dirname "$0")/review-threads.sh" "$repo" "$pr" > "$tmp/threads.json"
+review_threads "$repo" "$pr" > "$tmp/threads.json"
 
 if [ "$count" = 1 ]; then
   jq -n --argjson pr "$pr" --arg head "$(cat "$tmp/head")" --slurpfile t "$tmp/threads.json" \

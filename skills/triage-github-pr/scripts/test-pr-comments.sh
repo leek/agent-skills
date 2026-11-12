@@ -1,5 +1,5 @@
 #!/bin/bash
-# Offline test for pr-comments.sh (and review-threads.sh, which it calls): a stub `gh` first
+# Offline test for pr-comments.sh (and its review_threads query): a stub `gh` first
 # on PATH returns canned JSON per subcommand and fails the calls GH_FAIL (a regex) matches.
 # Prints one `ok <case>` line per case and exits non-zero on the first failed assertion.
 set -e
@@ -141,6 +141,4 @@ ok "unknown login leaves disposition null"
 run; eq "no args" "$rc" 2
 run 7 --since "$work/none.json"; eq "missing snapshot" "$rc" 2
 run 7 --bogus; eq "unknown flag" "$rc" 2
-rc=0; bash "$here/review-threads.sh" o/r abc 2>/dev/null || rc=$?; eq "helper bad pr" "$rc" 2
-rc=0; bash "$here/review-threads.sh" nor 7 2>/dev/null || rc=$?; eq "helper bad repo" "$rc" 2
 ok "usage errors exit 2"

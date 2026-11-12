@@ -33,7 +33,7 @@ fi
 
 NORM='
 def norm:
-  sub("#.*$"; "")
+  sub("(?:#.*$)"; "")
   | sub("^(?<s>[A-Za-z]+)://(www\\.)?(?<h>[^/?]+)"; "\(.s | ascii_downcase)://\(.h | ascii_downcase)"; "i")
   | sub("^http://"; "https://")
   | if test("\\?") then
@@ -43,7 +43,7 @@ def norm:
          | join("&")) as $q
       | $p[0] + (if $q == "" then "" else "?" + $q end)
     else . end
-  | sub("/+$"; "");
+  | sub("(?:/+$)"; "");
 '
 
 case "$MODE" in
