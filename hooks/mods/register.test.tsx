@@ -114,8 +114,8 @@ test('/scratch takes a path as the slug, ages a tracked file by its last commit,
     const stdout =
       argv[1] === 'ls-files'
         ? '.scratch/auth/tickets/01-login.md\0'
-        : argv[1] === 'log' && argv.at(-1) === '.scratch/auth/tickets/01-login.md'
-          ? `${(now - 40 * DAY) / 1000}\n`
+        : argv.includes('log')
+          ? `\0${(now - 40 * DAY) / 1000}\n\n.scratch/auth/tickets/01-login.md\n\0${(now - 50 * DAY) / 1000}\n\n.scratch/auth/tickets/01-login.md\n`
           : ''
     return { value: { exitCode: 0, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } } as never
   })

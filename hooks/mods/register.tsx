@@ -56,37 +56,47 @@ let only = ''
 // The person closed the ticket pane; later updates for the same board leave it closed.
 let isTicketsDismissed = false
 
-// Last commit time of each tracked path, as scratch-state.sh reads it: `git ls-files` once
-// per scan, then one `git log -1` per tracked file. Any failure leaves the path to its mtime.
+// Last commit time of each tracked path, as scratch-state.sh reads it: `git ls-files` and one
+// `git log` over .scratch/ once per scan, both fixed commands (the plugin README lists them).
+// The log runs newest first, so a path's first appearance is its last commit. Any failure,
+// or a path the log does not name, leaves the path to its mtime.
 function commitTimes($: EngineInterface, cwd: string) {
-  let tracked: Promise<Set<string>> | undefined
-  const listTracked = async () => {
+  let lastCommits: Promise<Map<string, number>> | undefined
+  const readGit = async () => {
+    const times = new Map<string, number>()
     const ls = await $.process.run(['git', 'ls-files', '-z', '.scratch'], { cwd })
+    if (ls.exitCode !== 0) {
+      return times
+    }
+    const tracked = new Set(ls.stdout.split('\0').filter(Boolean))
+    const log = await $.process.run(
+      ['git', '-c', 'core.quotePath=false', 'log', '--relative', '--format=%x00%ct', '--name-only', '--', '.scratch'],
+      { cwd },
+    )
+    if (log.exitCode !== 0) {
+      return times
+    }
+    for (const block of log.stdout.split('\0')) {
+      const [stamp = '', ...names] = block.split('\n')
+      const seconds = Number(stamp)
+      if (!(seconds > 0)) {
+        continue
+      }
+      for (const name of names) {
+        if (tracked.has(name) && !times.has(name)) {
+          times.set(name, seconds * 1000)
+        }
+      }
+    }
 
-    return new Set(ls.exitCode === 0 ? ls.stdout.split('\0').filter(Boolean) : [])
+    return times
   }
 
   return async (paths: readonly string[]) => {
-    const times = new Map<string, number>()
-    tracked ??= listTracked().catch(() => new Set<string>())
-    const known = await tracked
-    await Promise.all(
-      paths
-        .filter(p => known.has(p))
-        .map(async p => {
-          try {
-            const log = await $.process.run(['git', 'log', '-1', '--format=%ct', '--', p], { cwd })
-            const seconds = Number(log.stdout.trim())
-            if (log.exitCode === 0 && seconds > 0) {
-              times.set(p, seconds * 1000)
-            }
-          } catch {
-            // This file falls back to its mtime.
-          }
-        }),
-    )
+    lastCommits ??= readGit().catch(() => new Map<string, number>())
+    const known = await lastCommits
 
-    return times
+    return new Map(paths.flatMap(p => (known.has(p) ? [[p, known.get(p) ?? 0] as const] : [])))
   }
 }
 
