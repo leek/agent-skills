@@ -6,5 +6,7 @@
     "name": "leek",
     "email": "leeked@gmail.com"
   },
+  "homepage": "https://leek.io",
+  "repository": "https://github.com/leek/agent-skills",
   "types": "./types/index.d.ts"
 }
