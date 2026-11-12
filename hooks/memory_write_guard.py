@@ -5,7 +5,8 @@ These agents read untrusted input (PR comments, transcripts, diffs), so they sta
 read-only, but `memory:` needs Write and Edit to keep its notes. Wired from
 hooks/hooks.json on the file-write tools. For an agent in MEMORY_ONLY, a write passes
 only when its real path lies under `.claude/agent-memory/` of the working directory or one
-of its parents (project memory) or `~/.claude/agent-memory/` (user memory); anything else,
+of its parents (project memory) or `~/.claude/agent-memory/` (user memory; under a profile,
+`$CLAUDE_CONFIG_DIR/agent-memory/`); anything else,
 a symlink that leads out of those included, exits 2. Every other caller
 passes. Grok's `search_replace` sends the same `file_path` key, so it is covered too.
 """
@@ -30,7 +31,12 @@ def memory_roots(cwd: str) -> list[str]:
         if parent == here:
             break
         here = parent
-    return [os.path.realpath(os.path.join(r, ".claude", "agent-memory")) for r in roots]
+    dirs = [os.path.realpath(os.path.join(r, ".claude", "agent-memory")) for r in roots]
+    # A profile (CLAUDE_CONFIG_DIR) moves user memory to <config dir>/agent-memory/.
+    config_dir = os.environ.get("CLAUDE_CONFIG_DIR")
+    if config_dir:
+        dirs.append(os.path.realpath(os.path.join(os.path.expanduser(config_dir), "agent-memory")))
+    return dirs
 
 
 def memory_path(path: str, cwd: str) -> bool:
@@ -50,7 +56,7 @@ def run_payload(payload: dict) -> int:
     if path and memory_path(path, payload.get("cwd", "")):
         return 0
     print(f"BLOCKED: {agent} is read-only; it may write only its memory files under "
-          ".claude/agent-memory/. Report what you found instead of changing files.",
+          ".claude/agent-memory/ (or $CLAUDE_CONFIG_DIR/agent-memory/). Report what you found instead of changing files.",
           file=sys.stderr)
     return 2
 

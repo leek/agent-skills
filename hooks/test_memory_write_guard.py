@@ -10,12 +10,25 @@ GUARD = Path(__file__).with_name("memory_write_guard.py")
 
 
 class MemoryWriteGuardTest(unittest.TestCase):
-    def run_guard(self, path, agent="leek-skills:standards-reviewer", tool="Write", cwd="/repo"):
+    def run_guard(self, path, agent="leek-skills:standards-reviewer", tool="Write", cwd="/repo",
+                  config_dir=None):
         payload = {"tool_name": tool, "tool_input": {"file_path": path}, "cwd": cwd}
         if agent:
             payload["agent_type"] = agent
+        env = {k: v for k, v in os.environ.items() if k != "CLAUDE_CONFIG_DIR"}
+        if config_dir:
+            env["CLAUDE_CONFIG_DIR"] = config_dir
         return subprocess.run([sys.executable, str(GUARD)], input=json.dumps(payload),
-                              text=True, capture_output=True).returncode
+                              text=True, capture_output=True, env=env).returncode
+
+    def test_user_memory_follows_claude_config_dir(self):
+        # A profile (CLAUDE_CONFIG_DIR) keeps user memory at <config dir>/agent-memory/.
+        miner = "leek-skills:session-miner"
+        profile = "/profiles/work"
+        self.assertEqual(self.run_guard(f"{profile}/agent-memory/leek-skills-session-miner/p.md",
+                                        agent=miner, config_dir=profile), 0)
+        self.assertEqual(self.run_guard(f"{profile}/settings.json", agent=miner, config_dir=profile), 2)
+        self.assertEqual(self.run_guard(f"{profile}/agent-memory/x.md", agent=miner), 2)
 
     def test_memory_files_pass(self):
         self.assertEqual(self.run_guard("/repo/.claude/agent-memory/standards-reviewer/MEMORY.md"), 0)
