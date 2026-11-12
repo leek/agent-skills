@@ -2,7 +2,7 @@
 name: code-smells-audit
 description: Audit a codebase, path, or branch diff for classic code smells against the 56-smell Luzkan catalog (PHP/Laravel and TS/React heuristics). Use when the user asks for a code-smell audit or smell-check of a module or diff.
 argument-hint: "[path | glob | diff] (omit for a whole-repo sweep)"
-allowed-tools: "Bash(bash *code-review/scripts/review-scope.sh *) Bash(git diff *)"
+allowed-tools: "Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/code-review/scripts/review-scope.sh *) Bash(git diff *)"
 ---
 
 # Code Smells Audit

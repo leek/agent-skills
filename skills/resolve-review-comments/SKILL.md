@@ -2,7 +2,7 @@
 name: resolve-review-comments
 description: Fix or rebut every review comment on a pull request, human or AI-review bot (Codex, Copilot, Gemini), then reply and resolve each thread. Use when the user wants a PR's review comments addressed, answered, or cleared.
 argument-hint: "A PR number or URL (defaults to the PR for the current branch)"
-allowed-tools: "Bash(gh pr view *) Bash(gh pr diff *) Bash(gh pr checks *) Bash(gh api *) Bash(bash *triage-github-pr/scripts/pr-comments.sh *) Bash(bash *triage-github-pr/scripts/pr-reply.sh *) Bash(bash *fix-ci-failures/scripts/failed-jobs.sh *)"
+allowed-tools: "Bash(gh pr view *) Bash(gh pr diff *) Bash(gh pr checks *) Bash(gh api *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/triage-github-pr/scripts/pr-comments.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/triage-github-pr/scripts/pr-reply.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/fix-ci-failures/scripts/failed-jobs.sh *)"
 ---
 
 # Resolve Review Comments

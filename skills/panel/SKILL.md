@@ -3,7 +3,7 @@ name: panel
 description: Convene a panel of agent CLIs (grok, claude, codex, agy) on a prompt or a code review, then report one consensus grouped by how much they agree.
 disable-model-invocation: true
 argument-hint: "A prompt, or a review scope like 'review since main'"
-allowed-tools: "Bash(bash *panel/scripts/launch.sh *) Bash(bash *code-review/scripts/review-scope.sh *) Bash(git diff *) Bash(git status *) Bash(grok *) Bash(claude *) Bash(codex *) Bash(agy *)"
+allowed-tools: "Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/panel/scripts/launch.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/code-review/scripts/review-scope.sh *) Bash(git diff *) Bash(git status *)"
 compatibility: "Needs at least one of the grok, claude, codex, or agy CLIs on PATH"
 model: sonnet
 effort: medium

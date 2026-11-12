@@ -3,7 +3,7 @@ name: fix-ci-failures
 description: Read a branch's latest failed CI runs, triage each failure from its existing logs, and fix the real ones.
 disable-model-invocation: true
 argument-hint: "Branch name (defaults to main), then optional guidance (\"skip lint\", \"only the test job\")"
-allowed-tools: "Bash(gh run list *) Bash(gh run view *) Bash(bash *fix-ci-failures/scripts/failed-jobs.sh *)"
+allowed-tools: "Bash(gh run list *) Bash(gh run view *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/fix-ci-failures/scripts/failed-jobs.sh *)"
 ---
 
 # Fix CI Failures

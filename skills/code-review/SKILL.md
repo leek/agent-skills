@@ -2,7 +2,7 @@
 name: code-review
 description: "Three-axis review of the diff since a fixed point: Correctness (bugs, failure modes, security), Standards (repo conventions) and Spec (ticket/PRD fidelity). Use when the user wants to review a branch, PR, WIP changes, or asks to \"review since X\"."
 argument-hint: "since <ref>, or a PR or branch (omit for WIP changes)"
-allowed-tools: "Bash(bash *code-review/scripts/review-scope.sh *) Bash(git diff *) Bash(git log *) Bash(git merge-base *) Bash(git status *)"
+allowed-tools: "Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/code-review/scripts/review-scope.sh *) Bash(git diff *) Bash(git log *) Bash(git merge-base *) Bash(git status *)"
 ---
 
 # Code Review

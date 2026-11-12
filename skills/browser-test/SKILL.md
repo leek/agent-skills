@@ -3,7 +3,7 @@ name: browser-test
 description: Test a web app from a start URL and a plain-language prompt, and get one verdict table. Read-only unless you confirm a write.
 disable-model-invocation: true
 argument-hint: "<start-url> <what to test> (e.g. https://app.test/invoices filters and pagination work)"
-allowed-tools: "Bash(agent-browser *) Bash(bash *browser-test/scripts/start-run.sh *)"
+allowed-tools: "Bash(agent-browser *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/browser-test/scripts/start-run.sh *)"
 compatibility: "Needs the agent-browser CLI and python3 on PATH"
 model: sonnet
 effort: medium

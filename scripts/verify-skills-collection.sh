@@ -615,7 +615,7 @@ for md in sorted(glob.glob("skills/*/SKILL.md")):
         for path, text, first in texts:
             hit = next((n for n, line in enumerate(text.splitlines(), first) if own.search(line)), None)
             if hit is not None:
-                bad.append(f"{path}:{hit}: names scripts/{name} but {md} allowed-tools does not cover it (add Bash(bash *{d}/scripts/{name} *), or exempt it in the verifier with the reason)")
+                bad.append(f"{path}:{hit}: names scripts/{name} but {md} allowed-tools does not cover it (add Bash(bash ${{CLAUDE_PLUGIN_ROOT}}/skills/{d}/scripts/{name} *), or exempt it in the verifier with the reason)")
                 break
 if bad:
     print("\n".join(bad), file=sys.stderr)

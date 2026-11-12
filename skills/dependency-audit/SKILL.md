@@ -6,7 +6,7 @@ context: fork
 agent: leek-skills:dependency-auditor
 background: false
 argument-hint: "composer | npm (omit to auto-detect)"
-allowed-tools: "Bash(bash *dependency-audit/scripts/audit.sh) Bash(bash *dependency-audit/scripts/audit.sh *) WebFetch"
+allowed-tools: "Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/dependency-audit/scripts/audit.sh) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/dependency-audit/scripts/audit.sh *) WebFetch(domain:github.com) WebFetch(domain:raw.githubusercontent.com)"
 ---
 
 # Dependency Audit

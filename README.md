@@ -95,6 +95,54 @@ The plugin also ships a [mod](https://code.claude.com/docs/en/plugins/mods/overv
 
 Other harnesses, and Claude Code surfaces that don't draw, run the same skills without it.
 
+## What runs on your machine
+
+Nothing below makes a network call or sends data anywhere. Everything the hooks and the mod read stays on your machine and in your Claude Code session.
+
+### Hooks (`hooks/hooks.json`)
+
+| Event | Script | What it does | What it changes |
+|---|---|---|---|
+| `SessionStart` | `hooks/bare-worktree-notice.sh` | Checks whether the project directory is a linked git worktree (a `.git` file) of a Laravel app (`artisan` and `composer.json`) with no `vendor/` yet. | When all three hold, it adds one line of session context pointing the agent at `laravel-herd-worktrees`' bootstrap. Otherwise nothing. It writes no files. |
+| `PreToolUse` on `Bash` | `hooks/shell_guard.py` | Reads the tool call from stdin. For the `browser-tester`, `browser-test-planner`, `finding-verifier`, and `pr-reviewer` agents, it parses the shell command and checks it against a read-only allowlist. | It blocks a non-read-only command from those four agents (exit 2 with the reason). It never rewrites a command, and every other caller passes untouched. |
+| `PreToolUse` on `Write`, `Edit`, `MultiEdit` | `hooks/memory_write_guard.py` | For the read-only agents that keep `memory:` (`deepening-scout`, `dependency-auditor`, `finding-verifier`, `release-notes-collector`, `session-miner`, `standards-reviewer`, `upgrade-impact-scout`), it resolves the target path. It reads `CLAUDE_CONFIG_DIR` only to find a profile's `agent-memory/` folder. | It blocks a write outside `.claude/agent-memory/` (project), `~/.claude/agent-memory/`, or `$CLAUDE_CONFIG_DIR/agent-memory/`. Every other caller passes untouched. |
+| `PreToolUse` on `AskUserQuestion`, and `Notification` | `hooks/terminal-bell.sh` | Only when `TERM_PROGRAM` is `ghostty`: runs `ps` to find the terminal the session runs in. | It writes one bell character to that terminal, so the Ghostty tab shows 🔔 while Claude waits on you. It does nothing in any other terminal. |
+
+### Mod (`hooks/mods/register.tsx`)
+
+**What it sends, and where:** nothing leaves your machine. The mod makes no network calls. What it shows (the `.scratch/` board, the workers band, the ticket board) is held in Claude Code's plugin state for the session.
+
+**Programs it runs,** through `process.run`, in the session's working directory. Both use fixed arguments, and both run only when `/scratch` runs or its pane is open:
+
+- `git ls-files -z .scratch`: which `.scratch/` files are tracked.
+- `git -c core.quotePath=false log --relative --format=%x00%ct --name-only -- .scratch`: the last commit time of each tracked file, so the board can mark stale tickets. A file git does not track falls back to its modified time.
+
+The mod parses their output into timestamps for the pane and sends it nowhere.
+
+**Files it reads:** `.scratch/` under the session's working directory (`fs.list`, `fs.read`), to draw the board.
+
+**Hooks, and what each one reads and changes:**
+
+- `session.start`: registers the `/scratch` and `/ticket-board` commands and the `ticket_board` tool. Changes nothing else.
+- `command.run`: answers only the mod's own two commands, `/scratch` and `/ticket-board`. It opens the pane and replies with a one-line summary, or with the table where no pane draws. It never sees or changes another command.
+- `tool.call`:
+  - It **stands in for one tool only,** `mcp__leek-skills__ticket_board`, which the mod itself registers. No other tool sits behind it. When `implement-spec`, `implement <spec> all`, or `wayfinder <map> all` reports ticket progress, the hook records the update, draws the pane, and returns a one-line reply that says whether the pane showed it.
+  - For every other tool, it observes only. It reads the tool name and input to count a subagent's tool calls and show its latest tool on the workers band. Then it calls `next` with the call unchanged and returns that result unchanged. After a write whose path or command names `.scratch/`, it rescans the open board.
+- `agent.spawn`: reads the new subagent's name, type, and description, and the agent id from the result, to add a row to the workers band. It passes the spawn and returns its result unchanged.
+- `turn.complete`: records a subagent's outcome on the band.
+- `prompt.submit`: never reads the prompt's text. When no subagent is still running, it clears the workers band. The prompt passes unchanged.
+- `ui.close`: remembers that you closed a pane, so later updates leave it closed.
+- `ui.render`: draws the band and the two panes.
+
+### Scripts the skills run
+
+Skills run their own `skills/<name>/scripts/*.sh` by literal path, and each skill's `allowed-tools` pre-approves only those scripts by their path under `${CLAUDE_PLUGIN_ROOT}`. Two scripts deserve a note:
+
+- `skills/upgrade-plan/scripts/versions.sh` downloads package metadata JSON from `repo.packagist.org` and `registry.npmjs.org` with `curl` and reads it with `jq`. It never runs what it downloads.
+- `skills/autopilot/scripts/lib/tmux.sh` starts detached agent CLI sessions in tmux. A tmux session starts with the tmux server's environment, so the launcher passes on the variables those CLIs read (`PATH`, `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `GROK_HOME`, and the Anthropic, OpenAI, and xAI key and base-URL variables). It writes them to an owner-only temp file, which the child reads once and deletes. It never puts them on a command line or in a log, and never sends them anywhere else.
+
+The `test-*.sh` files are the scripts' own tests. Only this repo's verifier (`scripts/verify-skills-collection.sh`) and CI run them, never a skill.
+
 ## Installation
 
 ### `npx skills` (any agent)
