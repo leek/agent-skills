@@ -141,6 +141,19 @@ Skills run their own `skills/<name>/scripts/*.sh` by literal path, and each skil
 - `skills/upgrade-plan/scripts/versions.sh` downloads package metadata JSON from `repo.packagist.org` and `registry.npmjs.org` with `curl` and reads it with `jq`. It never runs what it downloads.
 - `skills/autopilot/scripts/lib/tmux.sh` starts detached agent CLI sessions in tmux. A tmux session starts with the tmux server's environment, so the launcher passes on the variables those CLIs read (`PATH`, `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `GROK_HOME`, and the Anthropic, OpenAI, and xAI key and base-URL variables). It writes them to an owner-only temp file, which the child reads once and deletes. It never puts them on a command line or in a log, and never sends them anywhere else.
 
+### Services the skills contact
+
+The plugin declares no connectors and runs no server of its own. Nothing goes to the plugin's author. Some skills reach these outside services, always with your own tools and logins:
+
+| Service | Skills | What goes there |
+|---|---|---|
+| GitHub (`gh` CLI) | `closeout`, `fix-ci-failures`, `fix-github-issues`, `implement`, `implement-spec`, `prune-tests`, `release`, `resolve-review-comments`, `run-after`, `scratch-cleanup`, `scratch-status`, `sweep`, `triage-github-pr` | Reads of PRs, issues, review comments, and CI runs. Writes only what the skill exists to make: PR replies and thread resolves, issue comments and closes, branches and PRs, release pages. |
+| PostHog, Laravel Nightwatch (your own MCP servers) | `fix-posthog-issues`, `fix-nightwatch-issues` | Issue reads, comments, and resolve calls on your own project. |
+| Packagist, npm registry | `upgrade-plan` (`versions.sh`), `dependency-audit` (`composer` and `npm` commands) | Package names, to read version metadata. |
+| The web (Claude Code's WebFetch and WebSearch) | `research`, `chatter-scout`, `upgrade-plan`, `dependency-audit` | Search queries and the pages fetched. |
+| Other agent CLIs (`claude`, `codex`, `grok`, `agy`) | `panel`, `autopilot` | The task prompt and, for a review, the diff. Each CLI sends them to its own provider under your account. |
+| The app you name | `browser-test` | The browser visits the start URL you give. |
+
 The `test-*.sh` files are the scripts' own tests. Only this repo's verifier (`scripts/verify-skills-collection.sh`) and CI run them, never a skill.
 
 ## Installation
