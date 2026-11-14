@@ -71,6 +71,8 @@ session's uncommitted work. One release, one version, one tag, one GitHub releas
    `name` and the plugin `name`: `claude plugin marketplace update <marketplace>` then
    `claude plugin update <plugin>@<marketplace>`. For this repo that is
    `claude plugin marketplace update leek-agent-skills && claude plugin update leek-skills@leek-agent-skills`.
+   When the repo has an executable `bin/sync-installs`, run it instead of printing that
+   command, and report the before and after version it prints for each install.
    The running session keeps the previous plugin until it restarts.
 
 ## Guardrails
