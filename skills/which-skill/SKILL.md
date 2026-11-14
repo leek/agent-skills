@@ -81,4 +81,6 @@ Order matters: the cheapest move that preserves the primary source wins:
 
 Say so plainly and answer the question directly. Reaching for the nearest skill because one must be named is worse than none: it spends a whole workflow on the wrong shape of problem.
 
+Writing a blog post, or holding a draft to this repo's blog style guide → `blog-writing`. Writing or reviewing UI text, error messages, emails, or marketing copy against this repo's brand guide → `brand-guidelines`. The agent also reaches for both on its own, and each one offers to set up its guide on first use.
+
 Two skills exist for the meta-work rather than the work: `writing-for-agents` (writing any document an agent consumes) and `teach` (learn a concept inside this workspace). `wait-what` is the one to reach for when *this* answer did not land.

@@ -1,0 +1,5 @@
+interface:
+  display_name: "Brand Guidelines"
+  short_description: "Write or review user-facing copy against this repo's own brand guide and shared craft rules"
+policy:
+  allow_implicit_invocation: true

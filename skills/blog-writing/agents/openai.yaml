@@ -1,0 +1,5 @@
+interface:
+  display_name: "Blog Writing"
+  short_description: "Write or review a blog post against this repo's own style guide and shared craft rules"
+policy:
+  allow_implicit_invocation: true
