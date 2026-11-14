@@ -1,5 +1,7 @@
 #!/bin/bash
-# Run one fresh top-level Claude Code, Codex, or Grok process per pipeline unit.
+# Build one spec with fresh top-level Claude Code, Codex, or Grok processes: a parallel
+# frontier of build workers, each in its own worktree, landing on one integration branch,
+# then one finish worker that reviews, verifies, resolves, and delivers.
 # Human-readable progress goes to stderr; terminal results and status use JSON on stdout.
 
 set -euo pipefail
@@ -9,9 +11,14 @@ PROVIDER=""
 ROOT_REF=""
 REPO_DIR="$(pwd)"
 MAX_ITERATIONS="${AUTOPILOT_MAX_ITERATIONS:-50}"
+CONCURRENCY="${AUTOPILOT_CONCURRENCY:-5}"
+INTEGRATION_DIR=""
+DELIVERY="pr"
+CLEANUP="list"
+FINISH_NOW="false"
 HEARTBEAT_SECONDS="${AUTOPILOT_HEARTBEAT_SECONDS:-300}"
 QUIET_SECONDS=""
-POLL_SECONDS=5
+POLL_SECONDS="${AUTOPILOT_POLL_SECONDS:-5}"
 TMUX_START_TIMEOUT_SECONDS=30
 MODE="run"
 USE_TMUX="false"
@@ -26,9 +33,17 @@ WORKER_EFFORT=""
 WORKER_EFFORT_SOURCE=""
 REPORTED_MODEL=""
 MODEL_CAPTURE_FILE=""
-COMPLETED_REF_STATUS=""
+BRANCH=""
+DEFAULT_BRANCH=""
+NOTES_DIR=""
+MAIN_CHECKOUT=""
+BASE_SHA=""
+LAUNCHES=0
+WORKERS_JSON="[]"
+WORKER_LABEL=""
+WORKER_CWD=""
+WORKER_ACTIVITY_FILE=""
 
-COMPLETED_REFS=""
 TEMP_DIR=""
 LOCK_DIR=""
 LOCK_OWNED="false"
@@ -53,11 +68,7 @@ NEXT_REF_STATE=""
 RESULT_FILE_STATE=""
 ITERATION=0
 RUNNER_PID_STATE=""
-WORKER_PID_STATE=""
 RUNNER_PROCESS_STARTED=""
-WORKER_PROCESS_STARTED=""
-WORKER_PROCESS_GROUP=""
-WORKER_STARTED_AT=""
 LOG_FILE=""
 LOG_MIRROR_FILE=""
 ACTIVITY_FILE=""
@@ -84,11 +95,12 @@ SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd -P)"
 SCRIPT_PATH="$SCRIPT_DIR/autopilot.sh"
 WORKER_PATH="$SKILL_DIR/references/worker.md"
 SCHEMA_PATH="$SCRIPT_DIR/result-schema.json"
+LAND_PATH="$SCRIPT_DIR/land.sh"
 GIT_DIR=""
-WAYFINDER_PATH=""
-TO_SPEC_PATH=""
-TO_TICKETS_PATH=""
+IMPLEMENT_SPEC_PATH=""
 IMPLEMENT_PATH=""
+TO_TICKETS_PATH=""
+TICKET_SH=""
 SCHEMA_JSON=""
 
 require_module() {
@@ -144,15 +156,26 @@ unset -f require_module
 usage() {
   cat >&2 <<'EOF'
 Usage:
-  autopilot.sh --provider <claude|codex|grok> --root <ref> [options]
-  autopilot.sh --status --root <ref> [--repo <path>]
-  autopilot.sh --follow --root <ref> [--repo <path>]
-  autopilot.sh --history --root <ref> [--repo <path>]
-  autopilot.sh --wait --root <ref> [--repo <path>]     # block until terminal; exit = run status
+  autopilot.sh --provider <claude|codex|grok> --root <spec> --integration <path> [options]
+  autopilot.sh --status --root <spec> [--repo <path>]
+  autopilot.sh --follow --root <spec> [--repo <path>]
+  autopilot.sh --history --root <spec> [--repo <path>]
+  autopilot.sh --wait --root <spec> [--repo <path>]    # block until terminal; exit = run status
+
+<spec> is .scratch/<slug>/spec.md (or its directory). Its tickets must exist, and its
+integration branch must be checked out at --integration: the autopilot skill does both
+before it starts this script.
 
 Run options:
   --repo <path>         Target Git repository (default: current directory)
-  --max-iterations <n>  Fresh-process limit (default: 50)
+  --integration <path>  Checkout that has the integration branch checked out (default:
+                        --repo). Never the default branch.
+  --delivery <shape>    pr (default), stack (stacked PRs), or branch (push, no PR)
+  --concurrency <n>     Build workers at once (default: 5; AUTOPILOT_CONCURRENCY)
+  --cleanup <auto|list> What the finish worker does with leftovers: remove them, or
+                        list them for the user (default: list)
+  --finish-now          Deliver what is landed without the tickets a worker released
+  --max-iterations <n>  Worker-session limit for this invocation (default: 50)
   --model <name>        Model for every worker session (default: provider config)
   --effort <level>      Reasoning effort for every worker session
                         claude: low|medium|high|xhigh|max
@@ -161,12 +184,18 @@ Run options:
   --tmux                Start the run in a detached tmux session
   -h, --help            Show this help
 
+Each ready ticket gets a build worker in <main checkout>/.claude/worktrees/<branch>--<NN>
+on the branch <branch>--<NN>; a ticket whose Files overlap a running ticket's waits. A
+worker lands its branch with land.sh, one at a time. When nothing more can be built, one
+finish worker runs in the integration checkout. Run notes (reports, landed/, the landing
+lock, screenshots) are in <git-common-dir>/implement-spec/<branch>.
+
 Autopilot writes raw provider events and a human-readable log under the target
 repository's Git directory. Heartbeats default to every five minutes. Set
 AUTOPILOT_HEARTBEAT_SECONDS to a positive number of seconds to change them.
 AUTOPILOT_MODEL and AUTOPILOT_EFFORT are the environment equivalents of --model
 and --effort. Every run reports the model and effort its worker sessions use: at
-run start, per iteration, in each heartbeat, and in --status (model, model_source,
+run start, per worker, in each heartbeat, and in --status (model, model_source,
 effort, effort_source, reported_model). A source is "requested" (flag or env),
 "settings" (Claude Code settings chain: model, effortLevel; honors CLAUDE_CONFIG_DIR),
 "config" ($CODEX_HOME/config.toml: model, model_reasoning_effort; $GROK_HOME/config.toml:
@@ -176,13 +205,25 @@ announced when it differs from the requested one.
 
 Output:
   run        progress on stderr; one terminal result object on stdout
-  --status   one state object ({"status":"none",...} and exit 1 when no run exists)
+  --status   one state object ({"status":"none",...} and exit 1 when no run exists);
+             "workers" lists the live worker sessions
   --history  an array of retained states for the root
   --tmux     one launch object (status, follow and tmux attach commands); read the
              exact terminal result from the result_file in --status
   --follow   the human-readable log ("<timestamp> Autopilot: <message>") until the
              run ends
   --wait     the final state object once the run leaves "running"
+
+Progress lines to watch for ("<timestamp> Autopilot: <message>"):
+  selected <ticket> (...)            a build worker was dispatched
+  worker <NN> started|alive|result   worker lifecycle; <NN> is "finish" for the last one
+  ticket <NN> merged (k of n ...)    the ticket landed on the integration branch
+  ticket <NN> assumed: <choice>      it was built on an assumed answer: confirm it
+  question <NN>: <text>              it needs an answer; the ticket was released
+  ticket <NN> blocked: <text>        it could not be built; the ticket was released
+  worker <NN> failed: <text>         the run stops dispatching and ends failed
+  board <json>                       a ticket-board change from the finish worker (a review
+                                     stage, a finding, an open entry): send it to the board
 
 Exit codes: 0 complete, 2 needs input, 3 blocked, 4 worker failure,
   5 runner/configuration failure, 129 hangup, 130 interrupted, 143 terminated.
@@ -219,6 +260,30 @@ while [[ $# -gt 0 ]]; do
       [[ $# -ge 2 ]] || runner_failure "--repo requires a value"
       REPO_DIR="$2"
       shift 2
+      ;;
+    --integration)
+      [[ $# -ge 2 ]] || runner_failure "--integration requires a value"
+      INTEGRATION_DIR="$2"
+      shift 2
+      ;;
+    --delivery)
+      [[ $# -ge 2 ]] || runner_failure "--delivery requires a value"
+      DELIVERY="$2"
+      shift 2
+      ;;
+    --concurrency)
+      [[ $# -ge 2 ]] || runner_failure "--concurrency requires a value"
+      CONCURRENCY="$2"
+      shift 2
+      ;;
+    --cleanup)
+      [[ $# -ge 2 ]] || runner_failure "--cleanup requires a value"
+      CLEANUP="$2"
+      shift 2
+      ;;
+    --finish-now)
+      FINISH_NOW="true"
+      shift
       ;;
     --max-iterations)
       [[ $# -ge 2 ]] || runner_failure "--max-iterations requires a value"
@@ -276,6 +341,9 @@ done
 if [[ "$MODE" == "run" ]]; then
   [[ "$MAX_ITERATIONS" =~ ^[1-9][0-9]*$ ]] || runner_failure "--max-iterations must be a positive integer"
   [[ "$HEARTBEAT_SECONDS" =~ ^[1-9][0-9]*$ ]] || runner_failure "AUTOPILOT_HEARTBEAT_SECONDS must be a positive integer"
+  [[ "$CONCURRENCY" =~ ^[1-9][0-9]*$ ]] || runner_failure "--concurrency must be a positive integer"
+  [[ "$DELIVERY" =~ ^(pr|stack|branch)$ ]] || runner_failure "--delivery must be pr, stack, or branch"
+  [[ "$CLEANUP" =~ ^(auto|list)$ ]] || runner_failure "--cleanup must be auto or list"
   QUIET_SECONDS=$((HEARTBEAT_SECONDS * 2))
 else
   [[ "$USE_TMUX" == "false" ]] || runner_failure "--tmux is only valid when starting a run"
@@ -290,6 +358,12 @@ ORIGINAL_DIR="$(cd "$REPO_DIR" 2>/dev/null && pwd -P)" || runner_failure "reposi
 REPO_ROOT="$(git -C "$ORIGINAL_DIR" rev-parse --show-toplevel 2>/dev/null)" || runner_failure "not a Git repository: $ORIGINAL_DIR"
 
 ROOT_REF="$(canonical_root_ref "$ROOT_REF")" || runner_failure "could not resolve root: $ROOT_REF"
+# A spec's directory names its spec: one root, one run, however it is spelled. The
+# directory may be missing here when the spec lives only on the integration branch.
+if [[ -d "$ROOT_REF" && -f "$ROOT_REF/spec.md" ]] || [[ ! -e "$ROOT_REF" && "$(basename "$(dirname "$ROOT_REF")")" == ".scratch" ]]; then
+  ROOT_REF="$ROOT_REF/spec.md"
+fi
+[[ -n "$INTEGRATION_DIR" ]] || INTEGRATION_DIR="$REPO_ROOT"
 
 GIT_DIR="$(git -C "$REPO_ROOT" rev-parse --absolute-git-dir 2>/dev/null)" || runner_failure "could not resolve the repository Git directory"
 resolve_state_paths
@@ -315,6 +389,7 @@ esac
 
 [[ -f "$WORKER_PATH" ]] || runner_failure "worker contract missing: $WORKER_PATH"
 [[ -f "$SCHEMA_PATH" ]] || runner_failure "result schema missing: $SCHEMA_PATH"
+[[ -f "$LAND_PATH" ]] || runner_failure "landing script missing: $LAND_PATH"
 jq -e . "$SCHEMA_PATH" >/dev/null 2>&1 || runner_failure "result schema is invalid JSON"
 resolve_workflow_skills
 configure_provider

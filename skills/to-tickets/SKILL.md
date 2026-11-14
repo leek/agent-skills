@@ -106,7 +106,7 @@ not a layer-by-layer implementation list.
 
 Keep comments out of the frontmatter: an empty `claimed-by` means unclaimed. Blockers live in the `blocked-by` frontmatter (ticket numbers, `[]` to start at once), not a body section. The delivery ticket has its own template in [DELIVERY-TICKET.md](DELIVERY-TICKET.md).
 
-When the spec sequences deploys (expand/migrate/contract, "ship A, deploy, then B", a command that must exist in production before the enforcement that calls it), set `deploy-gate: true` on every ticket that must be live before its dependents are built. Blockers alone do not express this: a worker can close ticket A and start ticket B on the same branch, collapsing three deploys into one PR. `autopilot` stops with `needs_input` after closing a deploy-gate ticket; a human session should likewise commit, deploy, and only then pick up the dependents.
+When the spec sequences deploys (expand/migrate/contract, "ship A, deploy, then B", a command that must exist in production before the enforcement that calls it), set `deploy-gate: true` on every ticket that must be live before its dependents are built. Blockers alone do not express this: a worker can close ticket A and start ticket B on the same branch, collapsing three deploys into one PR. `autopilot` builds up to a deploy-gate ticket, delivers that, and stops with `needs_input` before its dependents; a human session should likewise commit, deploy, and only then pick up the dependents.
 
 Files are numbered from `01` in topological order: every blocker has a lower number than the ticket it blocks. Numbers order dependencies; they do not serialize independent tickets.
 

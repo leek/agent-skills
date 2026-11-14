@@ -1,6 +1,6 @@
 #!/bin/bash
-# Offline test for ticket.sh, and for its agreement with scratch-state.sh and autopilot's
-# lib/tickets.sh on one shared fixture. Builds every fixture under mktemp -d.
+# Offline test for ticket.sh, and for its agreement with scratch-state.sh on one shared
+# fixture. Builds every fixture under mktemp -d.
 # Prints one `ok <case>` line per case; exits non-zero on the first failed assertion.
 set -e
 set -o pipefail
@@ -8,7 +8,6 @@ set -o pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 ticket_sh="$here/ticket.sh"
 state_sh="$here/../../scratch-status/scripts/scratch-state.sh"
-tickets_lib="$here/../../autopilot/scripts/lib/tickets.sh"
 command -v jq >/dev/null 2>&1 || { echo "test-ticket.sh: jq is required" >&2; exit 2; }
 
 t="$(mktemp -d)"
@@ -105,7 +104,7 @@ eq "claim age old" "$(q "$f" '.tickets[4].claim_age_seconds > 100000000')" 'true
 eq "claim age fresh" "$(q "$f" '.tickets[5].claim_age_seconds < 3600')" 'true'
 echo "ok frontier reports claim_age_seconds and leaves staleness to the caller"
 
-# ---- agreement with scratch-state.sh and autopilot's tickets.sh ---------------------------
+# ---- agreement with scratch-state.sh -----------------------------------------------------
 s="$(bash "$state_sh" --root "$r" --no-commits auth)"
 eq "state closed set" "$(q "$s" '[.efforts[0].tickets[] | select(.derived_status == "closed") | .number]')" \
   "$(q "$f" '[.tickets[] | select(.derived == "closed") | .number]')"
@@ -114,38 +113,6 @@ eq "state frontier" "$(q "$s" '.efforts[0].frontier')" '["tickets/03-c.md","tick
 eq "state statuses" "$(q "$s" '[.efforts[0].tickets[] | [.status, .claimed_by, .blocked_by]]')" \
   "$(q "$f" '[.tickets[] | [.status, .claimed_by, (.blocked_by | map(tostring))]]')"
 echo "ok scratch-state.sh gives the same closed set, statuses, claims, and next ticket"
-
-lib_closed="$(
-  REPO_ROOT="$r"
-  # shellcheck source=/dev/null
-  . "$tickets_lib"
-  for file in "$a"/*.md; do
-    read_work_item_state "$file" || true
-    if work_item_is_closed "$WORK_ITEM_STATUS"; then
-      basename "$file" | cut -d- -f1
-    fi
-  done | jq -Rsc 'split("\n")[:-1]'
-)"
-eq "tickets.sh closed set" "$lib_closed" "$(q "$f" '[.tickets[] | select(.derived == "closed") | .number]')"
-lib_facts="$(
-  REPO_ROOT="$r"
-  # shellcheck source=/dev/null
-  . "$tickets_lib"
-  read_work_item_state "$a/05-e.md"
-  printf '%s|%s|' "$WORK_ITEM_STATUS" "$WORK_ITEM_CLAIM"
-  read_work_item_state "$a/01-a.md"
-  printf '%s|' "$WORK_ITEM_STATUS"
-  work_item_is_human_gate build needs-info "" && printf 'info-gate|'
-  work_item_is_human_gate build ready-for-human "" && printf 'human-gate|'
-  work_item_is_human_gate build needs-triage "" && printf 'triage-gate|'
-  work_item_is_human_gate build needs-input "" || printf 'no-input-gate|'
-  work_item_is_closed wontfix && printf 'wontfix-closed|'
-  work_item_is_closed 'closed (abc1234)' && printf 'cited-closed|'
-  work_item_is_closed closing || printf 'closing-open'
-)"
-eq "tickets.sh facts" "$lib_facts" \
-  'in-progress|bo-2|closed|info-gate|human-gate|triage-gate|no-input-gate|wontfix-closed|cited-closed|closing-open'
-echo "ok autopilot tickets.sh agrees: closed set, comment stripping, needs-info gate"
 
 # ---- claim ---------------------------------------------------------------------------------
 cp "$a/03-c.md" "$t/before-claim.md"
@@ -290,14 +257,8 @@ echo "ok the repo's own ready-for-human string is a human gate"
 
 run "$c" set-status "$c/.scratch/pay/tickets/02-b.md" not-planned
 eq "custom legal" "$rc $(q "$out" '[.status, .previous]')" '0 ["not-planned","afk-ready"]'
-custom_closed="$(
-  # shellcheck disable=SC2034
-  REPO_ROOT="$c"
-  # shellcheck source=/dev/null
-  . "$tickets_lib"
-  work_item_is_closed not-planned && printf yes
-)"
-eq "tickets.sh custom wontfix" "$custom_closed" yes
+run "$c" frontier pay
+eq "custom wontfix is closed" "$(q "$out" '.tickets[1].derived')" '"closed"'
 echo "ok the repo's own AFK-ready and wontfix strings are honoured by every reader"
 
 # ---- resolve -------------------------------------------------------------------------------
@@ -393,16 +354,6 @@ cmp -s "$h/03-c.md" "$t/expect.md" || fail "claim and release changed a ready-fo
 printf -- '---\ntitle: "Spec"\nstatus: needs-info\n---\n\n## Problem Statement\n\nx\n' >"$r/.scratch/gate/spec.md"
 run "$r" claim "$r/.scratch/gate/spec.md" --as zed-9
 eq "gate spec" "$rc $(q "$out" '.reason')" '1 "human"'
-gate_lib="$(
-  # shellcheck disable=SC2034
-  REPO_ROOT="$r"
-  # shellcheck source=/dev/null
-  . "$tickets_lib"
-  for status in needs-info ready-for-human ready-for-agent; do
-    if work_item_is_human_gate build "$status" ""; then printf '%s|' "$status"; fi
-  done
-)"
-eq "tickets.sh gates" "$gate_lib" 'needs-info|ready-for-human|'
 echo "ok claim refuses a human-gate ticket or spec with reason human and writes nothing"
 
 # ---- an older ticket's body line **Claimed by:** --------------------------------------------
@@ -432,15 +383,6 @@ run "$r" claim "$l/01-a.md" --as ann-1
 eq "older claim" "$rc $(q "$out" '[.won, .status, .claimed_by]')" '0 [true,"in-progress","ann-1"]'
 printf -- '---\ntitle: "L"\nstatus: in-progress\nclaimed-by: ann-1\n---\n\n# L\n\n**Claimed by:** ann-1\n\nbody line\n' >"$t/expect.md"
 cmp -s "$l/01-a.md" "$t/expect.md" || fail "claim on an older ticket did not write the frontmatter key and the body line"
-older_lib="$(
-  # shellcheck disable=SC2034
-  REPO_ROOT="$r"
-  # shellcheck source=/dev/null
-  . "$tickets_lib"
-  read_work_item_state "$l/01-a.md"
-  printf '%s|%s' "$WORK_ITEM_STATUS" "$WORK_ITEM_CLAIM"
-)"
-eq "older claim: tickets.sh" "$older_lib" 'in-progress|ann-1'
 eq "older claim: scratch-state.sh" "$(claim_of "$l/01-a.md")" ann-1
 run "$r" claim "$l/01-a.md" --as zed-9
 eq "older claim held" "$rc $(q "$out" '[.reason, .claimed_by]')" '1 ["claimed","ann-1"]'
@@ -477,15 +419,6 @@ run "$r" claim "$y/01-a.md" --as 'alice: session'
 eq "quoted id again" "$rc $(q "$out" '.won')" '0 true'
 run "$r" claim "$y/01-a.md" --as zed-9
 eq "quoted id held" "$rc $(q "$out" '[.reason, .claimed_by]')" '1 ["claimed","alice: session"]'
-quoted_lib="$(
-  # shellcheck disable=SC2034
-  REPO_ROOT="$r"
-  # shellcheck source=/dev/null
-  . "$tickets_lib"
-  read_work_item_state "$y/01-a.md"
-  printf '%s' "$WORK_ITEM_CLAIM"
-)"
-eq "quoted id: tickets.sh" "$quoted_lib" 'alice: session'
 eq "quoted id: scratch-state.sh" \
   "$(bash "$state_sh" --root "$r" --no-commits quote | jq -r '.efforts[0].tickets[0].claimed_by')" 'alice: session'
 run "$r" lint quote

@@ -105,10 +105,16 @@ echo "ok a missing environment file fails the child"
 
 # --- The lock check in launch_tmux -----------------------------------------------------
 
+# A spec with one ready ticket, committed, on its integration branch `foo`: the end-to-end
+# case below claims the ticket and starts one build worker in a worktree.
 r="$t/repo"
 mkdir -p "$r/.scratch/foo/tickets"
 git init -q "$r"
-printf -- '---\nstatus: ready-for-agent\n---\n\n# One\n' >"$r/.scratch/foo/tickets/01-a.md"
+printf -- '---\ntitle: "Spec"\nstatus: ready-for-agent\n---\n\n# Spec\n' >"$r/.scratch/foo/spec.md"
+printf -- '---\ntitle: "One"\nstatus: ready-for-agent\nclaimed-by:\nblocked-by: []\n---\n\n# One\n' >"$r/.scratch/foo/tickets/01-a.md"
+git -C "$r" add -- .scratch
+git -C "$r" -c user.name=t -c user.email=t@example.invalid commit -q -m "docs(scratch): foo"
+git -C "$r" checkout -q -b foo
 
 calls="$t/tmux-calls"
 cat >"$t/stub-bin/tmux" <<EOF
@@ -134,7 +140,12 @@ launch() {
     source "$here/lib/process.sh"
     source "$here/lib/tmux.sh"
     REPO_ROOT="$r"
-    ROOT_REF="$r/.scratch/foo"
+    ROOT_REF="$r/.scratch/foo/spec.md"
+    INTEGRATION_DIR="$r"
+    DELIVERY="pr"
+    CONCURRENCY=5
+    CLEANUP="list"
+    FINISH_NOW="false"
     STATE_KEY="test-key"
     STATE_FILE="$r/.git/autopilot/test-key.json"
     LOCK_DIR="$lock_dir"

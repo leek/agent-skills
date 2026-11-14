@@ -52,7 +52,7 @@ Nothing new. Prove the spec shipped whole, before merge and after deploy.
 
 ## Work it
 
-The builder (`implement`, a spec run, `implement-spec`, an autopilot worker) works it after every other ticket is closed or merged, in two passes. `ticket.sh` below is `bash <this-skill-dir>/../setup/scripts/ticket.sh` (`<this-skill-dir>` is the directory of the skill that is running), and its operations are the tracker's.
+The builder (`implement`, a spec run, `implement-spec`, autopilot's finish worker) works it after every other ticket is closed or merged, in two passes. `ticket.sh` below is `bash <this-skill-dir>/../setup/scripts/ticket.sh` (`<this-skill-dir>` is the directory of the skill that is running), and its operations are the tracker's.
 
 **Pass 1: before merge.** Skip the seams and TDD steps; nothing new gets built.
 

@@ -88,8 +88,11 @@ announce() {
   emit_stderr "$message"
 }
 
+# WORKER_ACTIVITY_FILE is set in a worker's stream readers: the run's activity and that
+# worker's own, which its heartbeat reads.
 mark_activity() {
   [[ -z "$ACTIVITY_FILE" ]] || touch "$ACTIVITY_FILE"
+  [[ -z "${WORKER_ACTIVITY_FILE:-}" ]] || touch "$WORKER_ACTIVITY_FILE"
 }
 
 record_activity() {

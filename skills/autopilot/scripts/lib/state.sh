@@ -107,11 +107,14 @@ persist_state() {
     --arg effort "$WORKER_EFFORT" \
     --arg effort_source "$WORKER_EFFORT_SOURCE" \
     --arg runner_pid "$RUNNER_PID_STATE" \
-    --arg worker_pid "$WORKER_PID_STATE" \
     --arg runner_process_started "$RUNNER_PROCESS_STARTED" \
-    --arg worker_process_started "$WORKER_PROCESS_STARTED" \
-    --arg worker_process_group "$WORKER_PROCESS_GROUP" \
-    --arg worker_started_at "$WORKER_STARTED_AT" \
+    --argjson workers "${WORKERS_JSON:-[]}" \
+    --arg integration "$INTEGRATION_DIR" \
+    --arg branch "$BRANCH" \
+    --arg notes "$NOTES_DIR" \
+    --arg delivery "$DELIVERY" \
+    --arg cleanup "$CLEANUP" \
+    --arg concurrency "$CONCURRENCY" \
     --arg finished_at "$FINISHED_AT" \
     --arg iteration "$ITERATION" \
     --arg max_iterations "$MAX_ITERATIONS" \
@@ -128,7 +131,7 @@ persist_state() {
     --arg next_ref "$NEXT_REF_STATE" \
     --arg result_file "$RESULT_FILE_STATE" \
     '{
-      version: 3,
+      version: 4,
       run_id: $run_id,
       root_ref: $root_ref,
       repo_root: $repo_root,
@@ -142,11 +145,14 @@ persist_state() {
       effort: $effort,
       effort_source: $effort_source,
       runner_pid: (if $runner_pid == "" then null else ($runner_pid | tonumber) end),
-      worker_pid: (if $worker_pid == "" then null else ($worker_pid | tonumber) end),
       runner_process_started: (if $runner_process_started == "" then null else $runner_process_started end),
-      worker_process_started: (if $worker_process_started == "" then null else $worker_process_started end),
-      worker_process_group: (if $worker_process_group == "" then null else ($worker_process_group | tonumber) end),
-      worker_started_at: (if $worker_started_at == "" then null else $worker_started_at end),
+      workers: $workers,
+      integration: (if $integration == "" then null else $integration end),
+      branch: (if $branch == "" then null else $branch end),
+      notes: (if $notes == "" then null else $notes end),
+      delivery: $delivery,
+      cleanup: $cleanup,
+      concurrency: ($concurrency | tonumber),
       finished_at: (if $finished_at == "" then null else $finished_at end),
       iteration: ($iteration | tonumber),
       max_iterations: ($max_iterations | tonumber),
@@ -180,10 +186,7 @@ transition_to_terminal() {
   RUN_PHASE="terminal"
   FINISHED_AT="$(timestamp)"
   RUNNER_PID_STATE=""
-  WORKER_PID_STATE=""
-  WORKER_PROCESS_STARTED=""
-  WORKER_PROCESS_GROUP=""
-  WORKER_STARTED_AT=""
+  WORKERS_JSON="[]"
 }
 
 record_terminal_state() {
@@ -211,7 +214,7 @@ record_failure_state() {
 validate_state() {
   local state_file="$1"
   jq -e --arg root "$ROOT_REF" --arg repo "$REPO_ROOT" '
-    (.version == 1 or .version == 2 or .version == 3) and
+    (.version == 1 or .version == 2 or .version == 3 or .version == 4) and
     .root_ref == $root and
     .repo_root == $repo and
     (.run_id | type == "string" and length > 0)

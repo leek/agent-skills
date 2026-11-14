@@ -109,7 +109,12 @@ launch_tmux() {
     --root "$ROOT_REF"
     --repo "$REPO_ROOT"
     --max-iterations "$MAX_ITERATIONS"
+    --integration "$INTEGRATION_DIR"
+    --delivery "$DELIVERY"
+    --concurrency "$CONCURRENCY"
+    --cleanup "$CLEANUP"
   )
+  [[ "$FINISH_NOW" != "true" ]] || command_args+=(--finish-now)
   [[ -z "$REQUESTED_MODEL" ]] || command_args+=(--model "$REQUESTED_MODEL")
   [[ -z "$REQUESTED_EFFORT" ]] || command_args+=(--effort "$REQUESTED_EFFORT")
   [[ -z "$LOG_FILE_OVERRIDE" ]] || command_args+=(--log-file "$LOG_FILE_OVERRIDE")

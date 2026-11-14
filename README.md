@@ -25,7 +25,7 @@ The engineering pipeline is one straight line (**decide → spec → tickets →
 | Skill | Invocation | What it does |
 |---|---|---|
 | `architecture-satisfaction` | user | Run a bounded architectural refactor loop. |
-| `autopilot` | user | Drive an existing wayfinder map, spec, or set of tickets to completion through fresh top-level Claude Code, Codex, or Grok sessions. |
+| `autopilot` | user | Build a whole spec while you are away. Asks every question up front, then a runner drives parallel fresh top-level Claude Code, Codex, or Grok sessions, one per ticket in its own worktree, onto one integration branch, delivered as one PR or a stack of PRs. |
 | `blog-writing` | model | Write, review, or improve a blog post. The repo's own decisions (reader, voice, banned language, post types, closing) live in its `.agents/blog-style.md`, which the first run offers to draft from its published posts and which grows whenever you state a preference; shared craft rules cover the rest. |
 | `brand-guidelines` | model | Write or review user-facing copy: UI text, errors, empty states, onboarding, emails, marketing. The repo's own decisions (voices, where each applies, spelling, punctuation, word choices, product terms) live in its `.agents/brand-guidelines.md`, which the first run offers to draft from the existing copy and which grows whenever you state a preference; shared craft rules cover the rest. |
 | `browser-test` | user | Test a web app from a start URL and a plain-language prompt: a planner splits it into cases, cheap parallel browser workers run them, and one verdict table comes back. Read-only unless you confirm a write. |

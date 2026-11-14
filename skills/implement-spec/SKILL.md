@@ -2,7 +2,7 @@
 name: implement-spec
 description: "Build a whole spec fast: parallel implementer subagents work the ticket frontier, each in its own worktree, merging onto one integration branch; then one review, one verification pass, and one PR or a stack of PRs."
 disable-model-invocation: true
-argument-hint: "A spec path (.scratch/<slug>/spec.md); a spec with no tickets gets them cut first. Optionally, how many implementers at once (default 4)"
+argument-hint: "A spec path (.scratch/<slug>/spec.md); a spec with no tickets gets them cut first. Optionally, how many implementers at once (default 5)"
 ---
 
 # Implement Spec
@@ -11,7 +11,7 @@ Build every ticket of one spec in this session by **orchestrating**, not buildin
 
 The tickets are not a list of steps. They are a **task graph**: `blocked-by` edges mean there is always a **frontier** of tickets ready to grab, and every ticket on it can be built at once.
 
-Reach for the neighbours instead when they fit better: `/implement <spec> all` builds the same tickets one after another in this session, with no subagents (and is the fallback when the harness has none: say so and stop); `autopilot` drives the tickets through fresh top-level sessions while you are away.
+Reach for the neighbours instead when they fit better: `/implement <spec> all` builds the same tickets one after another in this session, with no subagents (and is the fallback when the harness has none: say so and stop); `autopilot` builds the same frontier the same way, on the same kind of integration branch, but with a script as the orchestrator and fresh top-level sessions as the implementers, so the run goes on while you are away.
 
 Talk to subagents in **context pointers**: paths to the spec, the ticket, blocker resolutions, notes, commits. Never paste what a pointer already reaches. Ask them for sparse reports. To **follow up** with a named subagent (an implementer or fixer), use `SendMessage` to its name in Claude Code, or the follow-up move in [harness-tools](../harness-tools/SKILL.md) elsewhere; where neither exists, brief a fresh one with its worktree path, its ticket or findings, and the new input.
 
@@ -65,7 +65,7 @@ When several tickets need the same exploration (an unfamiliar module, a package'
 
 ### 3. Dispatch the frontier
 
-For each frontier ticket, up to the concurrency limit (default 4: each one runs a test suite). A ticket whose `## Files` share a path with a running ticket's waits until that one merges, so the two never conflict; dispatch the next frontier ticket instead.
+For each frontier ticket, up to the concurrency limit (default 5: each one runs a test suite). A ticket whose `## Files` share a path with a running ticket's waits until that one merges, so the two never conflict; dispatch the next frontier ticket instead.
 
 1. **Claim** it in the integration checkout: `ticket.sh claim <path> --as implement-spec-<slug>-<run id> --built <NN,NN>` (the tracker's Claim operation), where `--built` lists the tickets this run has merged: they close only in step 7, and without it their dependents are refused as `blocked`. Only you write `.scratch/`; claims stay uncommitted until step 7.
 2. **Worktree.** `git worktree add -b <slug>--<NN> <main checkout>/.claude/worktrees/<slug>--<NN> <integration tip>` (the main checkout's `.claude/worktrees/`, never one inside the integration worktree), then make it runnable (install dependencies, copy local env config) the way the project's docs say, or as the stack reference says. When you write the setup into the implementer's brief, point at that recipe rather than restating a shorter one: a hand-written list that skips a step (for Laravel, the `herd.yml` `workspaces.copy` files) fails the implementer's first `artisan` call. When the tests need a real database, give it its own (`<app db>_spec_<slug>_<NN>`, never a name the main checkout's env or test config uses) and register it the moment you create it: `bash <this-skill-dir>/../laravel-herd-worktrees/scripts/scratch-db.sh register <pgsql|mysql> <database> <worktree path>` ([Scratch database registry](../laravel-herd-worktrees/SKILL.md#scratch-database-registry)).
@@ -130,6 +130,6 @@ Print the end-of-session block using the frame in [`wayfinder/references/pipelin
 - **A stack of PRs is open** → `/triage-github-pr <every PR, bottom-up>` to land it bottom-up with merge commits
 - **Stopped at a deploy gate** → deploy the PR, then `/implement-spec <spec>` for the dependents
 - **The delivery ticket is at `ready-for-human`** → merge and deploy, then `/implement <delivery ticket>` for its after-deploy steps; list them
-- **Tickets released or left open** → `/implement <ticket>` for each, or `/implement-spec <spec>` again
+- **Tickets released or left open** → `/implement <ticket>` for each, or `/implement-spec <spec>` again (`/autopilot <spec>` to leave it running)
 - **The build exposed a decision nobody made** → `/grill-me` on it, then re-run `/to-spec`
 - **The run went sideways** → `/retro this`

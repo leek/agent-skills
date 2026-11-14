@@ -218,13 +218,13 @@ process_event_stream() {
       [[ -n "$kind" && -n "$message" ]] || continue
       message="$(sanitize_message "$message")"
       if [[ "$kind" == "milestone" ]]; then
-        announce_activity "worker: $message"
+        announce_activity "worker $WORKER_LABEL: $message"
       elif [[ "$kind" == "model" ]]; then
         [[ -z "$MODEL_CAPTURE_FILE" ]] || printf '%s\n' "$message" >"$MODEL_CAPTURE_FILE"
         if [[ "$message" == "$WORKER_MODEL" ]]; then
-          record_activity "worker session model $message"
+          record_activity "worker $WORKER_LABEL session model $message"
         else
-          announce_activity "worker session model $message (reported)"
+          announce_activity "worker $WORKER_LABEL session model $message (reported)"
         fi
       else
         record_activity "$message"
@@ -237,7 +237,7 @@ process_error_stream() {
   local line
   while IFS= read -r line || [[ -n "$line" ]]; do
     [[ -n "$line" ]] || continue
-    announce_activity "$PROVIDER: $line"
+    announce_activity "$PROVIDER $WORKER_LABEL: $line"
   done
 }
 
@@ -256,7 +256,7 @@ run_claude_provider() {
   )
   [[ -z "$REQUESTED_MODEL" ]] || args+=(--model "$REQUESTED_MODEL")
   [[ -z "$REQUESTED_EFFORT" ]] || args+=(--effort "$REQUESTED_EFFORT")
-  (cd "$REPO_ROOT" && "$PROVIDER_BIN" "${args[@]}" >"$event_pipe" 2>"$error_pipe")
+  (cd "${WORKER_CWD:-$REPO_ROOT}" && "$PROVIDER_BIN" "${args[@]}" >"$event_pipe" 2>"$error_pipe")
 }
 
 run_codex_provider() {
@@ -264,7 +264,7 @@ run_codex_provider() {
   local args=(
     exec --ephemeral
     --dangerously-bypass-approvals-and-sandbox
-    --cd "$REPO_ROOT"
+    --cd "${WORKER_CWD:-$REPO_ROOT}"
     --json
     --output-schema "$SCHEMA_PATH"
     --output-last-message "$result_file"
@@ -281,7 +281,7 @@ run_grok_provider() {
     --verbatim
     --always-approve
     --output-format streaming-messages-json
-    --cwd "$REPO_ROOT"
+    --cwd "${WORKER_CWD:-$REPO_ROOT}"
     --no-plan
     --max-turns 200
   )

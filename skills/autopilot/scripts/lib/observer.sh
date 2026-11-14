@@ -39,14 +39,15 @@ print_status() {
   fi
   validate_state "$STATE_FILE" || runner_failure "runner state is invalid: $STATE_FILE"
 
-  local runner_pid worker_pid runner_process_started worker_process_started runner_alive worker_alive
+  local runner_pid runner_process_started runner_alive worker_alive workers_alive=0 worker_rows worker_pid worker_started
+  local current_branch current_delivery current_concurrency
   local tmux_session tmux_alive activity_file last_event_epoch last_event_at current_status current_iteration current_max log_file
   local current_model current_model_source current_reported_model current_effort current_effort_source model_display
   read_state_fields "$STATE_FILE" '[
     ((.runner_pid // "") | tostring),
-    ((.worker_pid // "") | tostring),
+    (.branch // ""),
     (.runner_process_started // ""),
-    (.worker_process_started // ""),
+    (.delivery // ""),
     (.tmux_session // ""),
     (.activity_file // ""),
     (.status // "interrupted"),
@@ -59,9 +60,9 @@ print_status() {
     (.effort_source // "")
   ]'
   runner_pid="${STATE_FIELDS[0]:-}"
-  worker_pid="${STATE_FIELDS[1]:-}"
+  current_branch="${STATE_FIELDS[1]:-}"
   runner_process_started="${STATE_FIELDS[2]:-}"
-  worker_process_started="${STATE_FIELDS[3]:-}"
+  current_delivery="${STATE_FIELDS[3]:-}"
   tmux_session="${STATE_FIELDS[4]:-}"
   activity_file="${STATE_FIELDS[5]:-}"
   current_status="${STATE_FIELDS[6]:-interrupted}"
@@ -74,7 +75,15 @@ print_status() {
   current_effort_source="${STATE_FIELDS[13]:-}"
 
   if pid_is_alive "$runner_pid" "$runner_process_started"; then runner_alive=true; else runner_alive=false; fi
-  if pid_is_alive "$worker_pid" "$worker_process_started"; then worker_alive=true; else worker_alive=false; fi
+  worker_rows="$(jq -r '(.workers // [])[] | [(.pid | tostring), (.process_started // "")] | @tsv' "$STATE_FILE")"
+  while IFS=$'\t' read -r worker_pid worker_started; do
+    [[ -n "$worker_pid" ]] || continue
+    if pid_is_alive "$worker_pid" "$worker_started"; then
+      workers_alive=$((workers_alive + 1))
+    fi
+  done <<<"$worker_rows"
+  if [[ "$workers_alive" -gt 0 ]]; then worker_alive=true; else worker_alive=false; fi
+  current_concurrency="$(jq -r '(.concurrency // "") | tostring' "$STATE_FILE")"
   tmux_alive=false
   if [[ -n "$tmux_session" ]] && command -v tmux >/dev/null 2>&1 && tmux has-session -t "$tmux_session" 2>/dev/null; then
     tmux_alive=true
@@ -83,10 +92,13 @@ print_status() {
   last_event_at="$(iso_from_epoch "$last_event_epoch")"
   log_file="$(state_log_file "$STATE_FILE")"
 
-  printf 'Autopilot: status %s (iteration %s/%s); runner %s; worker %s\n' \
+  printf 'Autopilot: status %s (worker session %s/%s); runner %s; workers alive %s\n' \
     "$current_status" "$current_iteration" "$current_max" \
     "$([[ "$runner_alive" == true ]] && printf alive || printf stopped)" \
-    "$([[ "$worker_alive" == true ]] && printf alive || printf stopped)" >&2
+    "$workers_alive" >&2
+  if [[ -n "$current_branch" ]]; then
+    emit_stderr "integration branch $current_branch; delivery ${current_delivery:-unknown}; up to ${current_concurrency:-?} workers at once"
+  fi
   if [[ -n "$current_model" || -n "$current_reported_model" || -n "$current_effort" ]]; then
     if [[ -n "$current_reported_model" ]]; then
       model_display="$current_reported_model (reported)"
@@ -100,11 +112,13 @@ print_status() {
   jq -c \
     --argjson runner_alive "$runner_alive" \
     --argjson worker_alive "$worker_alive" \
+    --argjson workers_alive "$workers_alive" \
     --argjson tmux_alive "$tmux_alive" \
     --arg last_event_at "$last_event_at" \
     '. + {
       runner_alive: $runner_alive,
       worker_alive: $worker_alive,
+      workers_alive: $workers_alive,
       tmux_alive: $tmux_alive,
       last_event_at: (if $last_event_at == "" then null else $last_event_at end)
     }' "$STATE_FILE"

@@ -1,9 +1,10 @@
 #!/bin/bash
 # Offline test for the root canonicalisation in autopilot.sh (lib/state.sh): every spelling
-# of one tracker root must give one ROOT_REF, one STATE_KEY, and one LOCK_DIR. Runs
-# autopilot.sh in a throwaway repository under mktemp -d with a stub provider binary
-# (AUTOPILOT_CLAUDE_BIN) that records any call; the fixture trackers hold no tickets, so
-# every run stops at "blocked" before a worker starts. No tmux, no network.
+# of one spec (its file, its directory, a symlink to either) must give one ROOT_REF, one
+# STATE_KEY, and one LOCK_DIR, and a second spec must give another. Runs autopilot.sh in a
+# throwaway repository under mktemp -d with a stub provider binary (AUTOPILOT_CLAUDE_BIN)
+# that records any call; the fixture specs hold no tickets, so every run stops at "blocked"
+# before a worker starts. No tmux, no network.
 # Prints one `ok <case>` line per case; exits non-zero on the first failed assertion.
 # shellcheck disable=SC2034 # globals the sourced libraries read
 set -e
@@ -31,9 +32,12 @@ printf '#!/bin/bash\necho called >>"%s/provider-called"\nexit 1\n' "$t" >"$t/bin
 chmod +x "$t/bin/claude-stub"
 
 r="$t/repo"
-mkdir -p "$r/.scratch/foo/tickets" "$r/sub/deep"
+mkdir -p "$r/.scratch/foo/tickets" "$r/.scratch/bar/tickets" "$r/sub/deep"
 git init -q "$r"
+# The integration checkout is never the default branch.
+git -C "$r" checkout -q -b foo
 printf -- '---\nstatus: ready-for-agent\n---\n\n# Spec\n' >"$r/.scratch/foo/spec.md"
+printf -- '---\nstatus: ready-for-agent\n---\n\n# Spec\n' >"$r/.scratch/bar/spec.md"
 ln -s "$r/.scratch/foo" "$t/abs-dir-link"
 ln -s .scratch/foo "$r/dir-link"
 ln -s .scratch/foo/spec.md "$r/spec-link.md"
@@ -65,23 +69,30 @@ root_ref() {
   printf '%s' "$out" | jq -r '.root_ref // .root'
 }
 
-dir_root="$r/.scratch/foo"
+# A spec's directory names its spec: both spellings are the root .scratch/foo/spec.md.
+dir_root="$r/.scratch/foo/spec.md"
 file_root="$r/.scratch/foo/spec.md"
 
 status=0
 out="$(ap "$r" --provider claude --root .scratch/foo)" || status=$?
 eq "directory run exit" "$status" 3
 eq "directory run status" "$(printf '%s' "$out" | jq -r '.status')" "blocked"
+case "$(printf '%s' "$out" | jq -r '.reason')" in
+  "the spec has no tickets"*) ;;
+  *) fail "no-tickets reason: $out" ;;
+esac
 dir_run="$(run_id "$r" --root .scratch/foo)"
 [ "$dir_run" != "none" ] || fail "the directory run left no state"
+file_run="$(run_id "$r" --root .scratch/foo/spec.md)"
+eq "the spec file and its directory are one run" "$file_run" "$dir_run"
 
 status=0
-out="$(ap "$r" --provider claude --root .scratch/foo/spec.md)" || status=$?
-eq "file run exit" "$status" 3
-file_run="$(run_id "$r" --root .scratch/foo/spec.md)"
-[ "$file_run" != "none" ] || fail "the file run left no state"
-[ "$file_run" != "$dir_run" ] || fail "the spec file and its directory share one run"
-echo "ok a directory root and a file root are separate trackers"
+out="$(ap "$r" --provider claude --root .scratch/bar/spec.md)" || status=$?
+eq "second spec exit" "$status" 3
+other_run="$(run_id "$r" --root .scratch/bar)"
+[ "$other_run" != "none" ] || fail "the second spec's run left no state"
+[ "$other_run" != "$dir_run" ] || fail "two specs share one run"
+echo "ok a spec's file and directory are one tracker, and a second spec is another"
 
 # check <case> <want run> <want root> <cwd> <arguments>
 check() {
@@ -140,19 +151,14 @@ refused "lock, plain" "$r" --provider claude --root .scratch/foo
 refused "lock, trailing slash" "$r" --provider claude --root ./.scratch/foo/
 refused "lock, subdirectory" "$r/sub" --provider claude --root .scratch/foo
 refused "lock, symlinked directory" "$r" --provider claude --root "$t/abs-dir-link"
+refused "lock, symlink to the file" "$r" --provider claude --root spec-link.md
+refused "lock, file from a subdirectory" "$r/sub" --provider claude --root ../.scratch/foo/spec.md
 rm -f "$lock_dir/pid"
 rmdir "$lock_dir"
 
-file_state="$(grep -l "\"run_id\":\"$file_run\"" "$r"/.git/autopilot/*.json)"
-file_lock="${file_state%.json}.lock"
-[ "$file_lock" != "$lock_dir" ] || fail "the file root and the directory root share one lock"
-mkdir "$file_lock"
-printf '%s\n' "$$" >"$file_lock/pid"
-refused "lock, symlink to the file" "$r" --provider claude --root spec-link.md
-refused "lock, file from a subdirectory" "$r/sub" --provider claude --root ../.scratch/foo/spec.md
-rm -f "$file_lock/pid"
-rmdir "$file_lock"
-echo "ok every spelling meets the same lock"
+other_state="$(grep -l "\"run_id\":\"$other_run\"" "$r"/.git/autopilot/*.json)"
+[ "${other_state%.json}.lock" != "$lock_dir" ] || fail "two specs share one lock"
+echo "ok every spelling meets the same lock, and a second spec has its own"
 
 # The key itself, from the functions autopilot.sh calls.
 keys="$(
@@ -166,22 +172,22 @@ keys="$(
     resolve_state_paths
     printf '%s %s\n' "$STATE_KEY" "$LOCK_DIR"
   }
-  key_for "$r" .scratch/foo
-  key_for "$r" ./.scratch/foo/
-  key_for "$r/sub" ../.scratch/foo
-  key_for "$r/sub/deep" .scratch/foo
-  key_for "$r" dir-link
-  key_for "$r" "$t/abs-dir-link/"
+  key_for "$r" .scratch/foo/spec.md
+  key_for "$r" ./.scratch/foo//spec.md
+  key_for "$r/sub" ../.scratch/foo/spec.md
+  key_for "$r/sub/deep" .scratch/foo/spec.md
+  key_for "$r" dir-link/spec.md
+  key_for "$r" "$t/spec-chain-link.md"
 )"
 eq "distinct STATE_KEY and LOCK_DIR pairs" "$(printf '%s\n' "$keys" | sort -u | wc -l | tr -d ' ')" 1
 eq "LOCK_DIR" "$(printf '%s\n' "$keys" | sed -n '1p' | cut -d' ' -f2)" "$lock_dir"
 echo "ok one STATE_KEY and one LOCK_DIR per tracker"
 
-# A root that does not exist still has one spelling, and reports as missing.
-missing="$r/.scratch/gone"
+# A spec that does not exist still has one spelling, and reports as missing.
+missing="$r/.scratch/gone/spec.md"
 eq "missing root" "$(root_ref "$r" --root .scratch/gone)" "$missing"
 eq "missing root, ./ and slash" "$(root_ref "$r" --root ./.scratch/gone/)" "$missing"
-eq "missing root, absolute" "$(root_ref "$t" --repo "$r" --root "$missing")" "$missing"
+eq "missing root, absolute" "$(root_ref "$t" --repo "$r" --root "$r/.scratch/gone")" "$missing"
 status=0
 out="$(ap "$r" --provider claude --root .scratch/gone)" || status=$?
 eq "missing root exit" "$status" 3

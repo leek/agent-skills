@@ -26,8 +26,8 @@
 # Stderr: status/error messages. Read-only.
 #
 # This file holds the tracker's one frontmatter reader. skills/setup/scripts/ticket.sh calls
-# it for every read, hooks/mods/scratch-scan.ts ports it, and autopilot's lib/tickets.sh uses
-# the same closed vocabulary and comment rule: change them together.
+# it for every read (autopilot's runner reads the tracker through ticket.sh too), and
+# hooks/mods/scratch-scan.ts ports it: change them together.
 set -e
 
 usage="usage: scratch-state.sh [--days N] [--root DIR] [--no-commits] [slug]"
