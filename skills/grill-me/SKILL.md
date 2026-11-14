@@ -17,6 +17,7 @@ Print the end-of-session block using the frame in [`wayfinder/references/pipelin
 ---
 Pipeline: **decide** → spec → tickets → build   (1 of 4)
 Done: <n of m decisions settled; what's still open>
+Open: <each open or deferred branch and unresolved risk (the grill's decision record)>
 Next:
   • <condition> → /<skill> <ref>
 ```

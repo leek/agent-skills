@@ -23,6 +23,8 @@ Understand the current state of the codebase if you haven't already. Use the pro
 
 **Invoked with a `wayfinder` map, read the map and every closed decision ticket's `## Resolution` first**: those resolutions are the authoritative decisions the spec must encode. Don't synthesize from conversation memory alone; a fresh session may not hold what earlier ticket sessions decided.
 
+**When the effort's `decisions/` holds an open `type: grilling` record** (`grilling`'s [Record the ledger](../grilling/SKILL.md#record-the-ledger)), read it first: its settled lines and defaults are decisions the spec encodes, and its open, deferred, and risk lines go to step 3's Needs decision list. After step 3 publishes, resolve it (`bash <this-skill-dir>/../setup/scripts/ticket.sh resolve <path> --body-file <file>`, the Resolution naming the spec), since the spec now holds everything it listed.
+
 Check the **constraints** the spec must honour before drafting, since each one found at build time costs a re-grill:
 
 - **Data handling**: which vendors may process this data (a PHI or residency rule can fix the AI or email provider).
@@ -113,7 +115,7 @@ Anything else future readers need.
 
 ## When you're done
 
-Print the end-of-session block using the frame in [`wayfinder/references/pipeline-end-block.md`](../wayfinder/references/pipeline-end-block.md). Its `Pipeline:` and `Done:` lines here are `Pipeline: decide → **spec** → tickets → build   (2 of 4)` and `Done: <what exists now, with its reference; whether a map was closed>`.
+Print the end-of-session block using the frame in [`wayfinder/references/pipeline-end-block.md`](../wayfinder/references/pipeline-end-block.md). Its `Pipeline:` and `Done:` lines here are `Pipeline: decide → **spec** → tickets → build   (2 of 4)` and `Done: <what exists now, with its reference; whether a map was closed>`. Its **Open** line names each of the spec's Open questions, at the spec's path.
 
 Stage-specific **Next** conditions (only those that apply, most likely first):
 

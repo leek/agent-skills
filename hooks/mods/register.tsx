@@ -12,8 +12,9 @@
 // Ticket board: implement-spec, implement <spec> all, and wayfinder <map> all report each
 // ticket's status through the ticket_board tool this module registers, and a pane shows
 // the run, joined to each ticket's running worker; once the tickets are built, it shows the
-// review stage and each finding's fix the same way. The tool's reply says whether a pane
-// drew it; where none did, the skill posts its progress lines in chat as before.
+// review stage and each finding's fix the same way, then the work still open after the run.
+// The tool's reply says whether a pane drew it; where none did, the skill posts its progress
+// lines in chat as before.
 
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
@@ -26,11 +27,15 @@ import {
   findingColor,
   findingMark,
   findingTally,
+  header as boardHeader,
+  isUntracked,
+  openColor,
+  openLabel,
+  openMark,
   parseUpdate,
   ticketColor,
   ticketMark,
   title,
-  tally as boardTally,
   summary as boardSummary,
 } from './ticket-board'
 import { KEEP, describeTool, duration, isFailed, mark, ordered } from './workers-model'
@@ -137,7 +142,7 @@ export const register: Register = on => {
     await $.tool.register({
       name: 'ticket_board',
       description:
-        'For implement-spec, implement <spec> all, and wayfinder <map> all: report ticket status changes, then the review stage and finding status changes, so a pane beside the chat shows the run. The reply says whether a pane drew it.',
+        'For implement-spec, implement <spec> all, and wayfinder <map> all: report ticket status changes, then the review stage and finding status changes, then the work still open after the run, so a pane beside the chat shows the run. The reply says whether a pane drew it.',
       inputSchema: SCHEMA,
     })
 
@@ -375,7 +380,7 @@ export const register: Register = on => {
     return (
       <Box flexDirection="column" width={e.props.bodyColumns}>
         <Text bold wrap="truncate-end">
-          {run.slug} <Text dimColor>{boardTally(run)}</Text>
+          {run.slug} <Text dimColor>{boardHeader(run)}</Text>
         </Text>
         {run.tickets.map(t => {
           const w = worker(t)
@@ -418,6 +423,25 @@ export const register: Register = on => {
             ◐ review fixes <Text dimColor>· {fixer.tools} tools · {duration(now - fixer.startedAt)}{fixer.lastTool === '' ? '' : ` · ${fixer.lastTool}`}</Text>
           </Text>
         )}
+        {run.open.length > 0 && (
+          <Box marginTop={1}>
+            <Text bold>Open after this run</Text>
+          </Box>
+        )}
+        {run.open.map(o => (
+          <Text key={o.id} wrap="truncate-end" dimColor={o.done}>
+            <Text color={openColor(o)}>{openMark(o)} </Text>
+            {o.title}
+            <Text dimColor>
+              {'  '}
+              {o.done ? 'done' : openLabel(o.kind)}
+              {' · '}
+            </Text>
+            <Text color={!o.done && isUntracked(o) ? 'error' : undefined} dimColor={o.done || !isUntracked(o)}>
+              {o.where}
+            </Text>
+          </Text>
+        ))}
       </Box>
     )
   })
@@ -429,6 +453,8 @@ function boardText(run: TicketBoard): string {
   const lines = run.tickets.map(t => `${ticketMark(t.status)} ${t.number} ${t.title}: ${t.status}${note(t.note)}`)
   if (run.stage !== '') lines.push('', `${run.stage}${run.findings.length > 0 ? `: ${findingTally(run)}` : ''}`)
   lines.push(...run.findings.map(f => `${findingMark(f.status)} ${f.title}: ${f.status}${note(f.note)}`))
+  if (run.open.length > 0) lines.push('', 'Open after this run')
+  lines.push(...run.open.map(o => `${openMark(o)} ${o.title}: ${o.done ? 'done' : openLabel(o.kind)} (${o.where})`))
 
   return lines.join('\n')
 }

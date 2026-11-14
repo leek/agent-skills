@@ -24,7 +24,7 @@ Talk to subagents in **context pointers**: paths to the spec, the ticket, blocke
 
 - Laravel (`laravel/framework` in `composer.json`): [`references/laravel.md`](references/laravel.md)
 
-**Ticket board.** Report each ticket's status per [`ticket-board.md`](../wayfinder/references/ticket-board.md), with `kind: "spec"`: `ready` and `blocked` (note: the blockers) from step 1, `skipped` for tickets left out, `running` at dispatch, `fixing` when a failure goes back to its implementer, `merged` (note: the merge SHA), `released` (note: why), and `closed` in step 7, or `awaiting-deploy` (note: the after-deploy steps, in a few words) for a delivery ticket left at `ready-for-human`. From step 5 on, also send the `stage` at each change (`review and verify round 1`, `fix pass 1`, `review and verify round 2`, `fix pass 2`, `fix pass 3` when step 5's extra round runs, `final checks`, `deliver`) and each finding's status, so the pane never goes quiet after the last merge.
+**Ticket board.** Report each ticket's status per [`ticket-board.md`](../wayfinder/references/ticket-board.md), with `kind: "spec"`: `ready` and `blocked` (note: the blockers) from step 1, `not-built` (note: why) or `skipped` for tickets left out, as that file tells them apart, `running` at dispatch, `fixing` when a failure goes back to its implementer, `merged` (note: the merge SHA), `released` (note: why), and `closed` in step 7, or `awaiting-deploy` (note: the after-deploy steps, in a few words) for a delivery ticket left at `ready-for-human`. From step 5 on, also send the `stage` at each change (`review and verify round 1`, `fix pass 1`, `review and verify round 2`, `fix pass 2`, `fix pass 3` when step 5's extra round runs, `final checks`, `deliver`) and each finding's status, so the pane never goes quiet after the last merge. Step 7 sends the `open` list.
 
 ## Process
 
@@ -34,7 +34,7 @@ Read the spec: its **Build Contract** section first, then what the tickets name.
 
 **No `tickets/` yet?** Cut them yourself with `to-tickets`' rules: its step 3 for the slicing, its step 4 for the open decisions, its step 5 and [Ticket template](../to-tickets/SKILL.md#ticket-template) to publish and commit. Vertical slices with honest `blocked-by` edges are what make the frontier wide; a chain of tickets each blocked by the last builds no faster than `/implement all`.
 
-Open the ticket board now, before anything else in this step: load `mcp__leek-skills__ticket_board` with ToolSearch if it is deferred, and send every in-scope ticket with its `title` as `ready` or `blocked`, and the left-out ones as `skipped`.
+Open the ticket board now, before anything else in this step: load `mcp__leek-skills__ticket_board` with ToolSearch if it is deferred, and send every in-scope ticket with its `title` as `ready` or `blocked`, and each left-out one as `skipped` (closed) or `not-built` (open; note: why).
 
 Leave out closed tickets and tickets claimed by someone else (name them in the report). Never dispatch the delivery ticket (`delivery: true`) to an implementer: you work it in steps 6–7. A `deploy-gate: true` ticket bounds the run: build up to and including it, then stop at step 7 with a PR.
 
@@ -91,6 +91,8 @@ After each merge, update the ticket board, and post one progress line so the use
 
 **A question never stops the run.** A decision the sweep missed (one that only shows once code exists) is built on its recommended answer when that answer is reversible: the implementer or fixer records it as an assumption in its report, and you ask it at the next merge, so a different answer becomes a follow-up fix, not a wait. When the choice is not reversible (a schema shape a later ticket builds on, a data migration), release that ticket and its dependents, keep building the rest of the frontier, and ask the open questions together at the next merge, or in the final report when nothing else is running. Stop and wait only when every remaining ticket is blocked on an answer.
 
+**Record work outside the spec at once.** When the user decides or asks for something during the run that this spec does not cover (a side grill, a new instrument, a new feature), write it to the tracker in the same turn: a decision record per `grilling`'s [Record the ledger](../grilling/SKILL.md#record-the-ledger), or a ticket. Then send it on the board's `open` list with that path as its `where`, and name it on the end block's **Open** line. Chat holds no copy that the next session can find.
+
 Finish when every in-scope ticket but the delivery ticket is merged or released, and no implementer is running.
 
 ### 5. Review and verify once, over the whole branch
@@ -105,7 +107,7 @@ Run `implement`'s step 6 once over the whole range. Skip the full-suite question
 
 ### 7. Close and deliver
 
-For each verified ticket: write its Resolution (what was built, deviations, verification evidence, its implementation commits, seams for successors, from `$notes/<NN>.md`) to a file and run `ticket.sh resolve <path> --body-file <file>`, which appends it, sets `status: closed`, and clears the claim. The delivery ticket closes, or goes to `ready-for-human` with its after-deploy steps copied into the PR body, per its file. Commit the tracker separately (`docs(scratch): <slug> resolutions`), never folded into code. Then follow [PR delivery: after step 8](../implement/references/spec-run.md#pr-delivery-after-step-8) for the chosen shape: push, open the PR (or, for a stack, whose ticket PRs opened as each ticket merged and whose integration PR opened in step 2, open the closing PR and fill in the integration PR's body per its [Stacked PRs](../implement/references/spec-run.md#stacked-prs) step 4), and read review threads once, except on a stack.
+For each verified ticket: write its Resolution (what was built, deviations, verification evidence, its implementation commits, seams for successors, from `$notes/<NN>.md`) to a file and run `ticket.sh resolve <path> --body-file <file>`, which appends it, sets `status: closed`, and clears the claim. The delivery ticket closes, or goes to `ready-for-human` with its after-deploy steps copied into the PR body, per its file. Commit the tracker separately (`docs(scratch): <slug> resolutions`), never folded into code. Then follow [PR delivery: after step 8](../implement/references/spec-run.md#pr-delivery-after-step-8) for the chosen shape: push, open the PR (or, for a stack, whose ticket PRs opened as each ticket merged and whose integration PR opened in step 2, open the closing PR and fill in the integration PR's body per its [Stacked PRs](../implement/references/spec-run.md#stacked-prs) step 4), and read review threads once, except on a stack. A fix that is built but not committed or pushed follows that section's **Not yet in this pull request** rule: the delivery is not complete while one exists. Last, send the board's full `open` list per [`ticket-board.md`](../wayfinder/references/ticket-board.md)'s **Open after this run**.
 
 ### 8. Clean up
 
@@ -117,7 +119,7 @@ When the user stops the run, follow [Stopping mid-run](references/resume-and-gat
 
 ## When you're done
 
-Print the end-of-session block using the frame in [`wayfinder/references/pipeline-end-block.md`](../wayfinder/references/pipeline-end-block.md). Its `Pipeline:` and `Done:` lines here are `Pipeline: decide → spec → tickets → **build**   (4 of 4)` and `Done: <tickets closed of total, integration branch, PR, verification state>`. Its **Next** conditions:
+Print the end-of-session block using the frame in [`wayfinder/references/pipeline-end-block.md`](../wayfinder/references/pipeline-end-block.md). Its `Pipeline:` and `Done:` lines here are `Pipeline: decide → spec → tickets → **build**   (4 of 4)` and `Done: <tickets closed of total, integration branch, PR, verification state>`. Its **Open** line carries every entry of step 7's `open` list that is not done. Its **Next** conditions:
 
 - **A PR is open and review bots are still running** → `/resolve-review-comments <PR>` once they post
 - **A stack of PRs is open** → `/triage-github-pr <every PR, bottom-up>` to land it bottom-up with merge commits

@@ -64,6 +64,7 @@ Print the end-of-session block using the frame in [`wayfinder/references/pipelin
 ---
 Pipeline: **decide** → spec → tickets → build   (a questionnaire unblocks a decision)
 Done: <file path (and online link); who it's for; what it needs back>
+Open: <the branch that waits on the answers (the questionnaire's path)>
 Next:
   • <condition> → /<skill> <ref>
 ```

@@ -18,7 +18,7 @@ Every map, spec, and ticket for this repo lives as a markdown file in `.scratch/
 
 The pipeline runs straight through it: `/wayfinder` writes `map.md` and `decisions/`, `/to-spec` writes `spec.md` once and closes the map, `/to-tickets` writes `tickets/`, `/implement` works one file in `tickets/` per session.
 
-- Small, already-clear work skips `map.md` and starts at `spec.md`; its `decisions/` holds only `to-tickets`' Build decisions ticket
+- Small, already-clear work skips `map.md` and starts at `spec.md`; its `decisions/` holds only a grill's decision record and `to-tickets`' Build decisions ticket
 - `decisions/` holds questions; `tickets/` holds build work. Nothing in `decisions/` is ever built, and nothing in `tickets/` is ever a question
 - There is no `issues/` folder
 - Build tickets are one file each, numbered from `01`; where a dependency is known give the blocker the lower number. Numbers only tie-break the frontier: `blocked-by` is what actually gates work

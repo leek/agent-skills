@@ -120,4 +120,15 @@ Settle each off the ladder or ask.
 
 Before ending, settle or explicitly abandon every `deferred` branch; no fact lookup may still be running, and no task ID belongs in any summary or hand-off text (a task handle dies with the session).
 
-End with a compact summary of settled decisions, the **Defaults applied** block, and unresolved risks. When invoked directly (not from another skill), also print the routing block from `grill-me`: only the outermost skill prints one.
+## Record the ledger
+
+A grill's decisions must outlive the conversation. Before the closing summary, write the ledger to the tracker as one open decision record, whether or not the user confirmed the plan:
+
+- **Where**: `.scratch/<slug>/decisions/<NN>-<short-name>.md`, in the effort's directory, numbered after the decisions already there. With no effort directory yet, pick a short slug and create `.scratch/<slug>/decisions/`.
+- **Format**: the tracker's decision ticket (`.agents/issue-tracker.md`, else the `setup` skill's [`issue-tracker.md`](../setup/issue-tracker.md)): frontmatter `title` in double quotes, `type: grilling`, `status: open`, empty `claimed-by`, `blocked-by: []`. The body holds `## Question` (what the grill was about), then `## Settled`, `## Defaults applied`, `## Open`, `## Deferred`, and `## Unresolved risks`, one line per item; leave out an empty section.
+- **Not confirmed**: when the user has not confirmed shared understanding, the first body line says `Not yet confirmed by the user.`
+- **No tracker**: where the repo has no `.scratch/` tracker, or `git check-ignore -q .scratch/` holds, say so, and print the full ledger in the summary.
+
+A grill that `wayfinder` runs writes no record of its own: the map, its tickets, and each ticket's Resolve operation hold it.
+
+End with a compact summary of settled decisions, the **Defaults applied** block, unresolved risks, and the record's path. When invoked directly (not from another skill), also print the routing block from `grill-me`: only the outermost skill prints one.

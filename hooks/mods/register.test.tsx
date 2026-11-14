@@ -208,3 +208,52 @@ test('ticket_board shows the review stage and each finding once the tickets are 
   expect(await pane.find({ type: 'Text', text: /✓ Old workers' runs vanish from the audit list {2}fixed · a1b2c3/ })).toBeDefined()
   expect(await pane.find({ type: 'Text', text: /◐ Notes page checks readiness once per row {2}fixing/ })).toBeDefined()
 })
+
+test('ticket_board counts not-built tickets as open and lists the work open after the run', async ($, on) => {
+  mock.clock(on, { now: 0 })
+  on('ui.render', async ($, e) => engineDraw($, e))
+  on('tool.call', async () => ({ result: 'ok' }) as never)
+  on('ui.open', async () => ({ value: { isPlaced: true } }) as never)
+
+  const board = { tool: 'mcp__leek-skills__ticket_board', board: 'auth', kind: 'spec' }
+  const pane = await $.ui.mount({
+    plugin: 'leek-skills',
+    surface: 'terminal',
+    component: 'Pane',
+    requestId: 'tickets',
+    props: { title: 'Spec: auth', isFocused: false, bodyColumns: 120, placement: 'dock' },
+  } as never)
+
+  await $.tool.call({
+    ...board,
+    tickets: [
+      { number: '01', title: 'Login form', status: 'closed' },
+      { number: '02', title: 'Logout', status: 'not-built', note: 'held for a person' },
+      { number: '03', title: 'Old flow', status: 'skipped', note: 'closed in an earlier run' },
+    ],
+    tool_use_id: 's1',
+  } as never)
+  expect(await pane.find({ type: 'Text', text: /1 of 2 done · 1 not built/ })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: /□ 02 Logout {2}not-built · held for a person/ })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: /– 03 Old flow {2}skipped/ })).toBeDefined()
+  // No open list yet: the section stays out.
+  expect(await pane.find({ type: 'Text', text: /Open after this run/ })).toBeUndefined()
+
+  const listed = await $.tool.call({
+    ...board,
+    open: [
+      { id: 'a', title: 'Fix for the audit list is not pushed', kind: 'not-shipped', where: '#101' },
+      { id: 'b', title: 'Second sign-in method', kind: 'your-decision', where: 'untracked' },
+    ],
+    tool_use_id: 's2',
+  } as never)
+  expect(String((listed as { result: unknown }).result)).toContain('2 open after this run (1 untracked)')
+  expect(await pane.find({ type: 'Text', text: /1 of 2 done · 1 not built · 2 open after this run \(1 untracked\)/ })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: /^Open after this run$/ })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: /○ Fix for the audit list is not pushed {2}not shipped · #101/ })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: /! Second sign-in method {2}your decision · untracked/ })).toBeDefined()
+
+  await $.tool.call({ ...board, open: [{ id: 'a', kind: 'not-shipped', done: true }], tool_use_id: 's3' } as never)
+  expect(await pane.find({ type: 'Text', text: /✓ Fix for the audit list is not pushed {2}done · #101/ })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: /1 open after this run \(1 untracked\)/ })).toBeDefined()
+})

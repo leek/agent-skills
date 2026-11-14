@@ -75,6 +75,7 @@ Print the end-of-session block using the frame in [`references/pipeline-end-bloc
 ---
 Pipeline: **decide** → spec → tickets → build   (1 of 4, multi-session map)
 Done: <map name; tickets open, resolved, and still in the fog>
+Open: <the open tickets, by name; what is still in the fog (the map)>
 Next:
   • <condition> → /<skill> <map or ticket name>
 ```

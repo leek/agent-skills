@@ -116,7 +116,7 @@ Work the **frontier** (any ticket whose blockers are all done) with `implement`,
 
 ## When you're done
 
-Print the end-of-session block using the frame in [`wayfinder/references/pipeline-end-block.md`](../wayfinder/references/pipeline-end-block.md). Its `Pipeline:` and `Done:` lines here are `Pipeline: decide → spec → **tickets** → build   (3 of 4)` and `Done: <how many tickets, how many on the frontier, with refs>`, counted by `ticket.sh frontier <slug>`.
+Print the end-of-session block using the frame in [`wayfinder/references/pipeline-end-block.md`](../wayfinder/references/pipeline-end-block.md). Its `Pipeline:` and `Done:` lines here are `Pipeline: decide → spec → **tickets** → build   (3 of 4)` and `Done: <how many tickets, how many on the frontier, with refs>`, counted by `ticket.sh frontier <slug>`. Its **Open** line is one entry for the tickets to build (their count and directory), plus any decision step 4 left unanswered.
 
 Stage-specific **Next** conditions (only those that apply, most likely first):
 

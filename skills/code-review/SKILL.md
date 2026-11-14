@@ -107,6 +107,7 @@ Invoked from `implement`, hand the findings back to its loop; it decides what's 
 ---
 Pipeline: decide → spec → tickets → **build**   (review runs inside build)
 Done: <n Correctness, m Standards, k Spec findings; the worst per axis>
+Open: <the findings not fixed, as one entry (their ticket or pull request)>
 Next:
   • <condition> → /<skill> <ref>
 ```

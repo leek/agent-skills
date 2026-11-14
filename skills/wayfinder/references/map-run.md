@@ -4,7 +4,7 @@ A **map run** (`/wayfinder <map> all`) works every ticket of one map in this ses
 
 The tracker is the run's memory. A closed ticket's `## Resolution` holds everything later tickets need, so nothing about it has to stay in context: fetch it again when a later ticket depends on it, the same as a fresh session would.
 
-**Ticket board.** Report each ticket's status per [`ticket-board.md`](ticket-board.md), with `kind: "map"`: `ready` and `blocked` (note: the blockers) at the start, from the Frontier call's `derived` and `open_blockers`, `skipped` for tickets claimed by someone else, `running` at its claim (a research sub-agent takes the name `<slug>--<NN>`), `resolved` (note: the decision, in a few words), `closed` when ruled out of scope or superseded (note: why), and `released` (note: why). A ticket an answer creates joins the board as `ready` or `blocked`.
+**Ticket board.** Report each ticket's status per [`ticket-board.md`](ticket-board.md), with `kind: "map"`: `ready` and `blocked` (note: the blockers) at the start, from the Frontier call's `derived` and `open_blockers`, `not-built` (note: who holds it) for tickets claimed by someone else, `running` at its claim (a research sub-agent takes the name `<slug>--<NN>`), `resolved` (note: the decision, in a few words), `closed` when ruled out of scope or superseded (note: why), and `released` (note: why). A ticket an answer creates joins the board as `ready` or `blocked`.
 
 ## Loop
 

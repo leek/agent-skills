@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { apply, parseUpdate, summary, tally } from './ticket-board'
+import { apply, header, isUntracked, openMark, parseUpdate, summary, tally, ticketColor, ticketMark } from './ticket-board'
 
 describe('apply', () => {
   test('first update lists the tickets; later ones change status by number and keep titles', async () => {
@@ -76,12 +76,76 @@ describe('apply', () => {
     const grown = apply(map, { board: 'billing', kind: 'map', tickets: [{ number: '03', title: 'Refund window', status: 'ready' }] }, 2)
     expect(tally(grown)).toBe('1 of 2 done · 1 ready')
   })
+
+  test('not-built and released tickets stay in the total; only skipped ones leave it', async () => {
+    const board = apply(null, {
+      board: 'auth',
+      kind: 'spec',
+      tickets: [
+        { number: '01', title: 'Login', status: 'closed' },
+        { number: '02', title: 'Logout', status: 'not-built', note: 'held for a person' },
+        { number: '03', title: 'Reset', status: 'not-built', note: 'claimed by ann' },
+        { number: '04', title: 'SSO', status: 'released', note: 'schema question' },
+        { number: '05', title: 'Old flow', status: 'skipped', note: 'closed in an earlier run' },
+      ],
+    }, 1)
+    expect(tally(board)).toBe('1 of 4 done · 2 not built · 1 released')
+    expect(ticketMark('not-built')).not.toBe(ticketMark('skipped'))
+    expect(ticketMark('not-built')).not.toBe(ticketMark('closed'))
+    expect(ticketColor('not-built')).toBe('warning')
+    expect(ticketColor('skipped')).toBeUndefined()
+  })
+
+  test('the open list upserts by id, marks an entry with no tracking place, and strikes a done one', async () => {
+    const built = apply(null, {
+      board: 'auth',
+      kind: 'spec',
+      tickets: [{ number: '01', title: 'Login', status: 'closed' }],
+      open: [
+        { id: 'a', title: 'Fix for the audit list is not pushed', kind: 'not-shipped', where: '#101' },
+        { id: 'b', title: 'Second sign-in method', kind: 'your-decision' },
+        { id: 'c', title: 'Checkout was never opened in a browser', kind: 'not-verified', where: ' Untracked ' },
+      ],
+    }, 1)
+    expect(built.open.map(o => o.where)).toEqual(['#101', 'untracked', 'Untracked'])
+    expect(built.open.map(isUntracked)).toEqual([false, true, true])
+    expect(openMark(built.open[1]!)).toBe('!')
+    expect(header(built)).toBe('1 of 1 done · 3 open after this run (2 untracked)')
+
+    const later = apply(built, {
+      board: 'auth',
+      kind: 'spec',
+      tickets: [],
+      open: [
+        { id: 'a', kind: 'not-shipped', done: true },
+        { id: 'b', kind: 'your-decision', where: '.scratch/auth/decisions/02-second-sign-in.md' },
+      ],
+    }, 2)
+    // The order the run listed them in stands, and an update keeps the title.
+    expect(later.open.map(o => o.id)).toEqual(['a', 'b', 'c'])
+    expect(later.open[0]).toEqual({ id: 'a', title: 'Fix for the audit list is not pushed', kind: 'not-shipped', where: '#101', done: true })
+    expect(openMark(later.open[0]!)).toBe('✓')
+    expect(isUntracked(later.open[1]!)).toBe(false)
+    expect(summary(later)).toBe('1 of 1 done · 2 open after this run (1 untracked)')
+  })
+
+  test('a call with only the old fields reads as before: no open list, no open count', async () => {
+    const board = apply(null, { board: 'auth', kind: 'spec', tickets: [{ number: '01', title: 'Login', status: 'merged' }] }, 1)
+    expect(board.open).toEqual([])
+    expect(header(board)).toBe('1 of 1 done')
+    expect(summary(board)).toBe('1 of 1 done')
+  })
 })
 
 describe('parseUpdate', () => {
   test('a stage-only update needs no tickets', async () => {
     const result = parseUpdate({ board: 'auth', kind: 'spec', stage: 'final checks' })
-    expect(result).toEqual({ board: 'auth', kind: 'spec', tickets: [], stage: 'final checks', findings: [] })
+    expect(result).toEqual({ board: 'auth', kind: 'spec', tickets: [], stage: 'final checks', findings: [], open: [] })
+  })
+
+  test('refuses an open entry with an unknown kind', async () => {
+    const result = parseUpdate({ board: 'auth', kind: 'spec', open: [{ id: 'a', kind: 'todo' }] })
+    expect(typeof result === 'string' && result.includes('your-decision')).toBe(true)
   })
 
   test('refuses a finding with an unknown status', async () => {

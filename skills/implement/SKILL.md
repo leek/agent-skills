@@ -108,6 +108,7 @@ Print the end-of-session block using the frame in [`wayfinder/references/pipelin
 ---
 Pipeline: decide → spec → tickets → **build**   (4 of 4)
 Done: <what now works, the work-item ref if any, commit(s), verification state>
+Open: <open tickets on the parent spec; findings and verification left open; a fix not yet pushed>
 Next:
   • <condition> → /<skill> <ref>
 ```

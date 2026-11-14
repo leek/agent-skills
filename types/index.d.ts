@@ -47,6 +47,9 @@ export type TicketStatus =
   | 'released'
   | 'awaiting-deploy'
   | 'closed'
+  /** Open, and left alone by this run; the note says why. Counts as open work. */
+  | 'not-built'
+  /** Closed elsewhere or ruled out for good; leaves the count. */
   | 'skipped'
 
 export type BoardKind = 'spec' | 'map'
@@ -70,6 +73,20 @@ export type BoardFinding = {
   note: string
 }
 
+export type OpenKind = 'not-shipped' | 'not-started' | 'not-verified' | 'your-decision' | 'later'
+
+/** One piece of work still open when the run ends. */
+export type BoardOpenItem = {
+  /** A stable key across updates; never shown. */
+  id: string
+  title: string
+  kind: OpenKind
+  /** Where it is tracked: a ticket path, a decision record, a pull request, or `untracked`. */
+  where: string
+  /** Resolved since it was listed; the pane strikes it. */
+  done: boolean
+}
+
 /** A multi-ticket run (implement-spec, implement all, wayfinder all) as the ticket_board tool last reported it. */
 export type TicketBoard = {
   slug: string
@@ -78,6 +95,8 @@ export type TicketBoard = {
   /** The step after the build, e.g. `review round 1`; empty while tickets build. */
   stage: string
   findings: BoardFinding[]
+  /** The "Open after this run" list; empty until the run sends one. */
+  open: BoardOpenItem[]
   updatedAt: number
 }
 
