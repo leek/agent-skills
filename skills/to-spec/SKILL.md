@@ -23,7 +23,7 @@ Understand the current state of the codebase if you haven't already. Use the pro
 
 **Invoked with a `wayfinder` map, read the map and every closed decision ticket's `## Resolution` first**: those resolutions are the authoritative decisions the spec must encode. Don't synthesize from conversation memory alone; a fresh session may not hold what earlier ticket sessions decided.
 
-**When the effort's `decisions/` holds an open `type: grilling` record** (`grilling`'s [Record the ledger](../grilling/SKILL.md#record-the-ledger)), read it first: its settled lines and defaults are decisions the spec encodes, and its open, deferred, and risk lines go to step 3's Needs decision list. After step 3 publishes, resolve it (`bash <this-skill-dir>/../setup/scripts/ticket.sh resolve <path> --body-file <file>`, the Resolution naming the spec), since the spec now holds everything it listed.
+**When the effort's `decisions/` holds an open `type: grilling` record** (`grilling`'s [Record the ledger](../grilling/SKILL.md#record-the-ledger)), read it first: its settled lines and defaults are decisions the spec encodes, and its open, deferred, and risk lines go to step 3's Needs decision list. On an in-place revision, reread the spec's existing `## Open questions` against the record: delete each line the grill settled, move each line that was never a question to Further Notes, and drop the section when nothing is left. After step 3 publishes, resolve it (`bash <this-skill-dir>/../setup/scripts/ticket.sh resolve <path> --body-file <file>`, the Resolution naming the spec), since the spec now holds everything it listed.
 
 Check the **constraints** the spec must honour before drafting, since each one found at build time costs a re-grill:
 
@@ -102,7 +102,7 @@ The detailed decisions that were made. Keep Build Contract material in that sect
 
 ## Open questions
 
-Decisions the conversation did not settle, one line each with the recommendation. Tickets that depend on one are blocked until it is answered. Omit the section when there are none.
+Decisions the conversation did not settle, one line each with the recommendation. Tickets that depend on one are blocked until it is answered. Omit the section when there are none: while it holds a line, the board's next step for the effort is `/grill-me`. A fact taken as given or a risk the user accepted is not an open question; it goes under Further Notes.
 
 ## Out of Scope
 

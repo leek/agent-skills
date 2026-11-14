@@ -9,6 +9,8 @@ argument-hint: "The plan, decision, or idea to stress-test"
 
 Run a `grilling` session on whatever the user brought.
 
+**Invoked on a spec**, every line under its `## Open questions` starts in the ledger as `open`: the board sends the user here because that section is not empty, and sends them back until it is. Each line ends the grill settled (asked, or taken off the ladder as a default) or `deferred` with the reason. A line that is not a question (a fact taken as given, a risk the user accepted) is recorded as a default, so `to-spec` moves it out of the section.
+
 ## When you're done
 
 Print the end-of-session block using the frame in [`wayfinder/references/pipeline-end-block.md`](../wayfinder/references/pipeline-end-block.md): whether the plan resolved, the user stopped the grill, or a branch dead-ended.
