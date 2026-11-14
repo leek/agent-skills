@@ -1,0 +1,30 @@
+#!/bin/sh
+# Remove the ~/.claude/skills symlinks that `npx skills update` re-creates for
+# leek/agent-skills. Claude Code gets these skills from the leek-skills plugin.
+# Only removes symlinks that point at ~/.agents/skills/<name> for a skill whose
+# lock entry has source leek/agent-skills. Pass -n to list without removing.
+exec python3 -I - "$@" <<'PY'
+import json, os, sys
+
+dry = "-n" in sys.argv[1:]
+home = os.path.expanduser("~")
+lock = os.path.join(home, ".agents", ".skill-lock.json")
+try:
+    skills = json.load(open(lock)).get("skills", {})
+except FileNotFoundError:
+    sys.exit(f"no lock file at {lock}")
+
+count = 0
+for name, entry in sorted(skills.items()):
+    if entry.get("source") != "leek/agent-skills":
+        continue
+    link = os.path.join(home, ".claude", "skills", name)
+    target = os.path.join(home, ".agents", "skills", name)
+    if os.path.islink(link) and os.path.realpath(link) == os.path.realpath(target):
+        if not dry:
+            os.unlink(link)
+        print(("would remove " if dry else "removed ") + name)
+        count += 1
+
+print(f"{count} link(s) {'found' if dry else 'removed'}")
+PY

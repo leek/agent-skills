@@ -1,0 +1,72 @@
+#!/bin/bash
+# Bring every local install of leek-skills to the latest release, so no profile or
+# harness keeps running an old copy:
+#   1. the leek-skills plugin in each Claude Code config directory: ~/.claude and
+#      every ~/.claude-profiles/<name> that has it installed
+#   2. the `npx skills` copy under ~/.agents/skills (what Codex reads), only the
+#      skills whose lock entry has source leek/agent-skills, then the
+#      ~/.claude/skills links that update re-creates are removed again
+#
+# Usage: scripts/sync-installs [-n]
+#   -n  list what would be updated, change nothing
+# Output: one JSON line {"claude":[{"dir","before","after"}],"agents":"updated"|"skipped"|"listed"}
+# Running sessions keep their loaded copy until they restart.
+
+set -e
+
+dry=0
+case "${1:-}" in
+  -n) dry=1 ;;
+  -h|--help) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 0 ;;
+  "") ;;
+  *) echo "Unknown arg: $1" >&2; exit 2 ;;
+esac
+
+here=$(cd "$(dirname "$0")" && pwd)
+plugin=leek-skills@leek-agent-skills
+market=leek-agent-skills
+command -v jq >/dev/null 2>&1 || { echo "jq is required" >&2; exit 1; }
+
+version_in() { jq -r --arg p "$plugin" '.plugins[$p][0].version // ""' "$1/plugins/installed_plugins.json" 2>/dev/null || true; }
+
+rows=()
+for d in "$HOME/.claude" "$HOME"/.claude-profiles/*; do
+  [ -f "$d/plugins/installed_plugins.json" ] || continue
+  before=$(version_in "$d")
+  [ -n "$before" ] || continue
+  after=$before
+  if [ "$dry" = 0 ]; then
+    echo ">> $d ($before)" >&2
+    if [ "$d" = "$HOME/.claude" ]; then
+      # The default directory is addressed by the variable's absence; a session
+      # started under a profile would otherwise update that profile twice.
+      env -u CLAUDE_CONFIG_DIR claude plugin marketplace update "$market" >&2
+      env -u CLAUDE_CONFIG_DIR claude plugin update "$plugin" >&2
+    else
+      CLAUDE_CONFIG_DIR="$d" claude plugin marketplace update "$market" >&2
+      CLAUDE_CONFIG_DIR="$d" claude plugin update "$plugin" >&2
+    fi
+    after=$(version_in "$d")
+  fi
+  rows+=("$(jq -nc --arg dir "$d" --arg before "$before" --arg after "$after" '{dir: $dir, before: $before, after: $after}')")
+done
+
+agents=skipped
+lock="$HOME/.agents/.skill-lock.json"
+if [ -f "$lock" ] && command -v npx >/dev/null 2>&1; then
+  names=()
+  while IFS= read -r name; do names+=("$name"); done < <(jq -r '.skills | to_entries[] | select(.value.source == "leek/agent-skills") | .key' "$lock")
+  if [ ${#names[@]} -gt 0 ]; then
+    if [ "$dry" = 1 ]; then
+      echo ">> would update ${#names[@]} skills under ~/.agents/skills" >&2
+      agents=listed
+    else
+      echo ">> updating ${#names[@]} skills under ~/.agents/skills" >&2
+      npx -y skills update "${names[@]}" -g -y >&2
+      "$here/unlink-claude-skills" >&2
+      agents=updated
+    fi
+  fi
+fi
+
+printf '%s\n' ${rows[@]+"${rows[@]}"} | jq -sc --arg agents "$agents" '{claude: ., agents: $agents}'
