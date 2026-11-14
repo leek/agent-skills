@@ -625,6 +625,23 @@ run "$g" frontier nowhere
 eq "frontier unknown slug" "$rc" 2
 echo "ok lint reports two delivery tickets and a repeated number; an unknown slug exits 2"
 
+# lint --fix quotes bare and single-quoted titles and leaves every other error to the caller.
+x="$g/.scratch/fixme/tickets"
+mkdir -p "$x"
+printf -- '---\ntitle: Bare: title #2\nstatus: closed\n---\nbody\n' >"$x/01-bare.md"
+printf -- "---\ntitle: 'It''s \"here\"'\nstatus: closed\n---\n" >"$x/02-single.md"
+printf -- '---\ntitle: "Fine"\nstatus: built\n---\n' >"$x/03-fine.md"
+run "$g" lint fixme --fix
+eq "lint --fix exit" "$rc $(q "$out" '[.ok, (.fixed | length), (.errors | map(.rule))]')" '1 [false,2,["status-legal"]]'
+eq "bare title quoted" "$(sed -n 2p "$x/01-bare.md")" 'title: "Bare: title #2"'
+eq "single-quoted title requoted" "$(sed -n 2p "$x/02-single.md")" "title: \"It's 'here'\""
+eq "body kept" "$(sed -n 5p "$x/01-bare.md")" 'body'
+run "$g" lint fixme --fix
+eq "lint --fix twice" "$(q "$out" '.fixed')" '[]'
+run "$g" resolve --help
+eq "subcommand --help" "$rc" 0
+echo "ok lint --fix quotes titles in place and reports the rest; --help after a subcommand prints usage"
+
 # ---- root discovery ------------------------------------------------------------------------
 if command -v git >/dev/null 2>&1; then
   git init -q "$g"

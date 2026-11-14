@@ -339,3 +339,11 @@ and each finding. Review and validate its fixes before opening it. Report the li
 leave it open and triage it only when the user names it. If the original is stopped or
 auto-merge queued, record carried findings and the pending follow-up instead of
 branching from an unmerged base.
+
+**Late-review sweep.** A review that was in flight at the merge lands after that one
+gather. So as the run's last GitHub step, after the last named PR and before clean-up,
+gather every PR this run merged once more (`pr-comments.sh --since` its merge time). When
+a review is still in flight on one, take one wait from what is left of that PR's
+optional-wait budget first. Classify what arrived; verified findings join that PR's
+follow-up PR (opened now if it had none). The report carries one line per merged PR:
+`late reviews: none as of <time>`, or the findings and their follow-up link.

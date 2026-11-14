@@ -13,7 +13,7 @@ Turn sessions into a ranked list of concrete improvements to the agent's **envir
 
 ## Where the logs live
 
-Claude Code (`~/.claude/projects`), Codex (`~/.codex/sessions`, plain and `.jsonl.zst`), Grok (`~/.grok/sessions`), and agy (`~/.gemini/antigravity-cli`: `history.jsonl` plus one SQLite `.db` per conversation). Two scripts in `<this-skill-dir>/scripts/` read them, read-only: they stream archives without decompressing in place and open SQLite read-only. Store their output in the session scratchpad, never beside the logs.
+Claude Code (`~/.claude/projects`, `$CLAUDE_CONFIG_DIR/projects`, and each `~/.claude-profiles/*/projects`), Codex (`~/.codex/sessions`, plain and `.jsonl.zst`), Grok (`~/.grok/sessions`), and agy (`~/.gemini/antigravity-cli`: `history.jsonl` plus one SQLite `.db` per conversation). Two scripts in `<this-skill-dir>/scripts/` read them, read-only: they stream archives without decompressing in place and open SQLite read-only. Store their output in the session scratchpad, never beside the logs.
 
 ## 1. Pick the N most recent sessions
 

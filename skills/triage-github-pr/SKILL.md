@@ -282,7 +282,9 @@ main checkout, that checkout is back on the branch it started on (see
 
 ## 7. Clean up
 
-Remove nothing while the PRs are in flight. After the last named PR, clean up what you
+Remove nothing while the PRs are in flight. After the last named PR, run the
+[late-review sweep](references/gh-mechanics.md#follow-up-pr) over every PR this run
+merged, then clean up what you
 created (worktrees from step 5, databases from
 [Scratch databases](references/gh-mechanics.md#scratch-databases)) by
 `laravel-herd-worktrees`' **What is left** rule: a PR that now shows merged loses its
@@ -294,5 +296,5 @@ chat is the signal).
 Anything you did not create is never touched. Name what stays in the report, so the
 user's next `repository-cleanup` run offers it once the merge lands.
 
-Completion criterion: everything you created for a merged PR is removed or named as
-refused, any question is answered, and the report names everything kept.
+Completion criterion: every merged PR has its late-review line in the report,
+everything you created for a merged PR is removed or named as refused, any question is answered, and the report names everything kept.

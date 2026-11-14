@@ -69,11 +69,13 @@
 #     repo's string for that role is written. Prints {"path","status","previous"}, where
 #     "status" is the value written.
 #
-#   lint <slug>                                                             read-only
+#   lint <slug> [--fix]                                       read-only without --fix
 #     {"ok":bool,"errors":[{"file","rule","detail"}]}, exit 1 when not ok. Rules:
 #     frontmatter, title-quoted, status-legal, no-comments, blocker-missing,
 #     blocker-not-lower, delivery-count, delivery-not-last, delivery-blockers,
-#     filename-number.
+#     filename-number. --fix first rewrites each bare or single-quoted title as one
+#     double-quoted string (an inner " becomes '), adds "fixed":[paths], and reports
+#     what is left.
 #
 # A refusal of release, resolve, close or set-status prints
 # {"error","detail","path","status","claimed_by"} (set-status adds "legal":[..]).
@@ -117,7 +119,7 @@ USAGE = """usage: ticket.sh [--root DIR] <subcommand> ...
   resolve <path> --body-file <file>
   close <path> --reason-file <file>
   set-status <path> <status>
-  lint <slug>"""
+  lint <slug> [--fix]"""
 TICKET_DIRS = {"decisions": "decision", "tickets": "ticket", "issues": "ticket"}
 HUMAN_ROLES = ("ready-for-human", "needs-info", "needs-triage")
 LOCK_WAIT_SECONDS = 120
@@ -699,8 +701,31 @@ def has_comment(value: str) -> bool:
     return re.search(r"(?:^|\s)#", val) is not None
 
 
+def quote_titles(root: str, slug: str, effort: dict | None) -> list[str]:
+    """Rewrite each bare or single-quoted `title:` as one double-quoted string."""
+    fixed: list[str] = []
+    for item in effort_items(effort) if effort else []:
+        path = os.path.join(root, ".scratch", slug, item["path"])
+        lines = read_lines(path)
+        for n in range(1, max(front_end(lines), 1)):
+            raw = bare(lines[n])
+            pair = re.match(r"^title:[ \t]+(.*\S)[ \t]*$", raw)
+            if not pair or re.fullmatch(r'"[^"]*"(\s+#.*)?', pair.group(1)):
+                continue
+            value = pair.group(1)
+            if len(value) > 1 and value[0] == value[-1] == "'":
+                value = value[1:-1].replace("''", "'")
+            value = value.replace('"', "'")
+            lines[n] = f'title: "{value}"' + lines[n][len(raw):]
+            write_lines(path, lines)
+            fixed.append(f".scratch/{slug}/{item['path']}")
+            break
+    return fixed
+
+
 def cmd_lint(root: str, args: list[str]) -> None:
-    rest, _ = take_options(args, ())
+    fix = "--fix" in args
+    rest, _ = take_options([a for a in args if a != "--fix"], ())
     if len(rest) != 1:
         usage("lint takes one slug")
     slug = rest[0].strip("/")
@@ -709,6 +734,12 @@ def cmd_lint(root: str, args: list[str]) -> None:
     if not os.path.isdir(os.path.join(root, ".scratch", slug)):
         usage(f"no effort at .scratch/{slug}/")
     state, effort = load_state(root, slug)
+    fixed: list[str] = []
+    if fix:
+        lock_effort(os.path.join(root, ".scratch", slug))
+        fixed = quote_titles(root, slug, effort)
+        if fixed:
+            state, effort = load_state(root, slug)
     errors: list[dict] = []
     at = lambda rel: f".scratch/{slug}/{rel}"
 
@@ -796,7 +827,7 @@ def cmd_lint(root: str, args: list[str]) -> None:
             if missing:
                 err(delivery["path"], "delivery-blockers", f"the delivery ticket's blocked-by leaves out {', '.join(missing)}")
 
-    emit({"ok": not errors, "errors": errors})
+    emit({"ok": not errors, "errors": errors, "fixed": fixed} if fix else {"ok": not errors, "errors": errors})
     if errors:
         print(f"ticket.sh: {len(errors)} lint error(s) in .scratch/{slug}/", file=sys.stderr)
         sys.exit(1)
@@ -811,7 +842,7 @@ def main() -> None:
             usage("--root needs a directory")
         root_arg = args[i + 1]
         del args[i:i + 2]
-    if not args or args[0] in ("-h", "--help"):
+    if not args or "-h" in args or "--help" in args:
         print(USAGE, file=sys.stderr)
         sys.exit(0 if args else 2)
     command, rest = args[0], args[1:]

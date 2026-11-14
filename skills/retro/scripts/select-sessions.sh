@@ -55,9 +55,17 @@ mtime_iso() { date -u -r "$(stat -f %m "$1" 2>/dev/null || stat -c %Y "$1")" +%Y
 
 # --- Claude Code: <project>/<uuid>.jsonl owns <uuid>/subagents/agent-*.jsonl ----------
 if want claude; then
-  if [ -d ~/.claude/projects ]; then
-    echo ">> claude: scanning" >&2
-    find ~/.claude/projects -type f -name '*.jsonl' ! -path '*/subagents/*' ! -path '*--claude-worktrees-agent-*' -print0 | newest |
+  # Every config directory holds its own logs: the default one, $CLAUDE_CONFIG_DIR, and
+  # each profile under ~/.claude-profiles. A symlinked duplicate is scanned once.
+  claude_roots=()
+  for d in ~/.claude/projects "${CLAUDE_CONFIG_DIR:+$CLAUDE_CONFIG_DIR/projects}" ~/.claude-profiles/*/projects; do
+    [ -n "$d" ] && [ -d "$d" ] || continue
+    real=$(cd "$d" && pwd -P)
+    case " ${claude_roots[*]-} " in *" $real "*) ;; *) claude_roots+=("$real") ;; esac
+  done
+  if [ ${#claude_roots[@]} -gt 0 ]; then
+    echo ">> claude: scanning ${#claude_roots[@]} config director$([ ${#claude_roots[@]} = 1 ] && echo y || echo ies)" >&2
+    find "${claude_roots[@]}" -type f -name '*.jsonl' ! -path '*/subagents/*' ! -path '*--claude-worktrees-agent-*' -print0 | newest |
     while IFS= read -r f; do
       id=$(basename "$f" .jsonl)
       kids=$(find "${f%.jsonl}/subagents" -name 'agent-*.jsonl' 2>/dev/null | jq -R . | jq -sc . || echo '[]')

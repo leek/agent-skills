@@ -34,7 +34,9 @@ command -v jq >/dev/null 2>&1 || { echo "jq is required" >&2; exit 1; }
 here=$(cd "$(dirname "$0")" && pwd)
 wt=${1:-}
 branch=""
-[ -n "$wt" ] || { echo "Usage: remove-worktree.sh <worktree path> [--branch <name>]" >&2; exit 2; }
+usage="Usage: remove-worktree.sh <worktree path> [--branch <name>]"
+case "$wt" in -h|--help) echo "$usage" >&2; exit 0 ;; esac
+[ -n "$wt" ] || { echo "$usage" >&2; exit 2; }
 shift
 while [ $# -gt 0 ]; do
   case "$1" in

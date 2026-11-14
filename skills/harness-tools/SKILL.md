@@ -42,6 +42,10 @@ Start sub-agents and keep working on something else; collect each result when it
 
 Fallback: run them inline one after another.
 
+Each wake either changes the run's state or does not. A notice with no result in it (an idle notice, a repeat of a report you already used) gets no reply: end the turn without text. A wake that changes state gets one status line with the count and the names still running (`4 of 7 done; waiting on billing-export, fax-cover`), so the user never has to ask for status.
+
+Codex limits how many agent threads are live at once. When `spawn_agent` fails with `agent thread limit reached`, `wait_agent` until one running agent finishes, then spawn the next; when none is running, do that piece inline. An agent whose status is `errored` (for example `out of credits`) produced nothing: report it once and do its piece inline in the same turn.
+
 A sub-agent's handle dies at `/clear`, at session end, and at compaction. In anything durable (tickets, comments, hand-off text), refer to its output by file path, never by task id.
 
 ## Follow up

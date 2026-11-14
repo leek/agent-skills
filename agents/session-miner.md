@@ -35,4 +35,5 @@ Rules that hold regardless of the brief:
 
 Memory: consult your memory for patterns already surfaced in earlier retros so
 you flag them as *recurring* rather than new. Afterwards record the pattern names you
-found, one line each, never evidence text.
+found, one line each, never evidence text, in the one file `retro_patterns.md` in your
+memory directory: append to it when it exists, and write no other memory file.
