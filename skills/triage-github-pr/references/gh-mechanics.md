@@ -28,13 +28,18 @@ bash <this-skill-dir>/scripts/pr-comments.sh N --count                          
 ```
 
 Its JSON holds `reviews`, `inline` (each with `thread`, the id to resolve, and
-`resolved`), `issue`, `me`, `head`, `threads_open`, and `disposition`; the script's header names
-every field. The snapshot is every `{id, at}` pair in it. `--since` prints only an id
+`resolved`), `issue`, `me`, `pr_author`, `head`, `threads_open`, and `disposition`, and
+every row carries `bot`, `assoc` (author_association), and `agent`; the script's header
+names every field. The snapshot is every `{id, at}` pair in it. `--since` prints only an id
 not in it, or an id whose `at` changed (bots often edit a summary comment in place
-instead of posting another), and never your own replies or disposition comment.
+instead of posting another), and never an agent's replies or your disposition comment.
 
-**Earlier answers.** An inline comment by you with a `reply_to` is your answer to the
-thread it replies to; its `url` is the link a repeat cites. The disposition comment's
+**Earlier answers.** An inline comment with `agent` true and a `reply_to` is an earlier
+answer to the thread it replies to; its `url` is the link a repeat cites. A reply from
+`me` without `agent` is your user's own word in that thread (you post from the same
+login): a direction to follow, never an earlier answer. Replies from before the marker
+existed carry no flag; one that opens with a reply form ("Fixed in", "Reviewed,") is an
+earlier answer. The disposition comment's
 table is the rest: the findings that live outside inline threads.
 
 ## In-flight signals
@@ -190,7 +195,8 @@ bash <this-skill-dir>/scripts/pr-reply.sh N <scratch>/pr-N-replies.json
 ```
 
 `comment_id` is the thread's root comment (`reply_to` null) and `thread` its `thread` in
-[`pr-comments.sh`](../scripts/pr-comments.sh)'s output; `body` is sent exactly as written,
+[`pr-comments.sh`](../scripts/pr-comments.sh)'s output; `body` is sent exactly as written
+plus a trailing `<!-- agent-reply -->` marker,
 and `resolve` follows the table below. It prints each item's `reply_url`, `replied`,
 `resolved`, and `error`, then `threads_open`. On exit 1, retry only the items with an
 `error`, never the whole file: an item with `replied: false` goes again as it was; an item

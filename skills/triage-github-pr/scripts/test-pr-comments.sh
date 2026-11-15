@@ -44,7 +44,7 @@ eq() { [ "$2" = "$3" ] || fail "$1: expected '$3', got '$2'"; }
 run() { rc=0; out=$(env GH_FAIL="${GH_FAIL:-}" bash "$script" "$@" 2> "$work/stderr") || rc=$?; }
 
 echo '{"nameWithOwner":"o/r"}' > "$GH_FIX/repo-view.json"
-echo '{"headRefOid":"abc1234def"}' > "$GH_FIX/pr-view.json"
+echo '{"headRefOid":"abc1234def","author":{"login":"pat"}}' > "$GH_FIX/pr-view.json"
 echo '{"login":"me"}' > "$GH_FIX/user.json"
 # Two pages, as `gh api graphql --paginate` prints them: one object per page.
 cat > "$GH_FIX/threads.json" <<'JSON'
@@ -55,9 +55,9 @@ cat > "$GH_FIX/threads.json" <<'JSON'
 JSON
 echo '[{"id":1,"user":{"login":"copilot[bot]"},"state":"COMMENTED","commit_id":"abc1234def0000","submitted_at":"2026-01-01T00:00:00Z","body":"review"}]' > "$GH_FIX/reviews.json"
 cat > "$GH_FIX/inline.json" <<'JSON'
-[{"id":111,"user":{"login":"codex[bot]"},"path":"a.php","line":3,"original_line":3,"commit_id":"abc1234def0000","updated_at":"2026-01-01T00:00:00Z","in_reply_to_id":null,"html_url":"https://x/111","body":"finding a"},
- {"id":112,"user":{"login":"me"},"path":"a.php","line":3,"original_line":3,"commit_id":"abc1234def0000","updated_at":"2026-01-02T00:00:00Z","in_reply_to_id":111,"html_url":"https://x/112","body":"fixed"},
- {"id":222,"user":{"login":"codex[bot]"},"path":"b.php","line":null,"original_line":9,"commit_id":"abc1234def0000","updated_at":"2026-01-01T00:00:00Z","in_reply_to_id":null,"html_url":"https://x/222","body":"finding b"}]
+[{"id":111,"user":{"login":"codex[bot]","type":"Bot"},"author_association":"NONE","path":"a.php","line":3,"original_line":3,"commit_id":"abc1234def0000","updated_at":"2026-01-01T00:00:00Z","in_reply_to_id":null,"html_url":"https://x/111","body":"finding a"},
+ {"id":112,"user":{"login":"me","type":"User"},"author_association":"MEMBER","path":"a.php","line":3,"original_line":3,"commit_id":"abc1234def0000","updated_at":"2026-01-02T00:00:00Z","in_reply_to_id":111,"html_url":"https://x/112","body":"Fixed in abc.\n\n<!-- agent-reply -->"},
+ {"id":222,"user":{"login":"codex[bot]","type":"Bot"},"author_association":"NONE","path":"b.php","line":null,"original_line":9,"commit_id":"abc1234def0000","updated_at":"2026-01-01T00:00:00Z","in_reply_to_id":null,"html_url":"https://x/222","body":"finding b"}]
 JSON
 # Own comments 31 (an older run's marker) and 33 (the newest); 32 is someone else's with the marker.
 cat > "$GH_FIX/issue.json" <<'JSON'
@@ -71,11 +71,13 @@ JSON
 # --- full run ---
 run 7 --repo o/r
 eq "full exit" "$rc" 0
-eq "full keys" "$(echo "$out" | jq -c 'keys')" '["disposition","head","inline","issue","me","pr","reviews","threads_open"]'
+eq "full keys" "$(echo "$out" | jq -c 'keys')" '["disposition","head","inline","issue","me","pr","pr_author","reviews","threads_open"]'
 eq "full threads_open" "$(echo "$out" | jq -c '.threads_open')" 1
 eq "full thread map" "$(echo "$out" | jq -c '[.inline[] | [.id, .thread, .resolved]]')" '[[111,"PRRT_a",true],[112,"PRRT_a",true],[222,"PRRT_b",false]]'
 eq "full line fallback" "$(echo "$out" | jq -c '.inline[2].line')" 9
 eq "full me" "$(echo "$out" | jq -r '.me')" me
+eq "full pr_author" "$(echo "$out" | jq -r '.pr_author')" pat
+eq "full authorship" "$(echo "$out" | jq -c '[.inline[] | [.id, .bot, .assoc, .agent]]')" '[[111,true,"NONE",false],[112,false,"MEMBER",true],[222,true,"NONE",false]]'
 eq "full counts" "$(echo "$out" | jq -c '[(.reviews | length), (.issue | length)]')" '[1,5]'
 ok "full run maps threads across pages"
 
@@ -97,11 +99,13 @@ ok "disposition null when you have none"
 
 # --- --since: new or edited only, own items dropped, disposition still reported ---
 run 7 --repo o/r; echo "$out" > "$work/snap.json"
-jq '. + [{"id":40,"user":{"login":"codex[bot]"},"updated_at":"2026-01-05T00:00:00Z","html_url":"https://x/40","body":"new"}]
+jq '. + [{"id":40,"user":{"login":"codex[bot]"},"updated_at":"2026-01-05T00:00:00Z","html_url":"https://x/40","body":"new"},
+           {"id":41,"user":{"login":"me"},"updated_at":"2026-01-05T00:00:00Z","html_url":"https://x/41","body":"approved, fix it"},
+           {"id":42,"user":{"login":"me"},"updated_at":"2026-01-05T00:00:00Z","html_url":"https://x/42","body":"Fixed in abc.\n\n<!-- agent-reply -->"}]
     | map(if .id == 30 then .updated_at = "2026-01-06T00:00:00Z" else . end)' "$work/issue.all" > "$GH_FIX/issue.json"
 run 7 --repo o/r --since "$work/snap.json"
 eq "since exit" "$rc" 0
-eq "since issue ids" "$(echo "$out" | jq -c '[.issue[].id]')" '[30,40]'
+eq "since issue ids: your user's reply kept, agent-marked dropped" "$(echo "$out" | jq -c '[.issue[].id]')" '[30,40,41]'
 eq "since inline" "$(echo "$out" | jq -c '.inline')" '[]'
 eq "since disposition" "$(echo "$out" | jq -c '.disposition.id')" 33
 cp "$work/issue.all" "$GH_FIX/issue.json"

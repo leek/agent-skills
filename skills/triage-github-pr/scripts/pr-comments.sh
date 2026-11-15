@@ -1,10 +1,15 @@
 #!/bin/bash
 # Gather a pull request's three comment surfaces in one read-only pass, with every inline
 # comment already mapped to its resolvable review thread, as one JSON object on stdout:
-#   pr, head (headRefOid), me (your login), threads_open (unresolved review threads),
-#   reviews  [{id, user, state, commit, at, body}]                     at = submitted_at
-#   inline   [{id, user, path, line, commit, at, reply_to, url, thread, resolved, body}]
-#   issue    [{id, user, at, url, body}]                                at = updated_at
+#   pr, head (headRefOid), me (your login), pr_author (the PR author's login),
+#   threads_open (unresolved review threads),
+#   reviews  [{id, user, bot, assoc, agent, state, commit, at, body}]  at = submitted_at
+#   inline   [{id, user, bot, assoc, agent, path, line, commit, at, reply_to, url, thread, resolved, body}]
+#   issue    [{id, user, bot, assoc, agent, at, url, body}]             at = updated_at
+#   bot   true when the author is a GitHub App or bot account (user.type "Bot")
+#   assoc the author's author_association (OWNER, MEMBER, COLLABORATOR, CONTRIBUTOR, NONE, …)
+#   agent true when the body carries pr-reply.sh's <!-- agent-reply --> marker: an agent
+#         wrote it, even though it shows under your login
 #   disposition {id, url, body} | null   your newest issue comment carrying the
 #            <!-- triage-disposition --> (or older <!-- triage-round: N -->) marker, with or
 #            without --since. null also when `me` is "" (the login lookup failed): not checked.
@@ -12,7 +17,9 @@
 #
 # Usage: pr-comments.sh <pr> [--repo OWNER/REPO] [--since <earlier output.json>] [--count]
 #   --since  keep only items new or edited since that snapshot: an id not in it, or an id
-#            whose `at` changed (bots edit summaries in place). Your own items are dropped.
+#            whose `at` changed (bots edit summaries in place). Agent-written items are
+#            dropped (`agent` true, or your disposition comment); your user's own replies,
+#            posted from the same login without the marker, are kept.
 #   --count  print only {"pr","head","threads_open"}: the re-query before a push or merge.
 # Save a full run to a file as the snapshot (`> <scratch>/pr-<N>-snapshot.json`).
 # Read-only: GET calls and one GraphQL query (review_threads, below).
@@ -73,24 +80,26 @@ if [ "$count" = 1 ]; then
   exit 0
 fi
 
+gh pr view "$pr" -R "$repo" --json author -q .author.login > "$tmp/author"
 gh api user --jq .login > "$tmp/me" 2>/dev/null || { echo ">> gh api user failed; own comments are not filtered" >&2; : > "$tmp/me"; }
 gh api "repos/$repo/pulls/$pr/reviews" --paginate \
-  --jq '.[] | {id, user: .user.login, state, commit: (.commit_id // "")[:8], at: .submitted_at, body}' | jq -s . > "$tmp/reviews.json"
+  --jq '.[] | {id, user: .user.login, bot: (.user.type == "Bot"), assoc: .author_association, agent: (.body // "" | contains("<!-- agent-reply -->")), state, commit: (.commit_id // "")[:8], at: .submitted_at, body}' | jq -s . > "$tmp/reviews.json"
 gh api "repos/$repo/pulls/$pr/comments" --paginate \
-  --jq '.[] | {id, user: .user.login, path, line: (.line // .original_line), commit: (.commit_id // "")[:8], at: .updated_at, reply_to: .in_reply_to_id, url: .html_url, body}' | jq -s . > "$tmp/inline.json"
+  --jq '.[] | {id, user: .user.login, bot: (.user.type == "Bot"), assoc: .author_association, agent: (.body // "" | contains("<!-- agent-reply -->")), path, line: (.line // .original_line), commit: (.commit_id // "")[:8], at: .updated_at, reply_to: .in_reply_to_id, url: .html_url, body}' | jq -s . > "$tmp/inline.json"
 gh api "repos/$repo/issues/$pr/comments" --paginate \
-  --jq '.[] | {id, user: .user.login, at: .updated_at, url: .html_url, body}' | jq -s . > "$tmp/issue.json"
+  --jq '.[] | {id, user: .user.login, bot: (.user.type == "Bot"), assoc: .author_association, agent: (.body // "" | contains("<!-- agent-reply -->")), at: .updated_at, url: .html_url, body}' | jq -s . > "$tmp/issue.json"
 
 [ -n "$since" ] || { echo '{"reviews":[],"inline":[],"issue":[]}' > "$tmp/since.json"; since="$tmp/since.json"; }
 
-jq -n --argjson pr "$pr" --arg head "$(cat "$tmp/head")" --arg me "$(cat "$tmp/me")" \
+jq -n --argjson pr "$pr" --arg head "$(cat "$tmp/head")" --arg me "$(cat "$tmp/me")" --arg author "$(cat "$tmp/author")" \
   --argjson delta "$([ "$since" = "$tmp/since.json" ] && echo false || echo true)" \
   --slurpfile t "$tmp/threads.json" --slurpfile r "$tmp/reviews.json" \
   --slurpfile i "$tmp/inline.json" --slurpfile c "$tmp/issue.json" --slurpfile old "$since" '
   def seen($k): [$old[0][$k][]? | "\(.id)@\(.at)"];
-  def fresh($k): if $delta then map(select(.user != $me and ("\(.id)@\(.at)" | IN(seen($k)[]) | not))) else . end;
+  def ours: .agent or (.user == $me and (.body // "" | test("<!-- triage-(disposition|round: [0-9]+) -->")));
+  def fresh($k): if $delta then map(select((ours | not) and ("\(.id)@\(.at)" | IN(seen($k)[]) | not))) else . end;
   ($t[0]) as $threads
-  | {pr: $pr, head: $head, me: $me,
+  | {pr: $pr, head: $head, me: $me, pr_author: $author,
      threads_open: ([$threads[] | select(.resolved | not)] | length),
      reviews: ($r[0] | fresh("reviews")),
      inline: ($i[0] | map(. as $x | ([$threads[] | select(.ids | index($x.id))][0]) as $th

@@ -73,7 +73,9 @@ eq "batch row keys" "$(echo "$out" | jq -c '.replies[0] | keys')" '["comment_id"
 eq "batch replied" "$(echo "$out" | jq -c '[.replies[].replied]')" '[true,true,true]'
 eq "batch reply_url" "$(echo "$out" | jq -r '.replies[1].reply_url')" 'https://github.com/o/r/pull/7#discussion_r2229'
 eq "batch threads_open" "$(echo "$out" | jq -c '.threads_open')" 1
-eq "batch body kept byte for byte" "$(jq -r .body "$GH_FIX/sent-3790734403.json")" "$tricky"
+eq "batch body kept byte for byte, then the agent marker" "$(jq -r .body "$GH_FIX/sent-3790734403.json")" "$tricky
+
+<!-- agent-reply -->"
 eq "batch body is the only field sent" "$(jq -c keys "$GH_FIX/sent-111.json")" '["body"]'
 eq "batch resolved threads" "$(tr '\n' ' ' < "$GH_FIX/resolved-threads")" 'PRRT_a PRRT_c '
 eq "batch reply endpoint" "$(grep -c '^api repos/o/r/pulls/7/comments/[0-9]*/replies --input ' "$GH_LOG")" 3

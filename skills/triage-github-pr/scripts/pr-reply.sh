@@ -8,7 +8,9 @@
 #   <file.json>  [{"comment_id": 123, "thread": "PRRT_..." | null, "body": "..." | null, "resolve": true | false}]
 #     comment_id  the thread's root inline comment (pr-comments.sh: `inline[].id` with `reply_to` null)
 #     thread      that comment's `thread` in pr-comments.sh's output; needed only to resolve
-#     body        the reply text. An explicit `"body": null` makes the item resolve-only: no
+#     body        the reply text, posted with a trailing `<!-- agent-reply -->` marker so
+#                 pr-comments.sh can tell an agent's reply from its user's (both post
+#                 from one login). An explicit `"body": null` makes the item resolve-only: no
 #                 reply is posted; it needs `thread` and `"resolve": true`
 #     resolve     true resolves the thread after the reply; false (or absent) leaves it open
 # The whole file is checked before the first write: a non-numeric comment_id, an empty or
@@ -118,7 +120,7 @@ while [ "$i" -lt "$count" ]; do
 
   if [ "$resolve_only" = true ]; then
     : # the reply is already on GitHub (an earlier run posted it); only the resolve is sent
-  elif jq '{body}' "$tmp/item.json" > "$tmp/body.json" \
+  elif jq '{body: (.body + "\n\n<!-- agent-reply -->")}' "$tmp/item.json" > "$tmp/body.json" \
       && gh api "repos/$repo/pulls/$pr/comments/$id/replies" --input "$tmp/body.json" > "$tmp/reply.json" 2> "$tmp/err"; then
     # An exit-0 POST is a posted reply, with or without an html_url in the response.
     replied=true

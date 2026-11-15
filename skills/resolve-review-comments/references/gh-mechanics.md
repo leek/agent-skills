@@ -30,7 +30,8 @@ git log --oneline BASE..HEAD      # what the reviewer had vs what exists now
 Write one item per thread to a scratch file, then send the batch in one run of
 [`pr-reply.sh`](../../triage-github-pr/scripts/pr-reply.sh), which writes to GitHub.
 `comment_id` is the thread's root comment (`reply_to` null) and `thread` its `thread`
-from `pr-comments.sh`; `body` is sent exactly as written.
+from `pr-comments.sh`; `body` is sent exactly as written, plus a trailing
+`<!-- agent-reply -->` marker that sets `agent` on the reply in later reads.
 
 ```json
 [{"comment_id": 3790734403, "thread": "PRRT_kwDO…0W", "body": "Fixed in <sha>. <behaviour now>. Test: <name>.", "resolve": true},
