@@ -34,12 +34,10 @@ names every field. The snapshot is every `{id, at}` pair in it. `--since` prints
 not in it, or an id whose `at` changed (bots often edit a summary comment in place
 instead of posting another), and never an agent's replies or your disposition comment.
 
-**Earlier answers.** An inline comment with `agent` true and a `reply_to` is an earlier
-answer to the thread it replies to; its `url` is the link a repeat cites. A reply from
-`me` without `agent` is your user's own word in that thread (you post from the same
-login): a direction to follow, never an earlier answer. Replies from before the marker
-existed carry no flag; one that opens with a reply form ("Fixed in", "Reviewed,") is an
-earlier answer. The disposition comment's
+**Earlier answers.** An agent's reply (told apart from your user's own by
+[Claims and directions](../../resolve-review-comments/references/threads.md#claims-and-directions))
+is an earlier answer to the thread it replies to; its `url` is the link a repeat cites.
+An owner's reply is a direction, never an earlier answer. The disposition comment's
 table is the rest: the findings that live outside inline threads.
 
 ## In-flight signals
@@ -227,11 +225,14 @@ Bodies and resolution by delivery state:
 | Carried LEGIT | `<severity>; carried to a follow-up PR` (add the link after opening it) | Yes |
 | AUTO-DISMISS or HALLUCINATION | One-line evidence | Yes |
 | Answered QUESTION | `decided by owner: <answer>` | Yes |
+| Directed agreement, fixed | `fixed in <sha> as directed: <what changed>; push pending` | Yes |
+| Directed refusal | `Left as is, per <author>'s reply: <reason>` | Yes |
 | STALE or repeat | `repeat of <earlier reply url>` | Yes |
 | Unanswered QUESTION | The pending owner decision | No |
 
 Publish the classification reply before coding, then reply again when its state
-changes. A local fix SHA is the same after pushing, but is not yet remotely available;
+changes. Before each batch is sent, run the directed-reply check in
+[Reply to a directed thread](../../resolve-review-comments/references/threads.md#reply-to-a-directed-thread). A local fix SHA is the same after pushing, but is not yet remotely available;
 record the published head in the disposition only after the push succeeds. Re-query
 the unresolved thread count (`pr-comments.sh N --count`; `pr-reply.sh` prints it too) before pushing, right after each push, and before merging:
 a reviewer watching the PR sees each batch's threads close as it lands, not all at the end. An unresolved owner decision
