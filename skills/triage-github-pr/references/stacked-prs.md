@@ -206,7 +206,7 @@ on the stack's PRs go as one `pr-reply.sh` batch per PR
    of its budget; count them as landings when reconciling pushes.
 4. While it is a draft, push batch 1 first (with no batch 1, nothing waits), then
    `gh pr ready <integration>`. The bots review it only once it is ready, so step 6
-   then uses step 2's remaining optional wait before its refresh, batch 1 or not. Its draft
+   then watches its reviewers before its refresh, batch 1 or not. Its draft
    state is the stack's layout, not unclear intent, and the bots review the whole stack
    once, already fixed. Step 6's checkpoint after batch 1 runs here, and the merge into
    the trunk uses `--merge`, under every gate step 6 names (deploy-branch approval

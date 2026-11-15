@@ -18,6 +18,25 @@ bash <this-skill-dir>/../triage-github-pr/scripts/pr-comments.sh PR --count    #
 
 Its header names every field ([`pr-comments.sh`](../../triage-github-pr/scripts/pr-comments.sh)).
 
+## Watch the reviewers
+
+A review is in flight while a requested reviewer has not submitted, a bot shows it is
+running, a bot that reviews every push has not reviewed the head, or the PR was
+pushed, opened, or marked ready under two minutes ago. One read checks all of it; run it from the repo:
+
+```bash
+bash <this-skill-dir>/../run-after/scripts/wait-until.sh --interval 30 --timeout 1200 -- bash <this-skill-dir>/../closeout/scripts/pr-state.sh PR --in-flight --no-required
+```
+
+Run it in the background (in Claude Code, Bash with `run_in_background`; the harness
+wakes you when it exits). `passed` means nothing is in flight; `timeout` means the
+20-minute cap ran out, and `detail.counted` names who is still running; `failed` means
+a read failed, so run it once more. The signals and the bots' behaviour are in
+`triage-github-pr`'s
+[In-flight signals](../../triage-github-pr/references/gh-mechanics.md#in-flight-signals).
+
+## Commit range
+
 The PR's commit range, to compare a reviewed commit against HEAD:
 
 ```bash

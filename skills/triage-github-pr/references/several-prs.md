@@ -21,8 +21,8 @@ steps need all three.
    background, in one message (other harnesses: dispatch in the background per [harness-tools](../../harness-tools/SKILL.md)). A stack's integration
    PR waits for its own turn after the landings, and steps 2–4 skip it until then.
 3. **Steps 2 and 3 for all PRs.** Gather reviews and review state for every PR.
-   Where optional waits are allowed, use one wait (as the shipping budget says) for the
-   queue and each PR's budget. A harness with no way to wait gathers what has already arrived.
+   Watch every PR's reviewers with one wait for the queue (several numbers in one
+   `--in-flight` read), as the shipping budget says.
 4. **Step 4 in one pool.** Send the findings of all PRs to the verifier workers
    together, each batch from one PR, so its head sha is the ref. Then collect the
    QUESTIONs of every PR into one `grilling` call, each one named with its PR number,

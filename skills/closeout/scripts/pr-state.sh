@@ -13,6 +13,12 @@
 #   cross_repo, maintainer_can_modify
 #   requested_reviewers  [login or team slug]     requested, not yet submitted
 #   bot_reactions        [{user, content}]        reactions bots left on the PR (eyes, +1, ...)
+#   reviews_owed         [{reviewer, why}]        reviews still owed, from the issue timeline:
+#                        a request with no later review or removal (Copilot's pending request
+#                        was seen here but not in requested_reviewers, 2026-11-14); a Codex
+#                        review-state comment not finished, or unreadable; a bot that reviewed
+#                        2+ commits of this PR but not the head
+#   head_pushed_at       when the push that made the head landed (activity feed), or null
 #   checks_failed        [{name, link}]           failed, errored, cancelled, timed out, or never started
 #   checks_pending       [{name, required}]       not finished yet; required is null when unknown
 #   threads_open         review threads not resolved
@@ -21,23 +27,26 @@
 #   stacked_above        [number]                 open PRs whose base is this PR's head; [] for a fork PR
 #   repo                 {name, default_branch, delete_branch_on_merge, merge_methods: ["merge","squash","rebase"]}
 #   merge_danger         the body's "## Merge Danger" section (the pr skill's format), or null
-#   unchecked            the reads that failed: "threads", "repo", "rounds", "reactions". Each one
-#                        leaves its fields null (threads_open; repo, stacked_above and every
-#                        `required`; rounds; bot_reactions). null means not checked, never zero.
+#   unchecked            the reads that failed: "threads", "repo", "rounds", "reactions", "timeline".
+#                        Each leaves its fields null (threads_open; repo, stacked_above and every
+#                        `required`; rounds and head_pushed_at; bot_reactions; reviews_owed).
+#                        null means not checked, never zero.
 #                        "checks" means the required-check list came back short of GitHub's own
 #                        count (every page is read, 100 contexts a page): a pending check missing
 #                        from it has `required: null`.
 # A PR that gh cannot read prints {"number", "error"}. Exit 0 either way.
-# Calls per PR: gh pr view, one GraphQL query, the activity feed, the reactions, and the
-# review-thread query (review_threads, below; when it fails, threads_open is null).
+# Calls per PR: gh pr view, one GraphQL query, the activity feed, the reactions, the timeline,
+# and the review-thread query (review_threads, below; when it fails, threads_open is null).
 #
 # --in-flight  Is a review or a required check still running? Prints one line, a JSON array of
-#     {"pr", "in_flight", "reviewers", "bot_reactions", "checks_pending", "counted"}
+#     {"pr", "in_flight", "reviewers", "bot_reactions", "reviews_owed", "checks_pending", "counted"}
 #   and exits 0 when nothing is in flight on any PR, 1 when something is, 2 on any error
 #   (a failed read, or a short required-check list: unknown is never "clear").
-#   Counted: every requested reviewer, every bot `eyes` reaction, and every pending required
-#   check. --no-required leaves required checks out; --check <name> also counts that pending
-#   check, required or not (repeatable). `checks_pending` lists every pending check by name,
+#   Counted: every requested reviewer, every bot `eyes` reaction, every review owed, a PR
+#   pushed, opened, or marked ready under PR_STATE_SETTLE seconds ago (default 120: bots take
+#   up to a minute to register one), and every pending required check. It skips the review-thread query.
+#   --no-required leaves required checks out; --check <name> also counts that pending check,
+#   required or not (repeatable). `checks_pending` lists every pending check by name,
 #   counted or not: which one is a review bot's own is the caller's judgement.
 #   The exit codes fit run-after's wait-until.sh:
 #     wait-until.sh --timeout <s> -- bash pr-state.sh <number> --in-flight
@@ -46,6 +55,7 @@ set -e
 usage() { echo "usage: pr-state.sh <number> [<number> ...] [--in-flight [--no-required] [--check <name>]...]" >&2; exit 2; }
 
 in_flight=0; no_required=0; prs=()
+settle=${PR_STATE_SETTLE:-120}
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
@@ -141,46 +151,99 @@ query($owner: String!, $repo: String!, $pr: Int!, $head: String!, $endCursor: St
     echo "null" > "$tmp/reactions.json"; echo reactions >> "$tmp/unchecked"
   fi
 
-  echo "null" > "$tmp/threads.json"; echo "null" > "$tmp/rounds.json"
+  # The issue timeline: review requests, submitted reviews (with the commit each covers), and
+  # comments with their current body (Codex edits its review-state comment in place).
+  if ! gh api --paginate "repos/$repo/issues/$n/timeline?per_page=100" > "$tmp/timeline.raw" \
+     || ! jq -s 'add // []' "$tmp/timeline.raw" > "$tmp/timeline.json" 2>/dev/null; then
+    echo "null" > "$tmp/timeline.json"; echo timeline >> "$tmp/unchecked"
+  fi
+
+  # A round is a push to the head branch after the PR opened; the push that made the current
+  # head dates it. The feed lives in the head repository: the fork, for a fork PR.
+  echo "null" > "$tmp/rounds.json"; echo "null" > "$tmp/pushed.json"
+  feed=$(jq -r 'if .headRepositoryOwner.login and .headRepository.name
+                then "repos/\(.headRepositoryOwner.login)/\(.headRepository.name)/activity?ref=refs/heads/\(.headRefName | @uri | gsub("%2F"; "/"))&activity_type=push&per_page=100"
+                else "" end' "$tmp/pr.json")
+  if [ -z "$feed" ] || ! gh api --paginate "$feed" > "$tmp/activity.raw" \
+     || ! jq -s --slurpfile pr "$tmp/pr.json" '[.[][] | select(.timestamp > $pr[0].createdAt)] | length' "$tmp/activity.raw" > "$tmp/rounds.json" 2>/dev/null; then
+    echo "null" > "$tmp/rounds.json"; echo rounds >> "$tmp/unchecked"
+  else
+    jq -s --slurpfile pr "$tmp/pr.json" '[.[][] | select(.after == $pr[0].headRefOid) | .timestamp] | max' "$tmp/activity.raw" > "$tmp/pushed.json"
+  fi
+
+  echo "null" > "$tmp/threads.json"
   if [ "$in_flight" = 0 ]; then
     if ! review_threads "$repo" "$n" > "$tmp/threads.raw"; then
       echo threads >> "$tmp/unchecked"
     else
       jq '[.[] | select(.resolved | not)] | length' "$tmp/threads.raw" > "$tmp/threads.json"
     fi
-
-    # A round is a push to the head branch after the PR opened. The feed lives in the head
-    # repository: the fork, for a fork PR.
-    feed=$(jq -r 'if .headRepositoryOwner.login and .headRepository.name
-                  then "repos/\(.headRepositoryOwner.login)/\(.headRepository.name)/activity?ref=refs/heads/\(.headRefName | @uri | gsub("%2F"; "/"))&activity_type=push&per_page=100"
-                  else "" end' "$tmp/pr.json")
-    if [ -z "$feed" ] || ! gh api --paginate "$feed" > "$tmp/activity.raw" \
-       || ! jq -s --slurpfile pr "$tmp/pr.json" '[.[][] | select(.timestamp > $pr[0].createdAt)] | length' "$tmp/activity.raw" > "$tmp/rounds.json" 2>/dev/null; then
-      echo "null" > "$tmp/rounds.json"; echo rounds >> "$tmp/unchecked"
-    fi
   fi
 
   jq --slurpfile d "$tmp/detail.json" --slurpfile reactions "$tmp/reactions.json" \
      --slurpfile threads "$tmp/threads.json" --slurpfile rounds "$tmp/rounds.json" \
-     --rawfile unchecked "$tmp/unchecked" --rawfile names "$tmp/check-names" \
+     --slurpfile timeline "$tmp/timeline.json" --slurpfile pushed "$tmp/pushed.json" \
+     --argjson settle "$settle" --rawfile unchecked "$tmp/unchecked" --rawfile names "$tmp/check-names" \
      --argjson in_flight "$in_flight" --argjson no_required "$no_required" '
     def outcome:
       if (.status // "COMPLETED" | ascii_upcase) != "COMPLETED" then "PENDING"
       else (.conclusion // .state // "") | ascii_upcase end;
     def lines: split("\n") | map(select(. != ""));
+    def t: .submitted_at // .updated_at // .created_at // "";
+    # The review-state comment Codex posts as a bot; a state that does not parse reads "unreadable", never clear.
+    def codex_state: [.[] | select(.event == "commented" and .user.type == "Bot"
+                                    and (.body // "" | contains("<!-- codex-review-state:v1 ")))] | last
+      | if . == null then null else
+          {user: .user,
+           state: ((.body | capture("<!-- codex-review-state:v1 (?<j>\\{.*?\\}) -->")? | .j | fromjson? | .code_review)
+                   // {status: "unreadable", commit_sha: null})} end;
+    # Reviews owed on this PR, from the timeline:
+    #  requested: a review request with no later review by that reviewer (any human review for a
+    #             team) and no later removal. Copilot shows here, not in reviewRequests.
+    #  running:   Codex review-state comment whose status is not finished.
+    #  head:      a bot that reviewed two or more commits of this PR (it reviews pushes) and has
+    #             not reviewed the head.
+    def owed($tl; $head):
+      if $tl == null then null else
+      def key: if .requested_team then "team:\(.requested_team.slug)" else ((.requested_reviewer // .user).id | tostring) end;
+      ($tl | codex_state) as $cx
+      | ([$tl[] | select(.event == "review_requested")] | group_by(key) | map(max_by(t))
+         | map(. as $r | ($r | key) as $k | ($r | t) as $at
+           | select([$tl[] | select(t > $at)
+                     | select((.event == "review_request_removed" and key == $k)
+                              or (.event == "reviewed" and (if ($k | startswith("team:")) then .user.type != "Bot"
+                                                            else (.user.id | tostring) == $k end)))] | length == 0)
+           | {reviewer: ($r.requested_team.slug // $r.requested_reviewer.login), why: "requested \($at), not submitted"}))
+        + (if $cx.state and (($cx.state.status // "completed") | ascii_downcase
+                             | IN("completed", "failed", "error", "cancelled", "canceled", "skipped") | not)
+           then [{reviewer: $cx.user.login, why: "\($cx.state.status) on \($cx.state.commit_sha // "?" | .[0:7])"}] else [] end)
+        + ([$tl[] | select(.event == "reviewed" and .user.type == "Bot") | {id: (.user.id | tostring), login: .user.login, c: .commit_id}]
+           + (if $cx.state.commit_sha and $cx.state.status == "completed"
+              then [{id: ($cx.user.id | tostring), login: $cx.user.login, c: $cx.state.commit_sha}] else [] end)
+           | group_by(.id)
+           | map(select((map(.c) | unique) as $cs | ($cs | length) >= 2 and ($cs | index($head) | not)))
+           | map({reviewer: .[0].login, why: "reviewed earlier pushes, not \($head[0:7])"}))
+      | unique_by(.reviewer) end;
     ($d[0].data.repository) as $r
     | (if $r then [$r.pullRequest.statusCheckRollup.contexts.nodes[]? | {name: (.name // .context), required: .isRequired}] else null end) as $req
     | def required($n): if $req == null then null
         else ([$req[] | select(.name == $n) | .required] | if length == 0 then null else any end) end;
       [.reviewRequests[]? | (.login // .slug // .name)] as $reviewers
+    | owed($timeline[0]; .headRefOid) as $owed
+    # Bots start on a push, on opening, and on leaving draft: settle from the latest of the three.
+    | ([$pushed[0], .createdAt, ($timeline[0] // [] | map(select(.event == "ready_for_review") | .created_at) | max)]
+       | map(select(. != null)) | max
+       | if . then (now - fromdateiso8601 | floor) else null end) as $pushed_ago
     | ([.statusCheckRollup[]? | select(outcome | IN("", "PENDING", "QUEUED", "IN_PROGRESS", "EXPECTED", "WAITING", "REQUESTED")) | (.name // .context)]
        | unique | map({name: ., required: required(.)})) as $pending
     | if $in_flight == 1 then
         ([$reviewers[] | "reviewer \(.)"]
          + [$reactions[0][]? | select(.content == "eyes") | "reaction \(.user) eyes"]
+         + [$owed[]? | "owed \(.reviewer): \(.why)"]
+         + (if $pushed_ago != null and $pushed_ago < $settle then ["settling: pushed, opened or marked ready \($pushed_ago)s ago"] else [] end)
          + [$pending[] | select((.required == true and $no_required == 0) or (.name | IN($names | lines | .[]))) | "check \(.name)"]) as $counted
         | {pr: .number, in_flight: ($counted | length > 0), reviewers: $reviewers, bot_reactions: $reactions[0],
-           checks_pending: $pending, counted: $counted}
+           reviews_owed: $owed, checks_pending: $pending, counted: $counted}
       else
         {number, url, title, state, draft: .isDraft,
          head: .headRefName, head_sha: .headRefOid, base: .baseRefName,
@@ -189,6 +252,8 @@ query($owner: String!, $repo: String!, $pr: Int!, $head: String!, $endCursor: St
          cross_repo: .isCrossRepository, maintainer_can_modify: .maintainerCanModify,
          requested_reviewers: $reviewers,
          bot_reactions: $reactions[0],
+         reviews_owed: $owed,
+         head_pushed_at: $pushed[0],
          checks_failed: [.statusCheckRollup[]? | select(outcome | IN("FAILURE", "CANCELLED", "TIMED_OUT", "ERROR", "ACTION_REQUIRED", "STARTUP_FAILURE", "STALE"))
                          | {name: (.name // .context), link: (.detailsUrl // .targetUrl // null)}],
          checks_pending: $pending,

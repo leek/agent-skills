@@ -2,7 +2,7 @@
 name: resolve-review-comments
 description: Fix or rebut every review comment on a pull request, human or AI-review bot (Codex, Copilot, Gemini), then reply and resolve each thread. Use when the user wants a PR's review comments addressed, answered, or cleared.
 argument-hint: "A PR number or URL (defaults to the PR for the current branch)"
-allowed-tools: "Bash(gh pr view *) Bash(gh pr diff *) Bash(gh pr checks *) Bash(gh api *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/triage-github-pr/scripts/pr-comments.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/triage-github-pr/scripts/pr-reply.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/fix-ci-failures/scripts/failed-jobs.sh *)"
+allowed-tools: "Bash(gh pr view *) Bash(gh pr diff *) Bash(gh pr checks *) Bash(gh api *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/triage-github-pr/scripts/pr-comments.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/triage-github-pr/scripts/pr-reply.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/fix-ci-failures/scripts/failed-jobs.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/closeout/scripts/pr-state.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/run-after/scripts/wait-until.sh * -- bash ${CLAUDE_PLUGIN_ROOT}/skills/closeout/scripts/pr-state.sh * --in-flight*)"
 ---
 
 # Resolve Review Comments
@@ -32,7 +32,12 @@ reply forms ("Fixed in", "Reviewed,", "Left as is") is an earlier run's too. Eve
 ## 1. Gather every thread
 
 Resolve the repo (`gh repo view --json nameWithOwner`) and the PR number (from the
-argument, or `gh pr view --json number` for the current branch). Pull all three comment
+argument, or `gh pr view --json number` for the current branch). **Watch the reviewers**
+first: when a review is in flight on the PR, wait for it to finish (the watch is in the
+references file), so this round answers its findings instead of leaving them to land
+after you. At the watch's cap, or when only requested humans are left in its `counted`
+(a person can take days), go on with what has arrived and name who is still reviewing
+in the report. Then pull all three comment
 surfaces (reviews, inline review threads, general issue comments) and the PR's
 commit range. See [`references/gh-mechanics.md`](references/gh-mechanics.md) for the exact
 `gh api` and GraphQL calls; you need it whenever you touch the GitHub side.
@@ -156,15 +161,17 @@ confirm), every reply is posted, and `git status` is clean.
 
 ## 7. Wait for CI and the re-review
 
-The push triggers CI and fresh bot reviews. Wait for both where the harness can (in
-Claude Code: `gh pr checks <n> --watch` as a background Bash command, then
-`ScheduleWakeup` for 5–10 minutes so the bots can re-review); otherwise report the
-pushed sha and tell the user to rerun this skill once CI and the bots finish. After the
-wait, re-query unresolved threads and read the failed checks (`failed-jobs.sh --pr`, in
-the references file): new threads or a failed job send you back to step 1. Stop after 3
-rounds.
+The push triggers CI and a fresh review from every bot. Wait for both where the harness
+can: `gh pr checks <n> --watch` and the reviewer watch from the references file, each as
+a background command. The reviewer watch, not a fixed sleep, says when the bots are done:
+they start up to a minute after the push and take 5–15 minutes. Without background
+commands, report the pushed sha and tell the user to rerun this skill once CI and the
+bots finish. After both waits, re-query unresolved threads and read the failed checks
+(`failed-jobs.sh --pr`, in the references file): new threads or a failed job send you
+back to step 1. Stop after 3 rounds.
 
-Completion criterion: CI is green and no new thread appeared, the round cap is hit, or
-the user has the rerun instruction. Report the tally: fixed vs rebutted (and how many of each were directed), any
+Completion criterion: CI is green, the reviewer watch read clear, and no new thread
+appeared; or the round cap is hit, or a reviewer was still running at the watch's cap
+(name it), or the user has the rerun instruction. Report the tally: fixed vs rebutted (and how many of each were directed), any
 direction that conflicts with a spec or ticket, the commit(s)
-that carried the fixes, and the rounds run. Mark a red check, a hit round cap, or a pending rerun ⚠️; no other marks.
+that carried the fixes, and the rounds run. Mark a red check, a hit round cap, a reviewer still running, or a pending rerun ⚠️; no other marks.

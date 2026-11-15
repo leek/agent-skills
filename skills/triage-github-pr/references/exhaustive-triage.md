@@ -5,18 +5,13 @@ clean. A bare PR number, an entire queue, or a resumed bounded run does not enab
 The main skill still owns classification, thread dispositions, local validation,
 exact-head review, merge gates and cleanup.
 
-## Wait for optional reviews
+## Wait for reviews
 
-Use the [in-flight signals](gh-mechanics.md#in-flight-signals). Spend the remaining
-budget as the main skill's one wait (a `ScheduleWakeup`, or the background command under
-**Taking the wait** there). When the harness has neither,
-gather the reviews already submitted and continue. Keep progress event-driven as the
-main skill allows.
-
-Optional waits share the main skill's 20-minute total budget per PR, at most 10
-minutes per checkpoint; record time used across rounds and resumes. Once exhausted,
-name any reviewers that did not finish and proceed with the reviews available.
-A later user instruction to merge now and move new findings to another PR
+Each round's checkpoint watches the reviewers as the main skill's does, by **Taking the
+wait** in [In-flight signals](gh-mechanics.md#in-flight-signals): until nothing is in
+flight on the head, at most 20 minutes per checkpoint; record the time used across
+rounds and resumes. A reviewer still running at the cap is the main skill's merge
+question. A later user instruction to merge now and move new findings to another PR
 immediately returns to bounded delivery. Hard merge
 gates still apply.
 
@@ -40,6 +35,6 @@ preserves its severity and is
 replied to, resolved and listed for the follow-up owned by the main skill.
 
 Before each push, update dispositions and independently review the unpushed fixes.
-After it, take the one wait within the limit above, gather changed comment surfaces
+After it, watch the reviewers as above, gather changed comment surfaces
 and classify only new claims. Repeat only when this table requires another fix. When clean, return
 to step 6's exact-head merge checkpoint.

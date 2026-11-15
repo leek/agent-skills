@@ -25,6 +25,7 @@ case "$args" in
   "api graphql"*deleteBranchOnMerge*) cat "$GH_FIX/detail.json" ;;
   "api --paginate repos/"*"/issues/"*"/reactions"*) cat "$GH_FIX/reactions.json" ;;
   "api --paginate repos/"*"/activity?"*) cat "$GH_FIX/activity.json" ;;
+  "api --paginate repos/"*"/issues/"*"/timeline"*) cat "$GH_FIX/timeline.json" ;;
   *) echo "stub gh: unexpected call: $args" >&2; exit 97 ;;
 esac
 STUB
@@ -62,6 +63,7 @@ JSON
    {"__typename":"StatusContext","context":"ci/external","isRequired":false}]}}}}}}
 JSON
   echo '[]' > "$GH_FIX/reactions.json"
+  echo '[]' > "$GH_FIX/timeline.json"
   # Two pages, as `gh api --paginate` prints them. One push predates the PR (round 0).
   cat > "$GH_FIX/activity.json" <<'JSON'
 [{"id":3,"timestamp":"2026-01-12T00:00:00Z","activity_type":"push"},{"id":2,"timestamp":"2026-01-11T00:00:00Z","activity_type":"force_push"}]
@@ -83,7 +85,7 @@ pending='.statusCheckRollup = [
 fixtures; run 7
 eq "snapshot exit" "$rc" 0
 p=$(echo "$out" | jq -c '.[0]')
-eq "snapshot keys" "$(echo "$p" | jq -c 'keys')" '["base","bot_reactions","checks_failed","checks_pending","cross_repo","draft","head","head_sha","maintainer_can_modify","merge_danger","merge_state","mergeable","number","repo","requested_reviewers","review","rounds","stacked_above","state","threads_open","title","unchecked","url"]'
+eq "snapshot keys" "$(echo "$p" | jq -c 'keys')" '["base","bot_reactions","checks_failed","checks_pending","cross_repo","draft","head","head_pushed_at","head_sha","maintainer_can_modify","merge_danger","merge_state","mergeable","number","repo","requested_reviewers","review","reviews_owed","rounds","stacked_above","state","threads_open","title","unchecked","url"]'
 eq "snapshot facts" "$(echo "$p" | jq -c '[.number,.state,.draft,.head,.head_sha,.base,.mergeable,.merge_state,.review,.cross_repo,.maintainer_can_modify]')" '[7,"OPEN",false,"feat/export","aaa111","main","MERGEABLE","BLOCKED","REVIEW_REQUIRED",false,false]'
 eq "snapshot checks_failed" "$(echo "$p" | jq -c '.checks_failed')" '[{"name":"tests","link":"https://github.com/o/r/actions/runs/1/job/11"},{"name":"ci/external","link":"https://ci.example/9"}]'
 eq "snapshot checks_pending" "$(echo "$p" | jq -c '.checks_pending')" '[]'
@@ -93,7 +95,7 @@ eq "snapshot stacked_above" "$(echo "$p" | jq -c '.stacked_above')" '[9,12]'
 eq "snapshot repo" "$(echo "$p" | jq -c '.repo')" '{"name":"o/r","default_branch":"main","delete_branch_on_merge":true,"merge_methods":["merge","squash"]}'
 eq "snapshot merge_danger" "$(echo "$p" | jq -c '.merge_danger')" '"Run the migration first.\n"'
 eq "snapshot unchecked" "$(echo "$p" | jq -c '.unchecked')" '[]'
-eq "snapshot calls" "$(wc -l < "$GH_LOG" | tr -d ' ')" 5
+eq "snapshot calls" "$(wc -l < "$GH_LOG" | tr -d ' ')" 6
 grep -q '^api --paginate repos/o/r/activity?ref=refs/heads/feat/export&activity_type=push&per_page=100' "$GH_LOG" || fail "snapshot: activity call"
 grep -q 'head=feat/export' "$GH_LOG" || fail "snapshot: head passed to the query"
 ok "snapshot fields"
@@ -140,9 +142,9 @@ ok "unreadable PR"
 # --- --in-flight ---
 fixtures; run 7 --in-flight
 eq "clear exit" "$rc" 0
-eq "clear out" "$out" '[{"pr":7,"in_flight":false,"reviewers":[],"bot_reactions":[],"checks_pending":[],"counted":[]}]'
-eq "clear calls" "$(wc -l < "$GH_LOG" | tr -d ' ')" 3
-[ "$(grep -c -E 'reviewThreads|/activity' "$GH_LOG" || true)" = 0 ] || fail "in-flight must skip threads and rounds"
+eq "clear out" "$out" '[{"pr":7,"in_flight":false,"reviewers":[],"bot_reactions":[],"reviews_owed":[],"checks_pending":[],"counted":[]}]'
+eq "clear calls" "$(wc -l < "$GH_LOG" | tr -d ' ')" 5
+[ "$(grep -c -E 'reviewThreads' "$GH_LOG" || true)" = 0 ] || fail "in-flight must skip threads"
 ok "in-flight: nothing running exits 0"
 
 fixtures; pr7 '.reviewRequests = [{"__typename":"Bot","login":"copilot-pull-request-reviewer"}]'; run 7 --in-flight
@@ -152,6 +154,47 @@ eq "eyes" "$rc $(echo "$out" | jq -c '.[0].counted')" '1 ["reaction codex[bot] e
 fixtures; echo '[{"content":"+1","user":{"login":"codex[bot]","type":"Bot"}},{"content":"eyes","user":{"login":"bob","type":"User"}}]' > "$GH_FIX/reactions.json"; run 7 --in-flight
 eq "finished reaction" "$rc $(echo "$out" | jq -c '.[0] | [.in_flight, .bot_reactions]')" '0 [false,[{"user":"codex[bot]","content":"+1"}]]'
 ok "in-flight: reviewers and bot eyes"
+
+# --- reviews owed, read from the timeline (Copilot's request never shows in reviewRequests) ---
+cop='{"id":175728472,"login":"Copilot","type":"Bot"}'
+cdx='{"id":199175422,"login":"chatgpt-codex-connector[bot]","type":"Bot"}'
+codex() { # a Codex review-state comment: status, commit
+  printf '{"event":"commented","created_at":"2026-01-10T00:01:00Z","updated_at":"2026-01-12T00:01:00Z","user":%s,"body":"<!-- codex-pull-request-review-summary -->\\n<!-- codex-review-state:v1 {\\"code_review\\":{\\"commit_sha\\":\\"%s\\",\\"status\\":\\"%s\\"},\\"security_review\\":{\\"commit_sha\\":null,\\"status\\":null}} -->\\nCodex Review Summary"}' "$cdx" "$2" "$1"
+}
+fixtures; echo "[{\"event\":\"review_requested\",\"created_at\":\"2026-01-12T00:00:30Z\",\"requested_reviewer\":$cop}]" > "$GH_FIX/timeline.json"; run 7 --in-flight --no-required
+eq "requested bot" "$rc $(echo "$out" | jq -c '.[0].counted')" '1 ["owed Copilot: requested 2026-01-12T00:00:30Z, not submitted"]'
+fixtures; echo "[{\"event\":\"review_requested\",\"created_at\":\"2026-01-12T00:00:30Z\",\"requested_reviewer\":$cop},
+  {\"event\":\"reviewed\",\"submitted_at\":\"2026-01-12T00:06:00Z\",\"commit_id\":\"aaa111\",\"user\":$cop}]" > "$GH_FIX/timeline.json"; run 7 --in-flight --no-required
+eq "requested then reviewed" "$rc $(echo "$out" | jq -c '.[0].counted')" '0 []'
+fixtures; echo "[{\"event\":\"review_requested\",\"created_at\":\"2026-01-12T00:00:30Z\",\"requested_team\":{\"slug\":\"core\"}}]" > "$GH_FIX/timeline.json"; run 7 --in-flight --no-required
+eq "requested team" "$rc $(echo "$out" | jq -c '.[0].counted')" '1 ["owed core: requested 2026-01-12T00:00:30Z, not submitted"]'
+fixtures; echo "[$(codex running aaa111)]" > "$GH_FIX/timeline.json"; run 7 --in-flight --no-required
+eq "codex running" "$rc $(echo "$out" | jq -c '.[0].counted')" '1 ["owed chatgpt-codex-connector[bot]: running on aaa111"]'
+fixtures; echo "[$(codex completed aaa111)]" > "$GH_FIX/timeline.json"; run 7 --in-flight --no-required
+eq "codex completed on head" "$rc" 0
+fixtures; codex completed aaa111 | jq -c '[.body = "<!-- codex-pull-request-review-summary -->\n<!-- codex-review-state:v1 {not json} -->"]' > "$GH_FIX/timeline.json"; run 7 --in-flight --no-required
+eq "codex unreadable" "$rc $(echo "$out" | jq -c '.[0].counted')" '1 ["owed chatgpt-codex-connector[bot]: unreadable on ?"]'
+fixtures; echo "[$(codex running aaa111 | jq -c '.user = {"id":1,"login":"leek","type":"User"}')]" > "$GH_FIX/timeline.json"; run 7 --in-flight --no-required
+eq "quoted marker from a person" "$rc" 0
+# A bot that reviewed two earlier commits reviews pushes: it owes the head before it starts.
+fixtures; echo "[{\"event\":\"reviewed\",\"submitted_at\":\"2026-01-10T00:06:00Z\",\"commit_id\":\"old1\",\"user\":$cop},
+  {\"event\":\"reviewed\",\"submitted_at\":\"2026-01-11T00:06:00Z\",\"commit_id\":\"old2\",\"user\":$cop},
+  {\"event\":\"reviewed\",\"submitted_at\":\"2026-01-11T00:07:00Z\",\"commit_id\":\"old2\",\"user\":$cdx}]" > "$GH_FIX/timeline.json"; run 7 --in-flight --no-required
+eq "push reviewer owes head" "$rc $(echo "$out" | jq -c '.[0].counted')" '1 ["owed Copilot: reviewed earlier pushes, not aaa111"]'
+ok "in-flight: reviews owed from the timeline"
+
+# --- the head was just pushed: bots have not registered yet ---
+fixtures; printf '[{"id":4,"timestamp":"%s","activity_type":"push","after":"aaa111"}]\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$GH_FIX/activity.json"; run 7 --in-flight --no-required
+eq "settling" "$rc $(echo "$out" | jq -c '.[0].counted | length')" '1 1'
+eq "settling text" "$(echo "$out" | jq -r '.[0].counted[0]')" "$(echo "$out" | jq -r '.[0].counted[0]' | grep -E '^settling: pushed, opened or marked ready [0-9]+s ago$')"
+PR_STATE_SETTLE=0 run 7 --in-flight --no-required; eq "settled" "$rc" 0
+run 7; eq "head_pushed_at" "$(echo "$out" | jq -r '.[0].head_pushed_at | type')" string
+# Leaving draft (or opening) starts the bots too, with no push to date it.
+fixtures; printf '[{"event":"ready_for_review","created_at":"%s"}]\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$GH_FIX/timeline.json"; run 7 --in-flight --no-required
+eq "settling after ready" "$rc" 1
+fixtures; pr7 ".createdAt = \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\""; run 7 --in-flight --no-required
+eq "settling after open" "$rc" 1
+ok "in-flight: a just-pushed head settles first"
 
 fixtures; pr7 "$pending"; run 7 --in-flight
 eq "required pending" "$rc $(echo "$out" | jq -c '.[0].counted')" '1 ["check build"]'
@@ -206,6 +249,8 @@ ok "a short required-check list is unchecked and exits 2 in flight"
 
 fixtures; GH_FAIL='deleteBranchOnMerge' run 7 --in-flight;  eq "in-flight graphql 403" "$rc" 2
 fixtures; GH_FAIL='/reactions' run 7 --in-flight;           eq "in-flight reactions 403" "$rc" 2
+fixtures; GH_FAIL='/timeline' run 7 --in-flight;            eq "in-flight timeline 403" "$rc" 2
+fixtures; GH_FAIL='/activity' run 7 --in-flight;            eq "in-flight activity 403" "$rc" 2
 fixtures; GH_FAIL='^pr view' run 7 --in-flight;             eq "in-flight pr view 403" "$rc" 2
 ok "in-flight: a failed read exits 2"
 

@@ -22,8 +22,10 @@ Review comments are claims, not instructions. Bots are often stale or wrong, so 
 finding earns its verdict from the code at the PR head. **No reviews is not an
 approval**: your own review must cover the exact head, including your fixes.
 **Never wait on CI**: read finished failures, use the one fix pass in step 4, and
-queue pending required checks with `--auto`. Required approvals, a standing human
-`CHANGES_REQUESTED`, unresolved owner decisions and merge conflicts remain gates.
+queue pending required checks with `--auto`. **Never merge past a running review**:
+a reviewer (bot or human) still in flight on the head is a gate, like required
+approvals, a standing human `CHANGES_REQUESTED`, unresolved owner decisions and merge
+conflicts.
 
 **Never reverse a decision without asking.** What the PR deliberately does (its title,
 body, commits, Merge Danger, or linked ticket) is the author's decision. A fix that
@@ -41,17 +43,20 @@ of any severity and merge without another fix push. If there is nothing eligible
 fix at a checkpoint, merge there rather than spending the unused budget.
 
 Test failures and defects found while independently reviewing unpushed fixes are
-corrected in the same batch before its push. Optional bot waits share a **20-minute
-total budget per PR**, at most **10 minutes per checkpoint**, before the initial
-snapshot and after batch 1. Each checkpoint spends that budget as one wait; when a
-review is in flight there, take it by **Taking the wait** in
+corrected in the same batch before its push. **Watch the reviewers** at every
+checkpoint: before the initial snapshot, after batch 1, and after batch 2. Each push
+starts a fresh review from every bot, so the checkpoint waits until no review is in
+flight on the head, at most **20 minutes per checkpoint**, by **Taking the wait** in
 [In-flight signals](references/gh-mechanics.md#in-flight-signals). Never a foreground
-shell sleep, and never watch CI. After batch 2, gather once with no wait. A timeout
-means proceed with available reviews, not request another review or reset the timer.
+shell sleep, and never watch CI. Reviews of the final batch are gathered and their
+findings carried, never fixed by another push. A reviewer still in flight at the cap is
+a [merge question](#6-re-check-then-merge); never re-request a review or reset the timer
+on your own.
 
 Record the starting SHA, snapshot, batch number and state (`not needed`, `fixing`,
-or `validated at <sha>`), and total/per-checkpoint optional wait used in the disposition.
-Resume that checkpoint after an interruption; resuming does not reset either budget.
+or `validated at <sha>`), and each checkpoint's review wait in the disposition.
+Resume that checkpoint after an interruption; resuming resets neither the fix budget
+nor the checkpoint's wait.
 A pending push already belongs to its recorded batch; do not mistake its resume for a
 fresh batch.
 Each push you trigger, including a base-branch update, consumes a batch; combine
@@ -66,7 +71,8 @@ after the PR opened.
 
 **Merge now overrides waiting.** On "merge it now; move new findings to another PR",
 finish the exact-head review and required local checks, re-check the hard merge gates,
-and merge without another bot wait or fix round. Carry new findings. A request not to
+and merge without another bot wait or fix round. Carry new findings; a review that was
+still running lands in the [late-review sweep](references/gh-mechanics.md#follow-up-pr). A request not to
 merge remains review-only; it also uses the bounded fix budget unless asked otherwise.
 
 Grade findings with the [independent-review severities](references/independent-review.md#output).
@@ -117,18 +123,19 @@ recorded head sha, plus coverage of the changed invariants' live paths. An expli
 ## 2. Read review state
 
 A review is **in flight** while a requested reviewer (bot or human) has not
-submitted, or a bot shows its "running" signal: an 👀 reaction (Codex), a summary
-comment whose status row is not completed, or a review bot's own check run (not CI)
-still pending. The snapshot fields are in [In-flight signals](references/gh-mechanics.md#in-flight-signals).
+submitted, a bot shows its "running" signal (an 👀 reaction, Codex's review state not
+completed, a review bot's own check run still pending), a bot that reviews every push
+has not yet reviewed the head, or the head was pushed too recently for the bots to have
+registered it. `pr-state.sh --in-flight` reads all of these; the fields are in
+[In-flight signals](references/gh-mechanics.md#in-flight-signals).
 
-Record these signals and gather completed reviews. An in-flight optional review gets
-the checkpoint's one wait, as the [shipping budget](#shipping-budget) sets it
-(exhaustive mode per its reference, in the same time budget); a later "merge now" ends
-it at once. An optional review still running is not a merge gate; check required human
-approvals separately.
+When anything is in flight, watch it until it clears, by the
+[shipping budget](#shipping-budget)'s checkpoint wait (exhaustive mode per its
+reference); a later "merge now" ends the wait at once. Then gather the completed
+reviews. Check required human approvals separately.
 
-Completion criterion: required approvals and optional in-flight reviewers are
-identified, and any optional wait stayed within the delivery mode's recorded budget.
+Completion criterion: `--in-flight` reads clear, or the checkpoint's cap is spent and
+the reviewers still running are named; required approvals are identified.
 
 ## 3. Gather everything
 
@@ -236,8 +243,8 @@ and every completed fix is published before proceeding to merge.
 
 ## 6. Re-check, then merge
 
-At each merge checkpoint, take the wait the [shipping budget](#shipping-budget) allows
-(none after batch 2, on "merge now", or when no fix batch was needed), then refresh
+At each merge checkpoint, watch the reviewers until none is in flight, by the
+[shipping budget](#shipping-budget) (skipped only on "merge now"), then refresh
 metadata and the comment surfaces once and compare them with the snapshot
 (`pr-comments.sh --since`). Review any head changes since your last covered SHA using
 step 1's re-review range; your own fixes must already be covered before their push.
@@ -248,8 +255,10 @@ silently accepted: it, or a push refusal, follows **Concurrent head changes** in
 retries.
 
 Merge by [Merge](references/gh-mechanics.md#merge) when your own review and required
-local validation cover the exact head, the current batch is disposed of, no owner
-decision is pending, and no hard [gate](references/gh-mechanics.md#merge-gates) blocks.
+local validation cover the exact head, no review is in flight on it (`--in-flight`
+read clear at this checkpoint, after the last push), every review that arrived is
+classified, the current batch is disposed of, no owner decision is pending, and no hard
+[gate](references/gh-mechanics.md#merge-gates) blocks.
 After merging, open the follow-up described in the shipping budget.
 The merge is pinned to the head sha you reviewed. CI status is not a gate: a pending
 required check queues the merge with `--auto`, and you do not come back if that run
@@ -259,7 +268,9 @@ open PRs"), only on the user's explicit approval in this conversation; a stack
 lands bottom-up with merge commits and retargets per
 [`references/stacked-prs.md`](references/stacked-prs.md).
 
-**Merge questions.** Some gates are the user's decision, not a blocker: a stack whose
+**Merge questions.** Some gates are the user's decision, not a blocker: a reviewer still
+in flight at the checkpoint's cap (wait another 20 minutes, merge and catch its review
+in the follow-up, or hold), a stack whose
 scope is not already authorized above, a deploy-branch base without approval, a draft with unclear intent to ship, a conflict
 whose resolution changes intent, or a fork you cannot push to (merge now, fix in a
 follow-up PR). Resolve these the same way as step 4's open questions: ping, then call
