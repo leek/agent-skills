@@ -183,8 +183,8 @@ prepare_integration() {
   [[ ! -f "$NOTES_DIR/board.jsonl" ]] || BOARD_LINES_SEEN="$(wc -l <"$NOTES_DIR/board.jsonl" | tr -d ' ')"
 }
 
-# The finish worker has no ticket-board tool: it appends one JSON object per board change to
-# $NOTES_DIR/board.jsonl (a stage, one finding, one open entry). Each new line is announced
+# Workers have no ticket-board tool: they append one JSON object per board change to
+# $NOTES_DIR/board.jsonl (a stage, one finding, one open entry, one stack PR). Each new line is announced
 # as `board <json>`, and the launching session sends it to the board.
 relay_board() {
   local file="$NOTES_DIR/board.jsonl" total line
@@ -555,6 +555,7 @@ build_manifest() {
     --arg notes "$NOTES_DIR" \
     --arg delivery "$DELIVERY" \
     --arg land "$LAND_PATH" \
+    --arg board_file "$NOTES_DIR/board.jsonl" \
     --arg head "$(git -C "$INTEGRATION_DIR" rev-parse HEAD 2>/dev/null || true)" \
     --argjson blockers "$blockers" \
     '{
@@ -576,6 +577,7 @@ build_manifest() {
       delivery: $delivery,
       land: $land,
       blockers: $blockers,
+      board_file: $board_file,
       integration_head: $head
     }'
 }

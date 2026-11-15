@@ -52,10 +52,10 @@ Stream the milestones by running `--follow 2>&1 | grep --line-buffered -E 'Autop
 | `ticket <NN> merged (…)` | `merged`, note: the SHA in `$notes/landed/<NN>` |
 | `question <NN>: …` or `ticket <NN> blocked: …` | `released`, note: why |
 | `worker <NN> failed: …` | `not-built`, note: the failure |
-| `board <json>` | the object as it is: a `stage`, a finding, or an `open` entry from the finish worker |
+| `board <json>` | the object as it is: a `stage`, a finding, an `open` entry, or a `stack` or `integration` PR from a worker |
 | `worker finish result continue` | each landed ticket `closed`; the delivery ticket `closed`, or `awaiting-deploy` at `ready-for-human` |
 
-When the reply says no pane shows the run, post `implement-spec`'s progress line for each merge instead.
+When the reply says no pane shows the run, post `implement-spec`'s progress line for each merge instead. On a resume the runner does not announce board lines an earlier run already relayed, so with Stacked PRs send every `stack` and `integration` line in `$notes/board.jsonl` once, in file order, before following the run.
 
 Also act on these lines as they arrive:
 

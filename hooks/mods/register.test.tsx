@@ -257,3 +257,44 @@ test('ticket_board counts not-built tickets as open and lists the work open afte
   expect(await pane.find({ type: 'Text', text: /✓ Fix for the audit list is not pushed {2}done · #101/ })).toBeDefined()
   expect(await pane.find({ type: 'Text', text: /1 open after this run \(1 untracked\)/ })).toBeDefined()
 })
+
+test('ticket_board keeps the safe-to-merge stack under the header, wrapped to the pane', async ($, on) => {
+  mock.clock(on, { now: 0 })
+  on('ui.render', async ($, e) => engineDraw($, e))
+  on('tool.call', async () => ({ result: 'ok' }) as never)
+  on('ui.open', async () => ({ value: { isPlaced: true } }) as never)
+
+  const board = { tool: 'mcp__leek-skills__ticket_board', board: 'auth', kind: 'spec' }
+  const pane = await $.ui.mount({
+    plugin: 'leek-skills',
+    surface: 'terminal',
+    component: 'Pane',
+    requestId: 'tickets',
+    props: { title: 'Spec: auth', isFocused: false, bodyColumns: 34, placement: 'dock' },
+  } as never)
+
+  await $.tool.call({ ...board, tickets: [{ number: '01', title: 'Login form', status: 'merged' }], tool_use_id: 's1' } as never)
+  expect(await pane.find({ type: 'Text', text: /Safe to merge/ })).toBeUndefined()
+
+  const stack = Array.from({ length: 6 }, (_, n) => ({ number: String(6487 + n), position: n + 1, status: 'safe' }))
+  await $.tool.call({
+    ...board,
+    stack,
+    integration: { number: '6486', into: 'main', safe: false, note: 'build not finished' },
+    tool_use_id: 's2',
+  } as never)
+  expect(await pane.find({ type: 'Text', text: /Safe to merge 6 of 6 safe/ })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: /^ {2}#6487 → #6488 → #6489 → #6490$/ })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: /^ {2}→ #6491 → #6492$/ })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: /✗ integration #6486 into main not safe yet · build not finished/ })).toBeDefined()
+
+  await $.tool.call({ ...board, integration: { number: '6486', safe: true }, tool_use_id: 's3' } as never)
+  expect(await pane.find({ type: 'Text', text: /^ {2}⇒ #6486 into main$/ })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: /not safe yet/ })).toBeUndefined()
+
+  const conflict = await $.tool.call({ ...board, stack: [{ number: '6489', status: 'not-safe', note: 'conflicts' }], tool_use_id: 's4' } as never)
+  expect(String((conflict as { result: unknown }).result)).toContain('stack 2 of 6 safe')
+  expect(await pane.find({ type: 'Text', text: /^ {2}#6487 → #6488$/ })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: /✗ #6489 not safe · conflicts/ })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: /waiting behind it: 3 more PRs and #6486/ })).toBeDefined()
+})

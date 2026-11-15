@@ -222,8 +222,8 @@ Progress lines to watch for ("<timestamp> Autopilot: <message>"):
   question <NN>: <text>              it needs an answer; the ticket was released
   ticket <NN> blocked: <text>        it could not be built; the ticket was released
   worker <NN> failed: <text>         the run stops dispatching and ends failed
-  board <json>                       a ticket-board change from the finish worker (a review
-                                     stage, a finding, an open entry): send it to the board
+  board <json>                       a ticket-board change from a worker (a review stage, a
+                                     finding, an open entry, a stack PR): send it to the board
 
 Exit codes: 0 complete, 2 needs input, 3 blocked, 4 worker failure,
   5 runner/configuration failure, 129 hangup, 130 interrupted, 143 terminated.

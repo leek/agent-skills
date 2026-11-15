@@ -13,6 +13,8 @@
 // ticket's status through the ticket_board tool this module registers, and a pane shows
 // the run, joined to each ticket's running worker; once the tickets are built, it shows the
 // review stage and each finding's fix the same way, then the work still open after the run.
+// A stacked delivery also sends its PRs, and the pane keeps the safe-to-merge chain under
+// the header: `#101 → #102 ⇒ #100 into main`, the integration PR only once the run marks it safe.
 // The tool's reply says whether a pane drew it; where none did, the skill posts its progress
 // lines in chat as before.
 
@@ -24,15 +26,21 @@ import { normalizeSlug, openFiles, scan, summary, tally } from './scratch-scan'
 import {
   SCHEMA,
   apply,
+  chainRows,
+  chainTokens,
   findingColor,
   findingMark,
   findingTally,
+  hasStack,
   header as boardHeader,
   isUntracked,
   openColor,
   openLabel,
   openMark,
   parseUpdate,
+  safeStack,
+  stackTally,
+  stackWarnings,
   ticketColor,
   ticketMark,
   title,
@@ -142,7 +150,7 @@ export const register: Register = on => {
     await $.tool.register({
       name: 'ticket_board',
       description:
-        'For implement-spec, implement <spec> all, and wayfinder <map> all: report ticket status changes, then the review stage and finding status changes, then the work still open after the run, so a pane beside the chat shows the run. The reply says whether a pane drew it.',
+        'For implement-spec, implement <spec> all, and wayfinder <map> all: report ticket status changes, then the review stage and finding status changes, then the work still open after the run, and for stacked PRs each PR\'s safe-to-merge state, so a pane beside the chat shows the run. The reply says whether a pane drew it.',
       inputSchema: SCHEMA,
     })
 
@@ -376,12 +384,39 @@ export const register: Register = on => {
     const worker = (t: BoardTicket) =>
       [...list].reverse().find(w => w.name === `${run.slug}--${t.number}` && w.outcome === 'running')
     const fixer = list.find(w => w.name === `${run.slug}--fix` && w.outcome === 'running')
+    const stack = safeStack(run)
+    const chain = chainRows(chainTokens(run), Math.max(20, e.props.bodyColumns - 2))
 
     return (
       <Box flexDirection="column" width={e.props.bodyColumns}>
         <Text bold wrap="truncate-end">
           {run.slug} <Text dimColor>{boardHeader(run)}</Text>
         </Text>
+        {hasStack(run) && (
+          <Box flexDirection="column" marginTop={1} marginBottom={1}>
+            <Text bold wrap="truncate-end">
+              Safe to merge <Text dimColor>{stackTally(run)}</Text>
+            </Text>
+            {chain.length === 0 && (
+              <Text color="warning" wrap="truncate-end">
+                {'  '}
+                {stack.pending.length === 0 && stack.integration === null ? 'every PR landed' : 'nothing safe to merge yet'}
+              </Text>
+            )}
+            {chain.map((row, n) => (
+              <Text key={`chain-${n}`} color="success" wrap="truncate-end">
+                {'  '}
+                {row}
+              </Text>
+            ))}
+            {stackWarnings(run).map((line, n) => (
+              <Text key={`stop-${n}`} color={n === 0 ? 'warning' : undefined} dimColor={n > 0} wrap="truncate-end">
+                {'  '}
+                {line}
+              </Text>
+            ))}
+          </Box>
+        )}
         {run.tickets.map(t => {
           const w = worker(t)
           const live = w === undefined ? '' : ` · ${w.tools} tools · ${duration(now - w.startedAt)}${w.lastTool === '' ? '' : ` · ${w.lastTool}`}`
@@ -450,7 +485,12 @@ export const register: Register = on => {
 // /ticket-board's reply where no pane draws.
 function boardText(run: TicketBoard): string {
   const note = (n: string) => (n === '' ? '' : ` (${n})`)
-  const lines = run.tickets.map(t => `${ticketMark(t.status)} ${t.number} ${t.title}: ${t.status}${note(t.note)}`)
+  const lines: string[] = []
+  if (hasStack(run)) {
+    const chain = chainTokens(run).join(' ')
+    lines.push(`Safe to merge (${stackTally(run)}): ${chain === '' ? 'nothing yet' : chain}`, ...stackWarnings(run), '')
+  }
+  lines.push(...run.tickets.map(t => `${ticketMark(t.status)} ${t.number} ${t.title}: ${t.status}${note(t.note)}`))
   if (run.stage !== '') lines.push('', `${run.stage}${run.findings.length > 0 ? `: ${findingTally(run)}` : ''}`)
   lines.push(...run.findings.map(f => `${findingMark(f.status)} ${f.title}: ${f.status}${note(f.note)}`))
   if (run.open.length > 0) lines.push('', 'Open after this run')

@@ -1,6 +1,20 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { apply, header, isUntracked, openMark, parseUpdate, summary, tally, ticketColor, ticketMark } from './ticket-board'
+import {
+  apply,
+  chainRows,
+  chainTokens,
+  header,
+  isUntracked,
+  openMark,
+  parseUpdate,
+  stackTally,
+  stackWarnings,
+  summary,
+  tally,
+  ticketColor,
+  ticketMark,
+} from './ticket-board'
 
 describe('apply', () => {
   test('first update lists the tickets; later ones change status by number and keep titles', async () => {
@@ -140,7 +154,7 @@ describe('apply', () => {
 describe('parseUpdate', () => {
   test('a stage-only update needs no tickets', async () => {
     const result = parseUpdate({ board: 'auth', kind: 'spec', stage: 'final checks' })
-    expect(result).toEqual({ board: 'auth', kind: 'spec', tickets: [], stage: 'final checks', findings: [], open: [] })
+    expect(result).toEqual({ board: 'auth', kind: 'spec', tickets: [], stage: 'final checks', findings: [], open: [], stack: [], integration: undefined })
   })
 
   test('refuses an open entry with an unknown kind', async () => {
@@ -156,5 +170,81 @@ describe('parseUpdate', () => {
   test('refuses an unknown status with the allowed list', async () => {
     const result = parseUpdate({ board: 'auth', kind: 'spec', tickets: [{ number: '01', status: 'done' }] })
     expect(typeof result === 'string' && result.includes('resolved')).toBe(true)
+  })
+})
+
+describe('stack', () => {
+  const base = { board: 'auth', kind: 'spec' as const, tickets: [] }
+
+  test('the chain reads in landing position, not PR or ticket number, and stops at the first unsafe PR', async () => {
+    const board = apply(null, {
+      ...base,
+      stack: [
+        { number: '6488', position: 2, status: 'safe' },
+        { number: '6487', position: 1, status: 'safe' },
+        { number: '6490', position: 4, status: 'safe' },
+        { number: '6489', position: 3, status: 'not-safe', note: 'conflicts with #6488' },
+      ],
+      integration: { number: '6486', into: 'main', safe: true },
+    }, 1)
+    expect(chainTokens(board)).toEqual(['#6487', '→ #6488'])
+    expect(stackTally(board)).toBe('2 of 4 safe')
+    expect(stackWarnings(board)).toEqual(['✗ #6489 not safe · conflicts with #6488', '  waiting behind it: 1 more PR and #6486'])
+  })
+
+  test('the integration PR closes the chain only once it is safe; until then it says why', async () => {
+    const stack = [
+      { number: '6487', position: 1, status: 'safe' as const },
+      { number: '6488', position: 2, status: 'safe' as const },
+    ]
+    const building = apply(null, { ...base, stack, integration: { number: '6486', into: 'main', safe: false, note: 'build not finished' } }, 1)
+    expect(chainTokens(building)).toEqual(['#6487', '→ #6488'])
+    expect(stackWarnings(building)).toEqual(['✗ integration #6486 into main not safe yet · build not finished'])
+
+    // A later call names only the integration PR; into and the stack carry over, the old note goes.
+    const ready = apply(building, { ...base, integration: { number: '6486', safe: true } }, 2)
+    expect(chainTokens(ready)).toEqual(['#6487', '→ #6488', '⇒ #6486 into main'])
+    expect(stackWarnings(ready)).toEqual([])
+    expect(summary(ready)).toContain('stack 2 of 2 safe + integration')
+  })
+
+  test('landed PRs leave the chain and are counted; a PR sent with no position goes on top', async () => {
+    const first = apply(null, { ...base, stack: [{ number: '101', position: 1, status: 'safe' }, { number: '102', position: 2, status: 'safe' }] }, 1)
+    const later = apply(first, { ...base, stack: [{ number: '101', status: 'landed' }, { number: '103', status: 'safe' }] }, 2)
+    expect(chainTokens(later)).toEqual(['#102', '→ #103'])
+    expect(stackTally(later)).toBe('2 of 2 safe · 1 landed')
+  })
+
+  test('a position with no PR yet stops the chain there, and the integration PR waits behind it', async () => {
+    const board = apply(null, {
+      ...base,
+      stack: [
+        { number: '101', position: 1, status: 'safe' },
+        { number: '103', position: 3, status: 'safe' },
+      ],
+      integration: { number: '100', into: 'main', safe: true },
+    }, 1)
+    expect(chainTokens(board)).toEqual(['#101'])
+    expect(stackWarnings(board)).toEqual(['✗ position 2 has no open PR yet', '  waiting behind it: 1 more PR and #100'])
+
+    // A landed PR still fills its position.
+    const landed = apply(board, { ...base, stack: [{ number: '101', status: 'landed' }, { number: '102', position: 2, status: 'safe' }] }, 2)
+    expect(chainTokens(landed)).toEqual(['#102', '→ #103', '⇒ #100 into main'])
+  })
+
+  test('rows break only before an arrow and stay inside the width', async () => {
+    const tokens = ['#6487', ...Array.from({ length: 20 }, (_, n) => `→ #${6488 + n}`), '⇒ #6486 into main']
+    const rows = chainRows(tokens, 40)
+    expect(rows.every(r => r.length <= 40)).toBe(true)
+    expect(rows.slice(1).every(r => /^[→⇒] #/.test(r))).toBe(true)
+    expect(rows.join(' ')).toBe(tokens.join(' '))
+  })
+
+  test('parseUpdate refuses a stack entry with no PR number or a bad status', async () => {
+    expect(typeof parseUpdate({ ...base, stack: [{ number: 'abc', status: 'safe' }] })).toBe('string')
+    expect(typeof parseUpdate({ ...base, stack: [{ number: '1', status: 'green' }] })).toBe('string')
+    expect(typeof parseUpdate({ ...base, integration: { number: '1' } })).toBe('string')
+    const ok = parseUpdate({ ...base, stack: [{ number: 6487, position: 1, status: 'safe' }] })
+    expect(typeof ok === 'string' ? ok : ok.stack).toEqual([{ number: '6487', position: 1, status: 'safe', note: undefined }])
   })
 })

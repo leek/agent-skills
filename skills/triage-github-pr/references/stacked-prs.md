@@ -95,7 +95,10 @@ is none), from the bottom up:
    When required checks are pending, `--auto` queues it; the PRs above wait for that
    merge to land, so stop the stack there and report it queued, naming the retarget
    each PR above still needs once it lands (step 3's `gh pr edit`), unless
-   `repo.delete_branch_on_merge` is true and GitHub retargets them itself.
+   `repo.delete_branch_on_merge` is true and GitHub retargets them itself. When the
+   session lists the `mcp__leek-skills__ticket_board` tool and shows this stack's board,
+   send each landed PR as `landed` in its `stack`, per
+   [`ticket-board.md`](../../wayfinder/references/ticket-board.md)'s **Stacked PRs**.
 3. **Retarget** each PR based on its head to the merged PR's base. GitHub does this by
    itself only when the merged head branch is deleted; this skill deletes nothing, so
    retarget explicitly and skip a PR whose base already reads the landing branch. First record

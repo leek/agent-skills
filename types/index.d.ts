@@ -87,6 +87,28 @@ export type BoardOpenItem = {
   done: boolean
 }
 
+export type StackStatus = 'safe' | 'not-safe' | 'landed'
+
+/** One pull request of a stacked delivery. */
+export type BoardStackPr = {
+  /** The PR number, digits only, e.g. `6487`. */
+  number: string
+  /** Landing position, bottom = 1; the chain reads in this order, not by ticket number. */
+  position: number
+  status: StackStatus
+  /** Why it is not safe, or its ticket; a few words. */
+  note: string
+}
+
+/** The stack's integration PR: it merges into `into` last, once the skill marks it safe. */
+export type BoardIntegration = {
+  number: string
+  /** The branch it merges into, e.g. `main`; may be empty. */
+  into: string
+  safe: boolean
+  note: string
+}
+
 /** A multi-ticket run (implement-spec, implement all, wayfinder all) as the ticket_board tool last reported it. */
 export type TicketBoard = {
   slug: string
@@ -97,6 +119,10 @@ export type TicketBoard = {
   findings: BoardFinding[]
   /** The "Open after this run" list; empty until the run sends one. */
   open: BoardOpenItem[]
+  /** A stacked delivery's ticket PRs, bottom-up; empty when the run sent none. */
+  stack: BoardStackPr[]
+  /** The stack's integration PR, or null when none was sent. */
+  integration: BoardIntegration | null
   updatedAt: number
 }
 

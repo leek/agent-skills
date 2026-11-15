@@ -6,11 +6,14 @@
 
 import type {
   BoardFinding,
+  BoardIntegration,
   BoardKind,
   BoardOpenItem,
+  BoardStackPr,
   BoardTicket,
   FindingStatus,
   OpenKind,
+  StackStatus,
   TicketBoard,
   TicketStatus,
 } from '../../types'
@@ -34,6 +37,8 @@ export const FINDING_STATUSES: readonly FindingStatus[] = ['open', 'fixing', 'fi
 
 export const OPEN_KINDS: readonly OpenKind[] = ['not-shipped', 'not-started', 'not-verified', 'your-decision', 'later']
 
+export const STACK_STATUSES: readonly StackStatus[] = ['safe', 'not-safe', 'landed']
+
 const UNTRACKED = 'untracked'
 
 const KINDS: readonly BoardKind[] = ['spec', 'map']
@@ -45,6 +50,8 @@ export type BoardUpdate = {
   stage?: string
   findings?: { id: string; title?: string; status: FindingStatus; note?: string }[]
   open?: { id: string; title?: string; kind: OpenKind; where?: string; done?: boolean }[]
+  stack?: { number: string; position?: number; status: StackStatus; note?: string }[]
+  integration?: { number: string; into?: string; safe: boolean; note?: string }
 }
 
 /** The input schema the model reads; kept beside the type it describes. */
@@ -109,6 +116,36 @@ export const SCHEMA = {
         required: ['id', 'kind'],
       },
     },
+    stack: {
+      type: 'array',
+      description:
+        'Stacked PRs only: the ticket PRs (and the closing review-fixes PR) whose state changed, each with its position on its first call. The pane draws the safe-to-merge chain from them.',
+      items: {
+        type: 'object',
+        properties: {
+          number: { type: 'string', description: 'The PR number, e.g. "6487".' },
+          position: { type: 'integer', description: 'Landing position in the stack, bottom = 1.' },
+          status: {
+            type: 'string',
+            enum: STACK_STATUSES,
+            description: 'safe: open, final, not a draft, on the PR below, no conflict. landed: merged into the integration branch.',
+          },
+          note: { type: 'string', description: 'A few words: why it is not safe.' },
+        },
+        required: ['number', 'status'],
+      },
+    },
+    integration: {
+      type: 'object',
+      description: 'Stacked PRs only: the integration PR, which merges last.',
+      properties: {
+        number: { type: 'string', description: 'The integration PR number.' },
+        into: { type: 'string', description: 'The branch it merges into, e.g. "main".' },
+        safe: { type: 'boolean', description: 'true once the build is finished and nothing waits outside the stack.' },
+        note: { type: 'string', description: 'A few words: why it is not safe yet.' },
+      },
+      required: ['number', 'safe'],
+    },
   },
   required: ['board', 'kind'],
 } as const
@@ -119,6 +156,9 @@ export function parseUpdate(input: Record<string, unknown>): BoardUpdate | strin
   const isList = (v: unknown) => v === undefined || Array.isArray(v)
   if (board === '' || !KINDS.includes(kind) || !isList(input.tickets) || !isList(input.findings) || !isList(input.open)) {
     return `board (string) and kind (${KINDS.join(' or ')}) are required; tickets, findings and open are arrays.`
+  }
+  if (!isList(input.stack)) {
+    return 'stack is an array.'
   }
   const tickets: BoardUpdate['tickets'] = []
   for (const raw of (input.tickets ?? []) as unknown[]) {
@@ -163,9 +203,46 @@ export function parseUpdate(input: Record<string, unknown>): BoardUpdate | strin
       done: typeof o.done === 'boolean' ? o.done : undefined,
     })
   }
+  const stack: NonNullable<BoardUpdate['stack']> = []
+  for (const raw of (input.stack ?? []) as unknown[]) {
+    const p = (raw ?? {}) as Record<string, unknown>
+    const number = prNumber(p.number)
+    const status = p.status as StackStatus
+    const position = Number(p.position)
+    if (number === '' || !STACK_STATUSES.includes(status)) {
+      return `Each stack entry needs a PR number and a status of ${STACK_STATUSES.join(', ')}.`
+    }
+    stack.push({
+      number,
+      status,
+      position: Number.isInteger(position) && position > 0 ? position : undefined,
+      note: typeof p.note === 'string' ? p.note : undefined,
+    })
+  }
+  let integration: BoardUpdate['integration']
+  if (input.integration !== undefined) {
+    const i = (input.integration ?? {}) as Record<string, unknown>
+    const number = prNumber(i.number)
+    if (number === '' || typeof i.safe !== 'boolean') {
+      return 'integration needs a PR number and safe (true or false).'
+    }
+    integration = {
+      number,
+      safe: i.safe,
+      into: typeof i.into === 'string' ? i.into.trim() : undefined,
+      note: typeof i.note === 'string' ? i.note : undefined,
+    }
+  }
   const stage = typeof input.stage === 'string' ? input.stage.trim() : undefined
 
-  return { board, kind, tickets, stage, findings, open }
+  return { board, kind, tickets, stage, findings, open, stack, integration }
+}
+
+/** `#6487`, `6487` and 6487 all read as `6487`; anything else as empty. */
+function prNumber(v: unknown): string {
+  const digits = String(typeof v === 'number' || typeof v === 'string' ? v : '').trim().replace(/^#/, '')
+
+  return /^\d+$/.test(digits) ? digits : ''
 }
 
 /** Upserts by ticket number; a new slug or kind starts a new board. */
@@ -231,7 +308,144 @@ export function apply(previous: TicketBoard | null, change: BoardUpdate, now: nu
     }
   }
 
-  return { slug: change.board, kind: change.kind, tickets, stage, findings, open, updatedAt: now }
+  // Stack entries upsert by PR number and read in landing position.
+  // A board saved before the stack existed has none.
+  const stack: BoardStackPr[] = isSame ? [...(previous.stack ?? [])] : []
+  for (const p of change.stack ?? []) {
+    const at = stack.findIndex(one => one.number === p.number)
+    const old = at === -1 ? undefined : stack[at]
+    const next: BoardStackPr = {
+      number: p.number,
+      // A PR sent with no position goes on top.
+      position: p.position ?? old?.position ?? Math.max(0, ...stack.map(one => one.position)) + 1,
+      status: p.status,
+      note: p.note ?? (old?.status === p.status ? old.note : ''),
+    }
+    if (old === undefined) {
+      stack.push(next)
+    } else {
+      stack[at] = next
+    }
+  }
+  stack.sort((a, b) => a.position - b.position)
+
+  const was = isSame ? (previous.integration ?? null) : null
+  const i = change.integration
+  const integration: BoardIntegration | null =
+    i === undefined
+      ? was
+      : {
+          number: i.number,
+          into: i.into ?? (was?.number === i.number ? was.into : ''),
+          safe: i.safe,
+          note: i.note ?? (was?.number === i.number && was.safe === i.safe ? was.note : ''),
+        }
+
+  return { slug: change.board, kind: change.kind, tickets, stage, findings, open, stack, integration, updatedAt: now }
+}
+
+/**
+ * The safe-to-merge view of a stack: the PRs still to land, the contiguous safe run from the
+ * bottom, the first PR that stops it, and whether the integration PR closes the chain.
+ */
+export function safeStack(board: TicketBoard) {
+  const all = board.stack ?? []
+  const pending = all.filter(p => p.status !== 'landed')
+  // The chain runs only through consecutive positions from 1, landed ones included: a position
+  // with no PR yet is a base no open PR heads, and it blocks everything above it.
+  let missing = 0
+  const reachable: BoardStackPr[] = []
+  for (const p of all) {
+    if (p.position !== reachable.length + 1) {
+      missing = reachable.length + 1
+      break
+    }
+    reachable.push(p)
+  }
+  const open = reachable.filter(p => p.status !== 'landed')
+  const stop = open.findIndex(p => p.status !== 'safe')
+  const safe = stop === -1 ? open : open.slice(0, stop)
+  const blocker = stop === -1 ? undefined : open[stop]
+  if (blocker !== undefined) missing = 0
+  const integration = board.integration ?? null
+  const isStopped = blocker !== undefined || missing > 0
+  const isIntegrationSafe = !isStopped && integration !== null && integration.safe
+
+  return {
+    pending,
+    safe,
+    blocker,
+    /** The landing position with no PR yet that stops the chain, or 0. */
+    missing,
+    /** PRs above whatever stops the chain, still waiting behind it. */
+    behind: pending.length - safe.length - (blocker === undefined ? 0 : 1),
+    landed: all.length - pending.length,
+    integration,
+    isIntegrationSafe,
+  }
+}
+
+export const hasStack = (board: TicketBoard) => (board.stack ?? []).length > 0 || (board.integration ?? null) !== null
+
+/** `⇒ #6486 into main`, or `⇒ #6486` when the target is unknown. */
+export const integrationLabel = (i: BoardIntegration) => `⇒ #${i.number}${i.into === '' ? '' : ` into ${i.into}`}`
+
+/** The safe chain's tokens: `#a`, `→ #b`, …, then `⇒ #i into main` when the integration PR is safe. */
+export function chainTokens(board: TicketBoard): string[] {
+  const view = safeStack(board)
+  const tokens = view.safe.map((p, n) => (n === 0 ? `#${p.number}` : `→ #${p.number}`))
+  if (view.isIntegrationSafe && view.integration !== null) tokens.push(integrationLabel(view.integration))
+
+  return tokens
+}
+
+/** Packs tokens into rows no wider than `width`, breaking only before an arrow. */
+export function chainRows(tokens: readonly string[], width: number): string[] {
+  const rows: string[] = []
+  let row = ''
+  for (const token of tokens) {
+    if (row !== '' && row.length + 1 + token.length > width) {
+      rows.push(row)
+      row = token
+    } else {
+      row = row === '' ? token : `${row} ${token}`
+    }
+  }
+  if (row !== '') rows.push(row)
+
+  return rows
+}
+
+/** The section's count: `5 of 21 safe · 3 landed`. */
+export function stackTally(board: TicketBoard): string {
+  const view = safeStack(board)
+  const parts = [`${view.safe.length} of ${view.pending.length} safe`]
+  if (view.landed > 0) parts.push(`${view.landed} landed`)
+
+  return parts.join(' · ')
+}
+
+/** The lines below the chain: what stops it, and the integration PR when it is not in the chain. */
+export function stackWarnings(board: TicketBoard): string[] {
+  const view = safeStack(board)
+  const lines: string[] = []
+  const why = (note: string) => (note === '' ? '' : ` · ${note}`)
+  if (view.blocker !== undefined || view.missing > 0) {
+    lines.push(
+      view.blocker !== undefined
+        ? `✗ #${view.blocker.number} not safe${why(view.blocker.note)}`
+        : `✗ position ${view.missing} has no open PR yet`,
+    )
+    const after = [view.behind > 0 ? `${view.behind} more PR${view.behind === 1 ? '' : 's'}` : '', view.integration === null ? '' : `#${view.integration.number}`]
+      .filter(part => part !== '')
+      .join(' and ')
+    if (after !== '') lines.push(`  waiting behind it: ${after}`)
+  } else if (view.integration !== null && !view.integration.safe) {
+    const i = view.integration
+    lines.push(`✗ integration #${i.number}${i.into === '' ? '' : ` into ${i.into}`} not safe yet${why(i.note)}`)
+  }
+
+  return lines
 }
 
 const DONE = new Set<TicketStatus>(['built', 'merged', 'resolved', 'closed'])
@@ -274,9 +488,14 @@ export function openTally(board: TicketBoard): string {
 /** The pane's header: the ticket count, then the open list's. */
 export const header = (board: TicketBoard) => [tally(board), openTally(board)].filter(part => part !== '').join(' · ')
 
-/** The tool's one-line summary: the header, then the stage and findings once a review runs. */
+/** The tool's one-line summary: the header, then the stage and findings once a review runs, then the stack. */
 export const summary = (board: TicketBoard) =>
-  [header(board), board.stage, board.findings.length > 0 ? findingTally(board) : '']
+  [
+    header(board),
+    board.stage,
+    board.findings.length > 0 ? findingTally(board) : '',
+    hasStack(board) ? `stack ${stackTally(board)}${safeStack(board).isIntegrationSafe ? ' + integration' : ''}` : '',
+  ]
     .filter(part => part !== '')
     .join(' · ')
 
