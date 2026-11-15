@@ -23,6 +23,13 @@ export function duration(ms: number): string {
   return `${Math.floor(seconds / 60)}m${String(seconds % 60).padStart(2, '0')}s`
 }
 
+/**
+ * The key a board run gives a ticket's worker: its `name`, or else the first word of its
+ * `description`. Claude Code skills dispatch unnamed (a named sub-agent is never woken by its
+ * own background command), so they lead the description with `<slug>--<NN>` instead.
+ */
+export const workerKey = (w: Pick<Worker, 'name' | 'description'>) => w.name || (w.description ?? '').trim().split(/\s+/)[0] || ''
+
 export const isFailed = (w: Worker) => w.outcome === 'error' || w.outcome === 'refusal' || w.outcome === 'aborted'
 
 /** Running first, then failures, then finished, newest first, cut to the rows the band has. */

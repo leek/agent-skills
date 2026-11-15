@@ -36,9 +36,10 @@ git worktree add --detach <main checkout>/.claude/worktrees/pr-<N>--fix-<k> <PR 
 Make it runnable the way step 5's worktree was. When its tests need a database of their
 own, name it `<app db>_pr<N>_fix<k>` and register it per
 [Scratch databases](gh-mechanics.md#scratch-databases). Then start one fixer per group
-in one message, in the background (Claude Code: `Agent`, `run_in_background: true`,
-`name: pr-<N>--fix-<k>`; other harnesses: dispatch in the background per
-[harness-tools](../../harness-tools/SKILL.md), keeping each id). Its brief gives the worktree
+in one message, in the background (Claude Code: `Agent`, `run_in_background: true`, no
+`name`, its `description` starting `pr-<N>--fix-<k>`, keeping the returned `agentId`; other
+harnesses: dispatch in the background per [harness-tools](../../harness-tools/SKILL.md),
+keeping each id). Its brief gives the worktree
 path, its findings' step 4 lines with links, its file list, the repo's `AGENTS.md` /
 `CLAUDE.md`, and these rules:
 
@@ -46,8 +47,12 @@ path, its findings' step 4 lines with links, its file list, the repo's `AGENTS.m
   `skills/tdd/SKILL.md`) and prove each fix per its **What needs a test** section: a
   behaviour fix gets a regression test that fails without it, a presentation fix gets
   none, and the report says so. Make the minimal change.
-- Run focused tests in the foreground and wait for the result; an idle fixer may not
-  wake when a background run ends. End with them green.
+- Run focused tests in the foreground and wait for the result. End with them green.
+- Never end your turn while a command you started is still running. If the shell tool
+  moves a command to the background (it does at its timeout), wait for it in the
+  foreground: `bash <harness-tools dir>/scripts/wait-task-output.sh <the output file it
+  named>`, and run that again while it prints `running`. (Write the script's absolute
+  path into the brief: `<this-skill-dir>/../harness-tools/scripts/wait-task-output.sh`.)
 - Touch a file outside the list only when the fix cannot land without it, and name it in
   the report.
 - Format the touched paths with the repo's formatter, and commit each finding on its
@@ -57,8 +62,8 @@ path, its findings' step 4 lines with links, its file list, the repo's `AGENTS.m
   test command and result, and anything that blocks a finding.
 
 Then end the turn and let the completion notifications wake you; never poll. An idle
-notification with no report and no new commit is a stall: message that fixer at once
-(`SendMessage` to its name in Claude Code; other harnesses follow up per [harness-tools](../../harness-tools/SKILL.md)) to finish or say what blocks it.
+notification or completion from a fixer that has not reported is a stall, even when it says it is
+waiting on a background run: message that fixer at once (`SendMessage` to its `agentId` in Claude Code; other harnesses follow up per [harness-tools](../../harness-tools/SKILL.md)) to finish or say what blocks it.
 
 Completion criterion: every group has a fixer running or a report back.
 
@@ -78,7 +83,7 @@ dispositioned as blocked.
 
 Run the union of the fixers' focused test commands once on the merged tree, then step
 5's pre-push review over the whole fix range. A failure or review defect goes back to
-the fixer that owns the file, with the output (`SendMessage` to its name in Claude Code; other harnesses
+the fixer that owns the file, with the output (`SendMessage` to its `agentId` in Claude Code; other harnesses
 follow up per [harness-tools](../../harness-tools/SKILL.md)), and its new commits are merged as in step 3. Fix inline only what no
 fixer owns. Then reply on each finding with its commit's SHA, `validated; push pending`,
 record the batch and push, as step 5 says.

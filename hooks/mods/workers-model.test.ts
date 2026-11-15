@@ -1,6 +1,13 @@
 import { expect, test } from 'claude-code/testing'
 
-import { duration } from './workers-model'
+import { duration, workerKey } from './workers-model'
+
+test('workerKey takes the name, or else the first word of the description', async () => {
+  expect(workerKey({ name: 'auth--01', description: 'build 01' })).toBe('auth--01')
+  expect(workerKey({ name: '', description: 'auth--01 build login' })).toBe('auth--01')
+  expect(workerKey({ name: '', description: '  auth--fix   round 2' })).toBe('auth--fix')
+  expect(workerKey({ name: '', description: '' })).toBe('')
+})
 
 test('duration rounds to whole seconds before splitting minutes from seconds', async () => {
   expect(duration(0)).toBe('0s')

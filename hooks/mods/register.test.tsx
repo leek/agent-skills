@@ -178,6 +178,33 @@ test('ticket_board draws each ticket beside its running implementer, or asks for
   expect(String((undrawn as { result: unknown }).result)).toContain('post the progress line in chat')
 })
 
+test('ticket_board matches an unnamed worker by the first word of its description', async ($, on) => {
+  mock.clock(on, { now: 0 })
+  on('ui.render', async ($, e) => engineDraw($, e))
+  on('agent.spawn', async () => ({ model: 'sonnet', agentId: 'a2' }))
+  on('tool.call', async () => ({ result: 'ok' }) as never)
+  on('ui.open', async () => ({ value: { isPlaced: true } }) as never)
+
+  await $.tool.call({
+    tool: 'mcp__leek-skills__ticket_board',
+    board: 'auth',
+    kind: 'spec',
+    tickets: [{ number: '01', title: 'Login form', status: 'running' }],
+    tool_use_id: 's1',
+  } as never)
+  await $.agent.spawn({ prompt: 'build', description: 'auth--01 build login', subagentType: 'general-purpose' } as never)
+  await $.tool.call({ tool: 'Bash', command: 'php artisan test', tool_use_id: 't1', agentId: 'a2' } as never)
+
+  const pane = await $.ui.mount({
+    plugin: 'leek-skills',
+    surface: 'terminal',
+    component: 'Pane',
+    requestId: 'tickets',
+    props: { title: 'Spec: auth', isFocused: false, bodyColumns: 120, placement: 'dock' },
+  } as never)
+  expect(await pane.find({ type: 'Text', text: /01 Login form.*running.*1 tools.*Bash: php artisan test/ })).toBeDefined()
+})
+
 test('ticket_board shows the review stage and each finding once the tickets are merged', async ($, on) => {
   mock.clock(on, { now: 0 })
   on('ui.render', async ($, e) => engineDraw($, e))

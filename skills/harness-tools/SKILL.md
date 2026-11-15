@@ -8,12 +8,13 @@ user-invocable: false
 
 Skills name a **move** (dispatch and wait, dispatch in the background, follow up, stop, structured question) and point here for the tool. Find your harness's row, use that tool with the skill's own content (the brief, the agent type, the options), and use the fallback when the tool is not in your tool list. A harness with no row here: use its own tool for the move if it has one, otherwise the fallback. The fallback is always a complete path.
 
-Verified against: Codex CLI 0.166's model-visible tools; Grok's live tool schema and its logged calls (its parameter is `background`, though the docs say `run_in_background`); agy 1.4.12's live tool schema, checked against its logged calls.
+Verified against: Claude Code 2.1.291–2.1.325 session logs (a named sub-agent got 0 of 266 wakes from its own background command, an unnamed one 175 of 230); Codex CLI 0.166's model-visible tools; Grok's live tool schema and its logged calls (its parameter is `background`, though the docs say `run_in_background`); agy 1.4.12's live tool schema, checked against its logged calls.
 
 ## Every sub-agent
 
 - **Brief it in full.** A sub-agent starts with none of your conversation: a Grok child starts a new conversation, Codex's `fork_turns: "none"` passes no history, and an agy sub-agent gets only its `Prompt`. Put every path, ref, and rule it needs in the brief.
 - **Typed agents.** A skill may name a typed agent, `leek-skills:<name>`, often in its Claude Code clause. Claude Code and Grok both load these from this plugin's `agents/` when the plugin is installed, so in Grok pass that same name as `subagent_type`. Codex and agy never load `agents/`, and neither does a Claude Code or Grok install from `npx skills` alone. There, start a general sub-agent with the same brief, and hold it to the typed agent's rules (read-only, output shape) through the brief.
+- **Its own background commands.** Every brief for a sub-agent you dispatch in the background carries this rule, with the script's absolute path: "Never end your turn while a command you started is still running. Run tests in the foreground. If the shell tool moves a command to the background (it does at its timeout), wait for it in the foreground: `bash <this-skill-dir>/scripts/wait-task-output.sh <the output file it named>`, and run that again while it prints `running`." Nothing may wake a sub-agent that ends its turn on a running command: a named Claude Code sub-agent is never woken by one.
 - **Model tier.** Where the skill asks for a cheaper or stronger model: Claude Code's `model` (`haiku`, `sonnet`, `opus`), Codex's `model` (omit it to inherit), agy's `Model` (`flash_lite` or `flash` cheaper, `pro` stronger, `inherit` the default). Grok: inherit.
 
 ## Dispatch and wait
@@ -35,14 +36,14 @@ Start sub-agents and keep working on something else; collect each result when it
 
 | Harness | Tool |
 |---|---|
-| Claude Code | `Agent` with `run_in_background: true` where offered (sub-agents may already default to the background), and a `name`. Each completion notification wakes you; end the turn while you wait, and never poll. |
+| Claude Code | `Agent` with `run_in_background: true` where offered (sub-agents may already default to the background), and **no `name`**: a named sub-agent becomes a teammate, and a teammate is never woken by its own background command, so it sleeps until you message it. Keep the `agentId` its result returns, and put the skill's label first in `description` (`<slug>--<NN> build`). Each completion notification wakes you; end the turn while you wait, and never poll. |
 | Codex | `spawn_agent` as above, keeping each `task_name`. Do the other work in the same turn, then `wait_agent` for the results. Do not end the turn while they run. |
 | Grok | `spawn_subagent` (`background` defaults to true), keeping each id. The harness notifies you when a child finishes; then read its result with `get_command_or_subagent_output`. Never poll. |
 | agy | `invoke_subagent` as above, keeping the `conversationId` it returns. It sends you a message when it finishes; never poll. |
 
 Fallback: run them inline one after another.
 
-Each wake either changes the run's state or does not. A notice with no result in it (an idle notice, a repeat of a report you already used) gets no reply: end the turn without text. A wake that changes state gets one status line with the count and the names still running (`4 of 7 done; waiting on billing-export, fax-cover`), so the user never has to ask for status.
+Each wake either changes the run's state or does not. A repeat of a report you already used gets no reply: end the turn without text, and so does Claude Code's interim notice that an unnamed agent "is waiting on its own background work" (the harness resumes it when that work ends). An idle notice or completion from an agent that has not delivered its report is a **stall**, even when it explains itself: it says it is waiting on a background run, a test, or a notice, or it carries no report and no new commit. Follow up with it at once: "Nothing will wake you. Wait for that run in the foreground with `wait-task-output.sh`, then finish and report." A wake that changes state gets one status line with the count and the names still running (`4 of 7 done; waiting on billing-export, fax-cover`), so the user never has to ask for status.
 
 Codex limits how many agent threads are live at once. When `spawn_agent` fails with `agent thread limit reached`, `wait_agent` until one running agent finishes, then spawn the next; when none is running, do that piece inline. An agent whose status is `errored` (for example `out of credits`) produced nothing: report it once and do its piece inline in the same turn.
 
@@ -54,7 +55,7 @@ Send more work to a sub-agent that is running or has finished, so it keeps its c
 
 | Harness | Tool |
 |---|---|
-| Claude Code | `SendMessage` to its `name` |
+| Claude Code | `SendMessage` to its `agentId` (or its `name`, for one started with a name) |
 | Codex | `followup_task` to its `task_name` (starts a turn if it is idle), or `send_message` (no new turn) |
 | Grok | `send_subagent_message`, only when active agent messages are on (`GROK_ACTIVE_AGENT_MESSAGES` or `[features] active_agent_messages`); otherwise wait for it to finish and continue it with `resume_from` |
 | agy | `send_message` with `Recipient` (its `conversationId`) and `Message` |
@@ -65,7 +66,7 @@ Fallback: brief a fresh sub-agent with everything the follow-up needs (paths, th
 
 | Harness | Tool |
 |---|---|
-| Claude Code | `TaskStop` with its name or task id |
+| Claude Code | `TaskStop` with its `agentId` or task id |
 | Codex | `interrupt_agent` (it stops the current turn; the agent stays available for follow-ups) |
 | Grok | `kill_command_or_subagent` |
 | agy | `manage_subagents` with `Action: "kill"` and its `ConversationIds`. This also kills its own sub-agents and deletes any branched workspace. |

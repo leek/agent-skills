@@ -46,7 +46,7 @@ import {
   title,
   summary as boardSummary,
 } from './ticket-board'
-import { KEEP, describeTool, duration, isFailed, mark, ordered } from './workers-model'
+import { KEEP, describeTool, duration, isFailed, mark, ordered, workerKey } from './workers-model'
 
 const PANE = 'scratch'
 const board = atom({ plugin: 'leek-skills', key: 'scratch' } as const, null)
@@ -380,10 +380,11 @@ export const register: Register = on => {
     }
     const list = await read($, workers)
     const now = await $.clock.now()
-    // A ticket's live worker: board runs name it <slug>--<NN> (implement-spec's fixer <slug>--fix).
+    // A ticket's live worker: board runs key it <slug>--<NN> (implement-spec's fixer <slug>--fix),
+    // by name or by the description's first word.
     const worker = (t: BoardTicket) =>
-      [...list].reverse().find(w => w.name === `${run.slug}--${t.number}` && w.outcome === 'running')
-    const fixer = list.find(w => w.name === `${run.slug}--fix` && w.outcome === 'running')
+      [...list].reverse().find(w => workerKey(w) === `${run.slug}--${t.number}` && w.outcome === 'running')
+    const fixer = list.find(w => workerKey(w) === `${run.slug}--fix` && w.outcome === 'running')
     const stack = safeStack(run)
     const chain = chainRows(chainTokens(run), Math.max(20, e.props.bodyColumns - 2))
 
