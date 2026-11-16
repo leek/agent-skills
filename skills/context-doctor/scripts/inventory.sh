@@ -20,6 +20,12 @@
 # Writes into <dir>:
 #   inventory.json  {project, config_dir, memory_dir, sources[], issues[], totals}
 #     issue: {type, path, line?, detail, fingerprint, declined}
+#       types: imports and links (import-unresolved, import-too-deep, import-outside-roots,
+#       link-not-import, pointer-unresolved), sources (source-outside-roots, glob-unmatched,
+#       identical-files, generated-file, upstream-drift), memory (memory-index-truncated,
+#       memory-pointer-broken, memory-orphan, memory-index-duplicate-row, memory-name-duplicate,
+#       memory-dir-rejected, agent-memory-orphan), config (skill-override-dead, skill-link-broken,
+#       skill-unlinked, mcp-setting-dead, permission-dead, hook-script-missing)
 #     source: {path, kind, scope, activation, why, bytes, lines, approx_tokens,
 #              loaded_bytes?, listing_chars?, imports[], plugin?, generated?, upstream?}
 #     kinds beyond the harness's own files: pointer-doc (a .md an instruction file names, up to
@@ -341,8 +347,14 @@ def memory_checks(d, index, topics):
 repo_root = git_root()
 slug = re.sub(r"[^A-Za-z0-9]", "-", repo_root)
 # Never from project settings: a repo must not be able to point this audit at another directory.
-mem_setting = merged("autoMemoryDirectory", order=("user", "local", "managed"))
-mem_dir = os.path.expanduser(mem_setting) if mem_setting else os.path.join(config, "projects", slug, "memory")
+# Only user and managed settings: a repo can commit .claude/settings.local.json too. A value
+# resolving to / or the home directory is ignored, since it would make everything trusted.
+mem_setting = merged("autoMemoryDirectory", order=("user", "managed"))
+mem_default = os.path.join(config, "projects", slug, "memory")
+mem_dir = os.path.expanduser(mem_setting) if mem_setting else mem_default
+if os.path.realpath(mem_dir) in ("/", home):
+    issues.append(dict(type="memory-dir-rejected", path=mem_dir, detail="autoMemoryDirectory resolves to / or the home directory; the default was audited instead"))
+    mem_dir = mem_default
 mem_off = merged("autoMemoryEnabled") is False or str(env.get("CLAUDE_CODE_DISABLE_AUTO_MEMORY", os.environ.get("CLAUDE_CODE_DISABLE_AUTO_MEMORY", ""))) == "1"
 if os.path.isdir(mem_dir):
     index = os.path.join(mem_dir, "MEMORY.md")
@@ -364,7 +376,7 @@ if os.path.isdir(mem_dir):
 # Roots whose files this audit may read as text. A file inside the repo is the repo's to
 # control, so its import or symlink resolving elsewhere (@~/.ssh/id_ed25519) is reported by
 # path, never read into units. User-level files point wherever the user put them.
-TRUSTED = sorted({os.path.realpath(x) for x in (project, repo_root, config, os.path.join(home, ".claude"), mem_dir, managed)})
+TRUSTED = sorted({os.path.realpath(x) for x in (project, repo_root, config, os.path.join(home, ".claude"), mem_dir, managed) if x})
 def trusted(path):
     r = os.path.realpath(path)
     return any(r == t or r.startswith(t.rstrip("/") + "/") for t in TRUSTED)
@@ -373,7 +385,8 @@ def repo_controlled(path):
     a = os.path.abspath(path)
     return any(a == t or a.startswith(t.rstrip("/") + "/") for t in REPO)
 def blocked(source_path, target):
-    return repo_controlled(source_path) and not trusted(target)
+    # A repo file may reach only the repo itself; the config dir and memory are the user's.
+    return repo_controlled(source_path) and not repo_controlled(os.path.realpath(target))
 
 # ---- agents, skills, commands, plugins -------------------------------------------------------------
 known_agents = set()
@@ -533,7 +546,7 @@ for base, scope in ((os.path.join(config, "agent-memory"), "agent-memory:user"),
 # ---- imports (after every source is known, so a lazy file's imports are lazy) ------------------------
 CODE = re.compile(r"(^|\n)(```|~~~).*?(\n\2[^\n]*|$)", re.S)
 SPAN = re.compile(r"`[^`\n]*`")
-IMPORT = re.compile(r"(?:^|(?<=\s))@((?:~/|/|(?:\.{1,2}/)+)?[A-Za-z0-9_][A-Za-z0-9_./-]*)")
+IMPORT = re.compile(r"(?:^|(?<=\s))@((?:~/|/)?[A-Za-z0-9_.][A-Za-z0-9_./-]*)")  # dot segments too: @../.claude/x
 LINK = re.compile(r"\]\(([^)#\s]+)\)")
 md_kinds = {"claude-md", "claude-local", "rule", "agents-md", "import", "memory-index", "output-style"}
 frontier = [p for p, s in sources.items() if s["kind"] in md_kinds and s["activation"] in ("always", "lazy", "uncertain")]
@@ -596,7 +609,7 @@ for p, s in list(sources.items()):
 
 # ---- upstream-synced copies: fixed in the upstream checkout, never here ------------------------------
 for p, s in list(sources.items()):
-    if not upstreams or s.get("plugin") or not s["path"].startswith(project + os.sep) \
+    if not upstreams or s.get("plugin") or s.get("generated") or not s["path"].startswith(project + os.sep) \
             or s["kind"] in ("settings", "memory", "memory-index", "agent-memory"):
         continue
     rel = os.path.relpath(s["path"], project)
@@ -679,8 +692,9 @@ def fm_paths(fm):
         vals.append(item.group(1).strip().strip("'\""))
     return vals
 
+GLOB_TOKEN = re.compile(r"^[\w.*?/{}\[\]-]+$")
 for p, s in list(sources.items()):
-    if s.get("plugin") or not s["path"].startswith(project + os.sep):
+    if s.get("plugin") or not s["path"].startswith(project + os.sep) or (s.get("upstream") and not s.get("upstream_drift")):
         continue
     lines = (read(p) or "").splitlines()
     def line_of(token):
@@ -692,10 +706,13 @@ for p, s in list(sources.items()):
     if s["kind"] in pointer_from | {"pointer-doc"}:
         for n, line in enumerate(lines, 1):
             cells = [c.strip().strip("`") for c in line.strip().strip("|").split("|")] if line.lstrip().startswith("|") else []
-            if len(cells) < 2 or not cells[-1].endswith(".md") or not resolve_from(p, cells[-1]):
+            # An index row is exactly "globs | rule file"; a prose table that mentions a file is not one.
+            globs = [x.strip().strip("`") for x in cells[0].split(",")] if len(cells) == 2 else []
+            if not globs or not cells[1].endswith(".md") or not resolve_from(p, cells[1]) \
+                    or not all(GLOB_TOKEN.match(g) for g in globs):
                 continue
-            for g in (x.strip().strip("`") for x in cells[0].split(",")):
-                if g and " " not in g and ("/" in g or "*" in g) and not glob_matches(g):
+            for g in globs:
+                if ("/" in g or "*" in g) and not glob_matches(g):
                     issues.append(dict(type="glob-unmatched", path=s["path"], line=n, detail=f"index glob {g} matches no file"))
 
 # ---- identical copies: the same bytes at two paths (a symlink is one source, so these are real copies) ----
@@ -757,7 +774,10 @@ for info in plugins:
 SCRIPT = re.compile(r"[\w.${}~/-]*[\w-]\.(?:sh|py|js|mjs|ts|rb|php)\b")
 def script_paths(text, base):
     found = []
-    for t in SCRIPT.findall(text or ""):
+    for m in SCRIPT.finditer(text or ""):
+        t = m.group(0)
+        if (m.start() and text[m.start() - 1] in "*?") or os.path.basename(t).startswith("."):
+            continue  # a pattern (*.blade.php) or an extension, not a file
         t2 = os.path.expanduser(re.sub(r"\$\{?CLAUDE_PROJECT_DIR\}?", project, t))
         if "$" in t2 or "{" in t2 or t2.startswith("//"):
             continue  # another variable or a URL: not resolvable here
@@ -807,6 +827,8 @@ units = []
 def norm(t):
     return " ".join(re.findall(r"[a-z0-9]+", t.lower()))
 
+MESSAGE = re.compile(r'"((?:[^"\\\n]|\\.){40,})"|\'([^\'\n]{40,})\'')
+
 def emit(s, start, end, heading, kind, text):
     text = text.strip("\n")
     if not text.strip():
@@ -822,17 +844,34 @@ for p, s in sources.items():
     if blocked(s["path"], p):
         issues.append(dict(type="source-outside-roots", path=s["path"], detail=f"resolves to {p}, outside the project and config dirs; not read"))
         continue
-    if s["kind"] in ("skill", "agent", "command") and not s.get("plugin"):
+    # A generated file is audited through its source; an unchanged upstream copy, upstream.
+    if s.get("generated_from") or (s.get("upstream") and not s.get("upstream_drift")):
+        continue
+    if s["kind"] == "hook-script":
+        for n, line in enumerate((read(p) or "").splitlines(), 1):
+            for m in MESSAGE.finditer(line):
+                msg = m.group(1) or m.group(2)
+                if len(msg.split()) >= 5 and not msg.lstrip().startswith(("$(", "//")):  # prose, not shell
+                    emit(s, n, n, os.path.basename(p), "message", msg)
+        continue
+    if s["kind"] in ("skill", "agent", "command"):
+        if s.get("plugin"):
+            continue
         fm = frontmatter(read(p))
         desc = fm_value(fm, "description")
         if desc and s.get("listing_chars"):  # only a description that is actually listed
             line = next((n for n, l in enumerate((read(p) or "").splitlines(), 1) if l.startswith("description:")), 1)
             emit(s, line, line, s.get("name", ""), "description", desc)
-        continue
+        if s["kind"] == "command" or s["activation"] == "never":
+            continue
+        # A user or project skill's body loads when it runs, and an agent's body is its system
+        # prompt: both are audited line by line below.
     # Line-level audit only where lines reach a context: a file that never loads, or a
-    # subagent's on-demand notes, is judged whole from the inventory. Auto-memory topic files
-    # and AGENTS.md are audited anyway: the first is the user's memory, the second often meant to load.
-    if s["kind"] not in editable or (s["activation"] in ("never", "on-demand", "config") and s["kind"] not in ("memory", "agents-md")):
+    # subagent's on-demand notes, is judged whole from the inventory. Auto-memory topic files,
+    # AGENTS.md, pointer docs, and generator sources are audited anyway: the user's memory, a file
+    # often meant to load, docs the agent is told to open, and the text of a generated file.
+    elif s["kind"] not in editable or (s["activation"] in ("never", "on-demand", "config")
+                                       and s["kind"] not in ("memory", "agents-md", "pointer-doc", "generator-source")):
         continue
     lines = (read(p) or "").splitlines()
     i, heading = 0, ""
