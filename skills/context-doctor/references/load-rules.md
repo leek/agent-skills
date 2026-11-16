@@ -16,6 +16,8 @@ Verified against code.claude.com docs (memory, settings, skills, sub-agents, mcp
 | `AGENTS.md` in the cwd chain | only without a CLAUDE.md | Native since 2.1.277: read only when no `CLAUDE.md`, `.claude/CLAUDE.md`, or `CLAUDE.local.md` exists in the cwd chain. `pluginConfigs."cc-plugin-agents-md@builtin".options.instructionFiles` changes it (`claude-md-or-agents-md` is the default). Nested `AGENTS.md`: unverified. |
 | `@path` imports | with the importing file | Relative to the importing file. Four hops at most. Imports inside code spans and fences are skipped; a markdown link `[x](AGENTS.md)` imports nothing. An import saves no context: the file loads in full. |
 | `.cursorrules`, `.cursor/rules/`, `.windsurfrules`, `.clinerules`, `GEMINI.md`, `.github/copilot-instructions.md` | never | Other tools' files. Claude Code reads them only through an import. |
+| A `.md` an instruction file names (a link, or a path in prose or backticks) | on-demand | A **pointer doc**: read only when the agent follows the pointer. The inventory follows two hops (a rules index and the rules it lists). |
+| A generated instruction file (Laravel Boost's `<laravel-boost-guidelines>` block, a "generated" header) | as its path loads | Its text is rebuilt from a source (`.ai/guidelines/` for Boost) on each generator run, so only the source is worth editing. |
 
 `claudeMdExcludes` (absolute-path globs, any settings scope, arrays merge) drops matching files. `/memory` lists the instruction files Claude Code sees; `/doctor prompt-audit` checks them for conflicts.
 
@@ -31,7 +33,7 @@ Verified against code.claude.com docs (memory, settings, skills, sub-agents, mcp
 - **Skill overrides**: `skillOverrides` in settings maps a skill name to `off` (hidden from the model), `user-invocable-only` (no description), or `name-only` (name listed, no description). Plugin skills ignore it: only disabling the plugin hides them.
 - **MCP**: tool names and server instructions. Servers come from `.mcp.json`, the config dir's `.claude.json` (under `CLAUDE_CONFIG_DIR`, the profile's own file, not `~/.claude.json`), plugins, claude.ai account connectors, and tools a plugin registers at runtime. The last two appear in no local file, so the session's own context is the only inventory of them. Tool schemas are deferred while tool search is on (the default). `ENABLE_TOOL_SEARCH=false`, or a server's `alwaysLoad: true`, loads them upfront.
 - **Output style**: the selected style's text joins every request. The default adds nothing.
-- **Hooks**: nothing by default. `additionalContext` from SessionStart, UserPromptSubmit, and similar hooks is injected, capped at 10,000 characters.
+- **Hooks**: nothing by default. `additionalContext` from SessionStart, UserPromptSubmit, and similar hooks is injected, capped at 10,000 characters. A PreToolUse deny reason, and a hook's stderr on exit 2, reach the agent only when the hook fires: the inventory lists those scripts as `hook-script` and their messages as units.
 
 Settings files (managed > `--settings` > `.claude/settings.local.json` > `.claude/settings.json` > `<config>/settings.json`) add no text, but they decide most of the above.
 

@@ -27,7 +27,7 @@ Why: <one sentence>
 Evidence: <file:line, command output, or usage count that proves it>
 ```
 
-User-scope findings carry `⟂ global: affects every project` after the class. Conflicts name the winning rule and why (the more specific scope wins in Claude Code; a newer verified convention beats an older one).
+User-scope findings carry `⟂ global: affects every project` after the class. A finding on a generated file names its source line and the regenerate command; one on an upstream copy carries `↑ upstream: <checkout>` and goes last in its group, as an edit to make there. A GENERALIZE finding lists the notes it replaces and gives the one rule that stays. Conflicts name the winning rule and why (the more specific scope wins in Claude Code; a newer verified convention beats an older one).
 
 ## 4. Proposed optimized context
 

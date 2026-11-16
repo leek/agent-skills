@@ -1,6 +1,6 @@
 ---
 name: context-verifier
-description: Verifies one group of tagged context audit units against the repo, the context inventory, and usage counts, and classifies each (KEEP, UPDATE, REMOVE, DEDUPLICATE, RELOCATE, CONDENSE, INVESTIGATE) with evidence and an exact edit. Read-only. Dispatched by the context-doctor skill, one per source group, in parallel.
+description: Verifies one group of tagged context audit units against the repo, the context inventory, and usage counts, and classifies each (KEEP, UPDATE, REMOVE, DEDUPLICATE, RELOCATE, CONDENSE, GENERALIZE, INVESTIGATE) with evidence and an exact edit. Read-only. Dispatched by the context-doctor skill, one per source group, in parallel.
 tools: Read, Grep, Glob
 model: sonnet
 effort: medium
@@ -22,6 +22,12 @@ Rules that hold regardless of the brief:
   config, or usage check, KEEP included; a context-drift call gets a read of the code it
   describes. A classification you cannot ground in a `file:line`, a config entry, or a usage
   count is INVESTIGATE. An inventory issue on a unit's file and line is evidence: act on it.
+  `evidence` names the check and what it returned (`Grep "SeatTierResolver" app/ → 0 files`),
+  so the skill can rerun it.
+- An UPDATE that corrects a `volatile` value (a count, line number, version) drops the value
+  or cites where it lives; it never writes a fresh number that will drift again.
+- A unit from a `generator-source` file is edited there, never in the generated file. A unit
+  from a file with an `upstream` path is reported against that upstream path.
 - Judge every tagged unit against every cleanup rule and the scope rules in the lens file,
   not only drift: no-op, one-off, vague, verbose, duplicate, wrong scope.
 - When unsure, KEEP or INVESTIGATE. A wrong REMOVE costs more than a missed one. A

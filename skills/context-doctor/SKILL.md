@@ -16,15 +16,17 @@ The audit is read-only. Files change only in step 7, only as approved, after a s
 
 ## Arguments
 
-`instructions` (CLAUDE.md, CLAUDE.local.md, rules, AGENTS.md, imports, output style), `memory` (auto memory, subagent memory), `config` (skills, agents, commands, plugins, MCP servers, hooks, settings), in any combination; none means all three. A path audits that project instead of the current directory. User-level sources that load in that project are always in scope.
+`instructions` (CLAUDE.md, CLAUDE.local.md, rules, AGENTS.md, imports, output style, the docs they point at, the sources of a generated file), `memory` (auto memory, subagent memory), `config` (skills and agents with their bodies, commands, plugins, MCP servers, hooks and their scripts' messages, settings), in any combination; none means all three. A path audits that project instead of the current directory. User-level sources that load in that project are always in scope.
 
 ## 1. Inventory
 
 Get the state directory, which holds the ledger of declined findings: `bash <this-skill-dir>/scripts/state.sh dir`. Then, with the scopes from the arguments (comma-separated):
 
 ```bash
-bash <this-skill-dir>/scripts/inventory.sh --out <scratch>/context-doctor --project <path> --scope <scopes> --declined <state dir>/declined.jsonl
+bash <this-skill-dir>/scripts/inventory.sh --out <scratch>/context-doctor --project <path> --scope <scopes> --declined <state dir>/declined.jsonl [--upstream <checkout>]...
 ```
+
+Pass `--upstream` once per checkout the project syncs instruction files from: a sync script names it, a doc says the files are synced, or a sibling repo holds the same `CLAUDE.md` files. Those copies are then fixed upstream, never here.
 
 It reads instruction files, memory, settings, `.mcp.json`, the config dir's `.claude.json` (MCP entries only), and installed plugins, and writes `inventory.json`, `config.json`, `units.jsonl`, `dupes.jsonl`, and `batch_<k>.jsonl` (see the script header). `--scope` narrows the units only; the inventory, issues, and totals always cover everything. Settings and MCP values never leave the script: it emits key names and structure, and redacts anything token-shaped. Load rules and their sources: [references/load-rules.md](references/load-rules.md).
 
@@ -58,13 +60,13 @@ The sweep sees one batch; redundancy and conflict span files. With every unit's 
 
 1. **Duplicates**: cluster units with matching gists, plus each pair in `dupes.jsonl`. For each cluster, choose the authoritative copy by the scope rules in lenses' **Scope** section.
 2. **Conflicts**: units on the same subject with incompatible directives. Name the winner: the more specific scope wins in Claude Code, and a convention the repo verifiably follows beats an older one.
-3. **Mechanical findings**: every entry in `inventory.json` `issues` (broken import, a link that imports nothing, memory pointer to a missing file, unlinked topic file, a truncated `MEMORY.md`) becomes a finding as is.
+3. **Mechanical findings**: every entry in `inventory.json` `issues` becomes a finding as is: broken imports and links, memory index problems, globs that match nothing, settings naming skills, MCP servers, plugins, or hook scripts that do not exist, broken or unlinked skills, identical copies, and generated or upstream files (the type list is in the script header). Lenses' **Scope** and **Configuration** sections say what each one becomes.
 
 Done when every cluster has an authoritative copy, every conflict a winner, and every issue a finding.
 
 ## 4. Verify: classify against reality
 
-Group the units by source: user instructions, project instructions (root, rules, nested, imports, AGENTS.md), memory, then descriptions with configuration. Send a unit when it carries any tag other than `preference` or `safeguard` alone, or sits in a duplicate or conflict cluster. The rest are KEEP. Split a group above about 60 units.
+Group the units by source: user instructions, project instructions (root, rules, nested, imports, AGENTS.md, pointer docs, generator sources), memory, then skill and agent text (descriptions, bodies, hook messages) with configuration. Send a unit when it carries any tag other than `preference` or `safeguard` alone, or sits in a duplicate or conflict cluster. The rest are KEEP. Split a group above about 60 units.
 
 Each group is verified in parallel. In Claude Code, dispatch the `leek-skills:context-verifier` agent (sonnet), one per group. In other harnesses, dispatch and wait per [harness-tools](../harness-tools/SKILL.md) with the same brief and the verifier's rules spelled out in it. Otherwise verify inline. The brief: the project path; the group's units with tags and gists; its duplicate pairs and conflicts from step 3; the inventory issues on the group's files, quoted; and the paths of `lenses.md`, `inventory.json`, `config.json`, and `usage.json`. A returned KEEP of a `claim` or `pointer` unit with no `checked` entry was not verified: verify it yourself.
 
@@ -91,8 +93,11 @@ Ask what to apply (a structured question ([harness-tools](../harness-tools/SKILL
 Apply only what was picked:
 
 1. Snapshot every file about to change or be deleted: `bash <this-skill-dir>/scripts/state.sh snapshot <file>...`. Keep the printed backup path.
-2. Apply each finding as an exact `old` → `new` replacement, one at a time, re-reading the file first. When `old` no longer matches exactly once, skip that finding and report it. Never apply a fuzzy edit. Deleting a memory file also deletes its `MEMORY.md` line. A plugin change goes through `claude plugin disable <key>` or `claude plugin uninstall <key>` and asks for a restart. Settings edits keep valid JSON, and never loosen a permission.
-3. Re-run step 1's inventory into `<scratch>/context-doctor/after/`. It must show no new `issues`, and each edited file must still load as intended. Report the real before and after totals.
+2. Apply each finding as an exact `old` → `new` replacement, one at a time, re-reading the file first and re-running the finding's evidence check: a fact can change between report and apply, and an UPDATE writes only a value you just confirmed. When `old` no longer matches exactly once, or the evidence no longer holds, skip that finding and report it. Never apply a fuzzy edit. Deleting a memory file also deletes its `MEMORY.md` line. A plugin change goes through `claude plugin disable <key>` or `claude plugin uninstall <key>` and asks for a restart. Settings edits keep valid JSON, and never loosen a permission.
+   - A generated file changes only through its source: edit the source, run the generator, and confirm the regenerated file changed where the source did and nowhere else.
+   - An upstream copy is never edited here; its findings go in the report for the upstream repo.
+   - Removing an item a generator or lock installs also removes or excludes it there (lenses' **Configuration**).
+3. Re-run step 1's inventory into `<scratch>/context-doctor/after/`. It must show no new `issues`, and each edited file must still load as intended. Every hook script, settings file, or other script you changed passes its syntax check (`bash -n`, `jq .`, `python3 -m py_compile`) and the tests that cover it. Report the real before and after totals.
 4. With the user's yes to remembering, pipe the unpicked findings (`{"fingerprint","path","class","excerpt"}` per line) to `bash <this-skill-dir>/scripts/state.sh decline`. The fingerprint comes from the finding's unit in `units.jsonl` or its entry in `inventory.json` `issues`. A finding with neither (a plugin, an MCP server) is not remembered; say so.
 
 End with one line per finding, starting ✅ applied, ⚠️ skipped (with why), or ❌ failed. Then give the backup path and the restore command: `bash <this-skill-dir>/scripts/state.sh restore <backup>`, which needs the user's go-ahead before it runs. Repo files are left uncommitted.
