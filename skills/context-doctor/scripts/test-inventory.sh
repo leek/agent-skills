@@ -259,6 +259,8 @@ cat > "$p4/.claude/rules/secrets.md" <<'MD'
 - Send Authorization: Bearer bearervalue12345678 to the API.
 - The database is postgres://admin:hunter2passw@db.internal/app.
 - Context budget: tokens: 1200 per turn.
+- Staging login password: hunt7r2 for now.
+- Config has "client_secret": "sh,ort}x" in it.
 MD
 printf -- '---\npaths: src/**/*.{ts,tsx}\n---\n- TSX rule.\n' > "$p4/.claude/rules/tsx.md"
 echo "x" > "$p4/src/a.tsx"
@@ -285,7 +287,7 @@ JSON
 bash "$here/inventory.sh" --out "$out" --project "$p4" --home "$home" --config-dir "$config" --managed-dir "$tmp/managed" >/dev/null 2>&1 \
   || fail "inventory failed on the fourth project"
 
-! grep -rq -e 'ghxsecretvalue123456' -e 'bearervalue12345678' -e 'hunter2passw' -e 'abcdefghijklmnopqrstu' "$out" || fail "a secret form survived redaction"
+! grep -rq -e 'ghxsecretvalue123456' -e 'bearervalue12345678' -e 'hunter2passw' -e 'abcdefghijklmnopqrstu' -e 'hunt7r2' -e 'sh,ort' "$out" || fail "a secret form survived redaction"
 grep -q 'GITHUB_TOKEN=\[REDACTED\]' "$out/units.jsonl" || fail "redaction dropped the key name"
 grep -q 'tokens: 1200' "$out/units.jsonl" || fail "redaction ate a short count"
 jq -e '.mcp_servers[] | select(.name=="api") | .host == "api.example.com"' "$out/config.json" >/dev/null || fail "MCP host kept its userinfo"
