@@ -142,7 +142,14 @@ mkdir -p "$p3/docs" "$p3/src" "$p3/sub2" "$p3/sub3" "$p3/.ai/guidelines" "$p3/.c
 git -C "$p3" init -q
 p3r=$(cd "$p3" && pwd -P)
 printf '<laravel-boost-guidelines>\nRead docs/index.md and `docs/guide.md`; see [gone](docs/missing.md).\n</laravel-boost-guidelines>\n' > "$p3/CLAUDE.md"
-echo '{}' > "$p3/boost.json"
+echo '{"skills": ["boosted"]}' > "$p3/boost.json"
+# Third-party skills: a Boost-installed project skill and an npx-skills-locked user skill keep their
+# listed description as a unit, never their body. A project copy of a user skill's name is shadowed.
+mkdir -p "$p3/.claude/skills/boosted" "$config/skills/locked" "$home/.agents" "$p3/.claude/skills/foo"
+printf -- '---\nname: boosted\ndescription: Boost installs me.\n---\n- BOOSTBODY rule.\n' > "$p3/.claude/skills/boosted/SKILL.md"
+printf -- '---\nname: locked\ndescription: A lock installs me.\n---\n- LOCKBODY rule.\n' > "$config/skills/locked/SKILL.md"
+echo '{"version": 3, "skills": {"locked": {"source": "x/y"}}}' > "$home/.agents/.skill-lock.json"
+printf -- '---\nname: foo\ndescription: Project copy of foo.\n---\n- SHADOWBODY rule.\n' > "$p3/.claude/skills/foo/SKILL.md"
 echo "- Guideline source rule." > "$p3/.ai/guidelines/core.md"
 printf '| Applies to | Rule |\n|---|---|\n| app/Nope/**, src/*.php | docs/guide.md |\n| a form (`*Form`, `*Infolist`) | `docs/guide.md` |\n' > "$p3/docs/index.md"
 echo "- The rule pack's own root file." > "$up/CLAUDE.md"
@@ -202,5 +209,29 @@ nounit() { ! grep -q -- "$1" "$out/units.jsonl" || fail "unexpected unit: $1"; }
 unit "Guide rule"; unit "Guideline source rule"; unit "Skill body rule"; unit "Agent prompt rule"
 unit "deny message is long enough"; unit "Local edit"
 nounit "laravel-boost-guidelines"; nounit "Synced rule"
+unit "Boost installs me"; unit "A lock installs me"; nounit "BOOSTBODY"; nounit "LOCKBODY"; nounit "SHADOWBODY"
+expect "$p3r/.claude/skills/foo/SKILL.md" never
+jq -e '.totals.third_party_skills == 2 and .totals.shadowed_skills == 1' "$out/inventory.json" >/dev/null || fail "third-party or shadowed totals"
+
+# An audited, unchanged file keeps its units out of the batches; an old audit or a changed file does not.
+guide="$p3r/docs/guide.md"
+today=$(date -u +%Y-%m-%d)
+echo "{\"path\":\"$guide\",\"sha256\":\"$(shasum -a 256 "$guide" | cut -d' ' -f1)\",\"audited_on\":\"$today\"}" > "$tmp/audited.jsonl"
+inv3() { bash "$here/inventory.sh" --out "$out" --project "$p3" --home "$home" --config-dir "$config" --managed-dir "$tmp/managed" --upstream "$up" "$@" >/dev/null 2>&1; }
+inv3 --audited "$tmp/audited.jsonl"
+jq -e 'select(.text | test("Guide rule")) | .audited' "$out/units.jsonl" >/dev/null || fail "audited unit not marked"
+! cat "$out"/batch_*.jsonl | grep -q "Guide rule" || fail "audited unit still batched"
+sed 's/"audited_on":"[0-9-]*"/"audited_on":"2000-01-01"/' "$tmp/audited.jsonl" > "$tmp/audited-old.jsonl"
+inv3 --audited "$tmp/audited-old.jsonl"
+cat "$out"/batch_*.jsonl | grep -q "Guide rule" || fail "an audit past --audited-days still skipped the file"
+echo "- Guide rule changed." > "$guide"
+inv3 --audited "$tmp/audited.jsonl"
+cat "$out"/batch_*.jsonl | grep -q "Guide rule changed" || fail "a changed audited file was skipped"
+
+# --max-batches raises the batch size instead of writing more batches.
+for n in 1 2 3; do
+  inv3 --max-batches "$n" --batch-size 1
+  [ "$(ls "$out"/batch_*.jsonl | wc -l | tr -d ' ')" -le "$n" ] || fail "--max-batches $n wrote more than $n batches"
+done
 
 echo "test-inventory: ok"

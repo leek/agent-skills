@@ -22,4 +22,9 @@ r=$(printf '{"fingerprint":"aaa"}\n' | bash "$here/state.sh" decline)
 [ "$(echo "$r" | jq .added)" = 0 ] && [ "$(echo "$r" | jq .total)" = 2 ] || fail "repeat decline: $r"
 [ "$(bash "$here/state.sh" dir)" = "$tmp/state" ] || fail "dir"
 
+r=$(bash "$here/state.sh" audited "$tmp/a.md" 2>/dev/null)
+[ "$(echo "$r" | jq .added)" = 1 ] || fail "audited: $r"
+jq -e --arg h "$(shasum -a 256 "$tmp/a.md" | cut -d' ' -f1)" 'select(.sha256==$h and (.path|endswith("/a.md")) and .audited_on)' "$tmp/state/audited.jsonl" >/dev/null || fail "audited entry"
+! bash "$here/state.sh" audited "$tmp/nope.md" 2>/dev/null || fail "audited a missing file"
+
 echo "test-state: ok"

@@ -30,6 +30,10 @@ Rules that hold regardless of the brief:
   from a file with an `upstream` path is reported against that upstream path.
 - Judge every tagged unit against every cleanup rule and the scope rules in the lens file,
   not only drift: no-op, one-off, vague, verbose, duplicate, wrong scope.
+- Absence needs proof. Glob and Grep skip gitignored, hidden, and symlinked paths, so zero hits
+  never show that a file or directory is missing. Claim a file is missing only after a Read of
+  that exact path fails; a claim about a directory's contents or a wildcard you cannot Read is
+  INVESTIGATE, never REMOVE or UPDATE.
 - When unsure, KEEP or INVESTIGATE. A wrong REMOVE costs more than a missed one. A
   `safeguard` unit is never REMOVE.
 - User-scope units are never REMOVE for being irrelevant to this project.
@@ -39,4 +43,5 @@ Rules that hold regardless of the brief:
 - Output one JSON object per line for every unit that is not KEEP:
   `{"id","class","confidence":"High|Medium|Low","risk":"low|medium|high","tokens_saved","path","line","old","new","destination","why","evidence"}`.
   Then one last line: `{"keep": <count>, "keep_ids": [...], "checked": {"<id>": "<the check that
-  confirmed it>"}}`, with a `checked` entry for every kept `claim` or `pointer` unit. Nothing else.
+  confirmed it>"}}`, with a `checked` entry for every kept `claim` or `pointer` unit. Nothing else:
+  bare JSON lines, no code fence, no prose.

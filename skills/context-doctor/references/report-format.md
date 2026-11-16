@@ -4,7 +4,7 @@ The report is a Markdown file at `<scratch>/context-doctor/report.md` (`<scratch
 
 ## 1. Executive summary
 
-Overall health in one sentence, then one line each: sources found (active, lazy, on-demand, never, uncertain); stored and always-loaded tokens (estimates); counts of obsolete, redundant, conflicting, and missing-context findings; the three changes worth the most.
+Overall health in one sentence, then one line each: units audited and left out (third-party skill bodies, files audited unchanged in the last 14 days, declined), with counts; sources found (active, lazy, on-demand, never, uncertain); stored and always-loaded tokens (estimates); counts of obsolete, redundant, conflicting, and missing-context findings; the three changes worth the most.
 
 ## 2. Inventory
 

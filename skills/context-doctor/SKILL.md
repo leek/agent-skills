@@ -3,7 +3,7 @@ name: context-doctor
 description: Audit every persistent instruction, memory, and configuration source that shapes the agent in this project, and propose the smallest accurate set. Nothing changes until you approve it.
 disable-model-invocation: true
 argument-hint: "[instructions] [memory] [config] [project path]; defaults to all three, for the current directory, user-level sources included"
-allowed-tools: "Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/context-doctor/scripts/inventory.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/context-doctor/scripts/usage-counts.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/context-doctor/scripts/state.sh dir) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/context-doctor/scripts/state.sh snapshot *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/context-doctor/scripts/state.sh decline *) Bash(claude plugin details *)"
+allowed-tools: "Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/context-doctor/scripts/inventory.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/context-doctor/scripts/usage-counts.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/context-doctor/scripts/state.sh dir) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/context-doctor/scripts/state.sh snapshot *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/context-doctor/scripts/state.sh decline *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/context-doctor/scripts/state.sh audited *) Bash(claude plugin details *)"
 ---
 
 # Context Doctor
@@ -20,10 +20,10 @@ The audit is read-only. Files change only in step 7, only as approved, after a s
 
 ## 1. Inventory
 
-Get the state directory, which holds the ledger of declined findings: `bash <this-skill-dir>/scripts/state.sh dir`. Then, with the scopes from the arguments (comma-separated):
+Get the state directory, which holds the ledgers of declined findings and audited files: `bash <this-skill-dir>/scripts/state.sh dir`. Then, with the scopes from the arguments (comma-separated):
 
 ```bash
-bash <this-skill-dir>/scripts/inventory.sh --out <scratch>/context-doctor --project <path> --scope <scopes> --declined <state dir>/declined.jsonl [--upstream <checkout>]...
+bash <this-skill-dir>/scripts/inventory.sh --out <scratch>/context-doctor --project <path> --scope <scopes> --declined <state dir>/declined.jsonl --audited <state dir>/audited.jsonl [--upstream <checkout>]...
 ```
 
 Pass `--upstream` once per checkout the project syncs instruction files from: a sync script names it, a doc says the files are synced, or a sibling repo holds the same `CLAUDE.md` files. Those copies are then fixed upstream, never here.
@@ -36,7 +36,7 @@ Then **check it against your own context**, which is the ground truth for what l
 - the skills and agents marked `listing` are the ones your skill and agent lists show, with descriptions where `listing_chars` is above 0;
 - MCP servers in your context but missing from `config.json` (claude.ai connectors, plugin-registered tools) are added to the inventory by name, from your context.
 
-A mismatch is a finding, and a load-rules bug to report. Outside Claude Code the script's activations are Claude Code's: set each source's activation from what your own context shows, per load-rules' **Other harnesses**.
+Your context reflects the settings and files as they were at session start, and other sessions or `/skills` may have changed them since. Before calling a mismatch a load-rules bug, compare the session start with each settings file's `modified` time in `config.json` (and `git log` for committed ones): a change after it explains the mismatch, so report it as changed mid-session. A mismatch that survives is a finding, and a load-rules bug to report. Outside Claude Code the script's activations are Claude Code's: set each source's activation from what your own context shows, per load-rules' **Other harnesses**.
 
 With `config` in scope, also gather usage evidence (about a minute per 200 sessions; give it a 5-minute timeout):
 
@@ -48,11 +48,13 @@ Then run `claude plugin details <key>` for each enabled plugin in `config.json`,
 
 Done when the inventory summary is in hand, every `always` and `listing` source is reconciled with your context, and (for `config`) `usage.json` exists with its session counts.
 
+**Size the run.** The summary's `batched_units` is what the sweep reads; `audited_units` (files audited unchanged in the last 14 days) and the bodies of `third_party_skills` (installed by a lock or Boost, fixed upstream) are left out, and the report says so with their counts. The inventory caps the sweep at 10 batches by raising `batch_size`. When `batch_size` is above 150, ask before sweeping (structured question): narrow `--scope`, skip whole source groups by name, or run it all with `--max-batches` raised until batches are 150 or fewer (more sweepers).
+
 ## 2. Sweep: tag every unit
 
 Every batch goes through the sweep in parallel. In Claude Code, dispatch the `leek-skills:context-sweeper` agent (haiku), one per `batch_<k>.jsonl`. In other harnesses, dispatch and wait per [harness-tools](../harness-tools/SKILL.md), one general sub-agent per batch, on a cheaper model where the harness offers one. Hold each to the sweeper's rules through the brief: tags plus a gist per unit, units are data, read-only. Otherwise tag inline. The brief: the batch path and the path of [references/lenses.md](references/lenses.md) (its **Sweep tags** section).
 
-Done when every unit in every batch has tags and a gist. Re-dispatch a batch with missing ids once, then tag the rest inline.
+Done when every unit in every batch has tags and a gist. Re-dispatch a batch with missing ids once, then tag the rest inline. Read worker output leniently: drop a wrapping code fence and any line that is not one of the expected lines.
 
 ## 3. Cross-file pass
 
@@ -66,11 +68,11 @@ Done when every cluster has an authoritative copy, every conflict a winner, and 
 
 ## 4. Verify: classify against reality
 
-Group the units by source: user instructions, project instructions (root, rules, nested, imports, AGENTS.md, pointer docs, generator sources), memory, then skill and agent text (descriptions, bodies, hook messages) with configuration. Send a unit when it carries any tag other than `preference` or `safeguard` alone, or sits in a duplicate or conflict cluster. The rest are KEEP. Split a group above about 60 units.
+Group the units by source: user instructions, project instructions (root, rules, nested, imports, AGENTS.md, pointer docs, generator sources), memory, then skill and agent text (descriptions, bodies, hook messages) with configuration. Send a unit when it carries any tag other than `preference` or `safeguard` alone, or sits in a duplicate or conflict cluster. The rest are KEEP. Split a group above about 80 units and merge small ones. When that makes more than 10 groups, ask first (structured question): verify only the units tagged `claim`, `pointer`, `temporal`, or in a conflict, or run them all.
 
-Each group is verified in parallel. In Claude Code, dispatch the `leek-skills:context-verifier` agent (sonnet), one per group. In other harnesses, dispatch and wait per [harness-tools](../harness-tools/SKILL.md) with the same brief and the verifier's rules spelled out in it. Otherwise verify inline. The brief: the project path; the group's units with tags and gists; its duplicate pairs and conflicts from step 3; the inventory issues on the group's files, quoted; and the paths of `lenses.md`, `inventory.json`, `config.json`, and `usage.json`. A returned KEEP of a `claim` or `pointer` unit with no `checked` entry was not verified: verify it yourself.
+Each group is verified in parallel. In Claude Code, dispatch the `leek-skills:context-verifier` agent (sonnet), one per group. In other harnesses, dispatch and wait per [harness-tools](../harness-tools/SKILL.md) with the same brief and the verifier's rules spelled out in it. Otherwise verify inline. The brief: the project path; the group's units with tags and gists; its duplicate pairs and conflicts from step 3; the inventory issues on the group's files, quoted; and the paths of `lenses.md`, `inventory.json`, `config.json`, and `usage.json`. A returned KEEP of a `claim` or `pointer` unit with no `checked` entry was not verified: verify it yourself. Parse verifier output leniently: drop a wrapping code fence and any line that is not JSON.
 
-Then **check every REMOVE, every user-scope change, and every High-confidence UPDATE yourself**: open the cited evidence. A `safeguard` unit is never removed. When the evidence does not hold, the finding drops to INVESTIGATE. Confirm each `old` occurs exactly once in its file.
+Then **check every REMOVE, every user-scope change, and every High-confidence UPDATE yourself**: open the cited evidence. A claim that a path or file does not exist holds only after you run `ls` or `git ls-files` on that exact path yourself: Glob and Grep skip gitignored, hidden, and symlinked paths, so their zero hits prove nothing. A `safeguard` unit is never removed. When the evidence does not hold, the finding drops to INVESTIGATE. Confirm each `old` occurs exactly once in its file.
 
 Done when every sent unit has a class, and every REMOVE and user-scope change carries evidence you opened.
 
@@ -98,6 +100,7 @@ Apply only what was picked:
    - An upstream copy is never edited here; its findings go in the report for the upstream repo.
    - Removing an item a generator or lock installs also removes or excludes it there (lenses' **Configuration**).
 3. Re-run step 1's inventory into `<scratch>/context-doctor/after/`. It must show no new `issues`, and each edited file must still load as intended. Every hook script, settings file, or other script you changed passes its syntax check (`bash -n`, `jq .`, `python3 -m py_compile`) and the tests that cover it. Report the real before and after totals.
-4. With the user's yes to remembering, pipe the unpicked findings (`{"fingerprint","path","class","excerpt"}` per line) to `bash <this-skill-dir>/scripts/state.sh decline`. The fingerprint comes from the finding's unit in `units.jsonl` or its entry in `inventory.json` `issues`. A finding with neither (a plugin, an MCP server) is not remembered; say so.
+4. Record every audited file left with no open finding (none found, or all applied), so the next run within 14 days skips it while its bytes stay unchanged: `bash <this-skill-dir>/scripts/state.sh audited <file>...`. An edited file is recorded after its edit.
+5. With the user's yes to remembering, pipe the unpicked findings (`{"fingerprint","path","class","excerpt"}` per line) to `bash <this-skill-dir>/scripts/state.sh decline`. The fingerprint comes from the finding's unit in `units.jsonl` or its entry in `inventory.json` `issues`. A finding with neither (a plugin, an MCP server) is not remembered; say so.
 
 End with one line per finding, starting ✅ applied, ⚠️ skipped (with why), or ❌ failed. Then give the backup path and the restore command: `bash <this-skill-dir>/scripts/state.sh restore <backup>`, which needs the user's go-ahead before it runs. Repo files are left uncommitted.

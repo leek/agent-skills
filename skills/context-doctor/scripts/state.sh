@@ -3,6 +3,7 @@
 #   ${CONTEXT_DOCTOR_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/context-doctor}
 #     backups/<UTC stamp>/manifest.tsv + files/<absolute path>   one snapshot per apply
 #     declined.jsonl                                             proposals the user said no to
+#     audited.jsonl                                              files a run audited, with their hash
 #
 # Usage:
 #   state.sh dir                       print the state dir (inventory.sh --declined <dir>/declined.jsonl)
@@ -12,6 +13,8 @@
 #                                      ones); prints {"restored": [paths]}
 #   state.sh decline < proposals.jsonl append declined proposals, one JSON object per line with at
 #                                      least "fingerprint"; repeats are skipped. Prints {"added","total"}
+#   state.sh audited <file>...         record each file as audited today, with its sha256
+#                                      (inventory.sh --audited <dir>/audited.jsonl). Prints {"added"}
 
 set -e
 
@@ -54,7 +57,17 @@ case "$cmd" in
     mv "$ledger.new" "$ledger"
     after=$(wc -l < "$ledger" | tr -d ' ')
     jq -nc --argjson a $((after - before)) --argjson t "$after" '{added:$a, total:$t}' ;;
+  audited)
+    [ $# -gt 0 ] || { echo "audited needs at least one file" >&2; exit 2; }
+    for f in "$@"; do [ -f "$f" ] || { echo "Not a file: $f" >&2; exit 1; }; done
+    mkdir -p "$state"
+    for f in "$@"; do
+      abs=$(cd "$(dirname "$f")" && pwd -P)/$(basename "$f")
+      jq -nc --arg p "$abs" --arg h "$(shasum -a 256 "$abs" | cut -d' ' -f1)" --arg d "$(date -u +%Y-%m-%d)" \
+        '{path:$p, sha256:$h, audited_on:$d}' >> "$state/audited.jsonl"
+    done
+    jq -nc --argjson n $# '{added:$n}' ;;
   *)
-    echo "Usage: state.sh dir | snapshot <file>... | restore <backup dir> | decline < proposals.jsonl" >&2
+    echo "Usage: state.sh dir | snapshot <file>... | restore <backup dir> | decline < proposals.jsonl | audited <file>..." >&2
     exit 2 ;;
 esac

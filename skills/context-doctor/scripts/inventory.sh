@@ -5,12 +5,17 @@
 #
 # Usage: inventory.sh --out <dir> [--project <dir>] [--home <dir>] [--config-dir <dir>]
 #                     [--managed-dir <dir>] [--declined <declined.jsonl>] [--batch-size N]
+#                     [--max-batches N] [--audited <audited.jsonl>] [--audited-days N]
 #   --project      the working directory sessions start in (default: $PWD)
 #   --home         the home directory (default: $HOME); tests pass a fixture
 #   --config-dir   Claude Code's config dir (default: $CLAUDE_CONFIG_DIR, else <home>/.claude)
 #   --managed-dir  managed-policy dir (default: the platform path)
 #   --declined     units whose fingerprint is listed here are marked declined (state.sh ledger)
-#   --batch-size   audit units per sweep batch (default 40)
+#   --batch-size   audit units per sweep batch (default 40), raised as needed to fit --max-batches
+#   --max-batches  most sweep batches to write (default 10): a bigger run gets bigger batches
+#   --audited      state.sh ledger of files a past run audited; a file whose bytes are unchanged and
+#                  whose audit is under --audited-days old (default 14) keeps its units, marked
+#                  audited and left out of every batch
 #   --scope        comma list of instructions, memory, config: which units to write and batch
 #                  (default all). Sources, issues, and totals always cover everything.
 #   --upstream     a checkout the project syncs instruction files from (repeatable). A project
@@ -38,14 +43,18 @@
 #   config.json     settings keys, hooks, MCP servers, plugins: names and structure only.
 #                   Values of env, headers, args, and anything token-shaped are never emitted.
 #   units.jsonl     one audit unit per line: {id, path, line, end_line, heading, kind, scope,
-#                   activation, text, fingerprint, declined}
+#                   activation, text, fingerprint, declined, audited}
+#     A skill a lock or generator installs (~/.agents/.skill-lock.json for user skills, the
+#     project's skills-lock.json or boost.json for project skills) is third-party: its listed
+#     description is a unit, its body is not (fixed upstream or by removing the skill).
 #   dupes.jsonl     {a, b, score}: unit pairs whose word sets overlap >= 0.6
 #   batch_<k>.jsonl units split for the sweep, whole sources kept together where they fit
 # Prints a JSON summary to stdout. Token counts are bytes/4: an estimate, not a measurement.
 
 set -e
 
-out=""; project="$PWD"; home="$HOME"; config=""; managed=""; declined=""; batch=40; scope="instructions,memory,config"; upstream=""
+out=""; project="$PWD"; home="$HOME"; config=""; managed=""; declined=""; batch=40; max_batches=10; audited=""; audited_days=14
+scope="instructions,memory,config"; upstream=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --out) out=$2; shift ;;
@@ -55,6 +64,9 @@ while [ $# -gt 0 ]; do
     --managed-dir) managed=$2; shift ;;
     --declined) declined=$2; shift ;;
     --batch-size) batch=$2; shift ;;
+    --max-batches) max_batches=$2; shift ;;
+    --audited) audited=$2; shift ;;
+    --audited-days) audited_days=$2; shift ;;
     --scope) scope=$2; shift ;;
     --upstream) upstream="$upstream${upstream:+:}$2"; shift ;;
     *) echo "Unknown arg: $1" >&2; exit 2 ;;
@@ -77,11 +89,11 @@ mkdir -p "$out"
 rm -f "$out"/batch_*.jsonl
 echo ">> inventory: project=$project config=$config" >&2
 
-python3 - "$project" "$home" "$config" "$managed" "$out" "$declined" "$batch" "$scope" "$upstream" <<'PY'
-import glob, hashlib, json, os, re, subprocess, sys
+python3 - "$project" "$home" "$config" "$managed" "$out" "$declined" "$batch" "$scope" "$upstream" "$max_batches" "$audited" "$audited_days" <<'PY'
+import datetime, glob, hashlib, json, math, os, re, subprocess, sys
 from fnmatch import fnmatch
 
-project, home, config, managed, out, declined_path, batch_size, scope_arg, upstream_arg = sys.argv[1:10]
+project, home, config, managed, out, declined_path, batch_size, scope_arg, upstream_arg, max_batches, audited_path, audited_days = sys.argv[1:13]
 upstreams = [os.path.realpath(os.path.expanduser(u)) for u in upstream_arg.split(":") if u]
 SCOPES = {"instructions": {"claude-md", "claude-local", "rule", "agents-md", "import", "output-style", "pointer-doc", "generator-source"},
           "memory": {"memory-index", "memory", "agent-memory"},
@@ -93,7 +105,7 @@ in_scope = set().union(*(SCOPES[x] for x in scope_arg.split(",")))
 project = os.path.realpath(project)
 home = os.path.realpath(home)
 config = os.path.realpath(os.path.expanduser(config))
-batch_size = int(batch_size)
+batch_size, max_batches, audited_days = int(batch_size), int(max_batches), int(audited_days)
 
 RANK = ["always", "listing", "lazy", "agent", "on-demand", "config", "uncertain", "never"]
 SECRET = re.compile(
@@ -448,6 +460,43 @@ def scan_listed(base, scope, plugin=None):
 scan_listed(config, "user")
 scan_listed(os.path.join(project, ".claude"), "project")
 
+def skill_name(s):
+    return s.get("name") or os.path.basename(os.path.dirname(s["path"]))
+
+# Personal beats project: a project skill with a user skill's name never loads. When the user copy
+# is hidden (skillOverrides "off"), whether the project copy shows is undocumented.
+user_skill = {skill_name(s): s for s in sources.values() if s["kind"] == "skill" and s["scope"] == "user"}
+for s in list(sources.values()):
+    u = user_skill.get(skill_name(s)) if s["kind"] == "skill" and s["scope"] == "project" else None
+    if u:
+        s["shadowed_by"] = u["path"]
+        if u["activation"] == "never":
+            s["activation"], s["why"] = "uncertain", "the personal skill of the same name is hidden; whether this project copy shows is undocumented"
+        else:
+            s["activation"], s["why"], s["listing_chars"] = "never", "shadowed: a personal skill of the same name wins over a project skill", 0
+
+# Third-party skills: what a lock or generator installs is fixed upstream, so only its listed
+# description is audited here.
+def lock_names(p):
+    data = load_json(p) or {}
+    val = data.get("skills") if isinstance(data, dict) else None
+    return set(val) if isinstance(val, (dict, list)) else set()
+user_lock = os.path.join(home, ".agents", ".skill-lock.json")
+installers = {"user": [(user_lock, lock_names(user_lock))],
+              "project": [(os.path.join(project, "skills-lock.json"), lock_names(os.path.join(project, "skills-lock.json"))),
+                          (os.path.join(project, "boost.json"), lock_names(os.path.join(project, "boost.json")))]}
+global_store = os.path.realpath(os.path.join(home, ".agents", "skills")) + os.sep
+for s in sources.values():
+    if s["kind"] != "skill":
+        continue
+    pairs = list(installers.get(s["scope"], []))
+    if s["scope"] == "project" and s["real_path"].startswith(global_store):
+        pairs += installers["user"]  # a project link into the global npx-skills store
+    for lock, names in pairs:
+        if skill_name(s) in names:
+            s["third_party"] = lock
+            break
+
 plugins = []
 installed = load_json(os.path.join(config, "plugins", "installed_plugins.json")) or {}
 for key, entries in sorted((installed.get("plugins") or {}).items()):
@@ -477,9 +526,12 @@ for key, entries in sorted((installed.get("plugins") or {}).items()):
 own_skills = {s.get("name") for s in sources.values() if s["kind"] == "skill" and not s.get("plugin")}
 own_skills |= {os.path.basename(os.path.dirname(s["path"])) for s in sources.values() if s["kind"] == "skill" and not s.get("plugin")}
 plugin_skills = {s.get("name") for s in sources.values() if s["kind"] == "skill" and s.get("plugin")}
+own_commands = {s.get("name") for s in sources.values() if s["kind"] == "command" and not s.get("plugin")}
 for key, val in sorted(skill_overrides.items()):
     if key not in own_skills:
-        why = "names a plugin skill, and plugin skills ignore skillOverrides" if key in plugin_skills else "names no installed user or project skill"
+        why = ("names a plugin skill, and plugin skills ignore skillOverrides" if key in plugin_skills else
+               "names a command, not a skill; whether skillOverrides applies to commands is undocumented" if key in own_commands else
+               "names no local user or project skill; dead unless a bundled or claude.ai-synced skill of that name is in the session's skill list")
         issues.append(dict(type="skill-override-dead", path=next((p for sc, p in settings_files if "skillOverrides" in settings.get(sc, {})), ""),
                            detail=f'skillOverrides "{key}": "{val}" {why}'))
 
@@ -805,7 +857,9 @@ for sc, data in settings.items():
     p = data.get("permissions") or {}
     perms[sc] = {k: [redact(str(x)) for x in p.get(k, [])] for k in ("allow", "deny", "ask") if p.get(k)}
 config_out = dict(
-    settings={sc: dict(keys=sorted(d.keys()), env_keys=sorted((d.get("env") or {}).keys())) for sc, d in settings.items()},
+    settings={sc: dict(keys=sorted(d.keys()), env_keys=sorted((d.get("env") or {}).keys()),
+                       modified=datetime.datetime.fromtimestamp(os.path.getmtime(dict(settings_files)[sc]), datetime.timezone.utc).isoformat(timespec="seconds"))
+              for sc, d in settings.items()},
     permissions=perms, claudeMdExcludes=excludes, auto_memory=dict(dir=mem_dir, disabled=mem_off),
     output_style=style, tool_search=env.get("ENABLE_TOOL_SEARCH", os.environ.get("ENABLE_TOOL_SEARCH")),
     plugins=plugins, mcp_servers=mcp, hooks=hooks)
@@ -821,6 +875,27 @@ if declined_path and os.path.isfile(declined_path):
             declined.add(json.loads(line)["fingerprint"])
         except (ValueError, KeyError):
             pass
+# Files a past run audited: unchanged bytes and a recent enough audit keep their units out of the
+# batches. The age bound matters because a doc goes stale when the code it describes changes.
+audited_ok = {}
+if audited_path and os.path.isfile(audited_path):
+    cutoff = (datetime.date.today() - datetime.timedelta(days=audited_days)).isoformat()
+    for line in open(audited_path, encoding="utf-8"):
+        try:
+            e = json.loads(line)
+            if str(e.get("audited_on", "")) >= cutoff:
+                audited_ok[e["path"]] = (e["audited_on"], e["sha256"])  # the ledger is in time order: last wins
+        except (ValueError, KeyError, TypeError):
+            pass
+def audited_on(s):
+    entry = audited_ok.get(s["real_path"]) or audited_ok.get(s["path"])
+    if not entry:
+        return None
+    try:
+        with open(s["real_path"], "rb") as fh:
+            return entry[0] if hashlib.sha256(fh.read()).hexdigest() == entry[1] else None
+    except OSError:
+        return None
 BULLET = re.compile(r"^(\s*)(?:[-*+]|\d+[.)])\s+")
 units = []
 
@@ -834,9 +909,11 @@ def emit(s, start, end, heading, kind, text):
     if not text.strip():
         return
     fp = hashlib.sha1((s["path"] + "\0" + norm(text)).encode()).hexdigest()[:12]
+    if "audited_on" not in s:
+        s["audited_on"] = audited_on(s)
     units.append(dict(id=f"u{len(units) + 1:04d}", path=s["path"], line=start, end_line=end, heading=heading,
                       kind=kind, scope=s["scope"], activation=s["activation"], text=redact(text),
-                      fingerprint=fp, declined=fp in declined))
+                      fingerprint=fp, declined=fp in declined, audited=bool(s["audited_on"])))
 
 for p, s in sources.items():
     if s["kind"] not in in_scope:
@@ -862,7 +939,7 @@ for p, s in sources.items():
         if desc and s.get("listing_chars"):  # only a description that is actually listed
             line = next((n for n, l in enumerate((read(p) or "").splitlines(), 1) if l.startswith("description:")), 1)
             emit(s, line, line, s.get("name", ""), "description", desc)
-        if s["kind"] == "command" or s["activation"] == "never":
+        if s["kind"] == "command" or s["activation"] == "never" or s.get("third_party"):
             continue
         # A user or project skill's body loads when it runs, and an agent's body is its system
         # prompt: both are audited line by line below.
@@ -947,25 +1024,32 @@ with open(os.path.join(out, "dupes.jsonl"), "w") as fh:
         fh.write(json.dumps(d) + "\n")
 
 # ---- batches: whole sources together where they fit ------------------------------------------------------------
-batches, current = [], []
 by_path = {}
 for u in units:
-    if not u["declined"]:
+    if not u["declined"] and not u["audited"]:
         by_path.setdefault(u["path"], []).append(u)
-for path, us in by_path.items():
-    while us:
-        room = batch_size - len(current)
-        if len(us) > room and current and len(us) <= batch_size:
-            batches.append(current)
-            current = []
-            continue
-        take, us = us[:batch_size - len(current)], us[batch_size - len(current):]
-        current += take
-        if len(current) >= batch_size:
-            batches.append(current)
-            current = []
-if current:
-    batches.append(current)
+
+def make_batches(size):
+    batches, current = [], []
+    for us in by_path.values():
+        while us:
+            if len(us) > size - len(current) and current and len(us) <= size:
+                batches.append(current)
+                current = []
+                continue
+            take, us = us[:size - len(current)], us[size - len(current):]
+            current += take
+            if len(current) >= size:
+                batches.append(current)
+                current = []
+    return batches + ([current] if current else [])
+
+# Whole sources stay together, which can leave batches part-full: grow the size until they fit.
+batch_size = max(batch_size, math.ceil(sum(len(us) for us in by_path.values()) / max(max_batches, 1)))
+batches = make_batches(batch_size)
+while len(batches) > max(max_batches, 1):
+    batch_size = math.ceil(batch_size * 1.1)
+    batches = make_batches(batch_size)
 paths = []
 for k, b in enumerate(batches, 1):
     bp = os.path.join(out, f"batch_{k}.jsonl")
@@ -989,6 +1073,11 @@ totals = dict(
     never_loaded_tokens=total(lambda s: s["activation"] == "never" and s["kind"] != "settings"),
     editable_stored_tokens=total(lambda s: s["kind"] in editable),
     units=len(units), declined_units=sum(u["declined"] for u in units), dupe_pairs=len(dupes),
+    audited_units=sum(u["audited"] and not u["declined"] for u in units),
+    batched_units=sum(len(b) for b in batches), batch_size=batch_size,
+    third_party_skills=sum(1 for s in sources.values() if s.get("third_party")),
+    third_party_body_tokens=total(lambda s: bool(s.get("third_party")) and s["activation"] != "never"),
+    shadowed_skills=sum(1 for s in sources.values() if s.get("shadowed_by")),
     mcp_servers=len(mcp), hooks=len(hooks), plugins_enabled=sum(1 for p in plugins if p["enabled"]))
 
 # Issues get a fingerprint too, so a declined one stays quiet on later runs.
