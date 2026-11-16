@@ -17,10 +17,12 @@ Where the two disagree, the brand guide wins. A blog post goes to the [blog-writ
 
 Read `.agents/brand-guidelines.md` before you write or review copy. A section the guide leaves out means only the craft rules apply there.
 
-If the file does not exist, this repo has not set the skill up. Ask the user before any other work (a structured question ([harness-tools](../harness-tools/SKILL.md)), otherwise in chat):
+If the file does not exist, this repo has not set the skill up.
 
-- **Set it up now** (recommended): bootstrap the guide per [BRAND-GUIDE-FORMAT.md](BRAND-GUIDE-FORMAT.md), then continue the task.
-- **Skip this time**: continue with the craft rules alone, and say in your reply that the repo has no brand guide yet.
+- **A user is here to answer** (an interactive main session): ask before any other work (a structured question ([harness-tools](../harness-tools/SKILL.md)), otherwise in chat):
+  - **Set it up now** (recommended): bootstrap the guide per [BRAND-GUIDE-FORMAT.md](BRAND-GUIDE-FORMAT.md), then continue the task.
+  - **Skip this time**: continue with the craft rules alone, and say in your reply that the repo has no brand guide yet.
+- **Nobody answers** (a sub-agent, an Autopilot worker, an unattended loop, any headless run): ask nothing and write nothing. Continue with the craft rules alone, and add one line to the report: `No .agents/brand-guidelines.md in this repo; used the craft rules alone.`
 
 Done when you can name the default voice in one line, or the user chose to skip.
 

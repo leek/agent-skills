@@ -44,7 +44,7 @@ session's uncommitted work. One release, one version, one tag, one GitHub releas
    versions bare (no `v`). It prints `{"changed": [paths]}`, or exits 1 with nothing written
    when a file does not hold `<old>` exactly once (`matches` other than 1): bump that file
    by hand and rerun for the rest. Commit them alone, in one commit, per
-   [Staging](../commit/SKILL.md#staging), subject `chore(release): <version>: <summary>`.
+   [Staging](../commit/SKILL.md#staging) with no `.claude/agent-memory/` (it rides with step 2's commit), subject `chore(release): <version>: <summary>`.
    The summary is the one in the arguments when given, otherwise the headline change in six words or fewer,
    matching the style of earlier release commits. A repo with no version file is
    versioned by its tags alone, and a first release's file already holds `next`: skip the

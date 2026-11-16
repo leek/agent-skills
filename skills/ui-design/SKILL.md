@@ -14,7 +14,7 @@ Where the two disagree, the project rule wins. Both lists grow through [Record a
 
 ## Load the project rules
 
-Before you build or review, read `.agents/ui-design.md` if it exists. When it does not exist, the house rules apply alone. Do not ask to set the file up: the first recorded rule creates it.
+Before you build or review, read `.agents/ui-design.md` in the current checkout; in a worktree that has none, read the main checkout's copy (the first entry of `git worktree list`). When neither exists, the house rules apply alone. Do not ask to set the file up: the first recorded rule creates it.
 
 ## Build
 
@@ -32,9 +32,9 @@ Report one line per finding: `<rule> · <where> · <what is wrong> → <fix>`. A
 
 When the user states a UI preference, or shows a before and after and says why one is better:
 
-The rule goes in this repo's `.agents/ui-design.md`. Create the file with a `# UI design` heading when it does not exist. Change the house rules below only when this repo is the one that holds this skill, never in an installed copy, because the next plugin update overwrites that copy.
+The rule goes in the `.agents/ui-design.md` you loaded. With none, create it with a `# UI design` heading in the main checkout (the first entry of `git worktree list`), never in a worktree, where it would ride along in that branch's diff. Change the house rules below only when this repo is the one that holds this skill, never in an installed copy, because the next plugin update overwrites that copy.
 
-1. Look for a project rule or a house rule that already covers the preference. If a project rule covers it, sharpen that project rule rather than adding a near-duplicate. If only a house rule covers it, add a project rule that states how this repo differs.
+1. Look for a project rule or a house rule that already covers the preference. If a project rule covers it, sharpen that project rule rather than adding a near-duplicate. If only a house rule covers it: in the repo that holds this skill, sharpen that house rule; anywhere else, add a project rule that states how this repo differs.
 2. Otherwise add a new rule under the group it fits (start a new group only when none does), in this shape:
 
    ```markdown

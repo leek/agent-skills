@@ -31,7 +31,7 @@ Done when the profile is loaded, or you know the run is on the defaults and why.
 
 1. **Pick the flow the change owns.** The route a user would hit, the command an operator would run, the job the system would dispatch, the Filament/Livewire page a back-office user would open. Select a small scenario that can expose the changed behavior: grouped or aggregated UI needs multiple related records with distinct values; interactive state needs the action and its reversal (for example expand, collapse, expand), checking controls and content agree each time. Use records the profile's **Data** marks safe, or isolated fixtures under the guardrails below. Keep the pass focused on the change, not a broad test suite.
 2. **Run it for real.**
-   - HTTP / UI: load the URL from the profile's **Serve** (for a worktree, the URL its bootstrap printed), signed in as the profile's account for the role the flow needs. Use the project's browser tooling (`agent-browser`, Boost's `browser-logs`) to load the page, perform the action, and screenshot the result of every step that shows a page. A browser test, including one pointed at `127.0.0.1`, is a test run, not this step.
+   - HTTP / UI: load the URL from the profile's **Serve** (for a worktree, the URL from the worktree command it names, else the URL the worktree's bootstrap printed), signed in as the profile's account for the role the flow needs. Use the project's browser tooling (`agent-browser`, Boost's `browser-logs`) to load the page, perform the action, and screenshot the result of every step that shows a page. A browser test, including one pointed at `127.0.0.1`, is a test run, not this step.
    - Console: run the command with realistic arguments.
    - Jobs / listeners: dispatch through the real path (`dispatchSync` or trigger the event), then check the side effect where it lands, database rows, storage, logs.
 3. **Check the seams the tests can't see.** Before driving the flow, start what the profile's **Watch** names under `Monitor` where available, so each error arrives tied to the action that caused it; otherwise read the log tail after each action. Look for browser console errors, the app log, a queue that needed a running worker, an unbuilt frontend (a Vite manifest error means run `npm run build`, not that the change is broken). Expect the profile's **Traps**.
@@ -52,7 +52,7 @@ Where the profile is silent or absent:
 When the user corrects how this repo is verified (a wrong URL, the account to use, a service never to trigger, a quirk to expect):
 
 1. **Nobody answers** (the same runs as in [Load the verify profile](#load-the-verify-profile)): write nothing; put the correction in the report as a suggested profile line.
-2. Otherwise, look in `.agents/verify.md` (main checkout) for the section that covers it, and sharpen that line rather than adding a near-duplicate. With no profile yet, create it with the `# Verify` heading and that one section.
+2. Otherwise, look in the profile you loaded (the current checkout's copy when it has one, else the main checkout's) for the section that covers it, and sharpen that line rather than adding a near-duplicate. With no profile yet, create it in the main checkout with the `# Verify` heading and that one section, and tell the user it is a new, uncommitted file there.
 3. Show the user the added or changed text in your reply.
 
 ## Guardrails
