@@ -71,7 +71,7 @@ The progress file is scratch state for long refactors and handoffs. Do not use i
 5. Run the relevant automated checks: tests, type checks, linters, formatters, build, migrations, or focused smoke scripts.
 6. Run an independent review after each significant change. Run the `code-review` skill against the checkpoint's starting commit (its Correctness axis runs as the `leek-skills:pr-reviewer` subagent where the harness has subagents, and inline otherwise), and brief it with the Independent Review Focus below. Where that skill is not installed, use an existing autoreview command or a separate review pass that looks for behavior regressions, missed callers, leaky abstractions, and test gaps.
 7. Fix issues found by live testing, checks, or review before moving to the next architectural step.
-8. Commit each verified checkpoint when the user has asked for commits or the repository workflow expects checkpoint commits. Keep commits small and named after the architectural move.
+8. Commit each verified checkpoint when the user has asked for commits or the repository workflow expects checkpoint commits. Keep commits small and named after the architectural move, staged per the `commit` skill's [Staging](../commit/SKILL.md#staging) with a subject per its [Subject](../commit/SKILL.md#subject).
 9. Update the progress file with the checkpoint, evidence, decisions, and next action.
 10. Repeat until the stated architecture target is met, checks pass, and review finds no blocking issue.
 

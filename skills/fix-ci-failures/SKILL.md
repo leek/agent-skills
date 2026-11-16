@@ -63,7 +63,8 @@ the tree is dirty or the branch is checked out elsewhere, use
 `git worktree add .claude/worktrees/ci-<branch> origin/B` (at that path, never a sibling
 directory), then make it runnable with `laravel-herd-worktrees`' **Bootstrap a bare worktree** section before running anything in it. Leave it in place until step 5. Per
 LEGIT failure: make the minimal change, run the failing command locally until it is
-green, then commit with explicit staging (Conventional Commits, naming the job).
+green, then commit per the `commit` skill's [Staging](../commit/SKILL.md#staging) and
+[Subject](../commit/SKILL.md#subject), the subject naming the job.
 
 Completion criterion: every LEGIT failure has a commit that turned its command green
 locally.

@@ -64,8 +64,8 @@ Per LEGIT finding: make the minimal change, with no drive-by refactors. Prove it
 `tdd` skill's [What needs a test](../tdd/SKILL.md#what-needs-a-test-and-what-proves-the-rest): a test for
 behaviour, run that test file green; `verify` for a presentation change. A user message to stop the
 tests ends test commands for the rest of the run: the last focused result stands, and
-the commits continue. Commit each fix on its own (Conventional
-Commits, explicit staging). Put `fixes #NNN` **only** on the commit that resolves the
+the commits continue. Commit each fix on its own, per the `commit` skill's
+[Staging](../commit/SKILL.md#staging) and [Subject](../commit/SKILL.md#subject). Put `fixes #NNN` **only** on the commit that resolves the
 issue's last legit finding, so the issue closes at the right moment.
 
 Run that test file against the repo's configured test database when you can. A run that needs

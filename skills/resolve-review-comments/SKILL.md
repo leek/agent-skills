@@ -91,7 +91,8 @@ expects on touched files.
 
 ## 5. Commit and push
 
-Commit the fixes with a message that states, per cluster, what changed and, for the
+Commit the fixes per the `commit` skill's [Staging](../commit/SKILL.md#staging) and
+[Subject](../commit/SKILL.md#subject), with a body that states, per cluster, what changed and, for the
 rebutted ones; that they were reviewed and why they stand. Push to the PR branch so the
 threads resolve against the pushed state.
 

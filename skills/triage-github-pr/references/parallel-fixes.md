@@ -56,7 +56,9 @@ path, its findings' step 4 lines with links, its file list, the repo's `AGENTS.m
 - Touch a file outside the list only when the fix cannot land without it, and name it in
   the report.
 - Format the touched paths with the repo's formatter, and commit each finding on its
-  own, by explicit path, its subject naming the finding.
+  own, per the **Staging** and **Subject** sections of the `commit` skill's `SKILL.md`,
+  the subject naming the finding. (Write its absolute path into the brief:
+  `<this-skill-dir>/../commit/SKILL.md`.)
 - Never push, never write to GitHub, never touch `.scratch/`.
 - Report in at most ten lines: each finding's commit SHA, the touched paths, the focused
   test command and result, and anything that blocks a finding.

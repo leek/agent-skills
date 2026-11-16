@@ -2,7 +2,7 @@
 name: release
 description: "Commit this session's work, bump the version, tag, push, and publish a GitHub release with grouped notes. Use when the user asks to release, cut, tag, or publish a version."
 argument-hint: "[major|minor|patch] [summary] (both inferred from the commits when omitted)"
-allowed-tools: "Bash(git status *) Bash(git diff *) Bash(git log *) Bash(git describe *) Bash(git tag --sort=*) Bash(git tag -l *) Bash(git show *) Bash(git fetch *) Bash(git rev-list *) Bash(git add *) Bash(git commit *) Bash(gh auth status) Bash(gh release view *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/release-plan.sh) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/release-plan.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/bump-version.sh *)"
+allowed-tools: "Bash(git status *) Bash(git diff *) Bash(git log *) Bash(git describe *) Bash(git tag --sort=*) Bash(git tag -l *) Bash(git show *) Bash(git fetch *) Bash(git rev-list *) Bash(git add *) Bash(git apply --cached *) Bash(git commit *) Bash(gh auth status) Bash(gh release view *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/release-plan.sh) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/release-plan.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/bump-version.sh *)"
 ---
 
 # Release
@@ -24,12 +24,10 @@ session's uncommitted work. One release, one version, one tag, one GitHub releas
    `origin/<branch>` does not exist, the branch was never pushed and nothing is ahead of it.
    Done when you are authenticated and the branch is known not to be behind.
 2. **Commit this session's work.** Only files *you* created, edited, or deleted in this
-   conversation; `git status --porcelain` lines you did not touch belong to a parallel
-   session and stay out. Changes under `.claude/agent-memory/` are always yours too, whoever wrote them: they are the notes of agents with `memory: project`, not a parallel session's work in progress, so they ride along in your commit (`git add -- .claude/agent-memory`). `git add -- <new-path>` each new file, then
-   `git commit --only -m "<type(scope): subject>" -- <path> …` (options before the `--`).
-   Never `git add -A`, `git add .`, or `commit -a`. A file that mixes your hunks with
-   foreign ones is left out and named in the report. Skip this step when there is nothing
-   of yours to commit. Done when `git status --porcelain` shows none of your files.
+   conversation, staged per the `commit` skill's [Staging](../commit/SKILL.md#staging) with a
+   subject per its [Subject](../commit/SKILL.md#subject); every file it leaves out is named in
+   the report. Skip this step when there is nothing of yours to commit. Done when
+   `git status --porcelain` shows none of your files.
 3. **Choose the version.** Run `release-plan.sh` again when step 2 committed, with the same
    bump argument as step 1, every time this step runs it. Empty
    `commits` means nothing to release. When step 2 left changes out as not this session's, ask once which
@@ -45,8 +43,8 @@ session's uncommitted work. One release, one version, one tag, one GitHub releas
    Run `bash <this-skill-dir>/scripts/bump-version.sh <old> <new> <path> …` with both
    versions bare (no `v`). It prints `{"changed": [paths]}`, or exits 1 with nothing written
    when a file does not hold `<old>` exactly once (`matches` other than 1): bump that file
-   by hand and rerun for the rest. Commit them alone, in one commit:
-   `git commit --only -m "chore(release): <version>: <summary>" -- <file> …`.
+   by hand and rerun for the rest. Commit them alone, in one commit, per
+   [Staging](../commit/SKILL.md#staging), subject `chore(release): <version>: <summary>`.
    The summary is the one in the arguments when given, otherwise the headline change in six words or fewer,
    matching the style of earlier release commits. A repo with no version file is
    versioned by its tags alone, and a first release's file already holds `next`: skip the
