@@ -1,5 +1,5 @@
 interface:
   display_name: "UI Design"
-  short_description: "The user's UI/UX design rules, each with its reason and a check"
+  short_description: "The user's UI/UX design rules plus this repo's own UI rules, each with its reason and a check"
 policy:
   allow_implicit_invocation: true

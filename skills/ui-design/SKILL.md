@@ -1,21 +1,30 @@
 ---
 name: ui-design
-description: The user's UI/UX design rules, each with its reason and a check. Use when building, restyling, or reviewing a page or component, or when the user states a UI preference to record as a rule.
+description: The user's UI/UX design rules plus this repo's own UI rules, each with its reason and a check. Use when building, restyling, or reviewing a page or component, or when the user states a UI preference to record as a rule.
 ---
 
 # UI Design
 
-House rules for interfaces: what this user counts as good UI, in any stack. Each rule says what to do, why it works, how to check it on a screen, and a before → after. The list grows over time through [Record a rule](#record-a-rule).
+Two layers of rules decide what good UI is:
+
+- The **project rules** hold this repo's own UI decisions. They live in the target repo at `.agents/ui-design.md`, and the user owns that file.
+- The **house rules** in [Rules](#rules) below hold in any app and any stack. Each rule says what to do, why it works, how to check it on a screen, and gives a before → after.
+
+Where the two disagree, the project rule wins. Both lists grow through [Record a rule](#record-a-rule).
+
+## Load the project rules
+
+Before you build or review, read `.agents/ui-design.md` if it exists. When it does not exist, the house rules apply alone. Do not ask to set the file up: the first recorded rule creates it.
 
 ## Build
 
-While you build or restyle a page or component, apply every rule in [Rules](#rules) to it, including the states the default view hides ([Hidden states](#hidden-states)). Done when, for each rule, you can name how the page meets it or why the rule does not apply.
+While you build or restyle a page or component, apply every project rule and every rule in [Rules](#rules) to it, including the states the default view hides ([Hidden states](#hidden-states)). Done when, for each rule, you can name how the page meets it or why the rule does not apply.
 
 A fix to a shared component, class, or style covers every page that renders it. Search for each use, fix or check each one, and name the pages you covered.
 
 ## Review
 
-Review a page (URL), screenshots, or a UI diff against every rule. Where the harness loads this plugin's agents, dispatch and wait ([harness-tools](../harness-tools/SKILL.md)) on one sub-agent: in Claude Code, the Agent tool with `subagent_type=leek-skills:ui-reviewer`, which arrives with these rules preloaded. Brief it with what to look at (URL, screenshot paths, or the diff command), the page's purpose, and its main user. Elsewhere, review inline yourself.
+Review a page (URL), screenshots, or a UI diff against every rule. Where the harness loads this plugin's agents, dispatch and wait ([harness-tools](../harness-tools/SKILL.md)) on one sub-agent: in Claude Code, the Agent tool with `subagent_type=leek-skills:ui-reviewer`, which arrives with these rules preloaded. Brief it with what to look at (URL, screenshot paths, or the diff command), the page's purpose, its main user, and the absolute path of `.agents/ui-design.md` when that file exists. Elsewhere, review inline yourself.
 
 Report one line per finding: `<rule> · <where> · <what is wrong> → <fix>`. A rule the page meets stays silent. Done when every rule was checked against every state the page can reach, and each state you could not reach is named.
 
@@ -23,8 +32,10 @@ Report one line per finding: `<rule> · <where> · <what is wrong> → <fix>`. A
 
 When the user states a UI preference, or shows a before and after and says why one is better:
 
-1. Look for a rule below that already covers it. Sharpen that rule rather than adding a near-duplicate.
-2. Otherwise add one under the group it fits (start a new group only when none does), in this shape:
+The rule goes in this repo's `.agents/ui-design.md`. Create the file with a `# UI design` heading when it does not exist. Change the house rules below only when this repo is the one that holds this skill, never in an installed copy, because the next plugin update overwrites that copy.
+
+1. Look for a project rule or a house rule that already covers the preference. If a project rule covers it, sharpen that project rule rather than adding a near-duplicate. If only a house rule covers it, add a project rule that states how this repo differs.
+2. Otherwise add a new rule under the group it fits (start a new group only when none does), in this shape:
 
    ```markdown
    ### <Short name>
@@ -37,7 +48,7 @@ When the user states a UI preference, or shows a before and after and says why o
    - **Except:** <optional: when the rule yields>
    ```
 
-3. Write the example as a generic case (a customer record, an orders table) that shows the correct pattern, in words. Leave out the app, screen, tab names, bug, or screenshot that prompted the rule: this skill is public and serves every app, and an example copied from one app teaches its quirks, not the rule.
+3. In a project rule, the example may name this app's own screens. In a house rule, write the example as a generic case (a customer record, an orders table) that shows the correct pattern, in words. Leave out the app, screen, tab names, bug, or screenshot that prompted it: house rules are public and serve every app, and an example copied from one app teaches that app's quirks, not the rule.
 4. Show the user the added or changed rule text in your reply.
 
 ## Rules

@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: "Three-axis review of the diff since a fixed point: Correctness (bugs, failure modes, security), Standards (repo conventions) and Spec (ticket/PRD fidelity). Use when the user wants to review a branch, PR, WIP changes, or asks to \"review since X\"."
+description: "Three-axis review of the diff since a fixed point: Correctness (bugs, failure modes, security), Standards (repo conventions) and Spec (ticket/PRD fidelity), plus a UI axis when the diff changes what a user sees. Use when the user wants to review a branch, PR, WIP changes, or asks to \"review since X\"."
 argument-hint: "since <ref>, or a PR or branch (omit for WIP changes)"
 allowed-tools: "Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/code-review/scripts/review-scope.sh *) Bash(git diff *) Bash(git log *) Bash(git merge-base *) Bash(git status *)"
 ---
@@ -12,6 +12,10 @@ Three-axis review of the diff between `HEAD` and a fixed point the user supplies
 - **Correctness**: would this change break something? Bugs, failure modes (what a side effect does when it fails, repeats, or races), security, data, broken contracts, missing tests (for behaviour only, per the `tdd` skill's [What needs a test](../tdd/SKILL.md#what-needs-a-test-and-what-proves-the-rest) section).
 - **Standards**: does the code conform to how this repo writes code?
 - **Spec**: does the code faithfully implement the originating ticket / PRD / spec?
+
+When the diff changes what a user sees, a fourth axis runs too:
+
+- **UI**: does the changed page meet the `ui-design` rules (the house rules plus this repo's `.agents/ui-design.md`)?
 
 The axes run **separately** so they don't pollute each other's context, then this skill aggregates their findings. Prefer **parallel sub-agents** when the harness supports them; otherwise run the reviews **inline in sequence** in this session. Either path must finish every axis before aggregating: never leave a review handle running past session end.
 
@@ -53,9 +57,9 @@ On top of whatever the repo documents, the Standards axis always carries the **s
 
 ### 4. Run the axes: sub-agents or inline
 
-**If the harness can spawn parallel sub-agents** (dispatch and wait per [harness-tools](../harness-tools/SKILL.md)): launch three foreground sub-agents in parallel, wait for all results before writing anything. Do not background them, a background handle can die with the session. Where the harness loads this plugin's agents, use the typed agents `leek-skills:pr-reviewer`, `leek-skills:standards-reviewer` and `leek-skills:spec-reviewer` (read-only tools enforced, the Standards one remembers this repo's recurring violations, in files under this repo's `.claude/agent-memory/` that the next commit includes); elsewhere, any general sub-agent with the briefs below, the Correctness one on your strongest model.
+**If the harness can spawn parallel sub-agents** (dispatch and wait per [harness-tools](../harness-tools/SKILL.md)): launch three foreground sub-agents in parallel (four when the UI axis runs), and wait for all results before writing anything. Do not background them, a background handle can die with the session. Where the harness loads this plugin's agents, use the typed agents `leek-skills:pr-reviewer`, `leek-skills:standards-reviewer` and `leek-skills:spec-reviewer` (read-only tools enforced, the Standards one remembers this repo's recurring violations, in files under this repo's `.claude/agent-memory/` that the next commit includes); elsewhere, any general sub-agent with the briefs below, the Correctness one on your strongest model.
 
-**If sub-agents are unavailable:** run the reviews inline in this session, Correctness first, then Standards, then Spec (or skip Spec when no source was found). Same briefs, same output shape, only the execution host changes.
+**If sub-agents are unavailable:** run the reviews inline in this session, Correctness first, then Standards, then Spec (or skip Spec when no source was found), then UI when it runs. Same briefs, same output shape, only the execution host changes.
 
 **Small diffs run inline too.** When step 1's `size` is `inline` (at most 3 files and 150 changed lines), three fresh contexts each re-reading it cost more than they find: take the inline path above.
 
@@ -81,15 +85,17 @@ On top of whatever the repo documents, the Standards axis always carries the **s
 
 If the spec is missing, skip the Spec axis and note this in the final report.
 
+**UI brief**: run this axis only when step 1's `files` change what a user sees: views, templates, components, stylesheets, or UI-defining classes (for example `*.blade.php`, `*.tsx`, `*.jsx`, `*.vue`, `*.svelte`, `*.css`, `resources/views/`, Filament resources, pages, and widgets, Livewire components). Follow the `ui-design` skill's **Review** section: dispatch `leek-skills:ui-reviewer` where the harness loads this plugin's agents, or review inline otherwise. Brief it with the diff command, the absolute path of this repo's `.agents/ui-design.md` when that file exists, and a URL or screenshot paths when the caller has them. When it does not run, report it as `not run (no UI files)`. Tag each UI finding MINOR, or MAJOR when a user cannot see or reach something the page is for, so callers that budget rounds on BLOCKING and MAJOR can count it.
+
 ### 5. Aggregate
 
-Present the reports under `## Correctness`, `## Standards` and `## Spec` headings, verbatim or lightly cleaned. Do **not** merge or rerank findings; the axes are deliberately separate (see _Why three axes_).
+Present the reports under `## Correctness`, `## Standards` and `## Spec` headings (and `## UI` when that axis ran), verbatim or lightly cleaned. Do **not** merge or rerank findings; the axes are deliberately separate (see _Why three axes_).
 
-Invoked standalone, report the findings through the host's findings list where it offers one (in Claude Code, one `ReportFindings` call holding all three axes, `category` set to the axis, axes in the order above and most severe first _within_ each axis; a judgement-call smell is `PLAUSIBLE`), and then print only the summary line below; otherwise print the three headed sections. Invoked by another skill, always print the sections.
+Invoked standalone, report the findings through the host's findings list where it offers one (in Claude Code, one `ReportFindings` call holding every axis that ran, `category` set to the axis, axes in the order above and most severe first _within_ each axis; a judgement-call smell is `PLAUSIBLE`), and then print only the summary line below; otherwise print the three headed sections. Invoked by another skill, always print the sections.
 
 End with a one-line summary: total findings per axis, and the worst issue _within each axis_ (if any). Don't pick a single winner across axes, that's the reranking the separation exists to prevent. Mark each axis in that line: ✅ no findings, ⚠️ findings. No marks in the findings themselves.
 
-## Why three axes
+## Why separate axes
 
 A change can pass any axis and fail another:
 
@@ -106,7 +112,7 @@ Invoked from `implement`, hand the findings back to its loop; it decides what's 
 ```text
 ---
 Pipeline: decide → spec → tickets → **build**   (review runs inside build)
-Done: <n Correctness, m Standards, k Spec findings; the worst per axis>
+Done: <n Correctness, m Standards, k Spec (and u UI) findings; the worst per axis>
 Open: <the findings not fixed, as one entry (their ticket or pull request)>
 Next:
   • <condition> → /<skill> <ref>
