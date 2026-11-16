@@ -26,13 +26,24 @@ long=$(printf 'x%.0s' $(seq 1 900))
   echo '{"type":"user","timestamp":"2026-11-02T10:00:00Z","message":{"role":"user","content":"Fix the build."}}'
   echo '{"type":"assistant","timestamp":"2026-11-02T10:00:05Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Skill","input":{"skill":"acme:lint"}}]}}'
 } > "$outside/66666666-7777-8888-9999-000000000000.jsonl"
+# A sibling repo whose log directory name starts with this repo's (app2 vs app) is not this repo;
+# a session started in a subdirectory is. Both are told apart by the cwd the log records.
+sib="$tmp/work/app2"; sub="$proj/sub"
+for d in "$sib" "$sub"; do
+  dir="$HOME/.claude/projects/$(printf '%s' "$d" | sed 's/[^A-Za-z0-9]/-/g')"; mkdir -p "$dir"
+  {
+    echo "{\"type\":\"user\",\"cwd\":\"$d\",\"timestamp\":\"2026-11-03T10:00:00Z\",\"message\":{\"role\":\"user\",\"content\":\"Work here.\"}}"
+    echo "{\"type\":\"assistant\",\"cwd\":\"$d\",\"timestamp\":\"2026-11-03T10:00:05Z\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"name\":\"Skill\",\"input\":{\"skill\":\"acme:lint\"}},{\"type\":\"tool_use\",\"name\":\"mcp__plugin_acme_srv__query\",\"input\":{}}]}}"
+  } > "$dir/$(printf '%s' "$d" | shasum | cut -c1-8)-0000-0000-0000-000000000000.jsonl"
+done
 
-u=$(bash "$here/usage-counts.sh" --out "$tmp/out" --count 5 --project "$proj" 2>/dev/null)
-[ "$(echo "$u" | jq .sessions)" = 2 ] || fail "sessions: $u"
-[ "$(echo "$u" | jq .project_sessions)" = 1 ] || fail "project sessions: $u"
-[ "$(echo "$u" | jq '.skills["acme:lint"].count')" = 3 ] || fail "skill count: $u"
-[ "$(echo "$u" | jq '.skills["acme:lint"].sessions')" = 2 ] || fail "skill sessions: $u"
-[ "$(echo "$u" | jq '.skills["acme:lint"].project_count')" = 2 ] || fail "skill project count: $u"
+u=$(bash "$here/usage-counts.sh" --out "$tmp/out" --count 10 --project "$proj" 2>/dev/null)
+[ "$(echo "$u" | jq .sessions)" = 4 ] || fail "sessions: $u"
+[ "$(echo "$u" | jq .project_sessions)" = 2 ] || fail "project sessions (sibling counted, or subdir missed): $u"
+[ "$(echo "$u" | jq '.skills["acme:lint"].count')" = 5 ] || fail "skill count: $u"
+[ "$(echo "$u" | jq '.skills["acme:lint"].sessions')" = 4 ] || fail "skill sessions: $u"
+[ "$(echo "$u" | jq '.skills["acme:lint"].project_count')" = 3 ] || fail "skill project count: $u"
+[ "$(echo "$u" | jq '.mcp_servers.plugin_acme_srv.count')" = 2 ] || fail "plugin MCP key: $u"
 [ "$(echo "$u" | jq '.agents["acme:reviewer"].count')" = 1 ] || fail "agent behind a long prompt: $u"
 [ "$(echo "$u" | jq '.mcp_servers.posthog.count')" = 1 ] || fail "mcp: $u"
 [ "$(echo "$u" | jq '.slash["acme:audit"].count')" = 1 ] || fail "slash: $u"

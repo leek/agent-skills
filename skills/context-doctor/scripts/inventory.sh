@@ -30,7 +30,8 @@
 #       identical-files, generated-file, upstream-drift), memory (memory-index-truncated,
 #       memory-pointer-broken, memory-orphan, memory-index-duplicate-row, memory-name-duplicate,
 #       memory-dir-rejected, agent-memory-orphan), config (skill-override-dead, skill-link-broken,
-#       skill-unlinked, mcp-setting-dead, permission-dead, hook-script-missing)
+#       skill-unlinked, mcp-setting-dead, permission-dead, hook-script-missing,
+#       hook-script-outside), safety (sensitive-file-skipped, symlink-to-non-markdown)
 #     source: {path, kind, scope, activation, why, bytes, lines, approx_tokens,
 #              loaded_bytes?, listing_chars?, imports[], plugin?, generated?, upstream?}
 #     kinds beyond the harness's own files: pointer-doc (a .md an instruction file names, up to
@@ -90,7 +91,7 @@ rm -f "$out"/batch_*.jsonl
 echo ">> inventory: project=$project config=$config" >&2
 
 python3 - "$project" "$home" "$config" "$managed" "$out" "$declined" "$batch" "$scope" "$upstream" "$max_batches" "$audited" "$audited_days" <<'PY'
-import datetime, glob, hashlib, json, math, os, re, subprocess, sys
+import datetime, glob, hashlib, json, math, os, re, subprocess, sys, urllib.parse
 from fnmatch import fnmatch
 
 project, home, config, managed, out, declined_path, batch_size, scope_arg, upstream_arg, max_batches, audited_path, audited_days = sys.argv[1:13]
@@ -102,6 +103,7 @@ bad = [x for x in scope_arg.split(",") if x not in SCOPES]
 if bad:
     sys.exit(f"Unknown --scope value(s): {bad}; use instructions, memory, config")
 in_scope = set().union(*(SCOPES[x] for x in scope_arg.split(",")))
+project_given = os.path.abspath(project)
 project = os.path.realpath(project)
 home = os.path.realpath(home)
 config = os.path.realpath(os.path.expanduser(config))
@@ -109,16 +111,79 @@ batch_size, max_batches, audited_days = int(batch_size), int(max_batches), int(a
 
 RANK = ["always", "listing", "lazy", "agent", "on-demand", "config", "uncertain", "never"]
 SECRET = re.compile(
-    r"(?<![A-Za-z0-9_-])(sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}"
-    r"|xox[abpr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+"
-    r"|(?i:(?:bearer|token|api[_-]?key|secret|password|passwd)\s*[=:]\s*)\S+"
-    r"|-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$))")
+    r"(?<![A-Za-z0-9_-])(?:sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}"
+    r"|xox[abpr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)"
+    r"|-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)")
+# Keep the key, drop the value: NAME_TOKEN=..., "password": "...", Bearer ..., --password ...,
+# and user:pass@ or a long token@ in a URL. Short values (counts like "tokens: 1200") are left.
+SECRET_KV = [
+    (re.compile(r"(?i)([A-Za-z0-9_.-]*(?:token|secret|passw(?:or)?d|passphrase|api[_-]?key|access[_-]?key"
+                r"|private[_-]?key|credential|client[_-]?secret)[A-Za-z0-9_.-]*[\"']?\s*[=:]\s*[\"']?)([^\s\"',}]{8,})"), r"\1[REDACTED]"),
+    (re.compile(r"(?i)(\bbearer\s+)[A-Za-z0-9._~+/=-]{8,}"), r"\1[REDACTED]"),
+    (re.compile(r"(?i)(--(?:password|passwd|token|api-key|secret)(?:=|\s+))\S+"), r"\1[REDACTED]"),
+    (re.compile(r"(://[^/\s:@]+:)[^/\s@]+(@)"), r"\1[REDACTED]\2"),
+    (re.compile(r"(://)[^/\s:@]{16,}(@)"), r"\1[REDACTED]\2"),
+]
+# Files whose text never goes into units, however they are reached (@.env, a symlinked key).
+SENSITIVE = re.compile(r"(?:^|/)\.env(?:\.[^/]*)?$|\.(?:pem|key|p12|pfx|keystore)$|(?:^|/)id_[a-z0-9]+$|(?:^|/)\.netrc$|(?:^|/)\.npmrc$")
 SKIP_DIRS = {".git", "node_modules", "vendor", "dist", "build", ".next", ".nuxt", "storage", ".venv", "venv", "__pycache__"}
 
 def redact(s):
-    return SECRET.sub("[REDACTED]", s or "")
+    s = SECRET.sub("[REDACTED]", s or "")
+    for rx, sub in SECRET_KV:
+        s = rx.sub(sub, s)
+    return s
+
+# ---- the repo boundary, fixed before any file is read ---------------------------------------
+def git_root():
+    try:
+        r = subprocess.run(["git", "-C", project, "rev-parse", "--path-format=absolute", "--git-common-dir"],
+                           capture_output=True, text=True, timeout=10)
+        if r.returncode == 0:
+            common = r.stdout.strip()
+            return os.path.dirname(common) if os.path.basename(common) == ".git" else common
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return project
+
+repo_root = git_root()
+# A repo file may reach only the repo itself. The git root counts only when it contains the
+# project: a crafted .git file pointing elsewhere must not widen the boundary.
+REPO = sorted({project} | ({os.path.realpath(repo_root)} if project.startswith(os.path.realpath(repo_root).rstrip("/") + "/") else set()))
+def repo_controlled(path):
+    a = os.path.abspath(path)
+    return any(a == t or a.startswith(t.rstrip("/") + "/") for t in REPO)
+def blocked(source_path, target):
+    return repo_controlled(source_path) and not repo_controlled(os.path.realpath(target))
+
+# ---- globs: Claude Code style (* within a segment, ** across, {a,b}, [abc]) --------------------
+def expand_braces(g):
+    m = re.search(r"\{([^{}]*)\}", g)
+    if not m:
+        return [g]
+    return [x for alt in m.group(1).split(",") for x in expand_braces(g[:m.start()] + alt + g[m.end():])]
+
+def glob_rx(g):
+    rx, i = "", 0
+    while i < len(g):
+        if g.startswith("**/", i):
+            rx, i = rx + "(?:.*/)?", i + 3
+        elif g.startswith("**", i):
+            rx, i = rx + ".*", i + 2
+        elif g[i] == "[" and "]" in g[i + 2:]:
+            j = g.index("]", i + 2)
+            cls = g[i + 1:j]
+            rx, i = rx + "[" + ("^" + cls[1:] if cls.startswith("!") else cls).replace("\\", "\\\\") + "]", j + 1
+        else:
+            rx, i = rx + {"*": "[^/]*", "?": "[^/]"}.get(g[i], re.escape(g[i])), i + 1
+    return re.compile(rx + "$")
+
+def glob_rxs(g):
+    return [glob_rx(x) for x in expand_braces(g)]
 
 def read(p):
+    if blocked(p, p):
+        return None
     try:
         with open(p, encoding="utf-8", errors="replace") as fh:
             return fh.read()
@@ -209,16 +274,18 @@ for sc in ("user", "project", "local", "managed"):
     enabled_plugins.update(settings.get(sc, {}).get("enabledPlugins", {}) or {})
 # cc-plugin-agents-md@builtin's instructionFiles: "claude-md-or-agents-md" is the default
 # (AGENTS.md only when no CLAUDE.md), an "-and-" value loads both, anything else is unverified.
-skill_overrides = {}
+skill_overrides, override_src = {}, {}
 for sc in ("user", "project", "local", "managed"):
-    skill_overrides.update(settings.get(sc, {}).get("skillOverrides") or {})
+    for k, v in (settings.get(sc, {}).get("skillOverrides") or {}).items():
+        skill_overrides[k], override_src[k] = v, dict(settings_files)[sc]
 agents_md_mode = "claude-md-or-agents-md"
 for sc in ("user", "project", "local", "managed"):
     pc = (settings.get(sc, {}).get("pluginConfigs") or {}).get("cc-plugin-agents-md@builtin") or {}
     agents_md_mode = (pc.get("options") or {}).get("instructionFiles", agents_md_mode)
 
+exclude_rxs = [r for g in excludes for r in glob_rxs(g)]
 def excluded(p):
-    return any(fnmatch(p, g) for g in excludes)
+    return any(r.match(c) for r in exclude_rxs for c in {os.path.abspath(p), os.path.realpath(p)})
 
 def add_instruction(p, kind, scope, activation, why):
     if excluded(p):
@@ -265,8 +332,8 @@ for d in chain:
             if not known(p):
                 add(p, "claude-md", "user", "never", "default config dir's CLAUDE.md; CLAUDE_CONFIG_DIR points elsewhere")
             continue
-        claude_in_chain = True
-        add_instruction(p, kind, scope, "always", f"{name} in the cwd chain")
+        if add_instruction(p, kind, scope, "always", f"{name} in the cwd chain")["activation"] != "never":
+            claude_in_chain = True
 scan_rules(os.path.join(project, ".claude", "rules"), "project")
 for d in chain:
     p = os.path.join(d, "AGENTS.md")
@@ -299,7 +366,23 @@ def project_files(patterns):
                 found.append(os.path.join(root, f))
     return found
 
-for p in project_files(["**/CLAUDE.md", "**/CLAUDE.local.md", "**/AGENTS.md", "CLAUDE.md", "AGENTS.md", "CLAUDE.local.md"]):
+def ignored_files(patterns):
+    try:
+        r = subprocess.run(["git", "-C", project, "ls-files", "--others", "--ignored", "--exclude-standard", "--"] + patterns,
+                           capture_output=True, text=True, timeout=30)
+        if r.returncode == 0:
+            # git also lists ignored nested repos (worktrees) as bare directories: keep real files
+            # whose name matches, nothing else.
+            names = {pat.split("/")[-1] for pat in patterns}
+            return [os.path.join(project, f) for f in r.stdout.splitlines()
+                    if f and os.path.basename(f) in names and os.path.isfile(os.path.join(project, f))
+                    and not set(f.split("/")) & SKIP_DIRS]
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return []
+
+for p in project_files(["**/CLAUDE.md", "**/CLAUDE.local.md", "**/AGENTS.md", "CLAUDE.md", "AGENTS.md", "CLAUDE.local.md"]) \
+        + ignored_files(["**/CLAUDE.local.md", "CLAUDE.local.md"]):
     p = os.path.abspath(p)
     if known(p) or os.path.dirname(p) == project or "/.claude/rules/" in p:
         continue
@@ -318,16 +401,15 @@ for p in glob.glob(os.path.join(project, ".cursor", "rules", "**", "*"), recursi
         add(p, "other-tool", "project", "never", "Cursor rule; Claude Code never reads it")
 
 # ---- auto memory ------------------------------------------------------------------------------------
-def git_root():
-    try:
-        r = subprocess.run(["git", "-C", project, "rev-parse", "--path-format=absolute", "--git-common-dir"],
-                           capture_output=True, text=True, timeout=10)
-        if r.returncode == 0:
-            common = r.stdout.strip()
-            return os.path.dirname(common) if os.path.basename(common) == ".git" else common
-    except (OSError, subprocess.SubprocessError):
-        pass
-    return project
+def memory_window(text):
+    """Bytes and whole lines of a MEMORY.md that load: the first 200 lines or 25KB."""
+    used, n = 0, 0
+    for line in text.splitlines(keepends=True)[:200]:
+        b = len(line.encode("utf-8"))
+        if used + b > 25000:
+            break
+        used, n = used + b, n + 1
+    return used, n
 
 def memory_checks(d, index, topics):
     """Index rows that point nowhere or repeat, topic files nothing links, and two files that
@@ -356,7 +438,6 @@ def memory_checks(d, index, topics):
             issues.append(dict(type="memory-name-duplicate", path=ps[0],
                                detail=f'name "{name}" is shared by {", ".join(os.path.basename(p) for p in ps)}'))
 
-repo_root = git_root()
 slug = re.sub(r"[^A-Za-z0-9]", "-", repo_root)
 # Never from project settings: a repo must not be able to point this audit at another directory.
 # Only user and managed settings: a repo can commit .claude/settings.local.json too. A value
@@ -372,33 +453,16 @@ if os.path.isdir(mem_dir):
     index = os.path.join(mem_dir, "MEMORY.md")
     topics = sorted(p for p in glob.glob(os.path.join(mem_dir, "**", "*.md"), recursive=True) if p != index)
     if os.path.isfile(index):
-        text = read(index) or ""
-        lines = text.splitlines(keepends=True)
-        window = "".join(lines[:200]).encode("utf-8")[:25000]
+        loaded, window_lines = memory_window(read(index) or "")
         s = add(index, "memory-index", "project-memory", "never" if mem_off else "always",
                 "auto memory disabled" if mem_off else "auto-memory index: first 200 lines or 25KB load every session",
-                loaded_bytes=len(window))
-        if len(window) < s["bytes"]:
+                loaded_bytes=loaded, window_lines=window_lines)
+        if loaded < s["bytes"]:
             issues.append(dict(type="memory-index-truncated", path=index,
                                detail=f"MEMORY.md is {s['lines']} lines / {s['bytes']} bytes; only the first 200 lines or 25KB load"))
     for p in topics:
         add(p, "memory", "project-memory", "never" if mem_off else "on-demand", "memory topic file: read only when the agent opens it")
     memory_checks(mem_dir, index, topics)
-
-# Roots whose files this audit may read as text. A file inside the repo is the repo's to
-# control, so its import or symlink resolving elsewhere (@~/.ssh/id_ed25519) is reported by
-# path, never read into units. User-level files point wherever the user put them.
-TRUSTED = sorted({os.path.realpath(x) for x in (project, repo_root, config, os.path.join(home, ".claude"), mem_dir, managed) if x})
-def trusted(path):
-    r = os.path.realpath(path)
-    return any(r == t or r.startswith(t.rstrip("/") + "/") for t in TRUSTED)
-REPO = sorted({os.path.realpath(project), os.path.realpath(repo_root)})
-def repo_controlled(path):
-    a = os.path.abspath(path)
-    return any(a == t or a.startswith(t.rstrip("/") + "/") for t in REPO)
-def blocked(source_path, target):
-    # A repo file may reach only the repo itself; the config dir and memory are the user's.
-    return repo_controlled(source_path) and not repo_controlled(os.path.realpath(target))
 
 # ---- agents, skills, commands, plugins -------------------------------------------------------------
 known_agents = set()
@@ -406,10 +470,12 @@ known_agents = set()
 def add_listed(p, kind, scope, plugin=None):
     text = read(p) or ""
     fm = frontmatter(text)
-    desc = fm_value(fm, "description") or fm_value(fm, "when_to_use") or ""
+    desc = " ".join(x for x in (fm_value(fm, "description"), fm_value(fm, "when_to_use")) if x)
     name = fm_value(fm, "name") or os.path.basename(os.path.dirname(p) if kind == "skill" else p)[:-3 if kind != "skill" else None]
     if kind == "agent":
         known_agents.add(name)
+        if plugin:
+            known_agents.add(plugin.split("@")[0] + "-" + name)
     user_only = bool(re.search(r"^disable-model-invocation:\s*true", fm, re.M))
     act = "on-demand" if user_only else "listing"
     why = "user-invoked: no description in context" if user_only else "name and description listed every turn; body on demand"
@@ -499,8 +565,12 @@ for s in sources.values():
 
 plugins = []
 installed = load_json(os.path.join(config, "plugins", "installed_plugins.json")) or {}
-for key, entries in sorted((installed.get("plugins") or {}).items()):
-    entry = entries[0] if isinstance(entries, list) and entries else (entries if isinstance(entries, dict) else {})
+def plugin_entry(key):
+    entries = (installed.get("plugins") or {}).get(key)
+    e = entries[0] if isinstance(entries, list) and entries else entries
+    return e if isinstance(e, dict) else {}
+for key in sorted(installed.get("plugins") or {}):
+    entry = plugin_entry(key)
     path = entry.get("installPath") or ""
     state = enabled_plugins.get(key)
     info = dict(key=key, version=entry.get("version"), scope=entry.get("scope"), enabled=state,
@@ -532,7 +602,7 @@ for key, val in sorted(skill_overrides.items()):
         why = ("names a plugin skill, and plugin skills ignore skillOverrides" if key in plugin_skills else
                "names a command, not a skill; whether skillOverrides applies to commands is undocumented" if key in own_commands else
                "names no local user or project skill; dead unless a bundled or claude.ai-synced skill of that name is in the session's skill list")
-        issues.append(dict(type="skill-override-dead", path=next((p for sc, p in settings_files if "skillOverrides" in settings.get(sc, {})), ""),
+        issues.append(dict(type="skill-override-dead", path=override_src.get(key, ""),
                            detail=f'skillOverrides "{key}": "{val}" {why}'))
 
 # Skill directories: a symlink to nothing, and a skill under .agents/skills (read by Codex and
@@ -571,11 +641,12 @@ for sc, p in settings_files:
 
 style = merged("outputStyle")
 if style and style.lower() not in ("default",):
-    for base in (os.path.join(project, ".claude"), config):
-        for p in glob.glob(os.path.join(base, "output-styles", "*.md")):
-            if fm_value(frontmatter(read(p)), "name") == style or os.path.basename(p)[:-3] == style:
-                s = known(p) or add(p, "output-style", "user", "never", "")
-                s["activation"], s["why"] = "always", "selected output style: its text joins every request"
+    hit = next((p for base in (os.path.join(project, ".claude"), config)
+                for p in sorted(glob.glob(os.path.join(base, "output-styles", "*.md")))
+                if fm_value(frontmatter(read(p)), "name") == style or os.path.basename(p)[:-3] == style), None)
+    if hit:
+        s = known(hit) or add(hit, "output-style", "user", "never", "")
+        s["activation"], s["why"] = "always", "selected output style: its text joins every request"
 
 # ---- subagent memory ----------------------------------------------------------------------------------
 for base, scope in ((os.path.join(config, "agent-memory"), "agent-memory:user"),
@@ -585,11 +656,17 @@ for base, scope in ((os.path.join(config, "agent-memory"), "agent-memory:user"),
         if not os.path.isdir(d):
             continue
         name = os.path.basename(d)
-        has_agent = any(name == a or name.endswith(a) or a.endswith(name) for a in known_agents)
+        has_agent = name in known_agents
         files = sorted(glob.glob(os.path.join(d, "**", "*.md"), recursive=True))
         for p in files:
             act = "agent" if os.path.basename(p) == "MEMORY.md" else "on-demand"
-            s = add(p, "agent-memory", scope, act, f"memory of subagent {name}" + ("" if has_agent else " (no agent of that name found)"))
+            extra = {}
+            if act == "agent":
+                extra["loaded_bytes"], extra["window_lines"] = memory_window(read(p) or "")
+            s = add(p, "agent-memory", scope, act, f"memory of subagent {name}" + ("" if has_agent else " (no agent of that name found)"), **extra)
+            if act == "agent" and s.get("loaded_bytes", 0) < s["bytes"]:
+                issues.append(dict(type="memory-index-truncated", path=p,
+                                   detail=f"{s['lines']} lines / {s['bytes']} bytes; only the first 200 lines or 25KB reach the agent"))
             if not has_agent:
                 issues.append(dict(type="agent-memory-orphan", path=p, detail=f"no installed agent named {name}"))
         index = os.path.join(d, "MEMORY.md")
@@ -612,6 +689,8 @@ while frontier:
         target = target.rstrip(".,;:)")
         if "/" not in target and "." not in target:
             continue  # a mention (@leek), not a path
+        if not target.startswith(("./", "../", "~/", "/")) and "." not in os.path.basename(target):
+            continue  # a package name (@types/node), not a file
         full = os.path.normpath(os.path.join(os.path.dirname(p), os.path.expanduser(target)))
         if blocked(s["path"], full):
             issues.append(dict(type="import-outside-roots", path=s["path"],
@@ -625,9 +704,10 @@ while frontier:
             issues.append(dict(type="import-too-deep", path=s["path"], detail=f"@{target} is past the 4-hop import limit"))
             continue
         key = os.path.realpath(full)
+        before = (known(full) or {}).get("activation")
         add(full, "import", s["scope"], s["activation"], f"imported by {s['path']}")
-        if key not in depth:
-            depth[key] = depth[p] + 1
+        if key not in depth or (before and known(full)["activation"] != before):
+            depth[key] = min(depth.get(key, 99), depth[p] + 1)
             frontier.append(key)
     if s["activation"] == "always":
         for target in LINK.findall(bare):
@@ -649,7 +729,7 @@ for p, s in list(sources.items()):
         continue
     s["generated"] = True
     if boost_made and os.path.isdir(boost_src):
-        s["generated_from"] = boost_src
+        s["generated_from"], s["boost_block"] = boost_src, True
         issues.append(dict(type="generated-file", path=s["path"],
                            detail="built by Laravel Boost: edit .ai/guidelines/, then run php artisan boost:update; never edit this file"))
         for g in sorted(glob.glob(os.path.join(boost_src, "**", "*"), recursive=True)):
@@ -696,7 +776,13 @@ frontier = [(p, 0) for p, s in sources.items()
 while frontier:
     p, hop = frontier.pop(0)
     s = sources[p]
+    fenced = False
     for n, line in enumerate((read(p) or "").splitlines(), 1):
+        if line.lstrip().startswith(("```", "~~~")):
+            fenced = not fenced
+            continue
+        if fenced:
+            continue
         for target in LINK_MD.findall(line):
             if not resolve_from(p, target):
                 issues.append(dict(type="pointer-unresolved", path=s["path"], line=n, detail=f"links to {target}, which does not exist"))
@@ -718,24 +804,15 @@ def repo_files():
     return _repo_files
 
 def glob_matches(g):
-    g = g[2:] if g.startswith("./") else g
-    rx, i = "", 0
-    while i < len(g):
-        if g.startswith("**/", i):
-            rx, i = rx + "(?:.*/)?", i + 3
-        elif g.startswith("**", i):
-            rx, i = rx + ".*", i + 2
-        else:
-            rx, i = rx + {"*": "[^/]*", "?": "[^/]"}.get(g[i], re.escape(g[i])), i + 1
-    r = re.compile(rx + "$")
-    return any(r.match(f) for f in repo_files())
+    rxs = glob_rxs(g[2:] if g.startswith("./") else g)
+    return any(r.match(f) for r in rxs for f in repo_files())
 
 def fm_paths(fm):
     m = re.search(r"^paths:[ \t]*(.*)$", fm, re.M)
     if not m:
         return []
     if m.group(1).strip():
-        return [x.strip().strip("'\"") for x in m.group(1).strip().strip("[]").split(",") if x.strip()]
+        return [x.strip().strip("'\"") for x in re.split(r",(?![^{]*\})", m.group(1).strip().strip("[]")) if x.strip()]
     vals = []
     for line in fm[m.end():].split("\n")[1:]:
         item = re.match(r"^\s*-\s*(.+)$", line)
@@ -759,7 +836,7 @@ for p, s in list(sources.items()):
         for n, line in enumerate(lines, 1):
             cells = [c.strip().strip("`") for c in line.strip().strip("|").split("|")] if line.lstrip().startswith("|") else []
             # An index row is exactly "globs | rule file"; a prose table that mentions a file is not one.
-            globs = [x.strip().strip("`") for x in cells[0].split(",")] if len(cells) == 2 else []
+            globs = [x.strip().strip("`") for x in re.split(r",(?![^{]*\})", cells[0])] if len(cells) == 2 else []
             if not globs or not cells[1].endswith(".md") or not resolve_from(p, cells[1]) \
                     or not all(GLOB_TOKEN.match(g) for g in globs):
                 continue
@@ -780,31 +857,39 @@ for group in by_hash.values():
                                   + ": paid twice when both load, and the copies drift; keep one, or symlink the other"))
 
 # ---- MCP and hooks (config.json: names and structure only) ------------------------------------------
-def mcp_entry(name, cfg, scope):
+def mcp_entry(name, cfg, scope, plugin=None):
     cfg = cfg if isinstance(cfg, dict) else {}
-    url = cfg.get("url") or ""
+    url = str(cfg.get("url") or "")
+    try:
+        host = urllib.parse.urlsplit(url).hostname if url else None
+    except ValueError:
+        host = None
+    # A plugin's server is called as mcp__plugin_<plugin>_<server>__<tool> (usage-counts.sh keys).
     return dict(name=name, scope=scope, type=cfg.get("type") or ("http" if url else "stdio"),
+                usage_key=f"plugin_{plugin.split('@')[0]}_{name}" if plugin else name,
                 command=os.path.basename(str(cfg.get("command") or "")) or None,
-                host=re.sub(r"^\w+://([^/:?]+).*$", r"\1", url) if url else None,
+                host=host,
                 always_load=bool(cfg.get("alwaysLoad")),
                 env_keys=sorted((cfg.get("env") or {}).keys()), header_keys=sorted((cfg.get("headers") or {}).keys()))
 
 mcp = []
 for name, cfg in ((load_json(os.path.join(project, ".mcp.json")) or {}).get("mcpServers") or {}).items():
     mcp.append(mcp_entry(name, cfg, "project"))
-for cj in (os.path.join(config, ".claude.json"), os.path.join(home, ".claude.json")):
-    data = load_json(cj)
-    if isinstance(data, dict):
-        for name, cfg in (data.get("mcpServers") or {}).items():
-            mcp.append(mcp_entry(name, cfg, "user"))
-        for name, cfg in (((data.get("projects") or {}).get(project) or {}).get("mcpServers") or {}).items():
-            mcp.append(mcp_entry(name, cfg, "local"))
-        break
+default_config = os.path.realpath(os.path.join(home, ".claude"))
+cj = os.path.join(home, ".claude.json") if config == default_config else os.path.join(config, ".claude.json")
+data = load_json(cj)
+if isinstance(data, dict):
+    for name, cfg in (data.get("mcpServers") or {}).items():
+        mcp.append(mcp_entry(name, cfg, "user"))
+    projects = data.get("projects") or {}
+    entry = projects.get(project) or projects.get(project_given) or {}
+    for name, cfg in (entry.get("mcpServers") or {}).items():
+        mcp.append(mcp_entry(name, cfg, "local"))
 for info in plugins:
     if info["mcp"]:
-        entry = ((installed.get("plugins") or {}).get(info["key"]) or [{}])[0]
+        entry = plugin_entry(info["key"])
         for name, cfg in ((load_json(os.path.join(entry.get("installPath", ""), ".mcp.json")) or {}).get("mcpServers") or {}).items():
-            mcp.append(mcp_entry(name, cfg, "plugin:" + info["key"]))
+            mcp.append(mcp_entry(name, cfg, "plugin:" + info["key"], plugin=info["key"]))
 
 hooks = []
 def collect_hooks(data, scope):
@@ -818,7 +903,7 @@ for sc, data in settings.items():
     collect_hooks(data, sc)
 for info in plugins:
     if info["hooks"] and info["enabled"] is not False:
-        entry = ((installed.get("plugins") or {}).get(info["key"]) or [{}])[0]
+        entry = plugin_entry(info["key"])
         collect_hooks(load_json(os.path.join(entry.get("installPath", ""), "hooks", "hooks.json")), "plugin:" + info["key"])
 
 # Hook scripts a settings hook runs: a missing one is an issue; an existing one (and a script it
@@ -836,7 +921,9 @@ def script_paths(text, base):
         found.append((t, os.path.normpath(t2 if os.path.isabs(t2) else os.path.join(base, t2))))
     return found
 
-def ours(p):
+def ours(p, sc):
+    if sc in ("project", "local"):  # the repo's own settings: the repo, nothing else
+        return repo_controlled(p) and repo_controlled(os.path.realpath(p))
     return p.startswith((project + os.sep, config + os.sep))
 
 for sc, p in settings_files:
@@ -844,12 +931,14 @@ for sc, p in settings_files:
         for g in groups or []:
             for h in (g or {}).get("hooks") or []:
                 for t, full in script_paths(h.get("command"), project):
-                    if not os.path.isfile(full):
+                    if sc in ("project", "local") and not ours(full, sc):
+                        issues.append(dict(type="hook-script-outside", path=p, detail=f"{event} hook runs {t}, outside the repo; not read"))
+                    elif not os.path.isfile(full):
                         issues.append(dict(type="hook-script-missing", path=p, detail=f"{event} hook runs {t}, which does not exist"))
-                    elif ours(full) and not known(full):
+                    elif ours(full, sc) and not known(full):
                         add(full, "hook-script", sc, "on-demand", f"{event} hook script: its messages reach the agent when the hook fires")
                         for _, sub in script_paths(read(full), os.path.dirname(full)):
-                            if os.path.isfile(sub) and ours(sub) and not known(sub):
+                            if os.path.isfile(sub) and ours(sub, sc) and not known(sub):
                                 add(sub, "hook-script", sc, "on-demand", f"run by {os.path.basename(full)} ({event} hook)")
 
 perms = {}
@@ -902,7 +991,7 @@ units = []
 def norm(t):
     return " ".join(re.findall(r"[a-z0-9]+", t.lower()))
 
-MESSAGE = re.compile(r'"((?:[^"\\\n]|\\.){40,})"|\'([^\'\n]{40,})\'')
+MESSAGE = re.compile(r'"((?:[^"\\\n]|\\.){20,})"|\'([^\'\n]{20,})\'')
 
 def emit(s, start, end, heading, kind, text):
     text = text.strip("\n")
@@ -912,23 +1001,31 @@ def emit(s, start, end, heading, kind, text):
     if "audited_on" not in s:
         s["audited_on"] = audited_on(s)
     units.append(dict(id=f"u{len(units) + 1:04d}", path=s["path"], line=start, end_line=end, heading=heading,
-                      kind=kind, scope=s["scope"], activation=s["activation"], text=redact(text),
+                      kind=kind, scope=s["scope"], text=redact(text),
+                      activation="never" if s.get("window_lines") is not None and start > s["window_lines"] else s["activation"],
                       fingerprint=fp, declined=fp in declined, audited=bool(s["audited_on"])))
 
 for p, s in sources.items():
     if s["kind"] not in in_scope:
         continue
     if blocked(s["path"], p):
-        issues.append(dict(type="source-outside-roots", path=s["path"], detail=f"resolves to {p}, outside the project and config dirs; not read"))
+        issues.append(dict(type="source-outside-roots", path=s["path"], detail=f"resolves to {p}, outside the repo; not read"))
         continue
-    # A generated file is audited through its source; an unchanged upstream copy, upstream.
-    if s.get("generated_from") or (s.get("upstream") and not s.get("upstream_drift")):
+    if SENSITIVE.search(p) or SENSITIVE.search(s["path"]):
+        issues.append(dict(type="sensitive-file-skipped", path=s["path"], detail="looks like a secrets file; its text is never put into units"))
+        continue
+    if s["path"] != p and s["kind"] not in ("hook-script", "generator-source") and not p.endswith(".md"):
+        issues.append(dict(type="symlink-to-non-markdown", path=s["path"], detail=f"links to {p}, which is not markdown; not read"))
+        continue
+    # A generated file is audited through its source (a Boost file keeps its handwritten lines
+    # outside the generated block); an unchanged upstream copy, upstream.
+    if (s.get("generated_from") and not s.get("boost_block")) or (s.get("upstream") and not s.get("upstream_drift")):
         continue
     if s["kind"] == "hook-script":
         for n, line in enumerate((read(p) or "").splitlines(), 1):
             for m in MESSAGE.finditer(line):
                 msg = m.group(1) or m.group(2)
-                if len(msg.split()) >= 5 and not msg.lstrip().startswith(("$(", "//")):  # prose, not shell
+                if len(msg.split()) >= 4 and not msg.lstrip().startswith(("$(", "//")):  # prose, not shell
                     emit(s, n, n, os.path.basename(p), "message", msg)
         continue
     if s["kind"] in ("skill", "agent", "command"):
@@ -939,7 +1036,7 @@ for p, s in sources.items():
         if desc and s.get("listing_chars"):  # only a description that is actually listed
             line = next((n for n, l in enumerate((read(p) or "").splitlines(), 1) if l.startswith("description:")), 1)
             emit(s, line, line, s.get("name", ""), "description", desc)
-        if s["kind"] == "command" or s["activation"] == "never" or s.get("third_party"):
+        if s["activation"] == "never" or s.get("third_party"):
             continue
         # A user or project skill's body loads when it runs, and an agent's body is its system
         # prompt: both are audited line by line below.
@@ -954,6 +1051,15 @@ for p, s in sources.items():
     i, heading = 0, ""
     if lines and lines[0] == "---" and "---" in lines[1:]:
         i = lines.index("---", 1) + 1
+    if s.get("boost_block"):  # Boost rewrites its block; the lines around it are the user's
+        in_block = False
+        for k, l in enumerate(lines):
+            if "<laravel-boost-guidelines>" in l:
+                in_block = True
+            if in_block:
+                lines[k] = ""
+            if "</laravel-boost-guidelines>" in l:
+                in_block = False
     cur, cur_start, cur_kind = [], 0, ""
     def flush(end):
         global cur
@@ -962,13 +1068,15 @@ for p, s in sources.items():
         cur = []
     while i < len(lines):
         line, n = lines[i], i + 1
-        if line.lstrip().startswith(("```", "~~~")):
+        fm_ = re.match(r"\s*(`{3,}|~{3,})", line)
+        if fm_:
             flush(n - 1)
-            fence, start, block = line.lstrip()[:3], n, [line]
+            fence, start, block = fm_.group(1), n, [line]
+            close = re.compile(r"\s*" + re.escape(fence[0]) + "{" + str(len(fence)) + r",}\s*$")
             i += 1
             while i < len(lines):
                 block.append(lines[i])
-                if lines[i].lstrip().startswith(fence):
+                if close.match(lines[i]):
                     break
                 i += 1
             emit(s, start, i + 1, heading, "code", "\n".join(block))
@@ -1003,7 +1111,7 @@ STOP = set("a an and are as at be by for from if in into is it its of on or that
 words = []
 for u in units:
     w = set(norm(u["text"]).split()) - STOP
-    words.append(w if len(w) >= 6 and u["kind"] != "code" else None)
+    words.append(w if len(w) >= 6 and u["kind"] != "code" and not u["declined"] else None)
 dupes = []
 for a in range(len(units)):
     if words[a] is None:

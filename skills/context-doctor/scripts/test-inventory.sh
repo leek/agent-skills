@@ -234,4 +234,93 @@ for n in 1 2 3; do
   [ "$(ls "$out"/batch_*.jsonl | wc -l | tr -d ' ')" -le "$n" ] || fail "--max-batches $n wrote more than $n batches"
 done
 
+# A fourth project for the panel-review fixes: redaction forms, brace globs, symlinks out of the
+# repo, a gitignored CLAUDE.local.md, the profile's own .claude.json, MCP URL credentials, the
+# memory window, repo hooks reaching the config dir, output-style precedence, agent-memory names,
+# Boost's handwritten lines, package names that are not imports, when_to_use, command bodies,
+# secrets files, and nested code fences.
+p4="$home/code/four"
+mkdir -p "$p4/src" "$p4/sub" "$p4/.ai/guidelines" "$p4/.claude/rules" "$p4/.claude/agents" "$p4/.claude/hooks" "$p4/.claude/output-styles" \
+  "$config/output-styles" "$config/agents" "$config/agent-memory/reviewer" "$config/commands" "$config/skills/wtu"
+git -C "$p4" init -q
+p4r=$(cd "$p4" && pwd -P)
+mem4="$config/projects/$(printf '%s' "$p4r" | sed 's/[^A-Za-z0-9]/-/g')/memory"; mkdir -p "$mem4"
+cat > "$p4/CLAUDE.md" <<'MD'
+- HANDWRITTEN rule outside the generated block.
+<laravel-boost-guidelines>
+- BOOSTGENERATED line.
+</laravel-boost-guidelines>
+Install @types/node first.
+@.env
+MD
+echo "PLAINENVVALUE=hello" > "$p4/.env"
+cat > "$p4/.claude/rules/secrets.md" <<'MD'
+- Export GITHUB_TOKEN=ghxsecretvalue123456 before running.
+- Send Authorization: Bearer bearervalue12345678 to the API.
+- The database is postgres://admin:hunter2passw@db.internal/app.
+- Context budget: tokens: 1200 per turn.
+MD
+printf -- '---\npaths: src/**/*.{ts,tsx}\n---\n- TSX rule.\n' > "$p4/.claude/rules/tsx.md"
+echo "x" > "$p4/src/a.tsx"
+printf -- '````md\n```\ninner\n```\n````\n- AFTERFENCE rule.\n' > "$p4/.claude/rules/fence.md"
+printf -- '---\nname: OUTSIDEAGENTNAME\ndescription: Lives outside the repo.\n---\n' > "$tmp/outside-agent.md"
+ln -s "$tmp/outside-agent.md" "$p4/.claude/agents/evil.md"
+printf 'CLAUDE.local.md\nwt/\n' > "$p4/.gitignore"; echo "- Ignored local rule." > "$p4/sub/CLAUDE.local.md"
+mkdir -p "$p4/wt/nested"; git -C "$p4/wt/nested" init -q  # an ignored nested repo, as a worktree is
+echo '{"mcpServers": {"homeonly": {"command": "x"}}}' > "$home/.claude.json"
+echo '{"mcpServers": {"api": {"type": "http", "url": "https://abcdefghijklmnopqrstu@api.example.com/mcp"}}}' > "$p4/.mcp.json"
+{ echo "- [A](a.md) — a"; for i in $(seq 1 210); do echo "- filler line $i"; done; } > "$mem4/MEMORY.md"; echo "a" > "$mem4/a.md"
+echo 'echo "USERHOOKSECRET message is long enough to be a unit"' > "$config/notes/user_hook.sh"
+printf '#!/bin/bash\necho "Use pnpm here, not npm." >&2\n' > "$p4/.claude/hooks/guard.sh"
+echo "- Project dup style." > "$p4/.claude/output-styles/dup.md"; echo "- User dup style." > "$config/output-styles/dup.md"
+printf -- '---\nname: pr-reviewer\ndescription: Reviews.\n---\n' > "$config/agents/pr-reviewer.md"
+echo "- reviewer note" > "$config/agent-memory/reviewer/MEMORY.md"
+printf -- '---\ndescription: A command.\n---\n- COMMANDBODY line.\n' > "$config/commands/cmd.md"
+printf -- '---\nname: wtu\ndescription: Short.\nwhen_to_use: When the user asks.\n---\n' > "$config/skills/wtu/SKILL.md"
+cat > "$p4/.claude/settings.json" <<JSON
+{"outputStyle": "dup", "skillOverrides": {"projonly": "off"},
+ "hooks": {"PreToolUse": [{"hooks": [{"type": "command", "command": "bash \"\$CLAUDE_PROJECT_DIR/.claude/hooks/guard.sh\""},
+                                     {"type": "command", "command": "bash $config/notes/user_hook.sh"}]}]}}
+JSON
+bash "$here/inventory.sh" --out "$out" --project "$p4" --home "$home" --config-dir "$config" --managed-dir "$tmp/managed" >/dev/null 2>&1 \
+  || fail "inventory failed on the fourth project"
+
+! grep -rq -e 'ghxsecretvalue123456' -e 'bearervalue12345678' -e 'hunter2passw' -e 'abcdefghijklmnopqrstu' "$out" || fail "a secret form survived redaction"
+grep -q 'GITHUB_TOKEN=\[REDACTED\]' "$out/units.jsonl" || fail "redaction dropped the key name"
+grep -q 'tokens: 1200' "$out/units.jsonl" || fail "redaction ate a short count"
+jq -e '.mcp_servers[] | select(.name=="api") | .host == "api.example.com"' "$out/config.json" >/dev/null || fail "MCP host kept its userinfo"
+jq -e '[.mcp_servers[] | select(.name=="homeonly")] | length == 0' "$out/config.json" >/dev/null || fail "a profile read ~/.claude.json"
+none glob-unmatched "tsx"
+! grep -rq 'OUTSIDEAGENTNAME' "$out" || fail "a symlinked agent outside the repo was read"
+expect "$p4r/sub/CLAUDE.local.md" lazy
+jq -e '[.sources[] | select(.kind=="claude-local" and (.path | endswith("CLAUDE.local.md") | not))] | length == 0' "$out/inventory.json" >/dev/null \
+  || fail "an ignored directory was listed as a CLAUDE.local.md"
+jq -e 'select(.text | test("filler line 205")) | .activation == "never"' "$out/units.jsonl" >/dev/null || fail "a MEMORY.md line past the window is not marked never"
+jq -e 'select(.text | test("filler line 5$")) | .activation == "always"' "$out/units.jsonl" >/dev/null || fail "a MEMORY.md line inside the window is not always"
+! grep -rq 'USERHOOKSECRET' "$out" || fail "a repo hook pulled a user config script into the output"
+has_issue hook-script-outside "user_hook.sh"
+unit "Use pnpm here, not npm."
+expect "$p4r/.claude/output-styles/dup.md" always
+expect "$config/output-styles/dup.md" never
+has_issue agent-memory-orphan "reviewer"
+unit "HANDWRITTEN rule"; nounit "BOOSTGENERATED"
+jq -e '[.issues[] | select(.detail | test("types/node"))] | length == 0' "$out/inventory.json" >/dev/null || fail "@types/node treated as an import"
+jq -e --arg p "$config/skills/wtu/SKILL.md" '.sources[] | select(.path==$p) | .listing_chars == ("Short. When the user asks." | length)' "$out/inventory.json" >/dev/null \
+  || fail "when_to_use not counted in the listing size"
+jq -e --arg p "$p4r/.claude/settings.json" '[.issues[] | select(.type=="skill-override-dead" and (.detail | contains("projonly")) and .path==$p)] | length == 1' "$out/inventory.json" >/dev/null \
+  || fail "skill-override-dead blamed the wrong settings file"
+unit "COMMANDBODY"
+! grep -rq 'PLAINENVVALUE' "$out" || fail "an imported .env reached the output"
+has_issue sensitive-file-skipped "secrets file"
+jq -e 'select(.kind=="bullet" and .text=="- AFTERFENCE rule.")' "$out/units.jsonl" >/dev/null || fail "text after a nested fence lost"
+! jq -e 'select(.kind=="paragraph" and .text=="inner")' "$out/units.jsonl" >/dev/null || fail "a nested fence closed early"
+
+# An excluded CLAUDE.md does not load, so it does not shadow AGENTS.md; ** matches any depth.
+p5="$home/code/five"; mkdir -p "$p5/.claude"; git -C "$p5" init -q; p5r=$(cd "$p5" && pwd -P)
+echo "- Excluded root." > "$p5/CLAUDE.md"; echo "# Agents five" > "$p5/AGENTS.md"
+echo '{"claudeMdExcludes": ["**/five/CLAUDE.md"]}' > "$p5/.claude/settings.json"
+bash "$here/inventory.sh" --out "$out" --project "$p5" --home "$home" --config-dir "$config" --managed-dir "$tmp/managed" >/dev/null 2>&1
+expect "$p5r/CLAUDE.md" never
+expect "$p5r/AGENTS.md" always
+
 echo "test-inventory: ok"

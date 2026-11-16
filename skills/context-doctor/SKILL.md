@@ -44,6 +44,8 @@ With `config` in scope, also gather usage evidence (about a minute per 200 sessi
 bash <this-skill-dir>/scripts/usage-counts.sh --out <scratch>/context-doctor --count 200 --project <path> --exclude <this session's id>
 ```
 
+In Claude Code the session id is the directory above the scratchpad (`…/<session id>/scratchpad`). Where you cannot find it, leave `--exclude` out: this run's own calls then count once more, which changes no verdict.
+
 Then run `claude plugin details <key>` for each enabled plugin in `config.json`, for its measured token cost.
 
 Done when the inventory summary is in hand, every `always` and `listing` source is reconciled with your context, and (for `config`) `usage.json` exists with its session counts.
@@ -62,13 +64,13 @@ The sweep sees one batch; redundancy and conflict span files. With every unit's 
 
 1. **Duplicates**: cluster units with matching gists, plus each pair in `dupes.jsonl`. For each cluster, choose the authoritative copy by the scope rules in lenses' **Scope** section.
 2. **Conflicts**: units on the same subject with incompatible directives. Name the winner: the more specific scope wins in Claude Code, and a convention the repo verifiably follows beats an older one.
-3. **Mechanical findings**: every entry in `inventory.json` `issues` becomes a finding as is: broken imports and links, memory index problems, globs that match nothing, settings naming skills, MCP servers, plugins, or hook scripts that do not exist, broken or unlinked skills, identical copies, and generated or upstream files (the type list is in the script header). Lenses' **Scope** and **Configuration** sections say what each one becomes.
+3. **Mechanical findings**: every entry in `inventory.json` `issues` without `declined: true` becomes a finding as is: broken imports and links, memory index problems, globs that match nothing, settings naming skills, MCP servers, plugins, or hook scripts that do not exist, broken or unlinked skills, identical copies, and generated or upstream files (the type list is in the script header). Lenses' **Scope** and **Configuration** sections say what each one becomes.
 
 Done when every cluster has an authoritative copy, every conflict a winner, and every issue a finding.
 
 ## 4. Verify: classify against reality
 
-Group the units by source: user instructions, project instructions (root, rules, nested, imports, AGENTS.md, pointer docs, generator sources), memory, then skill and agent text (descriptions, bodies, hook messages) with configuration. Send a unit when it carries any tag other than `preference` or `safeguard` alone, or sits in a duplicate or conflict cluster. The rest are KEEP. Split a group above about 80 units and merge small ones. When that makes more than 10 groups, ask first (structured question): verify only the units tagged `claim`, `pointer`, `temporal`, or in a conflict, or run them all.
+Group the units by source: user instructions, project instructions (root, rules, nested, imports, AGENTS.md, pointer docs, generator sources), memory, then skill and agent text (descriptions, bodies, hook messages) with configuration. Send a unit when it carries any tag other than `preference` or `safeguard` alone, or sits in a duplicate or conflict cluster; send every `description` unit whatever its tags, since its usage decides it. The rest are KEEP. With `config` in scope, the configuration group also gets the items that have no units: each enabled plugin, each MCP server (with its `usage_key`), and each plugin skill, from `config.json` and `inventory.json`, so a plugin or server nobody uses is judged against `usage.json` like any other line. Split a group above about 80 units and merge small ones. When that makes more than 10 groups, ask first (structured question): verify only the units tagged `claim`, `pointer`, `temporal`, or in a conflict, or run them all.
 
 Each group is verified in parallel. In Claude Code, dispatch the `leek-skills:context-verifier` agent (sonnet), one per group. In other harnesses, dispatch and wait per [harness-tools](../harness-tools/SKILL.md) with the same brief and the verifier's rules spelled out in it. Otherwise verify inline. The brief: the project path; the group's units with tags and gists; its duplicate pairs and conflicts from step 3; the inventory issues on the group's files, quoted; and the paths of `lenses.md`, `inventory.json`, `config.json`, and `usage.json`. A returned KEEP of a `claim` or `pointer` unit with no `checked` entry was not verified: verify it yourself. Parse verifier output leniently: drop a wrapping code fence and any line that is not JSON.
 
@@ -86,21 +88,22 @@ Write `<scratch>/context-doctor/report.md` per [references/report-format.md](ref
 
 ## 7. Approve and apply
 
-Ask what to apply (a structured question ([harness-tools](../harness-tools/SKILL.md)), otherwise numbered in chat), `multiSelect: true`, in one call:
+Ask what to apply (a structured question ([harness-tools](../harness-tools/SKILL.md)), otherwise numbered in chat), `multiSelect: true`. A call holds at most 4 questions; when these need more, ask the rest in a second call:
 
-- one question per group (instructions, memory, config), each option a bundle with its finding numbers and saved tokens (for example "High-confidence fixes: F1–F6, ~900 tokens"). Exclude single findings by number through "Other".
+- one question per group with findings (instructions, memory, config), each option a bundle with its finding numbers and saved tokens (for example "High-confidence fixes: F1–F6, ~900 tokens"). Exclude single findings by number through "Other".
 - user-scope findings in their own question, saying they affect every project.
 - a last question: remember the findings not picked, so later runs skip them?
 
 Apply only what was picked:
 
-1. Snapshot every file about to change or be deleted: `bash <this-skill-dir>/scripts/state.sh snapshot <file>...`. Keep the printed backup path.
-2. Apply each finding as an exact `old` → `new` replacement, one at a time, re-reading the file first and re-running the finding's evidence check: a fact can change between report and apply, and an UPDATE writes only a value you just confirmed. When `old` no longer matches exactly once, or the evidence no longer holds, skip that finding and report it. Never apply a fuzzy edit. Deleting a memory file also deletes its `MEMORY.md` line. A plugin change goes through `claude plugin disable <key>` or `claude plugin uninstall <key>` and asks for a restart. Settings edits keep valid JSON, and never loosen a permission.
+1. Snapshot every file about to change or be deleted, and name each file about to be created with `--new`, so a restore removes it: `bash <this-skill-dir>/scripts/state.sh snapshot <file>... --new <file>`. Keep the printed backup path.
+2. Apply each finding as an exact `old` → `new` replacement, one at a time, re-reading the file first and re-running the finding's evidence check: a fact can change between report and apply, and an UPDATE writes only a value you just confirmed. When `old` no longer matches exactly once, or the evidence no longer holds, skip that finding and report it. Never apply a fuzzy edit. Deleting a memory file removes the file itself (never empties it) and its `MEMORY.md` line. A plugin change goes through `claude plugin disable <key>` or `claude plugin uninstall <key>` and asks for a restart. Settings edits keep valid JSON, and never loosen a permission.
    - A generated file changes only through its source: edit the source, run the generator, and confirm the regenerated file changed where the source did and nowhere else.
+   - A generator, test suite, or other script from the audited repo is its code, not yours. Before running one, ask unless the user already works in this repo; otherwise report the command for them to run.
    - An upstream copy is never edited here; its findings go in the report for the upstream repo.
    - Removing an item a generator or lock installs also removes or excludes it there (lenses' **Configuration**).
 3. Re-run step 1's inventory into `<scratch>/context-doctor/after/`. It must show no new `issues`, and each edited file must still load as intended. Every hook script, settings file, or other script you changed passes its syntax check (`bash -n`, `jq .`, `python3 -m py_compile`) and the tests that cover it. Report the real before and after totals.
 4. Record every audited file left with no open finding (none found, or all applied), so the next run within 14 days skips it while its bytes stay unchanged: `bash <this-skill-dir>/scripts/state.sh audited <file>...`. An edited file is recorded after its edit.
-5. With the user's yes to remembering, pipe the unpicked findings (`{"fingerprint","path","class","excerpt"}` per line) to `bash <this-skill-dir>/scripts/state.sh decline`. The fingerprint comes from the finding's unit in `units.jsonl` or its entry in `inventory.json` `issues`. A finding with neither (a plugin, an MCP server) is not remembered; say so.
+5. With the user's yes to remembering, write the unpicked findings (`{"fingerprint","path","class","excerpt"}` per line) to `<scratch>/context-doctor/declined.jsonl` with the file-write tool, then run `bash <this-skill-dir>/scripts/state.sh decline <scratch>/context-doctor/declined.jsonl`. The fingerprint comes from the finding's unit in `units.jsonl` or its entry in `inventory.json` `issues`. A finding with neither (a plugin, an MCP server) is not remembered; say so.
 
 End with one line per finding, starting ✅ applied, ⚠️ skipped (with why), or ❌ failed. Then give the backup path and the restore command: `bash <this-skill-dir>/scripts/state.sh restore <backup>`, which needs the user's go-ahead before it runs. Repo files are left uncommitted.
