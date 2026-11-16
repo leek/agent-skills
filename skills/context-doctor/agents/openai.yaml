@@ -1,0 +1,6 @@
+interface:
+  display_name: "Context Doctor"
+  short_description: "Audit every instruction, memory, and config source the agent loads and propose the smallest accurate set"
+  default_prompt: "Use $context-doctor to audit the instructions, memory, and configuration that load in this project. Add instructions, memory, or config to narrow the scope, e.g. $context-doctor memory."
+policy:
+  allow_implicit_invocation: false

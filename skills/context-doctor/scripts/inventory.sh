@@ -1,0 +1,710 @@
+#!/bin/bash
+# Inventory every source of persistent agent context for one project, read-only: what exists,
+# its scope, whether and when the harness loads it, its size, and what it imports. Splits the
+# editable sources into audit units, flags near-duplicate units, and writes sweep batches.
+#
+# Usage: inventory.sh --out <dir> [--project <dir>] [--home <dir>] [--config-dir <dir>]
+#                     [--managed-dir <dir>] [--declined <declined.jsonl>] [--batch-size N]
+#   --project      the working directory sessions start in (default: $PWD)
+#   --home         the home directory (default: $HOME); tests pass a fixture
+#   --config-dir   Claude Code's config dir (default: $CLAUDE_CONFIG_DIR, else <home>/.claude)
+#   --managed-dir  managed-policy dir (default: the platform path)
+#   --declined     units whose fingerprint is listed here are marked declined (state.sh ledger)
+#   --batch-size   audit units per sweep batch (default 40)
+#   --scope        comma list of instructions, memory, config: which units to write and batch
+#                  (default all). Sources, issues, and totals always cover everything.
+#
+# Writes into <dir>:
+#   inventory.json  {project, config_dir, memory_dir, sources[], issues[], totals}
+#     issue: {type, path, line?, detail, fingerprint, declined}
+#     source: {path, kind, scope, activation, why, bytes, lines, approx_tokens,
+#              loaded_bytes?, listing_chars?, imports[], plugin?}
+#     activation: always (every session) | listing (name+description every turn, body on
+#       demand) | lazy (when a file under its directory or paths: glob is touched) | agent
+#       (when that subagent runs) | on-demand (read only when the agent opens it) | config
+#       (settings, never text in context) | never | uncertain
+#   config.json     settings keys, hooks, MCP servers, plugins: names and structure only.
+#                   Values of env, headers, args, and anything token-shaped are never emitted.
+#   units.jsonl     one audit unit per line: {id, path, line, end_line, heading, kind, scope,
+#                   activation, text, fingerprint, declined}
+#   dupes.jsonl     {a, b, score}: unit pairs whose word sets overlap >= 0.6
+#   batch_<k>.jsonl units split for the sweep, whole sources kept together where they fit
+# Prints a JSON summary to stdout. Token counts are bytes/4: an estimate, not a measurement.
+
+set -e
+
+out=""; project="$PWD"; home="$HOME"; config=""; managed=""; declined=""; batch=40; scope="instructions,memory,config"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --out) out=$2; shift ;;
+    --project) project=$2; shift ;;
+    --home) home=$2; shift ;;
+    --config-dir) config=$2; shift ;;
+    --managed-dir) managed=$2; shift ;;
+    --declined) declined=$2; shift ;;
+    --batch-size) batch=$2; shift ;;
+    --scope) scope=$2; shift ;;
+    *) echo "Unknown arg: $1" >&2; exit 2 ;;
+  esac
+  shift
+done
+[ -n "$out" ] || { echo "--out <dir> is required" >&2; exit 2; }
+[ -d "$project" ] || { echo "Not a directory: $project" >&2; exit 2; }
+command -v python3 >/dev/null || { echo "python3 is required" >&2; exit 1; }
+if [ -z "$config" ]; then
+  if [ "$home" = "$HOME" ] && [ -n "$CLAUDE_CONFIG_DIR" ]; then config=$CLAUDE_CONFIG_DIR; else config="$home/.claude"; fi
+fi
+if [ -z "$managed" ]; then
+  case "$(uname -s)" in
+    Darwin) managed="/Library/Application Support/ClaudeCode" ;;
+    *) managed="/etc/claude-code" ;;
+  esac
+fi
+mkdir -p "$out"
+rm -f "$out"/batch_*.jsonl
+echo ">> inventory: project=$project config=$config" >&2
+
+python3 - "$project" "$home" "$config" "$managed" "$out" "$declined" "$batch" "$scope" <<'PY'
+import glob, hashlib, json, os, re, subprocess, sys
+from fnmatch import fnmatch
+
+project, home, config, managed, out, declined_path, batch_size, scope_arg = sys.argv[1:9]
+SCOPES = {"instructions": {"claude-md", "claude-local", "rule", "agents-md", "import", "output-style"},
+          "memory": {"memory-index", "memory", "agent-memory"},
+          "config": {"skill", "agent", "command"}}
+bad = [x for x in scope_arg.split(",") if x not in SCOPES]
+if bad:
+    sys.exit(f"Unknown --scope value(s): {bad}; use instructions, memory, config")
+in_scope = set().union(*(SCOPES[x] for x in scope_arg.split(",")))
+project = os.path.realpath(project)
+home = os.path.realpath(home)
+config = os.path.realpath(os.path.expanduser(config))
+batch_size = int(batch_size)
+
+RANK = ["always", "listing", "lazy", "agent", "on-demand", "config", "uncertain", "never"]
+SECRET = re.compile(
+    r"(?<![A-Za-z0-9_-])(sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}"
+    r"|xox[abpr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+"
+    r"|(?i:(?:bearer|token|api[_-]?key|secret|password|passwd)\s*[=:]\s*)\S+)")
+SKIP_DIRS = {".git", "node_modules", "vendor", "dist", "build", ".next", ".nuxt", "storage", ".venv", "venv", "__pycache__"}
+
+def redact(s):
+    return SECRET.sub("[REDACTED]", s or "")
+
+def read(p):
+    try:
+        with open(p, encoding="utf-8", errors="replace") as fh:
+            return fh.read()
+    except OSError:
+        return None
+
+def load_json(p):
+    t = read(p)
+    if not t:
+        return None
+    try:
+        return json.loads(t)
+    except ValueError:
+        return None
+
+def tok(n):
+    return (n + 3) // 4
+
+def frontmatter(text):
+    m = re.match(r"^---\n(.*?)\n---\n", text or "", re.S)
+    return m.group(1) if m else ""
+
+def fm_value(fm, key):
+    m = re.search(rf"^{key}:\s*(.*)$", fm, re.M)
+    if not m:
+        return None
+    v = m.group(1).strip()
+    if v in (">", "|", ">-", "|-", ""):
+        rest = fm[m.end():].split("\n")
+        cont = []
+        for line in rest[1:]:
+            if line.startswith((" ", "\t")):
+                cont.append(line.strip())
+            else:
+                break
+        v = " ".join(cont)
+    return v.strip("\"'")
+
+sources, issues = {}, []
+
+def add(path, kind, scope, activation, why, **kw):
+    path = os.path.abspath(path)
+    key = os.path.realpath(path)  # a symlinked file is one source, listed under the first path seen
+    if key in sources:
+        s = sources[key]
+        if RANK.index(activation) < RANK.index(s["activation"]):
+            s["activation"], s["why"] = activation, why + "; also " + s["why"]
+        return s
+    text = read(path)
+    b = len(text.encode("utf-8")) if text is not None else 0
+    s = dict(path=path, real_path=key, kind=kind, scope=scope, activation=activation, why=why, bytes=b,
+             lines=(text.count("\n") + (0 if text.endswith("\n") else 1)) if text else 0,
+             approx_tokens=tok(b), imports=[])
+    s.update(kw)
+    sources[key] = s
+    return s
+
+def known(path):
+    return sources.get(os.path.realpath(path))
+
+# ---- settings ---------------------------------------------------------------------------
+settings_files = [("managed", os.path.join(managed, "managed-settings.json")),
+                  ("user", os.path.join(config, "settings.json")),
+                  ("project", os.path.join(project, ".claude", "settings.json")),
+                  ("local", os.path.join(project, ".claude", "settings.local.json"))]
+settings = {}
+for scope, p in settings_files:
+    data = load_json(p)
+    if isinstance(data, dict):
+        settings[scope] = data
+        add(p, "settings", scope, "config", "settings file: shapes behaviour, adds no text")
+
+def merged(key, order=("user", "project", "local", "managed")):
+    val = None
+    for sc in order:
+        if key in settings.get(sc, {}):
+            val = settings[sc][key]
+    return val
+
+excludes = []
+for sc in settings:
+    excludes += [os.path.expanduser(g) for g in settings[sc].get("claudeMdExcludes", []) or []]
+env = {}
+for sc in ("user", "project", "local", "managed"):
+    env.update(settings.get(sc, {}).get("env", {}) or {})
+enabled_plugins = {}
+for sc in ("user", "project", "local", "managed"):
+    enabled_plugins.update(settings.get(sc, {}).get("enabledPlugins", {}) or {})
+# cc-plugin-agents-md@builtin's instructionFiles: "claude-md-or-agents-md" is the default
+# (AGENTS.md only when no CLAUDE.md), an "-and-" value loads both, anything else is unverified.
+skill_overrides = {}
+for sc in ("user", "project", "local", "managed"):
+    skill_overrides.update(settings.get(sc, {}).get("skillOverrides") or {})
+agents_md_mode = "claude-md-or-agents-md"
+for sc in ("user", "project", "local", "managed"):
+    pc = (settings.get(sc, {}).get("pluginConfigs") or {}).get("cc-plugin-agents-md@builtin") or {}
+    agents_md_mode = (pc.get("options") or {}).get("instructionFiles", agents_md_mode)
+
+def excluded(p):
+    return any(fnmatch(p, g) for g in excludes)
+
+def add_instruction(p, kind, scope, activation, why):
+    if excluded(p):
+        return add(p, kind, scope, "never", "matched claudeMdExcludes")
+    return add(p, kind, scope, activation, why)
+
+# ---- managed + user instructions -----------------------------------------------------------
+if os.path.isfile(os.path.join(managed, "CLAUDE.md")):
+    add(os.path.join(managed, "CLAUDE.md"), "claude-md", "managed", "always", "managed policy CLAUDE.md")
+user_md = os.path.join(config, "CLAUDE.md")
+if os.path.isfile(user_md):
+    add_instruction(user_md, "claude-md", "user", "always", "user CLAUDE.md in the config dir")
+
+def scan_rules(d, scope):
+    for p in sorted(glob.glob(os.path.join(d, "**", "*.md"), recursive=True)):
+        fm = frontmatter(read(p))
+        if re.search(r"^paths:", fm, re.M):
+            add_instruction(p, "rule", scope, "lazy", "rule with paths: loads when a matching file is read or edited")
+        else:
+            add_instruction(p, "rule", scope, "always", "rule without paths: loads every session")
+
+scan_rules(os.path.join(config, "rules"), "user")
+
+# ---- the cwd chain, root first -----------------------------------------------------------------
+chain, d = [], project
+while True:
+    chain.append(d)
+    parent = os.path.dirname(d)
+    if parent == d:
+        break
+    d = parent
+chain.reverse()
+claude_in_chain = False
+default_user_md = os.path.join(home, ".claude", "CLAUDE.md")
+for d in chain:
+    scope = "project" if d == project else "ancestor"
+    for name, kind in (("CLAUDE.md", "claude-md"), (".claude/CLAUDE.md", "claude-md"), ("CLAUDE.local.md", "claude-local")):
+        p = os.path.join(d, name)
+        if not os.path.isfile(p):
+            continue
+        if p == default_user_md:
+            # The default config dir's CLAUDE.md is the user file, never a project one. Under
+            # CLAUDE_CONFIG_DIR it loads only when the active config dir's CLAUDE.md is the same file.
+            if not known(p):
+                add(p, "claude-md", "user", "never", "default config dir's CLAUDE.md; CLAUDE_CONFIG_DIR points elsewhere")
+            continue
+        claude_in_chain = True
+        add_instruction(p, kind, scope, "always", f"{name} in the cwd chain")
+scan_rules(os.path.join(project, ".claude", "rules"), "project")
+for d in chain:
+    p = os.path.join(d, "AGENTS.md")
+    if os.path.isfile(p):
+        scope = "project" if d == project else "ancestor"
+        if "-and-" in agents_md_mode:
+            add(p, "agents-md", scope, "always", f"instructionFiles is {agents_md_mode}")
+        elif agents_md_mode != "claude-md-or-agents-md":
+            add(p, "agents-md", scope, "uncertain", f"instructionFiles is {agents_md_mode}, a value this script has not verified")
+        elif claude_in_chain:
+            add(p, "agents-md", scope, "never", "a CLAUDE.md exists in the cwd chain, so Claude Code skips AGENTS.md unless it is imported")
+        else:
+            add(p, "agents-md", scope, "always", "no CLAUDE.md in the cwd chain, so Claude Code reads AGENTS.md (v2.1.277+)")
+
+# ---- nested files under the project ---------------------------------------------------------------
+def project_files(patterns):
+    try:
+        r = subprocess.run(["git", "-C", project, "ls-files", "--cached", "--others", "--exclude-standard", "--"] + patterns,
+                           capture_output=True, text=True, timeout=30)
+        if r.returncode == 0:
+            return [os.path.join(project, f) for f in r.stdout.splitlines() if f]
+    except (OSError, subprocess.SubprocessError):
+        pass
+    found = []
+    for root, dirs, files in os.walk(project):
+        dirs[:] = [x for x in dirs if x not in SKIP_DIRS]
+        for f in files:
+            rel = os.path.relpath(os.path.join(root, f), project)
+            if any(fnmatch(rel, pat) or fnmatch(f, pat.split("/")[-1]) for pat in patterns):
+                found.append(os.path.join(root, f))
+    return found
+
+for p in project_files(["**/CLAUDE.md", "**/CLAUDE.local.md", "**/AGENTS.md", "CLAUDE.md", "AGENTS.md", "CLAUDE.local.md"]):
+    p = os.path.abspath(p)
+    if known(p) or os.path.dirname(p) == project or "/.claude/rules/" in p:
+        continue
+    if os.path.basename(p) == "AGENTS.md":
+        add(p, "agents-md", "directory", "uncertain", "nested AGENTS.md: loading not documented")
+    else:
+        add_instruction(p, "claude-md" if p.endswith("CLAUDE.md") else "claude-local", "directory", "lazy",
+                        "nested file: loads when a file under its directory is read or edited")
+
+for name in (".cursorrules", ".windsurfrules", ".clinerules", "GEMINI.md", ".github/copilot-instructions.md"):
+    p = os.path.join(project, name)
+    if os.path.isfile(p):
+        add(p, "other-tool", "project", "never", "another tool's instruction file; Claude Code never reads it")
+for p in glob.glob(os.path.join(project, ".cursor", "rules", "**", "*"), recursive=True):
+    if os.path.isfile(p):
+        add(p, "other-tool", "project", "never", "Cursor rule; Claude Code never reads it")
+
+# ---- auto memory ------------------------------------------------------------------------------------
+def git_root():
+    try:
+        r = subprocess.run(["git", "-C", project, "rev-parse", "--path-format=absolute", "--git-common-dir"],
+                           capture_output=True, text=True, timeout=10)
+        if r.returncode == 0:
+            common = r.stdout.strip()
+            return os.path.dirname(common) if os.path.basename(common) == ".git" else common
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return project
+
+repo_root = git_root()
+slug = re.sub(r"[^A-Za-z0-9]", "-", repo_root)
+mem_setting = merged("autoMemoryDirectory")
+mem_dir = os.path.expanduser(mem_setting) if mem_setting else os.path.join(config, "projects", slug, "memory")
+mem_off = merged("autoMemoryEnabled") is False or str(env.get("CLAUDE_CODE_DISABLE_AUTO_MEMORY", os.environ.get("CLAUDE_CODE_DISABLE_AUTO_MEMORY", ""))) == "1"
+if os.path.isdir(mem_dir):
+    index = os.path.join(mem_dir, "MEMORY.md")
+    topics = sorted(p for p in glob.glob(os.path.join(mem_dir, "**", "*.md"), recursive=True) if p != index)
+    linked = set()
+    if os.path.isfile(index):
+        text = read(index) or ""
+        lines = text.splitlines(keepends=True)
+        window = "".join(lines[:200]).encode("utf-8")[:25000]
+        s = add(index, "memory-index", "project-memory", "never" if mem_off else "always",
+                "auto memory disabled" if mem_off else "auto-memory index: first 200 lines or 25KB load every session",
+                loaded_bytes=len(window))
+        if len(window) < s["bytes"]:
+            issues.append(dict(type="memory-index-truncated", path=index,
+                               detail=f"MEMORY.md is {s['lines']} lines / {s['bytes']} bytes; only the first 200 lines or 25KB load"))
+        for n, line in enumerate(text.splitlines(), 1):
+            for target in re.findall(r"\]\(([^)#\s]+\.md)\)", line):
+                full = os.path.normpath(os.path.join(mem_dir, target))
+                linked.add(full)
+                if not os.path.isfile(full):
+                    issues.append(dict(type="memory-pointer-broken", path=index, line=n, detail=f"points at missing {target}"))
+    for p in topics:
+        add(p, "memory", "project-memory", "never" if mem_off else "on-demand", "memory topic file: read only when the agent opens it")
+        if p not in linked:
+            issues.append(dict(type="memory-orphan", path=p, detail="topic file not linked from MEMORY.md, so nothing points the agent at it"))
+
+# ---- agents, skills, commands, plugins -------------------------------------------------------------
+known_agents = set()
+
+def add_listed(p, kind, scope, plugin=None):
+    text = read(p) or ""
+    fm = frontmatter(text)
+    desc = fm_value(fm, "description") or fm_value(fm, "when_to_use") or ""
+    name = fm_value(fm, "name") or os.path.basename(os.path.dirname(p) if kind == "skill" else p)[:-3 if kind != "skill" else None]
+    if kind == "agent":
+        known_agents.add(name)
+    user_only = bool(re.search(r"^disable-model-invocation:\s*true", fm, re.M))
+    act = "on-demand" if user_only else "listing"
+    why = "user-invoked: no description in context" if user_only else "name and description listed every turn; body on demand"
+    chars = 0 if user_only else min(len(desc), 1536)
+    # skillOverrides (settings) hides or trims a non-plugin skill; plugin skills ignore it.
+    override = skill_overrides.get(name) or skill_overrides.get(os.path.basename(os.path.dirname(p))) if kind == "skill" and not plugin else None
+    if override == "off":
+        act, why, chars = "never", "skillOverrides: off (hidden from the model)", 0
+    elif override == "user-invocable-only":
+        act, why, chars = "on-demand", "skillOverrides: user-invocable-only (no description in context)", 0
+    elif override == "name-only":
+        act, why, chars = "listing", "skillOverrides: name-only (name listed, no description)", 0
+    # usage_key joins usage-counts.sh: a plugin item is invoked as <plugin>:<name>.
+    kw = dict(listing_chars=chars, name=name, usage_key=(plugin.split("@")[0] + ":" + name) if plugin else name)
+    if plugin:
+        kw["plugin"] = plugin
+    return add(p, kind, scope, act, why, **kw)
+
+def declared(base, plugin, key):
+    """A plugin's own list for key (skills, agents, commands): plugin.json first, then its entry
+    in a marketplace.json shipped in the same install. None means use the default directory."""
+    name = (plugin or "").split("@")[0]
+    manifests = [load_json(os.path.join(base, ".claude-plugin", "plugin.json")) or {}]
+    mk = load_json(os.path.join(base, ".claude-plugin", "marketplace.json")) or {}
+    manifests += [e for e in mk.get("plugins") or [] if isinstance(e, dict) and e.get("name") == name]
+    for m in manifests:
+        val = m.get(key)
+        if val:
+            return [os.path.normpath(os.path.join(base, v)) for v in ([val] if isinstance(val, str) else val)]
+    return None
+
+def scan_listed(base, scope, plugin=None):
+    skills = declared(base, plugin, "skills") if plugin else None
+    skill_files = [os.path.join(d, "SKILL.md") for d in skills] if skills is not None else glob.glob(os.path.join(base, "skills", "*", "SKILL.md"))
+    for p in sorted(f for f in skill_files if os.path.isfile(f)):
+        add_listed(p, "skill", scope, plugin)
+    for key, kind in (("agents", "agent"), ("commands", "command")):
+        listed = declared(base, plugin, key) if plugin else None
+        roots = listed if listed is not None else [os.path.join(base, key)]
+        files = []
+        for r in roots:
+            files += [r] if os.path.isfile(r) else glob.glob(os.path.join(r, "**", "*.md"), recursive=True)
+        for p in sorted(files):
+            add_listed(p, kind, scope, plugin)
+    for p in sorted(glob.glob(os.path.join(base, "output-styles", "*.md"))):
+        add(p, "output-style", scope, "never", "output style not selected")
+
+scan_listed(config, "user")
+scan_listed(os.path.join(project, ".claude"), "project")
+
+plugins = []
+installed = load_json(os.path.join(config, "plugins", "installed_plugins.json")) or {}
+for key, entries in sorted((installed.get("plugins") or {}).items()):
+    entry = entries[0] if isinstance(entries, list) and entries else (entries if isinstance(entries, dict) else {})
+    path = entry.get("installPath") or ""
+    state = enabled_plugins.get(key)
+    info = dict(key=key, version=entry.get("version"), scope=entry.get("scope"), enabled=state,
+                skills=0, model_invoked_skills=0, agents=0, commands=0, listing_chars=0, hooks=False, mcp=False)
+    if state is not False and os.path.isdir(path):
+        before = set(sources)
+        scan_listed(path, "plugin", plugin=key)
+        for p in set(sources) - before:
+            s = sources[p]
+            if state is None:
+                s["activation"], s["why"] = "uncertain", "plugin installed but absent from enabledPlugins"
+            if s["kind"] in ("skill", "agent", "command"):
+                info[s["kind"] + "s"] += 1
+                info["listing_chars"] += s.get("listing_chars", 0)
+                if s["kind"] == "skill" and s["activation"] == "listing":
+                    info["model_invoked_skills"] += 1
+        info["hooks"] = os.path.isfile(os.path.join(path, "hooks", "hooks.json"))
+        info["mcp"] = os.path.isfile(os.path.join(path, ".mcp.json"))
+    plugins.append(info)
+
+# skillOverrides keys that hide nothing: no such user or project skill, or a plugin skill
+# (plugin skills ignore skillOverrides, so the entry is dead config either way).
+own_skills = {s.get("name") for s in sources.values() if s["kind"] == "skill" and not s.get("plugin")}
+own_skills |= {os.path.basename(os.path.dirname(s["path"])) for s in sources.values() if s["kind"] == "skill" and not s.get("plugin")}
+plugin_skills = {s.get("name") for s in sources.values() if s["kind"] == "skill" and s.get("plugin")}
+for key, val in sorted(skill_overrides.items()):
+    if key not in own_skills:
+        why = "names a plugin skill, and plugin skills ignore skillOverrides" if key in plugin_skills else "names no installed user or project skill"
+        issues.append(dict(type="skill-override-dead", path=next((p for sc, p in settings_files if "skillOverrides" in settings.get(sc, {})), ""),
+                           detail=f'skillOverrides "{key}": "{val}" {why}'))
+
+style = merged("outputStyle")
+if style and style.lower() not in ("default",):
+    for base in (os.path.join(project, ".claude"), config):
+        for p in glob.glob(os.path.join(base, "output-styles", "*.md")):
+            if fm_value(frontmatter(read(p)), "name") == style or os.path.basename(p)[:-3] == style:
+                s = known(p) or add(p, "output-style", "user", "never", "")
+                s["activation"], s["why"] = "always", "selected output style: its text joins every request"
+
+# ---- subagent memory ----------------------------------------------------------------------------------
+for base, scope in ((os.path.join(config, "agent-memory"), "agent-memory:user"),
+                    (os.path.join(project, ".claude", "agent-memory"), "agent-memory:project"),
+                    (os.path.join(project, ".claude", "agent-memory-local"), "agent-memory:local")):
+    for d in sorted(glob.glob(os.path.join(base, "*"))):
+        if not os.path.isdir(d):
+            continue
+        name = os.path.basename(d)
+        has_agent = any(name == a or name.endswith(a) or a.endswith(name) for a in known_agents)
+        for p in sorted(glob.glob(os.path.join(d, "**", "*.md"), recursive=True)):
+            act = "agent" if os.path.basename(p) == "MEMORY.md" else "on-demand"
+            s = add(p, "agent-memory", scope, act, f"memory of subagent {name}" + ("" if has_agent else " (no agent of that name found)"))
+            if not has_agent:
+                issues.append(dict(type="agent-memory-orphan", path=p, detail=f"no installed agent named {name}"))
+
+# ---- imports (after every source is known, so a lazy file's imports are lazy) ------------------------
+CODE = re.compile(r"(^|\n)(```|~~~).*?(\n\2[^\n]*|$)", re.S)
+SPAN = re.compile(r"`[^`\n]*`")
+IMPORT = re.compile(r"(?:^|(?<=\s))@((?:~/|\.{1,2}/|/)?[A-Za-z0-9_][A-Za-z0-9_./-]*)")
+LINK = re.compile(r"\]\(([^)#\s]+)\)")
+md_kinds = {"claude-md", "claude-local", "rule", "agents-md", "import", "memory-index", "output-style"}
+frontier = [p for p, s in sources.items() if s["kind"] in md_kinds and s["activation"] in ("always", "lazy", "uncertain")]
+depth = {p: 0 for p in frontier}
+while frontier:
+    p = frontier.pop(0)
+    s = sources[p]
+    text = read(p) or ""
+    bare = SPAN.sub("", CODE.sub("\n", text))
+    for target in IMPORT.findall(bare):
+        target = target.rstrip(".,;:)")
+        if "/" not in target and "." not in target:
+            continue  # a mention (@leek), not a path
+        full = os.path.normpath(os.path.join(os.path.dirname(p), os.path.expanduser(target)))
+        s["imports"].append(full)
+        if not os.path.isfile(full):
+            issues.append(dict(type="import-unresolved", path=s["path"], detail=f"@{target} resolves to nothing"))
+            continue
+        if depth[p] >= 4:
+            issues.append(dict(type="import-too-deep", path=s["path"], detail=f"@{target} is past the 4-hop import limit"))
+            continue
+        key = os.path.realpath(full)
+        add(full, "import", s["scope"], s["activation"], f"imported by {s['path']}")
+        if key not in depth:
+            depth[key] = depth[p] + 1
+            frontier.append(key)
+    if s["activation"] == "always":
+        for target in LINK.findall(bare):
+            full = os.path.normpath(os.path.join(os.path.dirname(p), target))
+            t = known(full)
+            if t and t["kind"] == "agents-md" and t["activation"] == "never":
+                issues.append(dict(type="link-not-import", path=s["path"],
+                                   detail=f"links to {target} ({t['approx_tokens']} tokens) without importing it; that file never loads at startup. Use @{target} to load it"))
+
+# ---- MCP and hooks (config.json: names and structure only) ------------------------------------------
+def mcp_entry(name, cfg, scope):
+    cfg = cfg if isinstance(cfg, dict) else {}
+    url = cfg.get("url") or ""
+    return dict(name=name, scope=scope, type=cfg.get("type") or ("http" if url else "stdio"),
+                command=os.path.basename(str(cfg.get("command") or "")) or None,
+                host=re.sub(r"^\w+://([^/:?]+).*$", r"\1", url) if url else None,
+                always_load=bool(cfg.get("alwaysLoad")),
+                env_keys=sorted((cfg.get("env") or {}).keys()), header_keys=sorted((cfg.get("headers") or {}).keys()))
+
+mcp = []
+for name, cfg in ((load_json(os.path.join(project, ".mcp.json")) or {}).get("mcpServers") or {}).items():
+    mcp.append(mcp_entry(name, cfg, "project"))
+for cj in (os.path.join(config, ".claude.json"), os.path.join(home, ".claude.json")):
+    data = load_json(cj)
+    if isinstance(data, dict):
+        for name, cfg in (data.get("mcpServers") or {}).items():
+            mcp.append(mcp_entry(name, cfg, "user"))
+        for name, cfg in (((data.get("projects") or {}).get(project) or {}).get("mcpServers") or {}).items():
+            mcp.append(mcp_entry(name, cfg, "local"))
+        break
+for info in plugins:
+    if info["mcp"]:
+        entry = ((installed.get("plugins") or {}).get(info["key"]) or [{}])[0]
+        for name, cfg in ((load_json(os.path.join(entry.get("installPath", ""), ".mcp.json")) or {}).get("mcpServers") or {}).items():
+            mcp.append(mcp_entry(name, cfg, "plugin:" + info["key"]))
+
+hooks = []
+def collect_hooks(data, scope):
+    for event, groups in ((data or {}).get("hooks") or {}).items():
+        for g in groups or []:
+            for h in (g or {}).get("hooks") or []:
+                hooks.append(dict(scope=scope, event=event, matcher=g.get("matcher"), type=h.get("type"),
+                                  command=redact(str(h.get("command") or h.get("prompt") or ""))[:200],
+                                  injects_context=event in ("SessionStart", "UserPromptSubmit", "SubagentStart", "PostCompact")))
+for sc, data in settings.items():
+    collect_hooks(data, sc)
+for info in plugins:
+    if info["hooks"] and info["enabled"] is not False:
+        entry = ((installed.get("plugins") or {}).get(info["key"]) or [{}])[0]
+        collect_hooks(load_json(os.path.join(entry.get("installPath", ""), "hooks", "hooks.json")), "plugin:" + info["key"])
+
+perms = {}
+for sc, data in settings.items():
+    p = data.get("permissions") or {}
+    perms[sc] = {k: [redact(str(x)) for x in p.get(k, [])] for k in ("allow", "deny", "ask") if p.get(k)}
+config_out = dict(
+    settings={sc: dict(keys=sorted(d.keys()), env_keys=sorted((d.get("env") or {}).keys())) for sc, d in settings.items()},
+    permissions=perms, claudeMdExcludes=excludes, auto_memory=dict(dir=mem_dir, disabled=mem_off),
+    output_style=style, tool_search=env.get("ENABLE_TOOL_SEARCH", os.environ.get("ENABLE_TOOL_SEARCH")),
+    plugins=plugins, mcp_servers=mcp, hooks=hooks)
+json.dump(config_out, open(os.path.join(out, "config.json"), "w"), indent=1)
+
+# ---- audit units ---------------------------------------------------------------------------------------
+editable = {"claude-md", "claude-local", "rule", "agents-md", "import", "memory-index", "memory", "agent-memory", "output-style"}
+declined = set()
+if declined_path and os.path.isfile(declined_path):
+    for line in open(declined_path, encoding="utf-8"):
+        try:
+            declined.add(json.loads(line)["fingerprint"])
+        except (ValueError, KeyError):
+            pass
+BULLET = re.compile(r"^(\s*)(?:[-*+]|\d+[.)])\s+")
+units = []
+
+def norm(t):
+    return " ".join(re.findall(r"[a-z0-9]+", t.lower()))
+
+def emit(s, start, end, heading, kind, text):
+    text = text.strip("\n")
+    if not text.strip():
+        return
+    fp = hashlib.sha1((s["path"] + "\0" + norm(text)).encode()).hexdigest()[:12]
+    units.append(dict(id=f"u{len(units) + 1:04d}", path=s["path"], line=start, end_line=end, heading=heading,
+                      kind=kind, scope=s["scope"], activation=s["activation"], text=redact(text),
+                      fingerprint=fp, declined=fp in declined))
+
+for p, s in sources.items():
+    if s["kind"] not in in_scope:
+        continue
+    if s["kind"] in ("skill", "agent", "command") and not s.get("plugin"):
+        fm = frontmatter(read(p))
+        desc = fm_value(fm, "description")
+        if desc and s.get("listing_chars"):  # only a description that is actually listed
+            line = next((n for n, l in enumerate((read(p) or "").splitlines(), 1) if l.startswith("description:")), 1)
+            emit(s, line, line, s.get("name", ""), "description", desc)
+        continue
+    # Line-level audit only where lines reach a context: a file that never loads, or a
+    # subagent's on-demand notes, is judged whole from the inventory. Auto-memory topic files
+    # and AGENTS.md are audited anyway: the first is the user's memory, the second often meant to load.
+    if s["kind"] not in editable or (s["activation"] in ("never", "on-demand", "config") and s["kind"] not in ("memory", "agents-md")):
+        continue
+    lines = (read(p) or "").splitlines()
+    i, heading = 0, ""
+    if lines and lines[0] == "---" and "---" in lines[1:]:
+        i = lines.index("---", 1) + 1
+    cur, cur_start, cur_kind = [], 0, ""
+    def flush(end):
+        global cur
+        if cur:
+            emit(s, cur_start, end, heading, cur_kind, "\n".join(cur))
+        cur = []
+    while i < len(lines):
+        line, n = lines[i], i + 1
+        if line.lstrip().startswith(("```", "~~~")):
+            flush(n - 1)
+            fence, start, block = line.lstrip()[:3], n, [line]
+            i += 1
+            while i < len(lines):
+                block.append(lines[i])
+                if lines[i].lstrip().startswith(fence):
+                    break
+                i += 1
+            emit(s, start, i + 1, heading, "code", "\n".join(block))
+            i += 1
+            continue
+        if re.match(r"^#{1,6}\s", line):
+            flush(n - 1)
+            heading = line.lstrip("#").strip()
+        elif not line.strip():
+            flush(n - 1)
+        elif line.lstrip().startswith("|"):
+            if cur_kind != "table":
+                flush(n - 1)
+                cur_start, cur_kind = n, "table"
+            cur.append(line)
+        elif BULLET.match(line):
+            flush(n - 1)
+            cur, cur_start, cur_kind = [line], n, "bullet"
+        else:
+            if not cur:
+                cur_start, cur_kind = n, "paragraph"
+            cur.append(line)
+        i += 1
+    flush(len(lines))
+
+with open(os.path.join(out, "units.jsonl"), "w") as fh:
+    for u in units:
+        fh.write(json.dumps(u) + "\n")
+
+# ---- near-duplicates -------------------------------------------------------------------------------------
+STOP = set("a an and are as at be by for from if in into is it its of on or that the this to with when you your not no do does use".split())
+words = []
+for u in units:
+    w = set(norm(u["text"]).split()) - STOP
+    words.append(w if len(w) >= 6 and u["kind"] != "code" else None)
+dupes = []
+for a in range(len(units)):
+    if words[a] is None:
+        continue
+    for b in range(a + 1, len(units)):
+        if words[b] is None:
+            continue
+        inter = len(words[a] & words[b])
+        if not inter:
+            continue
+        score = inter / len(words[a] | words[b])
+        if score >= 0.6:
+            dupes.append(dict(a=units[a]["id"], b=units[b]["id"], score=round(score, 2),
+                              cross_file=units[a]["path"] != units[b]["path"]))
+dupes.sort(key=lambda d: -d["score"])
+with open(os.path.join(out, "dupes.jsonl"), "w") as fh:
+    for d in dupes[:400]:
+        fh.write(json.dumps(d) + "\n")
+
+# ---- batches: whole sources together where they fit ------------------------------------------------------------
+batches, current = [], []
+by_path = {}
+for u in units:
+    if not u["declined"]:
+        by_path.setdefault(u["path"], []).append(u)
+for path, us in by_path.items():
+    while us:
+        room = batch_size - len(current)
+        if len(us) > room and current and len(us) <= batch_size:
+            batches.append(current)
+            current = []
+            continue
+        take, us = us[:batch_size - len(current)], us[batch_size - len(current):]
+        current += take
+        if len(current) >= batch_size:
+            batches.append(current)
+            current = []
+if current:
+    batches.append(current)
+paths = []
+for k, b in enumerate(batches, 1):
+    bp = os.path.join(out, f"batch_{k}.jsonl")
+    with open(bp, "w") as fh:
+        for u in b:
+            fh.write(json.dumps(u) + "\n")
+    paths.append(bp)
+
+# ---- totals ----------------------------------------------------------------------------------------------------
+def total(pred, field="approx_tokens"):
+    return sum(s.get(field, 0) for s in sources.values() if pred(s))
+always = sum(tok(s.get("loaded_bytes", s["bytes"])) for s in sources.values() if s["activation"] == "always")
+totals = dict(
+    sources=len(sources),
+    by_activation={a: sum(1 for s in sources.values() if s["activation"] == a) for a in RANK if any(s["activation"] == a for s in sources.values())},
+    always_tokens=always,
+    listing_tokens=tok(total(lambda s: s["activation"] == "listing", "listing_chars")),
+    listing_tokens_own=tok(total(lambda s: s["activation"] == "listing" and not s.get("plugin"), "listing_chars")),
+    lazy_tokens=total(lambda s: s["activation"] == "lazy"),
+    agent_memory_tokens=total(lambda s: s["activation"] == "agent"),
+    never_loaded_tokens=total(lambda s: s["activation"] == "never" and s["kind"] != "settings"),
+    editable_stored_tokens=total(lambda s: s["kind"] in editable),
+    units=len(units), declined_units=sum(u["declined"] for u in units), dupe_pairs=len(dupes),
+    mcp_servers=len(mcp), hooks=len(hooks), plugins_enabled=sum(1 for p in plugins if p["enabled"]))
+
+# Issues get a fingerprint too, so a declined one stays quiet on later runs.
+for it in issues:
+    it["fingerprint"] = hashlib.sha1((it["type"] + "\0" + it.get("path", "") + "\0" + it["detail"]).encode()).hexdigest()[:12]
+    it["declined"] = it["fingerprint"] in declined
+inv = dict(project=project, repo_root=repo_root, config_dir=config, memory_dir=mem_dir,
+           sources=sorted(sources.values(), key=lambda s: (RANK.index(s["activation"]), s["path"])),
+           issues=issues, totals=totals)
+json.dump(inv, open(os.path.join(out, "inventory.json"), "w"), indent=1)
+print(json.dumps(dict(out=out, totals=totals, issues=len(issues), batches=paths)))
+PY
