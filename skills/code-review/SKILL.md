@@ -49,7 +49,8 @@ Anything in the repo that documents how code should be written, in priority orde
 1. **`AGENTS.md`** at the repo root (and any standards docs under `docs/` it points at).
 2. **`CONTRIBUTING.md`**, **`CODING_STANDARDS.md`**, or other project standards under `docs/`.
 3. **Harness-specific or colocated rule files**: root and directory-scoped `CLAUDE.md`, `.cursor/rules`, or equivalents in directories the diff touches. Colocated rules are binding for their tree and override generic guidance for that path.
-4. When both `AGENTS.md` and a harness-specific root file exist, prefer `AGENTS.md` for cross-harness conventions; apply harness-specific files as additional constraints for that environment.
+4. **Skill-owned standards**, each passed by absolute path, since a sub-agent cannot load skills: when the diff changes user-facing strings (labels, messages, notifications, emails, `lang/` files) and `.agents/brand-guidelines.md` exists, that file plus the `brand-guidelines` skill's `SKILL.md`, with its **Review** section's report line; when the diff changes a skill, a subagent, `AGENTS.md`, or `CLAUDE.md`, the `writing-for-agents` skill's `SKILL.md` (and its `SKILL-MECHANICS.md` for a skill).
+5. When both `AGENTS.md` and a harness-specific root file exist, prefer `AGENTS.md` for cross-harness conventions; apply harness-specific files as additional constraints for that environment.
 
 **Skip anything tooling already enforces.** Formatters, type checkers, and mechanical upgrade tools own their domains; a finding those tools would catch or fix is noise, not a review finding. In a Laravel repo that typically means Pint, Larastan, and Rector.
 

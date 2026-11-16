@@ -99,6 +99,8 @@ Concrete proof that the change works, as a before and after.
 - **Screenshots** are best, when the change is visual and the environment can take them.
 - **Execution output** is next: the exact test that failed and now passes (name it, and sketch its steps as pseudocode), or command output before and after.
 
+When the change is one a user or operator can exercise and this session ran no end-to-end check of it, run the `verify` skill before writing this section; its screenshots and output are the evidence.
+
 No evidence is a finding, not a blank: say what was not verified and why.
 
 ### Screenshots
