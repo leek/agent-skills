@@ -118,14 +118,17 @@ SECRET = re.compile(
 # and user:pass@ or a long token@ in a URL. Short values (counts like "tokens: 1200") are left.
 _STRONG = r"(?:secret|passw(?:or)?d|passphrase|api[_-]?key|access[_-]?key|private[_-]?key|credential|client[_-]?secret)"
 _KEY = r"[A-Za-z0-9_.-]*{}[A-Za-z0-9_.-]*[\"']?\s*[=:]\s*"
+_QVAL = r"(?:\\.|(?!\2)[^\\\n])"  # one quoted character: an escape, or anything but the quote, a backslash, a newline
 SECRET_KV = [
-    # A quoted value goes whole, commas and braces included; `token` alone needs 8+ characters.
-    (re.compile(r"(?i)(" + _KEY.format(_STRONG) + r")([\"'])(?:\\.|(?!\2).)*\2"), r"\1\2[REDACTED]\2"),
-    (re.compile(r"(?i)(" + _KEY.format("token") + r")([\"'])(?:\\.|(?!\2).){8,}?\2"), r"\1\2[REDACTED]\2"),
+    # A quoted value goes whole, commas and braces included, to its closing quote or, unterminated,
+    # to the end of the line. The two alternatives of one character cannot both match it, so the
+    # match is linear however long the value or its run of backslashes. `token` alone needs 8+ characters.
+    (re.compile(r"(?i)(" + _KEY.format(_STRONG) + r")([\"'])" + _QVAL + r"*(?:\2|(?=\n)|$)"), r"\1\2[REDACTED]\2"),
+    (re.compile(r"(?i)(" + _KEY.format("token") + r")([\"'])" + _QVAL + r"{8,}(?:\2|(?=\n)|$)"), r"\1\2[REDACTED]\2"),
     # Unquoted: a strong keyword's value at any length; a `token` value only from 8 characters, so a
-    # count such as "tokens: 1200" stays readable.
-    (re.compile(r"(?i)(" + _KEY.format(_STRONG) + r")(?![\"'\[])([^\s\"',}]+)"), r"\1[REDACTED]"),
-    (re.compile(r"(?i)(" + _KEY.format("token") + r")(?![\"'\[])([^\s\"',}]{8,})"), r"\1[REDACTED]"),
+    # count such as "tokens: 1200" stays readable. Only an already-redacted value is skipped.
+    (re.compile(r"(?i)(" + _KEY.format(_STRONG) + r")(?![\"']|\[REDACTED\])([^\s\"',}]+)"), r"\1[REDACTED]"),
+    (re.compile(r"(?i)(" + _KEY.format("token") + r")(?![\"']|\[REDACTED\])([^\s\"',}]{8,})"), r"\1[REDACTED]"),
     (re.compile(r"(?i)(\bbearer\s+)[A-Za-z0-9._~+/=-]{8,}"), r"\1[REDACTED]"),
     (re.compile(r"(?i)(--(?:password|passwd|token|api-key|secret)(?:=|\s+))\S+"), r"\1[REDACTED]"),
     (re.compile(r"(://[^/\s:@]+:)[^/\s@]+(@)"), r"\1[REDACTED]\2"),
