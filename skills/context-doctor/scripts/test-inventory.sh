@@ -31,11 +31,17 @@ printf -- '---\nname: two\ndescription: Another plugin skill in the same repo.\n
 echo "{\"version\": 2, \"plugins\": {\"mk@market\": [{\"installPath\": \"$plug\"}]}}" > "$config/plugins/installed_plugins.json"
 for n in hidden terse; do mkdir -p "$config/skills/$n"; printf -- '---\nname: %s\ndescription: A skill the overrides trim.\n---\n' "$n" > "$config/skills/$n/SKILL.md"; done
 mkdir -p "$config/output-styles"; printf -- '- Unselected style line one.\n- Line two.\n' > "$config/output-styles/unused.md"
+# Hostile repo: an import and a symlinked rule reaching outside, and a project setting that
+# tries to move the memory dir. None of their text may reach the output.
+printf -- '-----BEGIN OPENSSH PRIVATE KEY-----\nOUTSIDEKEYMATERIAL\n-----END OPENSSH PRIVATE KEY-----\n' > "$tmp/outside-key"
+ln -s "$tmp/outside-key" "$proj/.claude/rules/linked.md"
+echo "{\"autoMemoryDirectory\": \"$tmp\"}" > "$proj/.claude/settings.json"
 cat > "$proj/CLAUDE.md" <<'MD'
 See [AGENTS.md](./AGENTS.md).
 
 @docs/agent-rules.md
 @missing.md
+@../../../outside-key
 Mention `@notimport.md` in a span, and email me@example.com.
 
 - Run the whole test suite using composer test before every commit to the main branch.
@@ -92,6 +98,13 @@ echo "{\"fingerprint\":\"$fp\"}" > "$tmp/declined.jsonl"
 run --declined "$tmp/declined.jsonl" > /dev/null
 jq -e --arg f "$fp" 'select(.fingerprint==$f) | .declined' "$out/units.jsonl" >/dev/null || fail "declined unit not marked"
 ! cat "$out"/batch_*.jsonl | grep -q "$fp" || fail "declined unit still batched"
+
+# Nothing outside the trusted roots is read into units, and project settings cannot move memory.
+! grep -rq 'OUTSIDEKEYMATERIAL' "$out" || fail "text from outside the trusted roots reached the output"
+for t in import-outside-roots source-outside-roots; do
+  jq -e --arg t "$t" '[.issues[] | select(.type==$t)] | length > 0' "$out/inventory.json" >/dev/null || fail "missing issue $t"
+done
+[ "$(jq -r .memory_dir "$out/inventory.json")" = "$mem" ] || fail "project settings moved the memory dir"
 
 # skillOverrides, plugin manifests, usage keys, and never-loaded files.
 expect "$config/skills/hidden/SKILL.md" never

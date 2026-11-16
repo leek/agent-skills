@@ -13,12 +13,18 @@
 #   --batch-size   audit units per sweep batch (default 40)
 #   --scope        comma list of instructions, memory, config: which units to write and batch
 #                  (default all). Sources, issues, and totals always cover everything.
+#   --upstream     a checkout the project syncs instruction files from (repeatable). A project
+#                  file at the same relative path there is marked upstream: identical files get
+#                  no units (fix them upstream), changed ones raise an upstream-drift issue.
 #
 # Writes into <dir>:
 #   inventory.json  {project, config_dir, memory_dir, sources[], issues[], totals}
 #     issue: {type, path, line?, detail, fingerprint, declined}
 #     source: {path, kind, scope, activation, why, bytes, lines, approx_tokens,
-#              loaded_bytes?, listing_chars?, imports[], plugin?}
+#              loaded_bytes?, listing_chars?, imports[], plugin?, generated?, upstream?}
+#     kinds beyond the harness's own files: pointer-doc (a .md an instruction file names, up to
+#       two hops), generator-source (what a generated instruction file is built from),
+#       hook-script (a script a settings hook runs; its messages reach the agent)
 #     activation: always (every session) | listing (name+description every turn, body on
 #       demand) | lazy (when a file under its directory or paths: glob is touched) | agent
 #       (when that subagent runs) | on-demand (read only when the agent opens it) | config
@@ -33,7 +39,7 @@
 
 set -e
 
-out=""; project="$PWD"; home="$HOME"; config=""; managed=""; declined=""; batch=40; scope="instructions,memory,config"
+out=""; project="$PWD"; home="$HOME"; config=""; managed=""; declined=""; batch=40; scope="instructions,memory,config"; upstream=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --out) out=$2; shift ;;
@@ -44,6 +50,7 @@ while [ $# -gt 0 ]; do
     --declined) declined=$2; shift ;;
     --batch-size) batch=$2; shift ;;
     --scope) scope=$2; shift ;;
+    --upstream) upstream="$upstream${upstream:+:}$2"; shift ;;
     *) echo "Unknown arg: $1" >&2; exit 2 ;;
   esac
   shift
@@ -64,14 +71,15 @@ mkdir -p "$out"
 rm -f "$out"/batch_*.jsonl
 echo ">> inventory: project=$project config=$config" >&2
 
-python3 - "$project" "$home" "$config" "$managed" "$out" "$declined" "$batch" "$scope" <<'PY'
+python3 - "$project" "$home" "$config" "$managed" "$out" "$declined" "$batch" "$scope" "$upstream" <<'PY'
 import glob, hashlib, json, os, re, subprocess, sys
 from fnmatch import fnmatch
 
-project, home, config, managed, out, declined_path, batch_size, scope_arg = sys.argv[1:9]
-SCOPES = {"instructions": {"claude-md", "claude-local", "rule", "agents-md", "import", "output-style"},
+project, home, config, managed, out, declined_path, batch_size, scope_arg, upstream_arg = sys.argv[1:10]
+upstreams = [os.path.realpath(os.path.expanduser(u)) for u in upstream_arg.split(":") if u]
+SCOPES = {"instructions": {"claude-md", "claude-local", "rule", "agents-md", "import", "output-style", "pointer-doc", "generator-source"},
           "memory": {"memory-index", "memory", "agent-memory"},
-          "config": {"skill", "agent", "command"}}
+          "config": {"skill", "agent", "command", "hook-script"}}
 bad = [x for x in scope_arg.split(",") if x not in SCOPES]
 if bad:
     sys.exit(f"Unknown --scope value(s): {bad}; use instructions, memory, config")
@@ -85,7 +93,8 @@ RANK = ["always", "listing", "lazy", "agent", "on-demand", "config", "uncertain"
 SECRET = re.compile(
     r"(?<![A-Za-z0-9_-])(sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}"
     r"|xox[abpr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+"
-    r"|(?i:(?:bearer|token|api[_-]?key|secret|password|passwd)\s*[=:]\s*)\S+)")
+    r"|(?i:(?:bearer|token|api[_-]?key|secret|password|passwd)\s*[=:]\s*)\S+"
+    r"|-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$))")
 SKIP_DIRS = {".git", "node_modules", "vendor", "dist", "build", ".next", ".nuxt", "storage", ".venv", "venv", "__pycache__"}
 
 def redact(s):
@@ -302,15 +311,42 @@ def git_root():
         pass
     return project
 
+def memory_checks(d, index, topics):
+    """Index rows that point nowhere or repeat, topic files nothing links, and two files that
+    share one frontmatter name (the agent cannot tell which one the name means)."""
+    linked, seen_rows, names = set(), {}, {}
+    if os.path.isfile(index):
+        for n, line in enumerate((read(index) or "").splitlines(), 1):
+            for target in re.findall(r"\]\(([^)#\s]+\.md)\)", line):
+                full = os.path.normpath(os.path.join(d, target))
+                linked.add(full)
+                if not os.path.isfile(full):
+                    issues.append(dict(type="memory-pointer-broken", path=index, line=n, detail=f"points at missing {target}"))
+                elif full in seen_rows:
+                    issues.append(dict(type="memory-index-duplicate-row", path=index, line=n,
+                                       detail=f"{target} is already indexed on line {seen_rows[full]}"))
+                else:
+                    seen_rows[full] = n
+    for p in topics:
+        if os.path.isfile(index) and p not in linked:
+            issues.append(dict(type="memory-orphan", path=p, detail="topic file not linked from MEMORY.md, so nothing points the agent at it"))
+        name = fm_value(frontmatter(read(p)), "name")
+        if name:
+            names.setdefault(name, []).append(p)
+    for name, ps in sorted(names.items()):
+        if len(ps) > 1:
+            issues.append(dict(type="memory-name-duplicate", path=ps[0],
+                               detail=f'name "{name}" is shared by {", ".join(os.path.basename(p) for p in ps)}'))
+
 repo_root = git_root()
 slug = re.sub(r"[^A-Za-z0-9]", "-", repo_root)
-mem_setting = merged("autoMemoryDirectory")
+# Never from project settings: a repo must not be able to point this audit at another directory.
+mem_setting = merged("autoMemoryDirectory", order=("user", "local", "managed"))
 mem_dir = os.path.expanduser(mem_setting) if mem_setting else os.path.join(config, "projects", slug, "memory")
 mem_off = merged("autoMemoryEnabled") is False or str(env.get("CLAUDE_CODE_DISABLE_AUTO_MEMORY", os.environ.get("CLAUDE_CODE_DISABLE_AUTO_MEMORY", ""))) == "1"
 if os.path.isdir(mem_dir):
     index = os.path.join(mem_dir, "MEMORY.md")
     topics = sorted(p for p in glob.glob(os.path.join(mem_dir, "**", "*.md"), recursive=True) if p != index)
-    linked = set()
     if os.path.isfile(index):
         text = read(index) or ""
         lines = text.splitlines(keepends=True)
@@ -321,16 +357,23 @@ if os.path.isdir(mem_dir):
         if len(window) < s["bytes"]:
             issues.append(dict(type="memory-index-truncated", path=index,
                                detail=f"MEMORY.md is {s['lines']} lines / {s['bytes']} bytes; only the first 200 lines or 25KB load"))
-        for n, line in enumerate(text.splitlines(), 1):
-            for target in re.findall(r"\]\(([^)#\s]+\.md)\)", line):
-                full = os.path.normpath(os.path.join(mem_dir, target))
-                linked.add(full)
-                if not os.path.isfile(full):
-                    issues.append(dict(type="memory-pointer-broken", path=index, line=n, detail=f"points at missing {target}"))
     for p in topics:
         add(p, "memory", "project-memory", "never" if mem_off else "on-demand", "memory topic file: read only when the agent opens it")
-        if p not in linked:
-            issues.append(dict(type="memory-orphan", path=p, detail="topic file not linked from MEMORY.md, so nothing points the agent at it"))
+    memory_checks(mem_dir, index, topics)
+
+# Roots whose files this audit may read as text. A file inside the repo is the repo's to
+# control, so its import or symlink resolving elsewhere (@~/.ssh/id_ed25519) is reported by
+# path, never read into units. User-level files point wherever the user put them.
+TRUSTED = sorted({os.path.realpath(x) for x in (project, repo_root, config, os.path.join(home, ".claude"), mem_dir, managed)})
+def trusted(path):
+    r = os.path.realpath(path)
+    return any(r == t or r.startswith(t.rstrip("/") + "/") for t in TRUSTED)
+REPO = sorted({os.path.realpath(project), os.path.realpath(repo_root)})
+def repo_controlled(path):
+    a = os.path.abspath(path)
+    return any(a == t or a.startswith(t.rstrip("/") + "/") for t in REPO)
+def blocked(source_path, target):
+    return repo_controlled(source_path) and not trusted(target)
 
 # ---- agents, skills, commands, plugins -------------------------------------------------------------
 known_agents = set()
@@ -427,6 +470,40 @@ for key, val in sorted(skill_overrides.items()):
         issues.append(dict(type="skill-override-dead", path=next((p for sc, p in settings_files if "skillOverrides" in settings.get(sc, {})), ""),
                            detail=f'skillOverrides "{key}": "{val}" {why}'))
 
+# Skill directories: a symlink to nothing, and a skill under .agents/skills (read by Codex and
+# other harnesses) with no entry in .claude/skills, which Claude Code cannot load.
+claude_skills = os.path.join(project, ".claude", "skills")
+for base in (os.path.join(config, "skills"), claude_skills):
+    for e in sorted(os.listdir(base)) if os.path.isdir(base) else []:
+        p = os.path.join(base, e)
+        if os.path.islink(p) and not os.path.exists(p):
+            issues.append(dict(type="skill-link-broken", path=p, detail=f"symlink to missing {os.readlink(p)}"))
+agents_skills = os.path.join(project, ".agents", "skills")
+if os.path.isdir(agents_skills):
+    linked_here = {os.path.realpath(os.path.join(claude_skills, e)) for e in os.listdir(claude_skills)} if os.path.isdir(claude_skills) else set()
+    for e in sorted(os.listdir(agents_skills)):
+        p = os.path.join(agents_skills, e)
+        if os.path.isfile(os.path.join(p, "SKILL.md")) and os.path.realpath(p) not in linked_here \
+                and not os.path.exists(os.path.join(claude_skills, e)):
+            issues.append(dict(type="skill-unlinked", path=os.path.join(p, "SKILL.md"),
+                               detail=f"{e} is in .agents/skills but not .claude/skills: other harnesses load it, Claude Code cannot"))
+
+# Settings that name things that do not exist: .mcp.json servers, and permission rules for an
+# MCP server a plugin would register when no plugin of that name is installed.
+mcp_json_names = set(((load_json(os.path.join(project, ".mcp.json")) or {}).get("mcpServers") or {}).keys())
+plugin_names = {k.split("@")[0] for k in (installed.get("plugins") or {})}
+for sc, p in settings_files:
+    data = settings.get(sc) or {}
+    for key in ("enabledMcpjsonServers", "disabledMcpjsonServers"):
+        for name in data.get(key) or []:
+            if name not in mcp_json_names:
+                issues.append(dict(type="mcp-setting-dead", path=p, detail=f'{key} names "{name}", which is not in .mcp.json'))
+    for kind_, rules in (data.get("permissions") or {}).items():
+        for rule in rules if isinstance(rules, list) else []:
+            m = re.match(r"mcp__plugin_(.+?)__", str(rule))
+            if m and not any(m.group(1) == n or m.group(1).startswith(n + "_") for n in plugin_names):
+                issues.append(dict(type="permission-dead", path=p, detail=f'{kind_} rule "{rule}" names a plugin MCP server, and no matching plugin is installed'))
+
 style = merged("outputStyle")
 if style and style.lower() not in ("default",):
     for base in (os.path.join(project, ".claude"), config):
@@ -444,16 +521,19 @@ for base, scope in ((os.path.join(config, "agent-memory"), "agent-memory:user"),
             continue
         name = os.path.basename(d)
         has_agent = any(name == a or name.endswith(a) or a.endswith(name) for a in known_agents)
-        for p in sorted(glob.glob(os.path.join(d, "**", "*.md"), recursive=True)):
+        files = sorted(glob.glob(os.path.join(d, "**", "*.md"), recursive=True))
+        for p in files:
             act = "agent" if os.path.basename(p) == "MEMORY.md" else "on-demand"
             s = add(p, "agent-memory", scope, act, f"memory of subagent {name}" + ("" if has_agent else " (no agent of that name found)"))
             if not has_agent:
                 issues.append(dict(type="agent-memory-orphan", path=p, detail=f"no installed agent named {name}"))
+        index = os.path.join(d, "MEMORY.md")
+        memory_checks(d, index, [p for p in files if p != index])
 
 # ---- imports (after every source is known, so a lazy file's imports are lazy) ------------------------
 CODE = re.compile(r"(^|\n)(```|~~~).*?(\n\2[^\n]*|$)", re.S)
 SPAN = re.compile(r"`[^`\n]*`")
-IMPORT = re.compile(r"(?:^|(?<=\s))@((?:~/|\.{1,2}/|/)?[A-Za-z0-9_][A-Za-z0-9_./-]*)")
+IMPORT = re.compile(r"(?:^|(?<=\s))@((?:~/|/|(?:\.{1,2}/)+)?[A-Za-z0-9_][A-Za-z0-9_./-]*)")
 LINK = re.compile(r"\]\(([^)#\s]+)\)")
 md_kinds = {"claude-md", "claude-local", "rule", "agents-md", "import", "memory-index", "output-style"}
 frontier = [p for p, s in sources.items() if s["kind"] in md_kinds and s["activation"] in ("always", "lazy", "uncertain")]
@@ -468,6 +548,10 @@ while frontier:
         if "/" not in target and "." not in target:
             continue  # a mention (@leek), not a path
         full = os.path.normpath(os.path.join(os.path.dirname(p), os.path.expanduser(target)))
+        if blocked(s["path"], full):
+            issues.append(dict(type="import-outside-roots", path=s["path"],
+                               detail=f"@{target} resolves outside the project and config dirs; not read. Claude Code asks before loading it"))
+            continue
         s["imports"].append(full)
         if not os.path.isfile(full):
             issues.append(dict(type="import-unresolved", path=s["path"], detail=f"@{target} resolves to nothing"))
@@ -487,6 +571,144 @@ while frontier:
             if t and t["kind"] == "agents-md" and t["activation"] == "never":
                 issues.append(dict(type="link-not-import", path=s["path"],
                                    detail=f"links to {target} ({t['approx_tokens']} tokens) without importing it; that file never loads at startup. Use @{target} to load it"))
+
+# ---- generated instruction files: edits go to the source, then the generator runs ---------------------
+GEN = re.compile(r"(?i)\bdo not edit\b|\bauto-?generated\b|\bthis file (?:is|was) generated\b|\bgenerated by\b")
+boost_src = os.path.join(project, ".ai", "guidelines")
+for p, s in list(sources.items()):
+    if s["kind"] not in ("claude-md", "claude-local", "agents-md", "rule", "other-tool") or s.get("plugin"):
+        continue
+    text = read(p) or ""
+    boost_made = "<laravel-boost-guidelines>" in text
+    if not (boost_made or GEN.search("\n".join(text.splitlines()[:15]))):
+        continue
+    s["generated"] = True
+    if boost_made and os.path.isdir(boost_src):
+        s["generated_from"] = boost_src
+        issues.append(dict(type="generated-file", path=s["path"],
+                           detail="built by Laravel Boost: edit .ai/guidelines/, then run php artisan boost:update; never edit this file"))
+        for g in sorted(glob.glob(os.path.join(boost_src, "**", "*"), recursive=True)):
+            if os.path.isfile(g) and g.endswith((".md", ".blade.php")) and not known(g):
+                add(g, "generator-source", "project", "never", f"source of the generated {os.path.relpath(s['path'], project)}")
+    else:
+        issues.append(dict(type="generated-file", path=s["path"],
+                           detail="its header marks it generated: find the source and generator, edit the source, regenerate"))
+
+# ---- upstream-synced copies: fixed in the upstream checkout, never here ------------------------------
+for p, s in list(sources.items()):
+    if not upstreams or s.get("plugin") or not s["path"].startswith(project + os.sep) \
+            or s["kind"] in ("settings", "memory", "memory-index", "agent-memory"):
+        continue
+    rel = os.path.relpath(s["path"], project)
+    for u in upstreams:
+        up = os.path.join(u, rel)
+        if os.path.isfile(up):
+            s["upstream"] = u
+            if (read(up) or "") != (read(p) or ""):
+                s["upstream_drift"] = True
+                issues.append(dict(type="upstream-drift", path=s["path"],
+                                   detail=f"differs from {up}: settle which side is right and fix it upstream, or the next sync undoes it"))
+            break
+
+# ---- pointer docs: .md files an instruction file names, read when the agent follows the pointer ----------
+PATH_TOKEN = re.compile(r"(?<![\w@/.-])((?:\.{1,2}/)?[\w.-]+(?:/[\w.-]+)+\.md)(?![\w/-])")
+LINK_MD = re.compile(r"\]\(([^)#\s:]+\.md)(?:#[^)]*)?\)")
+
+def resolve_from(src, target):
+    for base in (os.path.dirname(src), project):
+        full = os.path.normpath(os.path.join(base, target))
+        if os.path.isfile(full):
+            return full
+    return None
+
+def in_project(p):
+    rp = os.path.realpath(p)
+    return rp.startswith(project + os.sep) and not set(os.path.relpath(rp, project).split(os.sep)) & SKIP_DIRS
+
+pointer_from = md_kinds - {"memory-index"}
+frontier = [(p, 0) for p, s in sources.items()
+            if s["kind"] in pointer_from and s["activation"] in ("always", "lazy") and not s.get("plugin")]
+while frontier:
+    p, hop = frontier.pop(0)
+    s = sources[p]
+    for n, line in enumerate((read(p) or "").splitlines(), 1):
+        for target in LINK_MD.findall(line):
+            if not resolve_from(p, target):
+                issues.append(dict(type="pointer-unresolved", path=s["path"], line=n, detail=f"links to {target}, which does not exist"))
+        if hop >= 2:
+            continue
+        for target in set(PATH_TOKEN.findall(line)) | set(LINK_MD.findall(line)):
+            full = resolve_from(p, target)
+            if full and in_project(full) and not known(full):
+                add(full, "pointer-doc", "project", "on-demand",
+                    f"named by {os.path.relpath(s['path'], project)}: loads when the agent opens it")
+                frontier.append((os.path.realpath(full), hop + 1))
+
+# ---- globs that match no file: a rule's paths:, and a rules-index table (globs | rule file) -------------
+_repo_files = None
+def repo_files():
+    global _repo_files
+    if _repo_files is None:
+        _repo_files = [os.path.relpath(f, project) for f in project_files(["*"])]
+    return _repo_files
+
+def glob_matches(g):
+    g = g[2:] if g.startswith("./") else g
+    rx, i = "", 0
+    while i < len(g):
+        if g.startswith("**/", i):
+            rx, i = rx + "(?:.*/)?", i + 3
+        elif g.startswith("**", i):
+            rx, i = rx + ".*", i + 2
+        else:
+            rx, i = rx + {"*": "[^/]*", "?": "[^/]"}.get(g[i], re.escape(g[i])), i + 1
+    r = re.compile(rx + "$")
+    return any(r.match(f) for f in repo_files())
+
+def fm_paths(fm):
+    m = re.search(r"^paths:[ \t]*(.*)$", fm, re.M)
+    if not m:
+        return []
+    if m.group(1).strip():
+        return [x.strip().strip("'\"") for x in m.group(1).strip().strip("[]").split(",") if x.strip()]
+    vals = []
+    for line in fm[m.end():].split("\n")[1:]:
+        item = re.match(r"^\s*-\s*(.+)$", line)
+        if not item:
+            break
+        vals.append(item.group(1).strip().strip("'\""))
+    return vals
+
+for p, s in list(sources.items()):
+    if s.get("plugin") or not s["path"].startswith(project + os.sep):
+        continue
+    lines = (read(p) or "").splitlines()
+    def line_of(token):
+        return next((n for n, l in enumerate(lines, 1) if token in l), None)
+    if s["kind"] == "rule":
+        for g in fm_paths(frontmatter(read(p))):
+            if not glob_matches(g):
+                issues.append(dict(type="glob-unmatched", path=s["path"], line=line_of(g), detail=f"paths: glob {g} matches no file, so the rule never loads"))
+    if s["kind"] in pointer_from | {"pointer-doc"}:
+        for n, line in enumerate(lines, 1):
+            cells = [c.strip().strip("`") for c in line.strip().strip("|").split("|")] if line.lstrip().startswith("|") else []
+            if len(cells) < 2 or not cells[-1].endswith(".md") or not resolve_from(p, cells[-1]):
+                continue
+            for g in (x.strip().strip("`") for x in cells[0].split(",")):
+                if g and " " not in g and ("/" in g or "*" in g) and not glob_matches(g):
+                    issues.append(dict(type="glob-unmatched", path=s["path"], line=n, detail=f"index glob {g} matches no file"))
+
+# ---- identical copies: the same bytes at two paths (a symlink is one source, so these are real copies) ----
+by_hash = {}
+for p, s in sources.items():
+    if s["kind"] in ("claude-md", "claude-local", "rule", "agents-md", "import", "pointer-doc", "skill", "agent") \
+            and not s.get("plugin") and s["activation"] != "never" and s["bytes"]:
+        by_hash.setdefault(hashlib.sha1((read(p) or "").encode()).hexdigest(), []).append(s)
+for group in by_hash.values():
+    if len(group) > 1:
+        issues.append(dict(type="identical-files", path=group[0]["path"],
+                           detail="same bytes as " + ", ".join(g["path"] for g in group[1:])
+                                  + ": paid twice when both load, and the copies drift; keep one, or symlink the other"))
 
 # ---- MCP and hooks (config.json: names and structure only) ------------------------------------------
 def mcp_entry(name, cfg, scope):
@@ -530,6 +752,34 @@ for info in plugins:
         entry = ((installed.get("plugins") or {}).get(info["key"]) or [{}])[0]
         collect_hooks(load_json(os.path.join(entry.get("installPath", ""), "hooks", "hooks.json")), "plugin:" + info["key"])
 
+# Hook scripts a settings hook runs: a missing one is an issue; an existing one (and a script it
+# runs, one hop) is a source, since its deny and notice messages reach the agent when it fires.
+SCRIPT = re.compile(r"[\w.${}~/-]*[\w-]\.(?:sh|py|js|mjs|ts|rb|php)\b")
+def script_paths(text, base):
+    found = []
+    for t in SCRIPT.findall(text or ""):
+        t2 = os.path.expanduser(re.sub(r"\$\{?CLAUDE_PROJECT_DIR\}?", project, t))
+        if "$" in t2 or "{" in t2 or t2.startswith("//"):
+            continue  # another variable or a URL: not resolvable here
+        found.append((t, os.path.normpath(t2 if os.path.isabs(t2) else os.path.join(base, t2))))
+    return found
+
+def ours(p):
+    return p.startswith((project + os.sep, config + os.sep))
+
+for sc, p in settings_files:
+    for event, groups in ((settings.get(sc) or {}).get("hooks") or {}).items():
+        for g in groups or []:
+            for h in (g or {}).get("hooks") or []:
+                for t, full in script_paths(h.get("command"), project):
+                    if not os.path.isfile(full):
+                        issues.append(dict(type="hook-script-missing", path=p, detail=f"{event} hook runs {t}, which does not exist"))
+                    elif ours(full) and not known(full):
+                        add(full, "hook-script", sc, "on-demand", f"{event} hook script: its messages reach the agent when the hook fires")
+                        for _, sub in script_paths(read(full), os.path.dirname(full)):
+                            if os.path.isfile(sub) and ours(sub) and not known(sub):
+                                add(sub, "hook-script", sc, "on-demand", f"run by {os.path.basename(full)} ({event} hook)")
+
 perms = {}
 for sc, data in settings.items():
     p = data.get("permissions") or {}
@@ -542,7 +792,8 @@ config_out = dict(
 json.dump(config_out, open(os.path.join(out, "config.json"), "w"), indent=1)
 
 # ---- audit units ---------------------------------------------------------------------------------------
-editable = {"claude-md", "claude-local", "rule", "agents-md", "import", "memory-index", "memory", "agent-memory", "output-style"}
+editable = {"claude-md", "claude-local", "rule", "agents-md", "import", "memory-index", "memory", "agent-memory", "output-style",
+            "pointer-doc", "generator-source", "hook-script"}
 declined = set()
 if declined_path and os.path.isfile(declined_path):
     for line in open(declined_path, encoding="utf-8"):
@@ -567,6 +818,9 @@ def emit(s, start, end, heading, kind, text):
 
 for p, s in sources.items():
     if s["kind"] not in in_scope:
+        continue
+    if blocked(s["path"], p):
+        issues.append(dict(type="source-outside-roots", path=s["path"], detail=f"resolves to {p}, outside the project and config dirs; not read"))
         continue
     if s["kind"] in ("skill", "agent", "command") and not s.get("plugin"):
         fm = frontmatter(read(p))
