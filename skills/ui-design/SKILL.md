@@ -184,3 +184,22 @@ Show the pointer cursor on everything that responds to a click: buttons, links, 
 - **Why:** the cursor change is how a user finds out, before clicking, that something will respond. A clickable label with the arrow cursor reads as plain text, so the user aims at the small box instead.
 - **Check:** hover each clickable element, including labels of checkboxes and radios, and see the pointer. Disabled controls and plain text keep the default cursor.
 - **Example:** a filter panel's checkbox labels toggle their box but show the arrow cursor. Better: the label and the box both show the pointer, so the whole label reads as the target.
+
+### Marketing pages
+
+#### Every element earns its place
+
+Cut each hero element that exists because landing pages usually have one rather than because this product needs it, and say what the product does in concrete words.
+
+- **Why:** generated and template pages share the same filler: a numbered mono eyebrow, one italic serif accent word in the headline, a "the all-in-one workspace … seamlessly … one beautiful place" subline, round-number stats, an "As seen in" row, a secondary "See how it works", and "No credit card required". Visitors have learned to read these as low effort and skip past them. Each one also dilutes the one thing the page needs them to read and do.
+- **Check:** for each element, name what a visitor learns or can do from it that nothing else on the page gives them; remove it when you cannot. The headline names the user's problem or outcome in their own words, not the category. The subline lists what the product handles, with no adjectives. Stats and press logos appear only when they are real and someone would check them. The nav lists only places a first-time visitor would go. The hero has one primary action.
+- **Example:** a group-travel page opened with "[01] — GROUP TRAVEL, REIMAGINED", "Plan trips *together*, without the chaos.", a feature-list subline full of adjectives, two buttons, a free-forever note, three stats, and four press logos, under a four-item nav. Better: "Get the trip out of the group chat.", "Flights, stays and who owes what, in one plan the whole group can edit.", one action, and a two-item nav (Example trips, Pricing).
+
+#### Show the real product
+
+Lead with the actual product in use, set in a real scene, and let the primary action start the task in the hero itself, instead of an abstract illustration and a generic button.
+
+- **Why:** an orbit of floating status cards around a glowing icon could sell any product, so it tells the visitor nothing. A real screen with believable data shows what they will get, and a real photo sets the mood without decoration. An input that begins the task ("Where are you going?") turns the click into a first step of the job, not a jump to a sign-up form.
+- **Check:** the hero visual is a real screen of the product, or a faithful mock with plausible data (names, times, amounts), not icons, gradients and orbits. Photography is real and specific to the product's use. The primary action is the first step of the core task when that step is one field. Colour comes from the content (the photo, the product), so the chrome can stay neutral: a white or near-white page and a black or neutral primary button, not a brand colour on every control.
+- **Example:** a travel planner's hero showed a glowing globe icon with "Flight booked", "6 friends joined" and "€1,240 split" cards orbiting it on a cream background, with an orange "Start planning" button. Better: a full-width coastal photo with the real itinerary card on top (Lisbon, Fri 12 – Mon 15 June, six avatars, flights, stay, train, "You owe Marta €84 · Settle up"), above a "Where are you going?" field with a black "Start a plan" button, on white.
+- **Except:** a product with no screen to show (an API, a service). Show its output or a real customer instead, not an abstract illustration.
