@@ -110,7 +110,7 @@ Align icons, glyphs, and short text by where their visual mass sits, not by thei
 
 - **Why:** a bounding box includes empty corners and thin protrusions (a plane's wings and tail, a triangle's point, a numeral's descender-free baseline), so box-centred content looks shifted. Blurring hides the detail and leaves only the mass, which is what the eye actually centres.
 - **Check:** blur the element in your head or the design tool (a strong Gaussian blur) and look at the blob. Centred content has its blob centred in its frame. Content in the rounded end of a pill or a circular badge sits concentric with that curve: the blob's centre is the corner radius's centre, and the gap to the curve is even all round. Compare the blob, not the box, against neighbours that should line up.
-- **Example:** a status pill showed a plane icon at its left end and "47m" at its right end, both box-aligned to the inner padding. Blurred, the plane's blob sat too far right and too high within the left end cap, and the text sat off the right curve. Better: each nudged until its blob is concentric with its end cap.
+- **Example:** a status pill showed a plane icon at its left end and "47m" at its right end, both box-aligned to the inner padding. Blurred, the plane's blob sat off-centre within the left end cap, and the text sat off the right curve. Better: each nudged until its blob is concentric with its end cap.
 
 #### Button placement follows the container
 
