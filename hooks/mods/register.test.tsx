@@ -275,6 +275,12 @@ test('ticket_board counts not-built tickets as open and lists the work open afte
     tool_use_id: 's2',
   } as never)
   expect(String((listed as { result: unknown }).result)).toContain('2 open after this run (1 untracked)')
+  // The reply hands back each unfinished entry's id, which the pane never draws.
+  expect(String((listed as { result: unknown }).result)).toContain(
+    'Still open, by id (send done: true once one is resolved): a: Fix for the audit list is not pushed; b: Second sign-in method',
+  )
+  const asked = await $.tool.call({ ...board, tool_use_id: 's2b' } as never)
+  expect(String((asked as { result: unknown }).result)).toContain('a: Fix for the audit list is not pushed; b: Second sign-in method')
   expect(await pane.find({ type: 'Text', text: /1 of 2 done · 1 not built · 2 open after this run \(1 untracked\)/ })).toBeDefined()
   expect(await pane.find({ type: 'Text', text: /^Open after this run$/ })).toBeDefined()
   expect(await pane.find({ type: 'Text', text: /○ Fix for the audit list is not pushed {2}not shipped · #101/ })).toBeDefined()

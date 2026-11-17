@@ -100,7 +100,7 @@ export const SCHEMA = {
     open: {
       type: 'array',
       description:
-        'Work still open after this run, drawn as "Open after this run"; send the entries that changed, each with its title and where on its first call.',
+        'Work still open after this run, drawn as "Open after this run"; send the entries that changed, each with its title and where on its first call. Send done: true the moment one is resolved. The reply lists every unfinished entry with its id; a call with only board and kind changes nothing and returns that list.',
       items: {
         type: 'object',
         properties: {
@@ -498,6 +498,24 @@ export const summary = (board: TicketBoard) =>
   ]
     .filter(part => part !== '')
     .join(' · ')
+
+const UNSETTLED = new Set<FindingStatus>(['open', 'fixing', 'asking'])
+
+/**
+ * What the board still shows as unfinished, each with the id a later call needs: open entries
+ * not yet done, then findings not yet fixed or deferred. The ids are never drawn, so a run
+ * that lost its own notes (a compacted conversation, a resumed session) reads them back here.
+ */
+export function pending(board: TicketBoard): string[] {
+  const one = (id: string, title: string) => `${id}: ${title === '' ? '(no title)' : title}`
+  const open = board.open.filter(o => !o.done).map(o => one(o.id, o.title))
+  const findings = board.findings.filter(f => UNSETTLED.has(f.status)).map(f => one(f.id, f.title))
+  const lines: string[] = []
+  if (open.length > 0) lines.push(`Still open, by id (send done: true once one is resolved): ${open.join('; ')}`)
+  if (findings.length > 0) lines.push(`Findings not settled, by id: ${findings.join('; ')}`)
+
+  return lines
+}
 
 export const ticketMark = (s: TicketStatus) =>
   ({

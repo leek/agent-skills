@@ -113,7 +113,7 @@ For each verified ticket: write its Resolution (what was built, deviations, veri
 
 **Screenshots reach the pull requests.** Upload the images in `$notes/screenshots` per the `pr` skill's [Screenshots](../pr/SKILL.md#screenshots) section, which inspects each one first, and put them in the pull request's Evidence: in a stack, on each ticket's pull request (its `<NN>-` images) and on the closing one, per [Stacked PRs](../implement/references/spec-run.md#stacked-prs) step 4. After each successful upload, run `bash <this-skill-dir>/scripts/screenshots-report.sh $notes --uploaded <image>...`; an image that section leaves out goes to `--left-out` instead. Then run it with no flag. While its `counts.not_uploaded` is above 0 the delivery is not complete: each such image goes on the board's `open` list as `not-shipped`, with the folder's path as its `where`.
 
-Last, send the board's full `open` list per [`ticket-board.md`](../wayfinder/references/ticket-board.md)'s **Open after this run**.
+Last, send the board's full `open` list per [`ticket-board.md`](../wayfinder/references/ticket-board.md)'s **Open after this run**, and settle every entry and finding the pane still shows as unfinished per its **Keep the open list true**: entries sent earlier in the run stay on the pane until a call marks them. Work done later in this session (a follow-up fix, after-deploy checks, a triage) updates the board the same way.
 
 ### 8. Clean up
 

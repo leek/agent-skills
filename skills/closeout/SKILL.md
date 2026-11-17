@@ -42,6 +42,7 @@ A **follow-up** is an item that waits, but closing loses nothing.
 - **Untested edits**: code edited after the last passing test run → run the tests. A behavior change never seen in the running app → `/verify`.
 - **Post-merge and post-deploy steps**: each deploy fact from step 1, plus each PR's `merge_danger`, written as the step to run and when (for example "after deploy: `php artisan migrate`") → start the deploy or merge, then `/run-after`. A delivery ticket this session left at `ready-for-human` → after deploy, `/implement <delivery ticket>`.
 - **Open `.scratch/` work** this session touched → `/scratch-status`.
+- **A ticket board this session reported to** (`mcp__leek-skills__ticket_board`): before the report, make the empty call and settle every entry that is no longer true, per [`ticket-board.md`](../wayfinder/references/ticket-board.md)'s **Keep the open list true**. This is the one write steps 1–4 make, and it changes only the pane. What the reply still lists as open after that goes in the report as follow-ups, in its words.
 
 When follow-ups exist and the next session needs this one's context, also name `/handoff`.
 

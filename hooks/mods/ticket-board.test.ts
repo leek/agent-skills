@@ -8,6 +8,7 @@ import {
   isUntracked,
   openMark,
   parseUpdate,
+  pending,
   stackTally,
   stackWarnings,
   summary,
@@ -141,6 +142,43 @@ describe('apply', () => {
     expect(openMark(later.open[0]!)).toBe('✓')
     expect(isUntracked(later.open[1]!)).toBe(false)
     expect(summary(later)).toBe('1 of 1 done · 2 open after this run (1 untracked)')
+  })
+
+  test('pending names every unfinished open entry and unsettled finding with its id, and drops them once settled', async () => {
+    const built = apply(null, {
+      board: 'auth',
+      kind: 'spec',
+      tickets: [{ number: '01', title: 'Login', status: 'closed' }],
+      findings: [
+        { id: 'f1', title: 'Old runs vanish from the audit list', status: 'fixing' },
+        { id: 'f2', title: 'Two workers can claim one job', status: 'deferred' },
+        { id: 'f3', title: 'Retry loses the payload', status: 'fixed' },
+      ],
+      open: [
+        { id: 'a', title: 'Fix for the audit list is not pushed', kind: 'not-shipped', where: '#101' },
+        { id: 'b', title: 'Second sign-in method', kind: 'your-decision' },
+      ],
+    }, 1)
+    expect(pending(built)).toEqual([
+      'Still open, by id (send done: true once one is resolved): a: Fix for the audit list is not pushed; b: Second sign-in method',
+      'Findings not settled, by id: f1: Old runs vanish from the audit list',
+    ])
+
+    // A call that changes nothing still reads the list back.
+    const same = apply(built, { board: 'auth', kind: 'spec', tickets: [] }, 2)
+    expect(pending(same)).toEqual(pending(built))
+
+    const settled = apply(same, {
+      board: 'auth',
+      kind: 'spec',
+      tickets: [],
+      findings: [{ id: 'f1', status: 'fixed' }],
+      open: [
+        { id: 'a', kind: 'not-shipped', done: true },
+        { id: 'b', kind: 'your-decision', done: true },
+      ],
+    }, 3)
+    expect(pending(settled)).toEqual([])
   })
 
   test('a call with only the old fields reads as before: no open list, no open count', async () => {

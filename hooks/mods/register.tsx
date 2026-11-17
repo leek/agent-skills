@@ -38,6 +38,7 @@ import {
   openLabel,
   openMark,
   parseUpdate,
+  pending,
   safeStack,
   stackTally,
   stackWarnings,
@@ -213,11 +214,12 @@ export const register: Register = on => {
       }
       const isPlaced = !isTicketsDismissed && (await $.ui.open({ id: TICKETS_PANE, title: title(run) })).isPlaced
 
-      return {
-        result: isPlaced
-          ? `Shown in the ticket pane (${boardSummary(run)}). Skip the chat progress line.`
-          : `Recorded (${boardSummary(run)}), but no pane shows it: post the progress line in chat.`,
-      }
+      const said = isPlaced
+        ? `Shown in the ticket pane (${boardSummary(run)}). Skip the chat progress line.`
+        : `Recorded (${boardSummary(run)}), but no pane shows it: post the progress line in chat.`
+
+      // Every reply names what is still unfinished with its id, so a later call can settle it.
+      return { result: [said, ...pending(run)].join('\n') }
     }
     const id = e.agentId
     if (id !== undefined) {
