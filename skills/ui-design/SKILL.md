@@ -101,8 +101,16 @@ When a block is a short title plus one or two sentences (feature grids, benefit 
 In a button with an icon and a label, size the icon to the label's text, keep it close to the label, pad the icon side less than the text side, and nudge lopsided glyphs until they look centred.
 
 - **Why:** an icon carries more visual weight than the same width of text, and its bounding box holds empty space. Equal padding and a full-size icon make the content look shifted toward the icon and loosely joined. Geometric centring of a lopsided shape (a play triangle, a chevron) looks off-centre.
-- **Check:** the icon is about the label's cap height, not the line height. The icon-to-label gap is smaller than the padding at either end. Padding on the icon end is visibly smaller than on the text end (roughly 3/4 of it). Squint: the icon + label group looks centred in the button, and asymmetric glyphs (▶, →, ⌄) look centred on their own axis.
+- **Check:** the icon is about the label's cap height, not the line height. The icon-to-label gap is smaller than the padding at either end. Padding on the icon end is visibly smaller than on the text end (roughly 3/4 of it). Squint: the icon + label group looks centred in the button, and asymmetric glyphs (▶, →, ⌄) look centred on their own axis ([Align by visual mass](#align-by-visual-mass)).
 - **Example:** "+ New project", "Export", and "Watch demo" buttons had icons as tall as the text line, a wide gap, and equal padding, so each looked heavy on the icon end. Better: icons shrunk to cap height, the gap halved, the icon-end padding cut, and the play triangle moved a pixel or two toward its point so it reads as centred. Trailing icons ("Continue →", "Sort ⌄") get the same treatment, mirrored.
+
+#### Align by visual mass
+
+Align icons, glyphs, and short text by where their visual mass sits, not by their bounding box. When unsure, blur the element until it is a basic shape, and align that shape.
+
+- **Why:** a bounding box includes empty corners and thin protrusions (a plane's wings and tail, a triangle's point, a numeral's descender-free baseline), so box-centred content looks shifted. Blurring hides the detail and leaves only the mass, which is what the eye actually centres.
+- **Check:** blur the element in your head or the design tool (a strong Gaussian blur) and look at the blob. Centred content has its blob centred in its frame. Content in the rounded end of a pill or a circular badge sits concentric with that curve: the blob's centre is the corner radius's centre, and the gap to the curve is even all round. Compare the blob, not the box, against neighbours that should line up.
+- **Example:** a status pill showed a plane icon at its left end and "47m" at its right end, both box-aligned to the inner padding. Blurred, the plane's blob sat too far right and too high within the left end cap, and the text sat off the right curve. Better: each nudged until its blob is concentric with its end cap.
 
 #### Button placement follows the container
 
