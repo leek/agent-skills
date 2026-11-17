@@ -177,6 +177,14 @@ In a repeated list, show per-row actions (edit, delete, copy) when the user hove
 - **Except:** a row's primary action, or one used on most visits, stays visible.
 - **Example:** a notes list shows author, date, and text. "Edit" and a red "Delete" appear beside the date only while the row is hovered.
 
+#### Submenus forgive diagonal paths
+
+Give every hover-opened submenu a safe triangle: while the pointer moves from the parent item toward the open submenu, rows it crosses on the way do not take over, and only a pause (about 300ms) or leaving that path lets hover switch rows again.
+
+- **Why:** the shortest path from a menu item to its submenu is a diagonal that crosses the rows below or above it. With instant hover, crossing "Export" on the way to "Share"'s submenu closes Share and opens Export, so the user has to trace an L-shaped path or start over. It is one of the most common small frustrations in menus, and a safe zone removes it without making hover feel slow.
+- **Check:** open a submenu, then move the pointer diagonally to its far corner (the last item) across sibling rows: the submenu stays open and the crossed rows do not highlight. Stop on a sibling row for about 300ms: it takes over as normal. Moving straight down the parent menu still switches submenus immediately. Keyboard works without it: → opens the submenu, ← returns, ↑ and ↓ move between rows. Most menu libraries (Radix, Headless UI, Floating UI's `safePolygon`) provide this; check it is turned on, not reimplemented.
+- **Example:** a file menu (New file, Share ›, Export ›, Duplicate, Delete) has Share's submenu open. Aiming at "Invite people", the pointer cuts across Export and Duplicate. Instant hover swaps in the Export submenu. Better: the triangle from the pointer to the submenu's near edge keeps Share open; resting on Export for a moment then opens Export.
+
 #### Spectrum of explicitness
 
 Place each affordance on a spectrum, from labelled button to icon only, to shown on hover, to inside a menu, by how often it is used and how much it matters.
