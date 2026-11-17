@@ -16,7 +16,8 @@
 #   reviews_owed         [{reviewer, why}]        reviews still owed, from the issue timeline:
 #                        a request with no later review or removal (Copilot's pending request
 #                        was seen here but not in requested_reviewers, 2026-11-14); a Codex
-#                        review-state comment not finished, or unreadable; a bot that reviewed
+#                        review-state comment whose code review is not finished or unreadable,
+#                        or whose security review is started and not finished; a bot that reviewed
 #                        2+ commits of this PR but not the head
 #   head_pushed_at       when the push that made the head landed (activity feed), or null
 #   checks_failed        [{name, link}]           failed, errored, cancelled, timed out, or never started
@@ -191,12 +192,16 @@ query($owner: String!, $repo: String!, $pr: Int!, $head: String!, $endCursor: St
     def lines: split("\n") | map(select(. != ""));
     def t: .submitted_at // .updated_at // .created_at // "";
     # The review-state comment Codex posts as a bot; a state that does not parse reads "unreadable", never clear.
+    # It carries a code review and a security review; the security review is null until Codex starts one.
     def codex_state: [.[] | select(.event == "commented" and .user.type == "Bot"
                                     and (.body // "" | contains("<!-- codex-review-state:v1 ")))] | last
       | if . == null then null else
-          {user: .user,
-           state: ((.body | capture("<!-- codex-review-state:v1 (?<j>\\{.*?\\}) -->")? | .j | fromjson? | .code_review)
-                   // {status: "unreadable", commit_sha: null})} end;
+          ((.body | capture("<!-- codex-review-state:v1 (?<j>\\{.*?\\}) -->")? | .j | fromjson?) // null) as $j
+          | {user: .user,
+             state: ($j.code_review // {status: "unreadable", commit_sha: null}),
+             security: ($j.security_review // null)} end;
+    def unfinished: (. // "completed") | ascii_downcase
+      | IN("completed", "failed", "error", "cancelled", "canceled", "skipped") | not;
     # Reviews owed on this PR, from the timeline:
     #  requested: a review request with no later review by that reviewer (any human review for a
     #             team) and no later removal. Copilot shows here, not in reviewRequests.
@@ -214,9 +219,10 @@ query($owner: String!, $repo: String!, $pr: Int!, $head: String!, $endCursor: St
                               or (.event == "reviewed" and (if ($k | startswith("team:")) then .user.type != "Bot"
                                                             else (.user.id | tostring) == $k end)))] | length == 0)
            | {reviewer: ($r.requested_team.slug // $r.requested_reviewer.login), why: "requested \($at), not submitted"}))
-        + (if $cx.state and (($cx.state.status // "completed") | ascii_downcase
-                             | IN("completed", "failed", "error", "cancelled", "canceled", "skipped") | not)
+        + (if $cx.state and ($cx.state.status | unfinished)
            then [{reviewer: $cx.user.login, why: "\($cx.state.status) on \($cx.state.commit_sha // "?" | .[0:7])"}] else [] end)
+        + (if $cx.security.status and ($cx.security.status | unfinished)
+           then [{reviewer: "\($cx.user.login) security", why: "security review \($cx.security.status) on \($cx.security.commit_sha // "?" | .[0:7])"}] else [] end)
         + ([$tl[] | select(.event == "reviewed" and .user.type == "Bot") | {id: (.user.id | tostring), login: .user.login, c: .commit_id}]
            + (if $cx.state.commit_sha and $cx.state.status == "completed"
               then [{id: ($cx.user.id | tostring), login: $cx.user.login, c: $cx.state.commit_sha}] else [] end)

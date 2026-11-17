@@ -51,21 +51,28 @@ flight; ignore the rest for that purpose. Required human approvals are checked
 separately.
 
 **Taking the wait.** Each checkpoint watches the reviewers with this one background
-command (in Claude Code, Bash with `run_in_background`; the harness wakes you when it
-exits), capped at the checkpoint's 20 minutes. A harness with no background commands
-schedules one check every 5 minutes up to the cap (`ScheduleWakeup` in Claude Code); a
-harness with neither names the reviewers still running and treats it as the cap.
+command, capped at what is left of the PR's 20-minute review-wait budget. How to wait
+on it:
+
+- **Claude Code:** Bash with `run_in_background`; the harness wakes you when it exits.
+- **Codex:** start it with `exec_command`, then poll with an empty `write_stdin` at
+  `yield_time_ms: 300000`, the longest an empty poll takes (verified on Codex CLI
+  0.169). A 15- or 30-second yield re-reads the whole context every poll for no gain.
+- **A harness with no background commands:** schedule one check every 5 minutes up to
+  the cap (`ScheduleWakeup` in Claude Code).
+- **A harness with neither:** name the reviewers still running, and treat it as the cap.
 
 ```bash
-bash <this-skill-dir>/../run-after/scripts/wait-until.sh --interval 30 --timeout <seconds left of this checkpoint's 20 minutes> -- bash <this-skill-dir>/../closeout/scripts/pr-state.sh N --in-flight --no-required --check "<a review bot's own check>"
+bash <this-skill-dir>/../run-after/scripts/wait-until.sh --interval 30 --timeout <seconds left of the PR's 20-minute budget> -- bash <this-skill-dir>/../closeout/scripts/pr-state.sh N --in-flight --no-required --check "<a review bot's own check>"
 ```
 
 `--in-flight` counts every requested reviewer, every bot `eyes` reaction, every entry
 in `reviews_owed`, and a PR pushed, opened, or marked ready under two minutes ago (bots
 take up to a minute to register each, so a read right after one would look clear). `--no-required` keeps
 required CI out of the wait; pass one `--check` per pending check you judged a review
-bot's own, or none. Several PR numbers make one wait for the queue; use `--interval 60`
-for a queue, since each read costs five API calls per PR. The verdict is
+bot's own, or none. Several PR numbers make one wait for the queue, which spends that
+time from every listed PR's budget; use `--interval 60` for a queue, since each read
+costs five API calls per PR. The verdict is
 `passed` (nothing in flight: gather now), `timeout` (the cap: a merge question in step
 6), or `failed` (a read failed: run it once more in the foreground; failing again,
 the reviewers' state is unknown, which is the cap too). Its `detail` names what was
@@ -74,13 +81,16 @@ still running in `counted`.
 Verified bot behaviour (2026-10):
 
 - **Both bots review every push**, starting up to a minute after it. Resolve completed
-  fixes before pushing (step 5); after the final allowed batch, watch that run to the
-  end and carry its findings instead of buying another push.
+  fixes before pushing (step 5); after the final allowed batch, merge and let the
+  late-review sweep collect that run, carrying its findings instead of buying another push.
 - **Codex** (`chatgpt-codex-connector[bot]`) reacts with `eyes` while a review runs. It
   reacts `+1` when it finishes with no findings, and posts review comments when it has
   some. Its `<!-- codex-pull-request-review-summary -->` issue comment, edited in place,
   carries `<!-- codex-review-state:v1 {"code_review":{"commit_sha","status"}} -->`:
-  `running` while it reviews, `completed` with the commit when done. (2026-11)
+  `running` while it reviews, `completed` with the commit when done. A
+  `"security_review"` beside it has the same shape and stays null until Codex starts
+  one. `reviews_owed` counts a running security review too, so the one wait covers
+  both; never write a second wait for it. (2026-11)
 - **Copilot** (`copilot-pull-request-reviewer[bot]`, `Copilot` in the timeline) is
   re-requested on each push and submits a `COMMENTED` review, whose `commit_id` is the
   commit it reviewed. Its pending request was seen in the issue timeline but not in
@@ -127,9 +137,10 @@ use its one CI fix pass within its round budget.
   `REVIEW_REQUIRED` blocks when branch protection requires a review, and your own
   review does not satisfy it: GitHub never lets a PR's author approve it.
 - `draft`: run `gh pr ready N` only when the context implies the PR should ship.
-- in flight: `pr-state.sh N --in-flight --no-required` (with the review bots' own
-  `--check`s) must read clear after the last push. Watch it by
-  [Taking the wait](#in-flight-signals); at the cap it is a merge question.
+- in flight: before batch 2, `pr-state.sh N --in-flight --no-required` (with the review
+  bots' own `--check`s) must read clear after the last push. Watch it by
+  [Taking the wait](#in-flight-signals); a spent budget is a merge question. After
+  batch 2 it is not a gate: the late-review sweep collects what is still running.
 
 ## Stop cases
 
@@ -255,7 +266,7 @@ classification and every merge: anyone may have pushed since.
 One issue comment per PR, owned by you, edited in place as claims are verified and
 delivery states change. Publish it before coding and keep it current during each
 batch. It records the delivery mode, starting SHA, snapshot, batch checkpoint,
-optional wait used, verdicts and push count; GitHub activity owns that count:
+review-wait budget used, verdicts and push count; GitHub activity owns that count:
 
 ```markdown
 <!-- triage-disposition -->
@@ -263,7 +274,7 @@ optional wait used, verdicts and push count; GitHub activity owns that count:
 Mode: bounded | exhaustive
 Starting head: <sha>; snapshot: <ids and timestamps, or artifact link>
 Batch: <number>; not needed | fixing | validated at <sha>
-Checkpoint: <initial / after batch 1 / after batch 2 / exhaustive round N>; review wait: <minutes of 20>, <clear | capped: reviewers still running>
+Checkpoint: <initial / after batch 1 / after batch 2 / exhaustive round N>; review wait used: <minutes of the PR's 20>, <clear | capped: reviewers still running | not waited: after batch 2>
 Active wait started: <timestamp, or not waiting>
 Published head: <sha, or push pending>
 
@@ -352,9 +363,9 @@ it as queued: `autoMergeRequest` is set. Do not wait.
 ## Follow-up PR
 
 After the merge, gather the comment surfaces once more for findings that have arrived.
-The merge waited for every review in flight, so nothing should still be running; when
-`--in-flight` says otherwise (a "merge now", or a capped wait), the late-review sweep
-below waits for it. Classify new claims, then branch from the merged
+A merge after batch 2, on "merge now", or after a spent budget skips the review wait,
+so reviews may still be running; the late-review sweep below waits for them while this
+follow-up is built. Classify new claims, then branch from the merged
 base, fix all verified carried findings, and open a follow-up PR linking the merged PR
 and each finding. Review and validate its fixes before opening it. Report the link;
 leave it open and triage it only when the user names it. If the original is stopped or

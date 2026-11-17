@@ -176,6 +176,12 @@ fixtures; codex completed aaa111 | jq -c '[.body = "<!-- codex-pull-request-revi
 eq "codex unreadable" "$rc $(echo "$out" | jq -c '.[0].counted')" '1 ["owed chatgpt-codex-connector[bot]: unreadable on ?"]'
 fixtures; echo "[$(codex running aaa111 | jq -c '.user = {"id":1,"login":"leek","type":"User"}')]" > "$GH_FIX/timeline.json"; run 7 --in-flight --no-required
 eq "quoted marker from a person" "$rc" 0
+# The security review lives in the same comment: running owes it too, so one wait covers both.
+security() { codex completed aaa111 | jq -c --arg s "$1" '.body |= sub("\"security_review\":\\{[^}]*\\}"; "\"security_review\":{\"commit_sha\":\"aaa111\",\"status\":\"\($s)\"}")'; }
+fixtures; echo "[$(security running)]" > "$GH_FIX/timeline.json"; run 7 --in-flight --no-required
+eq "codex security running" "$rc $(echo "$out" | jq -c '.[0].counted')" '1 ["owed chatgpt-codex-connector[bot] security: security review running on aaa111"]'
+fixtures; echo "[$(security completed)]" > "$GH_FIX/timeline.json"; run 7 --in-flight --no-required
+eq "codex security completed" "$rc" 0
 # A bot that reviewed two earlier commits reviews pushes: it owes the head before it starts.
 fixtures; echo "[{\"event\":\"reviewed\",\"submitted_at\":\"2026-01-10T00:06:00Z\",\"commit_id\":\"old1\",\"user\":$cop},
   {\"event\":\"reviewed\",\"submitted_at\":\"2026-01-11T00:06:00Z\",\"commit_id\":\"old2\",\"user\":$cop},

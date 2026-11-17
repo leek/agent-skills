@@ -29,7 +29,8 @@ bash <this-skill-dir>/../run-after/scripts/wait-until.sh --interval 30 --timeout
 ```
 
 Run it in the background (in Claude Code, Bash with `run_in_background`; the harness
-wakes you when it exits). `passed` means nothing is in flight; `timeout` means the
+wakes you when it exits; Codex and other harnesses wait on it as `triage-github-pr`'s
+**Taking the wait** says). `passed` means nothing is in flight; `timeout` means the
 20-minute cap ran out, and `detail.counted` names who is still running; `failed` means
 a read failed, so run it once more. The signals and the bots' behaviour are in
 `triage-github-pr`'s

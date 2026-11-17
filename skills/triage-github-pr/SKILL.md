@@ -27,10 +27,11 @@ carry out a direction are in `resolve-review-comments`'
 3–5 follow. **No reviews is not an
 approval**: your own review must cover the exact head, including your fixes.
 **Never wait on CI**: read finished failures, use the one fix pass in step 4, and
-queue pending required checks with `--auto`. **Never merge past a running review**:
-a reviewer (bot or human) still in flight on the head is a gate, like required
-approvals, a standing human `CHANGES_REQUESTED`, unresolved owner decisions and merge
-conflicts.
+queue pending required checks with `--auto`. **Never merge past a running review
+you could still act on**: a reviewer (bot or human) in flight on the head is a gate,
+like required approvals, a standing human `CHANGES_REQUESTED`, unresolved owner
+decisions and merge conflicts, until the fix budget is spent. Reviews of the final
+push can only be carried, so they land in the late-review sweep after the merge.
 
 **Never reverse a decision without asking.** What the PR deliberately does (its title,
 body, commits, Merge Danger, or linked ticket) is the author's decision. A fix that
@@ -44,24 +45,29 @@ behaviour the PR adds. Ask first; never push it and explain afterwards.
 snapshot after steps 1–3. Fix every verified LEGIT finding in that snapshot in batch
 1. After its push, gather available new findings in step 6: fix new BLOCKING or MAJOR
 findings in batch 2, and carry MINOR findings. After batch 2, carry further findings
-of any severity and merge without another fix push. If there is nothing eligible to
-fix at a checkpoint, merge there rather than spending the unused budget.
+of any severity and merge without another fix push or review wait. If there is nothing
+eligible to fix at a checkpoint, merge there rather than spending the unused budget.
+**A carried finding never holds the merge**: whatever its grade, it goes to the
+follow-up PR and the PR merges.
 
 Test failures and defects found while independently reviewing unpushed fixes are
-corrected in the same batch before its push. **Watch the reviewers** at every
-checkpoint: before the initial snapshot, after batch 1, and after batch 2. Each push
-starts a fresh review from every bot, so the checkpoint waits until no review is in
-flight on the head, at most **20 minutes per checkpoint**, by **Taking the wait** in
-[In-flight signals](references/gh-mechanics.md#in-flight-signals). Never a foreground
-shell sleep, and never watch CI. Reviews of the final batch are gathered and their
-findings carried, never fixed by another push. A reviewer still in flight at the cap is
-a [merge question](#6-re-check-then-merge); never re-request a review or reset the timer
-on your own.
+corrected in the same batch before its push. **Watch the reviewers** at the two
+checkpoints whose findings can still be fixed: before the initial snapshot and after
+batch 1. Each push starts a fresh review from every bot, so the checkpoint waits until
+no review is in flight on the head, by **Taking the wait** in
+[In-flight signals](references/gh-mechanics.md#in-flight-signals), from one **review-wait
+budget of 20 minutes per PR** that both checkpoints share. Never a foreground shell
+sleep, and never watch CI. After batch 2, merge without waiting: the bots' reviews of
+that push are carried, never fixed, so the
+[late-review sweep](references/gh-mechanics.md#follow-up-pr) collects them after the
+merge. A reviewer still in flight when the budget is spent is a
+[merge question](#6-re-check-then-merge); never re-request a review or reset the
+budget on your own.
 
 Record the starting SHA, snapshot, batch number and state (`not needed`, `fixing`,
-or `validated at <sha>`), and each checkpoint's review wait in the disposition.
+or `validated at <sha>`), and the review-wait budget used in the disposition.
 Resume that checkpoint after an interruption; resuming resets neither the fix budget
-nor the checkpoint's wait.
+nor the review-wait budget.
 A pending push already belongs to its recorded batch; do not mistake its resume for a
 fresh batch.
 Each push you trigger, including a base-branch update, consumes a batch; combine
@@ -135,11 +141,11 @@ registered it. `pr-state.sh --in-flight` reads all of these; the fields are in
 [In-flight signals](references/gh-mechanics.md#in-flight-signals).
 
 When anything is in flight, watch it until it clears, by the
-[shipping budget](#shipping-budget)'s checkpoint wait (exhaustive mode per its
+[shipping budget](#shipping-budget)'s review wait (exhaustive mode per its
 reference); a later "merge now" ends the wait at once. Then gather the completed
 reviews. Check required human approvals separately.
 
-Completion criterion: `--in-flight` reads clear, or the checkpoint's cap is spent and
+Completion criterion: `--in-flight` reads clear, or the review-wait budget is spent and
 the reviewers still running are named; required approvals are identified.
 
 ## 3. Gather everything
@@ -265,8 +271,8 @@ and every completed fix is published before proceeding to merge.
 
 ## 6. Re-check, then merge
 
-At each merge checkpoint, watch the reviewers until none is in flight, by the
-[shipping budget](#shipping-budget) (skipped only on "merge now"), then refresh
+At each merge checkpoint before batch 2, watch the reviewers until none is in flight,
+by the [shipping budget](#shipping-budget) (skipped on "merge now"), then refresh
 metadata and the comment surfaces once and compare them with the snapshot
 (`pr-comments.sh --since`). Review any head changes since your last covered SHA using
 step 1's re-review range; your own fixes must already be covered before their push.
@@ -278,7 +284,8 @@ retries.
 
 Merge by [Merge](references/gh-mechanics.md#merge) when your own review and required
 local validation cover the exact head, no review is in flight on it (`--in-flight`
-read clear at this checkpoint, after the last push), every review that arrived is
+read clear after the last push; after batch 2, reviews still running go to the
+late-review sweep instead), every review that arrived is
 classified, the current batch is disposed of, no owner decision is pending, and no hard
 [gate](references/gh-mechanics.md#merge-gates) blocks.
 After merging, open the follow-up described in the shipping budget.
@@ -291,8 +298,8 @@ lands bottom-up with merge commits and retargets per
 [`references/stacked-prs.md`](references/stacked-prs.md).
 
 **Merge questions.** Some gates are the user's decision, not a blocker: a reviewer still
-in flight at the checkpoint's cap (wait another 20 minutes, merge and catch its review
-in the follow-up, or hold), a stack whose
+in flight when the review-wait budget is spent (wait another 20 minutes, merge and catch
+its review in the follow-up, or hold), a stack whose
 scope is not already authorized above, a deploy-branch base without approval, a draft with unclear intent to ship, a conflict
 whose resolution changes intent, or a fork you cannot push to (merge now, fix in a
 follow-up PR). Resolve these the same way as step 4's open questions: ping, then call

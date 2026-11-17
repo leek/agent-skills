@@ -7,9 +7,10 @@ exact-head review, merge gates and cleanup.
 
 ## Wait for reviews
 
-Each round's checkpoint watches the reviewers as the main skill's does, by **Taking the
-wait** in [In-flight signals](gh-mechanics.md#in-flight-signals): until nothing is in
-flight on the head, at most 20 minutes per checkpoint; record the time used across
+Each round's checkpoint watches the reviewers by **Taking the wait** in
+[In-flight signals](gh-mechanics.md#in-flight-signals), the final round included:
+until nothing is in flight on the head, at most 20 minutes per checkpoint (a cap per
+checkpoint here, not bounded mode's budget per PR); record the time used across
 rounds and resumes. A reviewer still running at the cap is the main skill's merge
 question. A later user instruction to merge now and move new findings to another PR
 immediately returns to bounded delivery. Hard merge

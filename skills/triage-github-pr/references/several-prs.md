@@ -27,8 +27,14 @@ steps need all three.
    together, each batch from one PR, so its head sha is the ref. Then collect the
    QUESTIONs of every PR into one `grilling` call, each one named with its PR number,
    so the user is asked once.
-5. **Steps 5 and 6 one PR at a time, in merge-plan order.** Use a worktree for every PR
+5. **Steps 5 and 6 one PR at a time, in merge-plan order, sharing the batch-1 wait.**
+   Use a worktree for every PR
    (`.claude/worktrees/pr-N`), never the main checkout, so no two PRs share a tree.
+   Waits run once for the queue: push batch 1 for each PR in turn whose merge does not
+   wait on another open PR (no stack base, no merge-after edge), then watch all of them with
+   one `--in-flight` read of several numbers, then take each through step 6 in order.
+   A PR on an edge still waits its turn, since its base changes when its predecessor
+   merges.
    A stack lands first and fixes once, on its integration PR or its top branch, per
    [Fixes inside a stack](stacked-prs.md#fixes-inside-a-stack).
    After a base PR merges, retarget each PR stacked on it; its step 6 re-checks
