@@ -79,6 +79,14 @@ Give accent colour, weight, and size to the one thing per area that needs attent
 - **Check:** squint at the screen; what stands out must be the most important thing there. Accent marks one state (selected, changed from the default, needs action), never a whole kind of element.
 - **Example:** a settings list showed every current value as a blue chip. Better: only the value that needs attention is blue; the others are grey chips.
 
+#### Icon and label buttons
+
+In a button with an icon and a label, size the icon to the label's text, keep it close to the label, pad the icon side less than the text side, and nudge lopsided glyphs until they look centred.
+
+- **Why:** an icon carries more visual weight than the same width of text, and its bounding box holds empty space. Equal padding and a full-size icon make the content look shifted toward the icon and loosely joined. Geometric centring of a lopsided shape (a play triangle, a chevron) looks off-centre.
+- **Check:** the icon is about the label's cap height, not the line height. The icon-to-label gap is smaller than the padding at either end. Padding on the icon end is visibly smaller than on the text end (roughly 3/4 of it). Squint: the icon + label group looks centred in the button, and asymmetric glyphs (▶, →, ⌄) look centred on their own axis.
+- **Example:** "+ New project", "Export", and "Watch demo" buttons had icons as tall as the text line, a wide gap, and equal padding, so each looked heavy on the icon end. Better: icons shrunk to cap height, the gap halved, the icon-end padding cut, and the play triangle moved a pixel or two toward its point so it reads as centred. Trailing icons ("Continue →", "Sort ⌄") get the same treatment, mirrored.
+
 ### Data
 
 #### Data drives the UI
