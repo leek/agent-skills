@@ -87,6 +87,15 @@ In a button with an icon and a label, size the icon to the label's text, keep it
 - **Check:** the icon is about the label's cap height, not the line height. The icon-to-label gap is smaller than the padding at either end. Padding on the icon end is visibly smaller than on the text end (roughly 3/4 of it). Squint: the icon + label group looks centred in the button, and asymmetric glyphs (▶, →, ⌄) look centred on their own axis.
 - **Example:** "+ New project", "Export", and "Watch demo" buttons had icons as tall as the text line, a wide gap, and equal padding, so each looked heavy on the icon end. Better: icons shrunk to cap height, the gap halved, the icon-end padding cut, and the play triangle moved a pixel or two toward its point so it reads as centred. Trailing icons ("Continue →", "Sort ⌄") get the same treatment, mirrored.
 
+#### Button placement follows the container
+
+Place a form's or dialog's buttons by what contains them. On a page form, put the primary button at the left edge under the fields. In a dialog, right-align them with the primary last. In a stepper, put Back at the left and Continue at the right. On a phone sheet, stack them full width with the primary on top.
+
+- **Why:** each position follows where the eye already is. A page form is read down its left edge, so the button sits where reading ends. A dialog ends at its bottom-right corner, where the user expects the commit action. Splitting Back and Continue maps them to backward and forward, and keeps an accidental Back away from the thumb going forward. On a narrow screen, full-width stacked buttons are easy to hit, and the primary on top is read first.
+- **Check:** a page form's submit lines up with the fields' left edge, not stretched or floated right. A dialog's buttons are grouped at the bottom right, with Cancel (secondary) before Save (primary). A multi-step flow has Back at the far left and Continue at the far right, on one row. On phone widths, a sheet's or dialog's buttons are full width and stacked, with the primary above Cancel. Every container of the same kind uses the same placement across the app.
+- **Example:** a profile settings form ends with "Save changes" at its left edge under the last field. A rename dialog ends with "Cancel" and "Save" at the bottom right. A three-step onboarding card has "Back" at the left and "Continue" at the right under a progress bar. A phone confirmation sheet has a full-width "Confirm" above a full-width "Cancel".
+- **Except:** a platform convention the app follows on purpose (some desktop platforms put the primary first); then use it everywhere.
+
 ### Theme
 
 #### Dark mode is its own palette
