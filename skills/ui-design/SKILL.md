@@ -79,6 +79,15 @@ Give accent colour, weight, and size to the one thing per area that needs attent
 - **Check:** squint at the screen; what stands out must be the most important thing there. Accent marks one state (selected, changed from the default, needs action), never a whole kind of element.
 - **Example:** a settings list showed every current value as a blue chip. Better: only the value that needs attention is blue; the others are grey chips.
 
+#### Run-in titles for short blurbs
+
+When a block is a short title plus one or two sentences (feature grids, benefit lists, setting descriptions), run the title into the paragraph as a bold first sentence ending in a full stop, with the rest in the muted body colour, instead of a heading on its own line.
+
+- **Why:** a stacked heading and body read as two separate things and leave a ragged gap between them; a short heading line also wastes most of its width. Run in, the bold phrase still catches the scanning eye, the sentence reads as one thought, and the block is a line or more shorter, so a grid of them stays even.
+- **Check:** in a grid or list of short blurbs, each title sits on the same line as its body, set in the strong text colour and a heavier weight, with a full stop, and the body follows in the muted colour at the same size. No blurb has a heading line followed by only one or two body lines.
+- **Example:** a feature card had "Bring your own subscription" as a heading, then "Runs on the plan you already pay for, so you can use the models you already have." on two lines below it. Better: "**Bring your own subscription.** Runs on the plan you already pay for…" as one paragraph, the first sentence dark and bold, the rest grey.
+- **Except:** a section heading that introduces several paragraphs, a list, or controls keeps its own line.
+
 #### Icon and label buttons
 
 In a button with an icon and a label, size the icon to the label's text, keep it close to the label, pad the icon side less than the text side, and nudge lopsided glyphs until they look centred.
