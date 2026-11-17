@@ -176,6 +176,14 @@ Show what most users need at first glance, and put the rest one interaction away
 - **Check:** each level shows a summary plus the way into the next level. Nothing a user needs often is more than two levels deep.
 - **Example:** the page header shows one "Share" button. It opens a popover with invite, general access, and the people list. Hovering a person there reveals the remove control.
 
+#### Say each fact once
+
+Put each fact on screen once, in the element that shows it best, and cut any label, subline, or intro that restates what a value, badge, or heading already says.
+
+- **Why:** every line of helper text costs reading time, and when most of it repeats what is already visible, users stop reading helper text at all, including the line that matters. Generated UI copy is especially prone to this: it explains each row as if the rest of the screen did not exist.
+- **Check:** for each subline, intro, or caption, cover it and ask what the user loses. When the answer is nothing because a badge, value, or heading already says it, delete it. A subline stays only when it adds something the row cannot show: a price or rate, a time window ("Since Nov 1"), a limit's source, a consequence. Section intros that summarise the rows below go.
+- **Example:** a "Plan & usage" panel showed a "Free plan" badge and "$0.00" estimated cost, yet also opened with "Free plan, courtesy of the provider: nothing is charged. Usage is still measured.", put "Courtesy of the provider" under Balance, and "Not charged: free plan" under Estimated cost. Better: drop all three. Keep "1 GB free, then $0.25 per GB-month" under Storage, "Since Nov 1" under This month, and "Custom, set by support" under Daily limit, because each adds a fact nothing else on the screen shows.
+
 #### Hover-reveal secondary actions
 
 In a repeated list, show per-row actions (edit, delete, copy) when the user hovers or focuses that row.
