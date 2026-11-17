@@ -114,8 +114,16 @@ Build dark mode as its own palette, not an inverted light mode: a dark-grey base
 Show each value in the form its data type calls for, so the user sees the type before reading the text.
 
 - **Why:** colour, icon, position, and weight are taken in before any reading. In a plain-text table the user must read every cell to find the one inactive row.
-- **Check:** categories are tags with one consistent colour per value. Status is icon + colour + word, never colour alone. Numbers are right-aligned with tabular figures. Out-of-play rows (inactive, archived) are dimmed as a whole row. Long values truncate with an ellipsis and show in full on hover.
+- **Check:** categories are tags with one consistent colour per value. Status is icon + colour + word, never colour alone. Numbers are right-aligned with tabular figures. Out-of-play rows (inactive, archived) are dimmed as a whole row. Long values truncate with an ellipsis and show in full on hover (where the ellipsis goes: [Truncate where values differ](#truncate-where-values-differ)).
 - **Example:** an employee table in plain text. Better: department as a tag with a coloured dot, employment as green "✓ Active" or red "✕ Inactive", years right-aligned, inactive rows greyed out, long emails truncated.
+
+#### Truncate where values differ
+
+Truncate filenames, paths, and URLs in the middle, keeping the start and the end, not at the end.
+
+- **Why:** related files share a prefix and differ at the end (version, suffix, extension), and a path's last segment names the thing. Cutting the end removes exactly the part that tells rows apart, so a list of "report-2026…" rows all look identical.
+- **Check:** in a list of long filenames, every row stays distinguishable, and the extension is visible. Paths keep the root and the last segment ("app/…/Orders/Show.php"). URLs keep the domain and the final segment. Plain prose and titles still truncate at the end. The full value shows on hover or focus and is what gets copied.
+- **Example:** an attachments list showed five rows of "brand-guidelines-202…". Better: "brand-guide…draft.pdf", "brand-guide…final.pdf", "brand-guide…final-v2.pdf", "brand-guide…print.pdf", "brand-guide…web.fig".
 
 #### Fit the form to the data
 
