@@ -112,6 +112,14 @@ Align icons, glyphs, and short text by where their visual mass sits, not by thei
 - **Check:** blur the element in your head or the design tool (a strong Gaussian blur) and look at the blob. Centred content has its blob centred in its frame. Content in the rounded end of a pill or a circular badge sits concentric with that curve: the blob's centre is the corner radius's centre, and the gap to the curve is even all round. Compare the blob, not the box, against neighbours that should line up.
 - **Example:** a status pill showed a plane icon at its left end and "47m" at its right end, both box-aligned to the inner padding. Blurred, the plane's blob sat off-centre within the left end cap, and the text sat off the right curve. Better: each nudged until its blob is concentric with its end cap.
 
+#### Boxed rows keep the list's lines
+
+When one item in a list is boxed (a card, an expandable panel, a highlighted row), keep its icon and text on the same vertical lines as the plain rows around it, and inset its contents evenly from the box's corner.
+
+- **Why:** the eye follows the column of icons and the column of text down the list. A boxed row whose icon shifts a few pixels, or whose text starts at a different gap from its icon, breaks those lines and looks like a different component dropped in. Uneven insets (8px from the top, 12px from the side) make the icon look jammed into the corner instead of placed in it.
+- **Check:** draw a vertical line through the icons and another at the start of the text: the boxed row's icon and text sit on both lines, and a timeline connector passes straight through its icon. The icon's inset from the box's top and side are equal, and the icon-to-text gap matches the plain rows. A trailing control (chevron, menu) has the same inset from its corner as the leading icon has from its. Inner corner radius ≈ outer radius − inset, so nested curves stay concentric.
+- **Example:** a pull request timeline showed plain event rows and one boxed "commented" row. Inside the box, the icon sat 8px from the top and 12px from the left, and 6px from its label instead of the list's 11px, so the icon and text both missed the list's lines. Better: the box is offset so its icon lands on the timeline axis, with 11px inset top and side, an 11px gap to the label, and the chevron inset to match.
+
 #### Button placement follows the container
 
 Place a form's or dialog's buttons by what contains them. On a page form, put the primary button at the left edge under the fields. In a dialog, right-align them with the primary last. In a stepper, put Back at the left and Continue at the right. On a phone sheet, stack them full width with the primary on top.
@@ -201,6 +209,14 @@ Give every hover-opened submenu a safe triangle: while the pointer moves from th
 - **Check:** open a submenu, then move the pointer diagonally to its far corner (the last item) across sibling rows: the submenu stays open and the crossed rows do not highlight. Stop on a sibling row for about 300ms: it takes over as normal. Moving straight down the parent menu still switches submenus immediately. Keyboard works without it: → opens the submenu, ← returns, ↑ and ↓ move between rows. Menu libraries such as Radix (sub-menu pointer grace area) and Floating UI (`safePolygon`) provide this; check it is turned on, not reimplemented.
 - **Example:** a file menu (New file, Share ›, Export ›, Duplicate, Delete) has Share's submenu open. Aiming at "Invite people", the pointer cuts across Export and Duplicate. Instant hover swaps in the Export submenu. Better: the triangle from the pointer to the submenu's near edge keeps Share open; resting on Export for a moment then opens Export.
 
+#### Animate disclosure
+
+Animate content that expands, collapses, opens, or closes with a short eased transition (about 200–300ms), not an instant jump, and cut it to an instant change when the user asks for reduced motion.
+
+- **Why:** an instant jump makes the content below teleport, and the user loses their place and has to work out what changed. A brief eased transition shows where the new content came from and where the rest went.
+- **Check:** expand and collapse each accordion, disclosure, or detail row: height and content ease in and out (ease-out, ~200–300ms), the content below slides rather than jumps, and nothing flickers or overshoots. Rapid repeated toggles stay smooth. With `prefers-reduced-motion: reduce`, the change is instant or a plain fade.
+- **Example:** clicking a collapsed comment in an activity feed snapped its body open and shoved the next event down. Better: the body grows over 300ms with an ease-out curve and the following events slide down with it.
+
 #### Spectrum of explicitness
 
 Place each affordance on a spectrum, from labelled button to icon only, to shown on hover, to inside a menu, by how often it is used and how much it matters.
@@ -242,6 +258,16 @@ Show the pointer cursor on everything that responds to a click: buttons, links, 
 - **Why:** the cursor change is how a user finds out, before clicking, that something will respond. A clickable label with the arrow cursor reads as plain text, so the user aims at the small box instead.
 - **Check:** hover each clickable element, including labels of checkboxes and radios, and see the pointer. Disabled controls and plain text keep the default cursor.
 - **Example:** a filter panel's checkbox labels toggle their box but show the arrow cursor. Better: the label and the box both show the pointer, so the whole label reads as the target.
+
+### Accessibility
+
+#### Custom controls behave like native ones
+
+Give every custom interactive element (an expandable card, a clickable row, a custom toggle) a real control's semantics: a role, a name that says what it is, its state, a visible focus ring, and a layout that holds up under the user's text size, contrast, and colour settings.
+
+- **Why:** a clickable `div` looks fine with a mouse but is invisible or nameless to keyboard and screen-reader users, and a layout tuned for one font size breaks for users who enlarge text or turn on high contrast. These users meet the hidden defects first.
+- **Check:** Tab reaches the control and shows a clear focus ring (`:focus-visible`), and Enter or Space activates it. The accessibility inspector shows the right role (button, link, checkbox) and a name that reads well alone ("tobias commented 2 days ago", not "button"), plus state (`aria-expanded`, `aria-pressed`, `aria-checked`). Bump the text size to 200%: nothing clips, overlaps, or truncates what matters. In forced-colours or high-contrast mode, borders, focus, and selected state are still visible. Under a different theme or accent colour, every element follows it.
+- **Example:** an expandable comment card in an activity feed was a `div` with a click handler. Better: its header is a `<button aria-expanded>` whose name is the event text, with a focus ring, and the feed still reads cleanly at larger text, in high contrast, and with a purple accent theme.
 
 ### Marketing pages
 
