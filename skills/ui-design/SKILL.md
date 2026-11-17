@@ -87,6 +87,17 @@ In a button with an icon and a label, size the icon to the label's text, keep it
 - **Check:** the icon is about the label's cap height, not the line height. The icon-to-label gap is smaller than the padding at either end. Padding on the icon end is visibly smaller than on the text end (roughly 3/4 of it). Squint: the icon + label group looks centred in the button, and asymmetric glyphs (▶, →, ⌄) look centred on their own axis.
 - **Example:** "+ New project", "Export", and "Watch demo" buttons had icons as tall as the text line, a wide gap, and equal padding, so each looked heavy on the icon end. Better: icons shrunk to cap height, the gap halved, the icon-end padding cut, and the play triangle moved a pixel or two toward its point so it reads as centred. Trailing icons ("Continue →", "Sort ⌄") get the same treatment, mirrored.
 
+### Theme
+
+#### Dark mode is its own palette
+
+Build dark mode as its own palette, not an inverted light mode: a dark-grey base instead of black, off-white text, raised surfaces lighter than the base, depth from borders and shadows, and muted fills for coloured elements.
+
+- **Why:** light text on a dark background glares and smears at full contrast, and saturated colours vibrate against near-black. On a dark screen a shadow alone is barely visible, so lightness is what shows elevation. Without it, cards, popovers and the page merge into one flat black.
+- **Check:** the page background is not `#000`, and body text is not pure `#fff`. Each elevation step (page → card → popover or menu) is a little lighter than the one below. A floating surface has a subtle border or highlight plus a shadow. Large coloured fills (event blocks, tags, banners) use a dark, desaturated tint of their hue with the full-strength hue kept for a thin accent (a left bar, a dot, the text). The primary button is still the most prominent element, without glowing.
+- **Example:** a calendar on pure black with white text and saturated blue, green, orange and purple event blocks, and a detail popover the same black as the page. Better: a dark-grey page, a slightly lighter calendar panel and a lighter popover with a hairline border and soft shadow, off-white text, and events as dim tinted blocks with a bright left bar in each event's colour.
+- **Except:** a deliberate pure-black (OLED) theme the user chose; elevation and muted fills still apply.
+
 ### Data
 
 #### Data drives the UI
