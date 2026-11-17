@@ -54,54 +54,77 @@ log and the code alone, and say that it is unreproduced.
 
 Completion criterion: every failed job has a line.
 
-## 3. Fix the legit ones
+## 3. Choose where the fixes land
 
-No LEGIT left: go to step 5.
+No LEGIT left: go to step 6.
 
-Work on the branch without disturbing a dirty tree or another worktree's checkout. When
-the tree is dirty or the branch is checked out elsewhere, use
-`git worktree add .claude/worktrees/ci-<branch> origin/B` (at that path, never a sibling
-directory), then make it runnable with `laravel-herd-worktrees`' **Bootstrap a bare worktree** section before running anything in it. Leave it in place until step 5. Per
-LEGIT failure: make the minimal change, run the failing command locally until it is
-green, then commit per the `commit` skill's [Staging](../commit/SKILL.md#staging) and
-[Subject](../commit/SKILL.md#subject), the subject naming the job.
+Unless the input or the conversation already says where ("push to main", "open a PR",
+"don't push"), ask before writing any fix, as a structured question
+([harness-tools](../harness-tools/SKILL.md)), with the LEGIT lines from step 2 in the
+question so it stands on its own. `<default>` is the repo's default branch
+(`gh repo view --json defaultBranchRef`). Offer these options, the recommended one
+first:
+
+- **Push to `<default>`** (recommended): the fixes go straight onto `<default>`. When
+  `B` is not `<default>`, `B` gets them at its next sync from `<default>`, and until
+  then its CI stays red.
+- **Pull request into `<default>`**: push a `fix/ci-<branch>` branch and open a PR.
+- **Push to `B` too** (only when `B` is not `<default>`): land on `<default>` and on `B`.
+  The description says the cost: `B` then has commits `<default>` lacks, so the next
+  fast-forward sync from `<default>` to `B` is refused until someone merges `B` back.
+- **Commit only**: keep the commits local and push nothing.
+
+Completion criterion: the user picked a landing, or the input already named one.
+
+## 4. Fix the legit ones
+
+Every landing writes the fixes on `<default>`, so work from `origin/<default>` without
+disturbing a dirty tree or another worktree's checkout. When the tree is dirty or the
+branch is checked out elsewhere, use
+`git worktree add .claude/worktrees/ci-<branch> origin/<default>` (at that path, never a
+sibling directory), then make it runnable with `laravel-herd-worktrees`' **Bootstrap a
+bare worktree** section before running anything in it. Leave it in place until step 6.
+
+When `B` is not `<default>`, first run each LEGIT failure's command at the base: a failure
+that does not reproduce there is already fixed on `<default>`, so name it in the report
+instead of fixing it. Per remaining LEGIT failure: make the minimal change, run the
+failing command locally until it is green, then commit per the `commit` skill's
+[Staging](../commit/SKILL.md#staging) and [Subject](../commit/SKILL.md#subject), the
+subject naming the job.
 
 Completion criterion: every LEGIT failure has a commit that turned its command green
-locally.
+locally, or is named as already fixed on `<default>`.
 
-## 4. Land the fixes
+## 5. Land the fixes
 
-A commit on the worktree fixes nothing until it is on `B`. Show the commits, say where
-they will go, and land them without asking:
+Land the commits the way step 3 chose, without asking again:
 
-- **Default:** push to `B` with `git push origin HEAD:B` (no `--force`). If it is
-  refused because `origin/B` moved, `git fetch origin`, rebase onto `origin/B`, re-run
-  each fixed command, and push again.
-- **Direct pushes forbidden** (branch protection, or the repo's rules): push a
-  `fix/ci-<branch>` branch and open a pull request into `B` with a body in the `pr`
-  skill's template.
-- **`B` is not the default branch** (a `production` or release branch): land the same
-  fixes on the default branch too, so the next merge into `B` does not bring the failure
-  back. Cherry-pick each fix commit onto `origin/<default>`, re-run each fixed command,
-  and land it by the two rules above. A fix the default branch already has, or one that
-  does not apply there, is named in the report, not forced. A cherry-pick conflict stops
-  this step: ask the user.
-- A user instruction in the input or the conversation ("open a PR", "don't push")
-  overrides all of these.
+- **Push:** `git push origin HEAD:<branch>` (no `--force`). If it is refused because the
+  remote branch moved, `git fetch origin`, rebase onto it, re-run each fixed command,
+  and push again.
+- **Pull request,** or a push the branch's protection refuses: push a `fix/ci-<branch>`
+  branch and open a pull request into the target with a body in the `pr` skill's
+  template.
+- **Push to `B` too:** push to `<default>` first, then cherry-pick each fix commit onto
+  `origin/B`, re-run each fixed command, and push that to `B`. A fix that does not apply
+  to `B` is named in the report, not forced. A cherry-pick conflict stops this step: ask
+  the user.
+- **Commit only:** push nothing.
+
+Never push to `B` on any answer other than **Push to `B` too**.
 
 The push starts new CI runs. Leave them running and do not come back for their result.
-When step 3 worked in the main checkout on a local `B`, it is now in step with
-`origin/B`; when it worked in a worktree, leave the user's local `B` as it is and say
-it is behind.
+When step 4 worked in the main checkout on a local branch, it is now in step with its
+remote; when it worked in a worktree, leave the user's local branches as they are and
+say which one is behind.
 
-Completion criterion: every fix commit is on `origin/B`, in an open pull request, or
-kept local by the user's instruction; when `B` is not the default branch, each one is
-also on the default branch, in a pull request into it, or named as not needed there.
+Completion criterion: every fix commit is on its landing branch, in an open pull
+request, or kept local by the user's answer.
 
-## 5. Clean up and report
+## 6. Clean up and report
 
-If step 3 created a worktree and its commits are on `origin/B` (or in the open pull
-request), remove it without asking, from the main checkout, by `laravel-herd-worktrees`' **Remove a served worktree**
+If step 4 created a worktree and its commits are on their landing branch (or in the
+open pull request), remove it without asking, from the main checkout, by `laravel-herd-worktrees`' **Remove a served worktree**
 (it never forces). If it refuses,
 or the commits are kept local, keep it and ask one yes/no question: "Can I delete the
 worktree I created?" Remove it only on yes, never with `--force`; otherwise name it in
