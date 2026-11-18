@@ -422,7 +422,29 @@ fail_unit() {
   FAILED_LIST="$FAILED_LIST $label"
   [[ -n "$FAILURE_REASON" ]] || FAILURE_REASON="$label: $reason"
   DRAINING="true"
+  record_retro_session "$label" failed
   announce_activity "worker $label failed: $reason"
+}
+
+# A worker session that failed or was blocked is a retro candidate: the finish worker mines
+# it and lists environment fixes in its report. The file lives in the run directory, so a
+# resumed run (same run ID) still sees the attempts an earlier invocation failed.
+RETRO_SESSIONS_LIMIT=5
+record_retro_session() {
+  local label="$1" outcome="$2" slot="$TEMP_DIR/w/$1" event_file
+  # Only a session that ran and ended (a worktree failure has none), and only once.
+  [[ -f "$slot/reaped" && ! -f "$slot/retro_recorded" ]] || return 0
+  event_file="$(sed -n '1p' "$slot/event_file" 2>/dev/null)"
+  [[ -s "$event_file" ]] || return 0
+  printf '%s\t%s\t%s\n' "$label" "$outcome" "$event_file" >>"$RUN_DIR/retro-sessions.tsv" || return 0
+  touch "$slot/retro_recorded"
+}
+
+# retro_sessions_json: the most recent candidates, newest last, as a JSON array.
+retro_sessions_json() {
+  [[ -s "$RUN_DIR/retro-sessions.tsv" ]] || { printf '[]\n'; return 0; }
+  tail -n "$RETRO_SESSIONS_LIMIT" "$RUN_DIR/retro-sessions.tsv" \
+    | jq -Rcs 'split("\n") | map(select(. != "") | split("\t") | {ticket: .[0], outcome: .[1], events: .[2]})'
 }
 
 handle_worker_result() {
@@ -482,6 +504,7 @@ handle_worker_result() {
       release_ticket "$ref" "autopilot $RUN_ID: blocked: $reason"
       BLOCKED_LIST="$BLOCKED_LIST $label"
       BLOCKERS="$BLOCKERS${BLOCKERS:+; }$label: $reason"
+      record_retro_session "$label" blocked
       announce_activity "ticket $label blocked: $reason"
       ;;
     failed)
@@ -675,6 +698,7 @@ start_finish_worker() {
     --arg delivery_ticket "$delivery_ticket" \
     --arg gates "$(landed_gate_numbers | paste -sd' ' -)" \
     --arg released "$QUESTIONS${QUESTIONS:+${BLOCKERS:+; }}$BLOCKERS" \
+    --argjson retro_sessions "$(retro_sessions_json)" \
     '{
       mode: "finish",
       spec_file: $spec_file,
@@ -691,7 +715,8 @@ start_finish_worker() {
       merged: ($merged | split(" ") | map(select(. != ""))),
       delivery_ticket: (if $delivery_ticket == "" then null else $delivery_ticket end),
       deploy_gates: ($gates | split(" ") | map(select(. != ""))),
-      left_open: (if $released == "" then null else $released end)
+      left_open: (if $released == "" then null else $released end),
+      retro_sessions: $retro_sessions
     }')"
   announce_activity "every buildable ticket is landed: starting the finish worker (review, verify, resolve, deliver as $DELIVERY)"
   launch_worker "finish" finish "$INTEGRATION_DIR" "$(build_prompt "$INTEGRATION_DIR" "$manifest")" ".scratch/$SPEC_SLUG/spec.md"

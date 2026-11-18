@@ -331,3 +331,7 @@ Items 1–7 landed; item 8 was already in place.
 ### Recommended pull
 
 Nothing required. Optional: the `autopilot` finish worker runs `retro` on failed or retried worker sessions and reports, without applying, the candidates.
+
+### Applied, 2026-11-17
+
+The optional item landed, report-only. The runner records each build session that `failed` or was `blocked` (`<run dir>/retro-sessions.tsv`, kept across a resumed run) and passes up to 5 of them to the finish worker as `retro_sessions`. After delivery the finish worker follows `retro`'s file on those event streams, writes proposals to `<notes>/retro.md`, and applies none; the launching session shows them for the user to pick. Worker sessions are not saved as logs (`--no-session-persistence`, `codex exec --ephemeral`), so `retro`'s `extract-signal.sh` learned the headless formats: Claude `stream-json` already parsed, `codex exec --json` items did not and now do. Grok streams fall back to reading event types with `jq`.

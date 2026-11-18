@@ -3,7 +3,8 @@
 # the tail of each assistant text reply, shell commands, and tool errors, each with its
 # source line (or SQLite step index).
 # Claude Code, Codex (plain or .jsonl.zst, streamed, never decompressed in place),
-# Grok, and agy (.db, opened read-only).
+# Grok, and agy (.db, opened read-only). Headless event streams read too: `claude -p
+# --output-format stream-json` and `codex exec --json` (autopilot's worker event files).
 #
 # Usage: extract-signal.sh <log path> [--max-chars N]
 #   --max-chars N   truncate each text to N characters (default 600)
@@ -100,6 +101,14 @@ case "$f" in
             elif .type=="message" and .role=="assistant" then {line:$n, kind:"assistant", text:(.content|txt|tail)}
             elif .type=="custom_tool_call" or .type=="function_call" then {line:$n, kind:"command", text:((.input // .arguments)|tostring)}
             elif (.type=="custom_tool_call_output" or .type=="function_call_output") and codex_failed then {line:$n, kind:"error", text:(.output|txt)}
+            else empty end)
+        elif .type=="item.completed" then                          # `codex exec --json` events
+          (.item | if .type=="agent_message" then {line:$n, kind:"assistant", text:(.text|tail)}
+            elif .type=="command_execution" then
+              ({line:$n, kind:"command", text:.command},
+               (select((.exit_code // 0) != 0 and ((.exit_code == 1 and (.aggregated_output // "") == "") | not))
+                | {line:$n, kind:"error", text:("exit " + (.exit_code|tostring) + ": " + (.aggregated_output // ""))}))
+            elif .type=="error" then {line:$n, kind:"error", text:.message}
             else empty end)
         elif .type=="event_msg" and .payload.type=="user_message" then  # older Codex logs
           {line:$n, kind:"user", text:.payload.message}

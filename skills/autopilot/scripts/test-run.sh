@@ -55,6 +55,7 @@ if [ "$mode" = "build" ]; then
     exit 0
   fi
   if grep -q 'CRASH' "$(m .ticket_file)"; then
+    jq -cn '{type:"assistant",message:{content:[{type:"text",text:"about to crash"}]}}'
     exit 7
   fi
   mkdir -p "$STUB_DIR/running"
@@ -73,6 +74,7 @@ if [ "$mode" = "build" ]; then
   result continue "$(m .ticket_ref)" "landed"
 else
   printf 'finish %s %s\n' "$(m '.merged | join(",")')" "$(pwd -P)" >>"$STUB_DIR/log"
+  m '[.retro_sessions[] | .ticket + ":" + .outcome + ":" + (.events | test("events[.]jsonl$") | tostring)] | join(",")' >"$STUB_DIR/retro"
   printf 'resolved\n' >"$STUB_DIR/body"
   printf '{"stage":"review and verify round 1"}\n' >>"$(m .board_file)"
   for n in $(m '.merged[]'); do
@@ -156,6 +158,7 @@ eq "ticket merges on the integration branch" "$(git -C "$r" rev-list --first-par
 grep -q 'ticket 01 assumed: colour -> blue' "$t/err" || fail "an assumption was not announced"
 grep -q 'ticket 03 merged (3 of 3' "$t/err" || fail "the last merge was not announced"
 grep -q 'Autopilot: board {"stage":"review and verify round 1"}' "$t/err" || fail "the finish worker's board line was not relayed"
+eq "no retro candidates on a clean run" "$(cat "$t/a-stub/retro")" ""
 echo "ok every ticket lands on the integration branch and the finish worker closes them"
 
 state="$(ap "$r" "$t/a-stub" --status --root .scratch/foo)"
@@ -222,6 +225,14 @@ if grep -q '^finish' "$t/d-stub/log"; then
   fail "the finish worker ran after a failure"
 fi
 echo "ok a failed worker keeps its claim, the others land, and the run ends failed"
+
+# The fix arrives: the rerun resumes the ticket, and the finish worker gets the failed session.
+ticket "$r" 01-a $'blocked-by: []\n' "fixed"
+status=0
+ap "$r" "$t/d-stub" --provider claude --root .scratch/foo >/dev/null || status=$?
+eq "retry exit" "$status" 0
+eq "retro candidates" "$(cat "$t/d-stub/retro")" "01:failed:true"
+echo "ok the finish worker receives the failed session's events as a retro candidate"
 
 # ---- the integration branch in its own worktree: the spec is only on that branch --------
 r="$t/w"

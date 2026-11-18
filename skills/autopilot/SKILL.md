@@ -67,6 +67,8 @@ Also act on these lines as they arrive:
 
 Read the result object: its `status` and `reason` say what happened. Ping the user on any exit but 0 (`PushNotification` where available).
 
+When a worker failed or was blocked, the finish worker mines those sessions with `retro` and writes its proposals to `$notes/retro.md`, without applying any. Whatever the exit, if that file exists, show its list in your report and let the user pick which to apply, as `retro` step 6 says.
+
 - **`0` complete**: every ticket is closed and delivered. Run `implement-spec`'s screenshot check (`screenshots-report.sh $notes`), ask about the leftovers the result names when cleanup was `list` (per [`leftovers.md`](../implement-spec/references/leftovers.md)), and report.
 - **`2` needs input**, with questions: write each answer into the spec's `decisions/` on the integration branch as a closed decision ticket and commit it, then run the same command again. It builds the released tickets and their dependents, then finishes once. When the user would rather ship without them, add `--finish-now`.
 - **`2` needs input**, at a deploy gate or a delivery ticket at `ready-for-human`: the delivery is done. The user deploys; then run this skill again for a gate's dependents, or `/implement <delivery ticket>` for its after-deploy steps.
