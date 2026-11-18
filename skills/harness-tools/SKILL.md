@@ -8,7 +8,7 @@ user-invocable: false
 
 Skills name a **move** (dispatch and wait, dispatch in the background, follow up, stop, structured question) and point here for the tool. Find your harness's row, use that tool with the skill's own content (the brief, the agent type, the options), and use the fallback when the tool is not in your tool list. A harness with no row here: use its own tool for the move if it has one, otherwise the fallback. The fallback is always a complete path.
 
-Verified against: Claude Code 2.1.291–2.1.325 session logs (a named sub-agent got 0 of 266 wakes from its own background command, an unnamed one 175 of 230); Codex CLI 0.166's model-visible tools; Grok's live tool schema and its logged calls (its parameter is `background`, though the docs say `run_in_background`); agy 1.4.12's live tool schema, checked against its logged calls.
+Verified against: Claude Code 2.1.291–2.1.325 session logs (a named sub-agent got 0 of 266 wakes from its own background command, an unnamed one 175 of 230); Codex CLI 0.166's model-visible tools; Grok's live tool schema and its logged calls (its parameter is `background`, though the docs say `run_in_background`); agy 1.4.12's live tool schema, checked against its logged calls. Tool names rechecked 2026-11-17 against the live tool lists of Codex 0.169, Grok 1.0.88 and agy 1.5.10 (sources in `docs/research/`).
 
 ## Every sub-agent
 
