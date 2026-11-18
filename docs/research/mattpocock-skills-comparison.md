@@ -304,3 +304,30 @@ Items 1–7 landed; item 8 was already in place.
 - **`wizard/template.sh`, after the panel review**: the shell-style `'\''` escape broke phpdotenv (it throws) and Node's `parseEnv` (it truncates). `write_env` now single-quotes, double-quotes a value holding `'` and nothing expandable, and refuses (listing the key for the human) a value no quoting carries; phpdotenv, Node and `source` all read both forms back exactly. A line `_existing` cannot read back (escapes, `$`, comments) is kept as is on Enter instead of overwritten. Writes go through a `0600` temp file beside the real target and `mv` into place, following a symlink, cleaned up on failure and on `INT`/`TERM`; an unreadable file or unwritable directory leaves `.env` untouched.
 - **`diagnosing-bugs`, `handoff`, `teach`, `which-skill`**: ported as upstream worded them, adapted to local wording.
 - **Seams**: `tdd`, `implement` and `to-spec` now state each seam with what it catches and what it misses, instead of a one-line why.
+
+---
+
+## Delta check, 2026-11-17
+
+- Upstream `main` now at `5863806dd4e15c63174bee4e7515a4256792ecfa` (merge, 2026-11-12). 3 non-merge commits since `a496f55`; 10 files changed, all under `skills/in-progress/` and `.changeset/`. No promoted skill changed, and no `docs/` change.
+- Local `main` at `7069776` (186 commits since `2dcc8f0`).
+
+### What changed upstream
+
+1. **`chief-of-staff` procedures** ([`5ae4816`](https://github.com/mattpocock/skills/commit/5ae4816)). Two additions to the still in-progress coordinator. (a) Look for a shared wiki the user or other agents already keep before starting one. (b) A new **Procedures** section runs user-invoked skills by reading their `SKILL.md` at a relative path (`../retro/SKILL.md`, `../to-spec/SKILL.md`, `../to-tickets/SKILL.md`, `../implement-spec/SKILL.md`), so they stay user-invoked. It runs `retro` on about one in five subagent sessions, worst first, and acts on the findings itself instead of asking.
+2. **New `software-factory`** ([`4ae2317`](https://github.com/mattpocock/skills/commit/4ae2317), [`d18183f`](https://github.com/mattpocock/skills/commit/d18183f)). An in-progress, user-invoked glossary for designing a CI-driven agent factory: task / trigger / run / runner, the service slots (ticket tracker, ticket source, git host, orchestrator, observability platform), "start slow" brakes (automated checks, automated review, human review; one throttled trigger at a time; cap every loop at a few tries), example tasks by problem (explore, implement, review, rework, decompose, ratchet, fix, architecture, retro), and product surveys per slot. It is course material (the last commit cites a cohort student), meant to be called beside a grilling session.
+
+### Assessment
+
+- **Relative-path procedures: already local convention.** `AGENTS.md:38` already has other skills follow `commit`'s file rather than invoke it, because it is user-invoked. Upstream has reached the same pattern; nothing to pull.
+- **Shared-wiki-first: not applicable.** No local long-running coordinator keeps a wiki.
+- **Sampled retro: optional, small.** Local `implement-spec` only suggests `/retro this` when a run went sideways (`skills/implement-spec/SKILL.md:136`); `autopilot` has no retro step. Upstream's rule (retro about one in five worker sessions, failures first) would fit `autopilot`'s finish worker. It needs a decision, because an unattended retro that acts on its own findings would edit instructions without review. The safe form: the finish worker runs `retro` on the failed or retried workers' sessions and lists the candidates in the delivery report, without applying them.
+- **`software-factory`: do not import.** Local already builds most of its example tasks as skills run by a person or a loop, not as triggered CI runs: explore = `triage` / `fix-github-issues` verification, implement = `implement` / `autopilot`, review = `code-review` / `triage-github-pr`, rework = `resolve-review-comments`, decompose = `to-tickets`, fix = `fix-ci-failures`, architecture = `improve-codebase-architecture`, retro = `retro`. The new ideas are vocabulary and the **ratchet** task (one file off a lint or type exception list per day, as a PR). Revisit the ratchet if a project adopts a stricter PHPStan level or Pint rule with a baseline. `prune-tests` already works the same way, one PR per area.
+
+### Local verification
+
+`scripts/verify-skills-collection.sh` passes. An untracked `skills/.DS_Store` exists again, but the verifier now fails only on a tracked one (`scripts/verify-skills-collection.sh:264-265`), and `.gitignore` keeps it out, so nothing ships.
+
+### Recommended pull
+
+Nothing required. Optional: the `autopilot` finish worker runs `retro` on failed or retried worker sessions and reports, without applying, the candidates.
