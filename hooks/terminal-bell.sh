@@ -1,5 +1,6 @@
 #!/bin/sh
-# PreToolUse on AskUserQuestion, and Notification: ring the terminal bell so a
+# PreToolUse on a structured question (AskUserQuestion, Grok ask_user_question,
+# Codex request_user_input, agy ask_question), and Notification: ring the terminal bell so a
 # Ghostty tab badges itself (🔔 in the title) while Claude waits on the user.
 # Ghostty only: other terminals beep, which nobody opted into.
 # Hooks have no controlling tty (/dev/tty fails), so walk up to the first ancestor that has one.

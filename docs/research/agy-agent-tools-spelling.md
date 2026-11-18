@@ -15,3 +15,14 @@ Question: Does an agy agent file tools: accept view_file-style IDs, native read_
 
 ## What this unblocks
 Both spellings work in agy 1.5.10: native names (`read_file`, ...) and legacy IDs (`view_file`, ...) were accepted; a wrong name does not hang but fails the subagent at startup with `unknown component: tool "<name>" not found in registry`. Prefer native names in agent files (they match the shipped migration skill and what fires at runtime); a typo is a loud, fast error, not a hang.
+
+## Follow-up: this plugin's Claude-format agents in agy (2026-11-17, agy 1.5.10)
+
+- `agy plugin validate .` on this repo: "no plugin.json found ... This looks like a Claude Code plugin: `plugin install` converts it".
+- `HOME=<scratch> agy plugin install https://github.com/leek/agent-skills` (and the same with the local path): installs 59 skills and 22 agents, writes a root `plugin.json` (`name`, `version`, `description`, `author`), and converts `hooks/hooks.json` to agy `hooks.json`: `Bash|run_terminal_command` became `run_command`, the file-write matcher became `write_to_file|write_file|replace_file_content|edit_file|multi_replace_file_content`, `${CLAUDE_PLUGIN_ROOT}/` became `./`. Skipped with a warning: `Notification` ("there is no Notification event") and any PreToolUse matcher naming no agy tool (`AskUserQuestion` alone; adding `ask_question` keeps the bell hook). Agent files are copied verbatim.
+- Agent probes in a scratch workspace (`.agents/agents/pr-reviewer.md`, parent `agy -p "Invoke the subagent named pr-reviewer ..." --output-format stream-json --dangerously-skip-permissions`):
+  - this repo's `agents/pr-reviewer.md` as is (`tools: Read, Grep, Glob, Bash`), with or without `subagent: true`: `subagent "pr-reviewer" not found or not allowed to be invoked`.
+  - minimal file, `tools: read_file, run_command` (comma string): same "not found". So a comma-string `tools:` makes agy drop the file silently.
+  - minimal file, `tools: [read_file, run_command]`: launched and returned the file content.
+  - minimal file, `tools: [Read, Grep, Glob, Bash]`: failed at startup, `unknown component: tool "Read" not found in registry` (and `Grep`, `Glob`, `Bash`).
+- So agy cannot run this repo's typed agents in either `tools:` form; skills keep agy on `invoke_subagent` `TypeName: "self"` (`skills/harness-tools/SKILL.md`).

@@ -104,7 +104,7 @@ Add a short section to `README.md` under **Available Skills**.
 
 ## Subagents (`agents/`)
 
-`agents/<name>.md` at the repo root are [Claude Code subagent definitions](https://code.claude.com/docs/en/sub-agents). They are **typed shells for work the skills already delegate**: read-only tool sets, a cheaper model where the thinking happens elsewhere, preloaded vocabulary via `skills:`, and cross-session `memory:`. Claude Code and Grok load them as `leek-skills:<name>` when the plugin is installed. Codex never sees the directory.
+`agents/<name>.md` at the repo root are [Claude Code subagent definitions](https://code.claude.com/docs/en/sub-agents). They are **typed shells for work the skills already delegate**: read-only tool sets, a cheaper model where the thinking happens elsewhere, preloaded vocabulary via `skills:`, and cross-session `memory:`. Claude Code and Grok load them as `leek-skills:<name>` when the plugin is installed. Codex never sees the directory. agy's `plugin install` copies it but cannot run the agents: it drops a file whose `tools:` is a comma string and rejects Claude tool names in a list, so agy skills use its built-in `self` sub-agent (verified on agy 1.5.10, `docs/research/agy-agent-tools-spelling.md`).
 
 Rules:
 

@@ -177,7 +177,7 @@ npx skills add https://github.com/leek/agent-skills --skill code-review
 
 Re-run either command to update.
 
-This copies the skills only. The typed subagents in [`agents/`](./agents) come with the Claude Code or Grok plugin, so in a repo that has the skills from `npx skills` and no plugin, a dispatch to `leek-skills:<name>` has no such agent and the skill takes its general sub-agent path. Install the plugin as well to get the cheaper, read-only typed agents. Codex's plugin does not load `agents/`.
+This copies the skills only. The typed subagents in [`agents/`](./agents) come with the Claude Code or Grok plugin, so in a repo that has the skills from `npx skills` and no plugin, a dispatch to `leek-skills:<name>` has no such agent and the skill takes its general sub-agent path. Install the plugin as well to get the cheaper, read-only typed agents. Codex's plugin does not load `agents/`, and agy's cannot run them.
 
 ### Claude Code (plugin marketplace)
 
@@ -207,6 +207,16 @@ grok plugin install leek-skills --trust
 ```
 
 Grok loads the plugin's skills, `agents/` as `leek-skills:<name>`, and `hooks/hooks.json`. It does not load the mod. Each harness's sub-agent and question tools are in [`harness-tools`](./skills/harness-tools/SKILL.md).
+
+### agy (Antigravity CLI plugin)
+
+agy converts this Claude Code plugin when it installs it:
+
+```bash
+agy plugin install https://github.com/leek/agent-skills
+```
+
+agy installs the skills and converts `hooks/hooks.json` to its own `hooks.json` (the `Notification` hook is skipped: agy has no such event). It copies `agents/` but cannot run them: agy drops an agent file whose `tools:` is a comma string, and rejects Claude tool names (`Read`, `Bash`) in a list. The skills start agy's built-in `self` sub-agent instead, per [`harness-tools`](./skills/harness-tools/SKILL.md). It does not load the mod. Pick one route per machine: `npx skills` and the plugin would list each skill twice.
 
 ### Claude Code (manual copy)
 
