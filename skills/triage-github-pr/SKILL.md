@@ -30,8 +30,9 @@ approval**: your own review must cover the exact head, including your fixes.
 queue pending required checks with `--auto`. **Never merge past a running review
 you could still act on**: a reviewer (bot or human) in flight on the head is a gate,
 like required approvals, a standing human `CHANGES_REQUESTED`, unresolved owner
-decisions and merge conflicts, until the fix budget is spent. Reviews of the final
-push can only be carried, so they land in the late-review sweep after the merge.
+decisions and merge conflicts, until the fix budget or the review-wait budget is
+spent. Reviews of the final push, and reviews still running when the wait is spent,
+are carried, so they land in the late-review sweep after the merge.
 
 **Never reverse a decision without asking.** What the PR deliberately does (its title,
 body, commits, Merge Danger, or linked ticket) is the author's decision. A fix that
@@ -56,13 +57,13 @@ checkpoints whose findings can still be fixed: before the initial snapshot and a
 batch 1. Each push starts a fresh review from every bot, so the checkpoint waits until
 no review is in flight on the head, by **Taking the wait** in
 [In-flight signals](references/gh-mechanics.md#in-flight-signals), from one **review-wait
-budget of 20 minutes per PR** that both checkpoints share. Never a foreground shell
+budget of 10 minutes per PR** that both checkpoints share. Never a foreground shell
 sleep, and never watch CI. After batch 2, merge without waiting: the bots' reviews of
 that push are carried, never fixed, so the
 [late-review sweep](references/gh-mechanics.md#follow-up-pr) collects them after the
-merge. A reviewer still in flight when the budget is spent is a
-[merge question](#6-re-check-then-merge); never re-request a review or reset the
-budget on your own.
+merge. A reviewer still in flight when the budget is spent is carried the same way:
+merge, and the late-review sweep collects its review into the follow-up PR. Never
+re-request a review or reset the budget.
 
 Record the starting SHA, snapshot, batch number and state (`not needed`, `fixing`,
 or `validated at <sha>`), and the review-wait budget used in the disposition.
@@ -300,9 +301,7 @@ open PRs"), only on the user's explicit approval in this conversation; a stack
 lands bottom-up with merge commits and retargets per
 [`references/stacked-prs.md`](references/stacked-prs.md).
 
-**Merge questions.** Some gates are the user's decision, not a blocker: a reviewer still
-in flight when the review-wait budget is spent (wait another 20 minutes, merge and catch
-its review in the follow-up, or hold), a stack whose
+**Merge questions.** Some gates are the user's decision, not a blocker: a stack whose
 scope is not already authorized above, a deploy-branch base without approval, a draft with unclear intent to ship, a conflict
 whose resolution changes intent, or a fork you cannot push to (merge now, fix in a
 follow-up PR). Resolve these the same way as step 4's open questions: ping, then call

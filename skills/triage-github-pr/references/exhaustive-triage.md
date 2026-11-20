@@ -11,8 +11,8 @@ Each round's checkpoint watches the reviewers by **Taking the wait** in
 [In-flight signals](gh-mechanics.md#in-flight-signals), the final round included:
 until nothing is in flight on the head, at most 20 minutes per checkpoint (a cap per
 checkpoint here, not bounded mode's budget per PR); record the time used across
-rounds and resumes. A reviewer still running at the cap is the main skill's merge
-question. A later user instruction to merge now and move new findings to another PR
+rounds and resumes. A reviewer still running at the cap is a merge question (wait another
+20 minutes, merge and carry its review to the follow-up, or hold). A later user instruction to merge now and move new findings to another PR
 immediately returns to bounded delivery. Hard merge
 gates still apply.
 

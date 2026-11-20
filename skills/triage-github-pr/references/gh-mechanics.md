@@ -51,7 +51,7 @@ flight; ignore the rest for that purpose. Required human approvals are checked
 separately.
 
 **Taking the wait.** Each checkpoint watches the reviewers with this one background
-command, capped at what is left of the PR's 20-minute review-wait budget. How to wait
+command, capped at what is left of the PR's 10-minute review-wait budget. How to wait
 on it:
 
 - **Claude Code:** Bash with `run_in_background`; the harness wakes you when it exits.
@@ -65,7 +65,7 @@ on it:
 - **A harness with neither:** name the reviewers still running, and treat it as the cap.
 
 ```bash
-bash <this-skill-dir>/../run-after/scripts/wait-until.sh --interval 30 --timeout <seconds left of the PR's 20-minute budget> -- bash <this-skill-dir>/../closeout/scripts/pr-state.sh N --in-flight --no-required --check "<a review bot's own check>"
+bash <this-skill-dir>/../run-after/scripts/wait-until.sh --interval 30 --timeout <seconds left of the PR's 10-minute budget> -- bash <this-skill-dir>/../closeout/scripts/pr-state.sh N --in-flight --no-required --check "<a review bot's own check>"
 ```
 
 `--in-flight` counts every requested reviewer, every bot `eyes` reaction, every entry
@@ -75,8 +75,9 @@ required CI out of the wait; pass one `--check` per pending check you judged a r
 bot's own, or none. Several PR numbers make one wait for the queue, which spends that
 time from every listed PR's budget; use `--interval 60` for a queue, since each read
 costs five API calls per PR. The verdict is
-`passed` (nothing in flight: gather now), `timeout` (the cap: a merge question in step
-6), or `failed` (a read failed: run it once more in the foreground; failing again,
+`passed` (nothing in flight: gather now), `timeout` (the cap: gather what arrived, and
+carry what is still running to the late-review sweep), or `failed` (a read failed:
+run it once more in the foreground; failing again,
 the reviewers' state is unknown, which is the cap too). Its `detail` names what was
 still running in `counted`.
 
@@ -141,8 +142,8 @@ use its one CI fix pass within its round budget.
 - `draft`: run `gh pr ready N` only when the context implies the PR should ship.
 - in flight: before batch 2, `pr-state.sh N --in-flight --no-required` (with the review
   bots' own `--check`s) must read clear after the last push. Watch it by
-  [Taking the wait](#in-flight-signals); a spent budget is a merge question. After
-  batch 2 it is not a gate: the late-review sweep collects what is still running.
+  [Taking the wait](#in-flight-signals). After a spent budget or batch 2 it is not a
+  gate: the late-review sweep collects what is still running.
 
 ## Stop cases
 
@@ -157,7 +158,7 @@ Stop instead of merging when:
 - a QUESTION the user answered with "hold", or a decision that belongs to someone
   other than the user (an infra or product owner);
 - the guidance says not to merge;
-- a merge question (a reviewer in flight at the cap, draft intent, stacked PR,
+- a merge question (draft intent, stacked PR,
   deploy-branch base: `production`, `staging`, or any branch the project context names)
   that the user answered with "hold" in this conversation.
 
