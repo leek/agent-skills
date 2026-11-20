@@ -56,8 +56,10 @@ on it:
 
 - **Claude Code:** Bash with `run_in_background`; the harness wakes you when it exits.
 - **Codex:** start it with `exec_command`, then poll with an empty `write_stdin` at
-  `yield_time_ms: 300000`, the longest an empty poll takes (verified on Codex CLI
-  0.169). A 15- or 30-second yield re-reads the whole context every poll for no gain.
+  `yield_time_ms: 300000` on every poll until it exits, the longest an empty poll takes
+  (verified on Codex CLI 0.169). Each poll re-reads the whole context, so a 1- to
+  60-second yield costs a full step for nothing. Between polls, send nothing: one waiting
+  message covers the checkpoint, and the next message reports its verdict.
 - **A harness with no background commands:** schedule one check every 5 minutes up to
   the cap (`ScheduleWakeup` in Claude Code).
 - **A harness with neither:** name the reviewers still running, and treat it as the cap.

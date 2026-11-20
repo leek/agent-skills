@@ -50,8 +50,8 @@ eligible to fix at a checkpoint, merge there rather than spending the unused bud
 **A carried finding never holds the merge**: whatever its grade, it goes to the
 follow-up PR and the PR merges.
 
-Test failures and defects found while independently reviewing unpushed fixes are
-corrected in the same batch before its push. **Watch the reviewers** at the two
+Test failures, and defects that the batch's own fixes introduce, are corrected in the
+same batch before its push; the pre-push review is one pass (step 5). **Watch the reviewers** at the two
 checkpoints whose findings can still be fixed: before the initial snapshot and after
 batch 1. Each push starts a fresh review from every bot, so the checkpoint waits until
 no review is in flight on the head, by **Taking the wait** in
@@ -250,8 +250,11 @@ A test failing outside your fix runs on the starting SHA first, by
 **Review before you push.** Every push buys another round from every bot, and a fix
 that adds a mechanism (a job, a lock, a claim, a retry, an outbox, a stream) is new
 surface the next round reviews. So run step 1's brief on the unpushed fix range first,
-with its failure-mode probes aimed at each mechanism the fix added. Fix what it finds in
-the same round.
+with its failure-mode probes aimed at each mechanism the fix added. Run it **once per
+batch**. Fix what it finds in the fix's own change in the same round, rerun those tests,
+and push without another review pass. A defect it finds anywhere else (code the fix did
+not change, a sibling path, a fault-injection case beyond the finding) is a new finding:
+carry it to the follow-up PR at its grade.
 
 **Resolve completed fixes promptly.** Once a fix is validated and committed, reply
 with its SHA and `push pending`, resolve its thread and update the disposition; other

@@ -8,7 +8,11 @@ steps one PR at a time. You stay the orchestrator. Never hand a whole PR to a su
 a sub-agent cannot start its own reviewers, ask the user, or schedule a wakeup, and the
 steps need all three.
 
-1. **Order.** Build the **merge plan** per
+1. **Snapshot.** "All open PRs", a label, or a range means the PRs that match when the
+   run starts. List them once; that list is the run. A PR opened during the run goes in
+   the report as `opened mid-run, not triaged`, unless the user asked for new PRs to be
+   taken too.
+2. **Order.** Build the **merge plan** per
    [`merge-order.md`](merge-order.md): edges from stack bases
    and merge-after lines in PR bodies, then the user's stated order as the fallback
    (a PR's order always wins over the user's), sorted bottom-up and printed before
@@ -17,17 +21,17 @@ steps need all three.
    builds its stack and owns its merge method, retargets, and fixes that must flow
    upward. A PR merges only after every PR before it on an edge shows `MERGED`; a
    stopped or queued one holds its dependents. Independent PRs keep the user's order.
-2. **Step 1 for all PRs at once.** Dispatch one `pr-reviewer` per PR in the
+3. **Step 1 for all PRs at once.** Dispatch one `pr-reviewer` per PR in the
    background, in one message (other harnesses: dispatch in the background per [harness-tools](../../harness-tools/SKILL.md)). A stack's integration
    PR waits for its own turn after the landings, and steps 2–4 skip it until then.
-3. **Steps 2 and 3 for all PRs.** Gather reviews and review state for every PR.
+4. **Steps 2 and 3 for all PRs.** Gather reviews and review state for every PR.
    Watch every PR's reviewers with one wait for the queue (several numbers in one
    `--in-flight` read), as the shipping budget says.
-4. **Step 4 in one pool.** Send the findings of all PRs to the verifier workers
+5. **Step 4 in one pool.** Send the findings of all PRs to the verifier workers
    together, each batch from one PR, so its head sha is the ref. Then collect the
    QUESTIONs of every PR into one `grilling` call, each one named with its PR number,
    so the user is asked once.
-5. **Steps 5 and 6 one PR at a time, in merge-plan order, sharing the batch-1 wait.**
+6. **Steps 5 and 6 one PR at a time, in merge-plan order, sharing the batch-1 wait.**
    Use a worktree for every PR
    (`.claude/worktrees/pr-N`), never the main checkout, so no two PRs share a tree.
    Waits run once for the queue: push batch 1 for each PR in turn whose merge does not
@@ -42,7 +46,7 @@ steps need all three.
    since its base and diff changed. Only a stack on per-PR fixes also gives each PR its
    own step 5, bottom-up; elsewhere a finding step 6 raises on a stack PR joins the
    integration or top PR's batch instead of a push to that PR.
-6. **Step 7 once,** after the last PR.
+7. **Step 7 once,** after the last PR.
 
 Completion criterion: every named PR is merged after all its predecessors, queued, or
 stopped with a blocker, and one report covers all of them, starting with the merge
