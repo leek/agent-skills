@@ -128,6 +128,13 @@ gathering review state; its completion notification brings the findings. In othe
 your strongest model, or review inline before you open the comment surfaces. Record the
 head sha it covered.
 
+**Test-only diffs are reviewed inline.** When every file the diff (or step 5's fix range)
+changes is a test, a test fixture, or a snapshot, run the brief yourself before
+you open the comment surfaces and dispatch no reviewer. A fresh context there mostly
+returns `Self: no findings` for the cost of a full rules reload. Check that the
+assertions still forbid what they were written to catch, and that no test was skipped,
+deleted, or weakened to go green.
+
 Completion criterion: a `Self N:` line per finding, or `Self: no findings`, against a
 recorded head sha, plus coverage of the changed invariants' live paths. An explicit
 `NOT REVIEWED` path still needs review before claiming the head is covered.

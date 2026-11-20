@@ -25,7 +25,7 @@ Finding facts is never the user's job. If a question can be answered by explorin
 
 The user's attention is the scarcest thing in the session, so a question has to earn its place: the answer must change the work *and* nothing cheaper may settle it. Before asking anything, walk this ladder and stop at the first rung that settles the decision.
 
-1. **Context**: codebase conventions, an existing implementation of the same shape, project docs, the ledger, the effort's standing notes. Match what is already there rather than asking which way to do it.
+1. **Context**: codebase conventions, an existing implementation of the same shape, project docs, the ledger, the effort's standing notes. Match what is already there rather than asking which way to do it. Before the first question, search the earlier decisions on the topic: grep `.scratch/*/decisions/`, `docs/` (ADRs and research included) and the effort's spec for its key nouns. A choice the user already made there is settled; cite the file instead of asking again.
 2. **Established practice**: the conventional answer for this stack, framework, or domain. Where the ecosystem has already settled a question, take the settled answer; never make the user re-derive it.
 3. **Default bias**: where practice is silent or genuinely split, take the option that is more reusable, more configurable, and less duplicated, and that avoids the smells in the `code-smells-audit` skill's index. That catalog cuts both ways: Speculative Generality is a smell too, so configurable means the seam exists, not that it is built for an imagined future.
 

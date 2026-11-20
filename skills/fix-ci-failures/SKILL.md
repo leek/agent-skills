@@ -35,15 +35,21 @@ and the first real error from its log (not the trailing `exit code 1`).
 ## 2. Classify every failure
 
 Read `git log --oneline <headSha>..origin/B` first: commits since the failed run may
-already fix it. Then write one line per failed job:
+already fix it. Then check open pull requests: another session or sweep often fixes the
+same failure in parallel. List them with `gh pr list --state open --json number,title,headRefName,files`
+and note any whose changed files include a failing test or the code its error names.
+Then write one line per failed job:
 
 ```
-Failure N: [LEGIT | STALE | FLAKY | INFRA] — <one-line evidence>
+Failure N: [LEGIT | STALE | IN FLIGHT | FLAKY | INFRA] — <one-line evidence>
 ```
 
 - **LEGIT**: the error points at code on the branch, and it reproduces at `origin/B`
   when you run the same command locally.
 - **STALE**: a later commit fixed it. Cite the sha, or show the command passing locally.
+- **IN FLIGHT**: an open PR already changes what this failure points at. Cite the PR
+  number. Do not write a second fix: report it, and when the run's fix would only repeat
+  it, stop there rather than open a duplicate PR.
 - **FLAKY**: it passes locally at the same sha, and the log shows timing, ordering, or
   a network call.
 - **INFRA**: runner, cache, registry, secret, or quota errors, and anything that needs

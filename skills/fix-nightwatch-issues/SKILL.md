@@ -91,8 +91,10 @@ unrelated GitHub issue that has the same number.
 
 ## 5. Resolve in Nightwatch
 
-For each fixed issue, comment with the root cause and the fix sha, then set it to
-`resolved`. For a cluster, do this for every member and point back to
+First run `list_issues` with status `open` again: the user often resolves or ignores
+issues in the Nightwatch UI while the run works. Skip any issue no longer in that list
+and name it in the tally; do not comment on it or set its status again. For each fixed issue still open, comment with the root cause and the fix sha,
+then set it to `resolved`. For a cluster, do this for every member and point back to
 the lead cause. A fix is not verified until it is deployed and last-seen goes quiet, so
 note "resolved pending deploy verification" where that applies.
 
