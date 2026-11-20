@@ -3,8 +3,9 @@
 Read this when the run has more than one PR, or one stacked on or merging after another.
 Step numbers are the main skill's.
 
-With more than one PR, run the read-only steps for all of them at once, and the writing
-steps one PR at a time. You stay the orchestrator. Never hand a whole PR to a sub-agent:
+With more than one PR, run the read-only steps for all of them at once, write the fixes
+of independent PRs in parallel, and push and merge one PR at a time. You stay the
+orchestrator. Never hand a whole PR to a sub-agent:
 a sub-agent cannot start its own reviewers, ask the user, or schedule a wakeup, and the
 steps need all three.
 
@@ -22,7 +23,7 @@ steps need all three.
    upward. A PR merges only after every PR before it on an edge shows `MERGED`; a
    stopped or queued one holds its dependents. Independent PRs keep the user's order.
 3. **Step 1 for all PRs at once.** Dispatch one `pr-reviewer` per PR in the
-   background, in one message (other harnesses: dispatch in the background per [harness-tools](../../harness-tools/SKILL.md)). A stack's integration
+   background, in one message (other harnesses: dispatch in the background per [harness-tools](../../harness-tools/SKILL.md); Codex: `spawn_agent` with `fork_turns: "none"` and the full brief). A stack's integration
    PR waits for its own turn after the landings, and steps 2–4 skip it until then.
 4. **Steps 2 and 3 for all PRs.** Gather reviews and review state for every PR.
    Watch every PR's reviewers with one wait for the queue (several numbers in one
@@ -34,6 +35,14 @@ steps need all three.
 6. **Steps 5 and 6 one PR at a time, in merge-plan order, sharing the batch-1 wait.**
    Use a worktree for every PR
    (`.claude/worktrees/pr-N`), never the main checkout, so no two PRs share a tree.
+   **Fixers per PR:** every PR whose merge does not wait on another open PR (no stack
+   base, no merge-after edge) and has current-batch findings gets its fixes written by
+   fixer sub-agents per [Parallel fix batch](parallel-fixes.md), one per PR (or one per
+   file group when that PR's batch splits), all started in one message (Codex:
+   `spawn_agent` with `fork_turns: "none"` and the full brief). While they run, keep
+   verifying and replying on the other PRs; as each returns, merge its work, then take
+   that PR through its tests, pre-push review and push. A stack is never split this
+   way: it fixes once, on its integration or top PR, below.
    Waits run once for the queue: push batch 1 for each PR in turn whose merge does not
    wait on another open PR (no stack base, no merge-after edge), then watch all of them with
    one `--in-flight` read of several numbers, then take each through step 6 in order.

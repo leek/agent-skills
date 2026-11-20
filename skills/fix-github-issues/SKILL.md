@@ -48,7 +48,7 @@ Finding N: [STALE | AUTO-DISMISS | HALLUCINATION | LEGIT] — <one-line evidence
 - `Finding 3: HALLUCINATION — rg 'BarPolicy::class' returns 0; symbol does not exist`
 - `Finding 4: LEGIT — app/Auth.php:88 still uses < instead of <=, exploitable on token boundary`
 
-Verify each line, delegate a set of more than 5, and run the second pass against the
+Verify each line, delegate a set of 3 or more, and run the second pass against the
 project's auto-dismiss and never-dismiss lists before any code, all by
 [Verify findings](references/verify-findings.md), with `origin/<default>` as the ref.
 You re-read the LEGIT code for the fix anyway.

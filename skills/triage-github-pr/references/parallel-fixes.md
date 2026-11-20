@@ -1,7 +1,7 @@
 # Parallel fix batch
 
-Step 5's fixes run one after another by default. A batch with at least 6 findings that
-split into at least 2 **fix groups** is written in parallel instead: one **fixer**
+Step 5's fixes run one after another only when the batch is one **fix group**. A batch
+that splits into at least 2 fix groups is written in parallel: one **fixer**
 sub-agent per group, each in its own worktree, merged back into the PR worktree before
 the batch's one test run, one pre-push review and one push. A stack's integration PR
 batch is the usual case; a lone PR with a long findings list qualifies the same way.
@@ -39,7 +39,7 @@ own, name it `<app db>_pr<N>_fix<k>` and register it per
 in one message, in the background (Claude Code: `Agent`, `run_in_background: true`, no
 `name`, its `description` starting `pr-<N>--fix-<k>`, keeping the returned `agentId`; other
 harnesses: dispatch in the background per [harness-tools](../../harness-tools/SKILL.md),
-keeping each id). Its brief gives the worktree
+keeping each id; Codex: `spawn_agent` with `fork_turns: "none"` and the full brief). Its brief gives the worktree
 path, its findings' step 4 lines with links, its file list, the repo's `AGENTS.md` /
 `CLAUDE.md`, and these rules:
 
