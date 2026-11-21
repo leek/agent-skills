@@ -35,9 +35,10 @@ SAFE_KEYS = {"Escape", "Tab", "Shift+Tab", "ArrowUp", "ArrowDown", "ArrowLeft", 
 FIND_READ_ACTIONS = {"click", "hover", "focus", "text", "scrollintoview"}
 # Flags any verb may carry. Everything else (--fn, --download, --profile, --auto-connect,
 # --cdp, --headers, --headed, …) runs JS, writes files, or swaps the browser, so it is refused.
-SAFE_FLAGS = {"--clear", "--filter", "--type", "--status", "--method", "--load", "--url", "--text", "--timeout",
-              "--json", "--full", "-i", "--interactive", "-c", "--compact", "-d", "--depth",
-              "-s", "--selector"}
+SAFE_BOOL_FLAGS = {"--clear", "--json", "--full", "-i", "--interactive", "-c", "--compact"}
+SAFE_VALUE_FLAGS = {"--filter", "--type", "--status", "--method", "--load", "--url", "--text",
+                    "--timeout", "-d", "--depth", "-s", "--selector"}
+SAFE_FLAGS = SAFE_BOOL_FLAGS | SAFE_VALUE_FLAGS
 ELEMENT_STATES = {"visible", "hidden", "attached", "detached"}
 FILTERS = {"grep", "head", "tail", "wc", "sort", "uniq", "echo"}
 
@@ -47,19 +48,61 @@ def same_origin(url: str, origin: str) -> bool:
     return a.scheme in ("http", "https") and (a.scheme, a.netloc) == (b.scheme, b.netloc)
 
 
-def inside(path: str, run_dir: str) -> bool:
-    real = os.path.realpath(path)
+def inside(path: str, run_dir: str, cwd: str) -> bool:
+    real = os.path.realpath(os.path.join(cwd, os.path.expanduser(path)))
     return real.startswith(os.path.realpath(run_dir) + os.sep)
 
 
+def strip_safe_flags(rest: list[str]) -> list[str]:
+    """Strip allowed SAFE_FLAGS (and values of value-taking flags), returning positionals."""
+    positional: list[str] = []
+    i = 0
+    while i < len(rest):
+        a = rest[i]
+        if a == "--":
+            positional.extend(rest[i + 1:])
+            break
+        if a.startswith("-"):
+            name, eq, _ = a.partition("=")
+            if name in SAFE_BOOL_FLAGS:
+                if eq:
+                    raise Blocked(f"flag `{a}` is not allowed")
+                i += 1
+                continue
+            if name in SAFE_VALUE_FLAGS:
+                if not eq:
+                    if i + 1 >= len(rest):
+                        raise Blocked(f"flag `{name}` needs a value")
+                    i += 1
+                i += 1
+                continue
+            raise Blocked(f"flag `{a}` is not allowed")
+        positional.append(a)
+        i += 1
+    return positional
+
+
 def check_find(rest: list[str]) -> None:
-    # find <locator> <value> <action> [text]
-    if len(rest) < 3:
+    pos = strip_safe_flags(rest)
+    if not pos:
         raise Blocked("`find` needs <locator> <value> <action>")
-    locator, value, action = rest[0], rest[1], rest[2]
+    if pos[0] == "nth":
+        # find nth <n> <selector> <action> [text]
+        if len(pos) < 4 or not pos[1].isdigit():
+            raise Blocked("`find nth` needs <n> <selector> <action>")
+        locator, value, action, extra = pos[0], pos[2], pos[3], pos[4:]
+    else:
+        # find <locator> <value> <action> [text]
+        if len(pos) < 3:
+            raise Blocked("`find` needs <locator> <value> <action>")
+        locator, value, action, extra = pos[0], pos[1], pos[2], pos[3:]
     if action in FIND_READ_ACTIONS:
+        if extra:
+            raise Blocked(f"`find … {action}` takes no extra arguments")
         return
     if action in ("fill", "type"):
+        if len(extra) != 1:
+            raise Blocked(f"`find … {action}` needs exactly one text argument")
         search = (locator == "role" and value == "searchbox") or (
             locator in ("placeholder", "label") and "search" in value.lower())
         if search:
@@ -68,9 +111,25 @@ def check_find(rest: list[str]) -> None:
     raise Blocked(f"`find … {action}` is not a read-only action")
 
 
-def check_browser(args: list[str], scope: dict | None, run_dir: str | None) -> None:
-    if len(args) < 2 or args[0] != "--session" or not SESSION.match(args[1]):
+def load_scope(cwd: str, run_id: str) -> tuple[dict | None, str]:
+    run_dir = os.path.join(cwd, ".scratch", "browser-test", run_id)
+    try:
+        with open(os.path.join(run_dir, "scope.json")) as fh:
+            data = json.load(fh)
+            if not isinstance(data, dict):
+                return None, run_dir
+            return data, run_dir
+    except (OSError, ValueError):
+        return None, run_dir
+
+
+def check_browser(args: list[str], cwd: str) -> None:
+    if len(args) < 2 or args[0] != "--session":
         raise Blocked("every agent-browser call must start with `--session bt-<run-id>-<tag>`")
+    m = SESSION.match(args[1])
+    if not m:
+        raise Blocked("every agent-browser call must start with `--session bt-<run-id>-<tag>`")
+    scope, run_dir = load_scope(cwd, m.group(1))
     if scope is None:
         raise Blocked("no scope.json for this run under .scratch/browser-test/ — the run was not started")
     args = args[2:]
@@ -107,8 +166,8 @@ def check_browser(args: list[str], scope: dict | None, run_dir: str | None) -> N
             raise Blocked(f"`{verb}` is only allowed on {scope['origin']} — navigate by clicking")
         return
     if verb == "screenshot":
-        paths = [a for a in rest if not a.startswith("--")]
-        if any(not inside(p, run_dir) for p in paths):
+        paths = strip_safe_flags(rest)
+        if any(not inside(p, run_dir, cwd) for p in paths):
             raise Blocked(f"screenshots must be saved under {run_dir}/")
         return
     if verb == "press":
@@ -134,30 +193,15 @@ def check_browser(args: list[str], scope: dict | None, run_dir: str | None) -> N
     raise Blocked(f"`{verb}` is not an allowed verb for a read-only browser test")
 
 
-def load_scope(cwd: str, parts: list[list[str]]) -> tuple[dict | None, str | None]:
-    for seg in parts:
-        if seg[:2] == ["agent-browser", "--session"] and len(seg) > 2:
-            m = SESSION.match(seg[2])
-            if m:
-                run_dir = os.path.join(cwd, ".scratch", "browser-test", m.group(1))
-                try:
-                    with open(os.path.join(run_dir, "scope.json")) as fh:
-                        return json.load(fh), run_dir
-                except (OSError, ValueError):
-                    return None, run_dir
-    return None, None
-
-
 def check(command: str, cwd: str) -> None:
     parts = parse_command(command)
-    scope, run_dir = load_scope(cwd, parts)
     for seg in parts:
         if seg[0] in FILTERS:
             check_filter(seg[0], seg[1:])
             continue
         if seg[0] != "agent-browser":
             raise Blocked(f"`{seg[0]}` is not allowed — only agent-browser and read-only filters")
-        check_browser(seg[1:], scope, run_dir)
+        check_browser(seg[1:], cwd)
 
 
 def run_payload(payload: dict) -> int:

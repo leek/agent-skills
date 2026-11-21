@@ -20,7 +20,8 @@ import re
 import sys
 
 SAFE_REDIRECTS = {("2", ">", "/dev/null"), ("2", ">&", "1")}
-REVIEW_GUARDED = {"finding-verifier", "pr-reviewer"}
+REVIEW_GUARDED = {"deepening-scout", "finding-verifier", "pr-reviewer",
+                  "spec-reviewer", "standards-reviewer"}
 BROWSER_GUARDED = {"browser-tester", "browser-test-planner"}
 
 
@@ -37,6 +38,7 @@ class Word(str):
 
     unquoted: str = ""
     glued: bool = False  # an operator follows with no space between: `2>` but not `2 >`
+    has_quotes: bool = False  # any quote or backslash appeared (disqualifies IO_NUMBER)
 
 
 def check_expansion(word: "Word") -> None:
@@ -113,16 +115,18 @@ def tokenize(command: str) -> list[str]:
     word: list[str] = []
     live: list[str] = []  # the same word with every quoted or escaped character blanked
     in_word = False
+    has_quotes = False
     i, n = 0, len(command)
 
     def flush(glued: bool = False) -> None:
-        nonlocal word, live, in_word
+        nonlocal word, live, in_word, has_quotes
         if in_word:
             token = Word("".join(word))
             token.unquoted = "".join(live)
             token.glued = glued
+            token.has_quotes = has_quotes
             tokens.append(token)
-        word, live, in_word = [], [], False
+        word, live, in_word, has_quotes = [], [], False, False
 
     def quoted(text: str) -> None:
         word.append(text)
@@ -140,6 +144,7 @@ def tokenize(command: str) -> list[str]:
                 continue
             quoted(command[i + 1])
             in_word = True
+            has_quotes = True
             i += 2
             continue
         if c == "'":
@@ -148,6 +153,7 @@ def tokenize(command: str) -> list[str]:
                 raise Blocked("could not parse the command (no closing quotation)")
             quoted(command[i + 1:end])
             in_word = True
+            has_quotes = True
             i = end + 1
             continue
         if c == '"':
@@ -172,6 +178,7 @@ def tokenize(command: str) -> list[str]:
                 quoted(d)
                 j += 1
             in_word = True
+            has_quotes = True
             i = j + 1
             continue
         if c == "`" or command.startswith(("$(", "$[", "=(", "$'"), i):
@@ -211,12 +218,14 @@ def segments(command: str) -> list[list[str]]:
     cleaned, i = [], 0
     while i < len(tokens):
         window = tokens[i:i + 3]
-        # `2>/dev/null` is a redirect only when the 2 is unquoted and touches the operator.
-        # `"2">/dev/null` and `2 >/dev/null` pass 2 as an argument and redirect stdout, so
-        # stripping them would hide an argument from the checks (`uniq -f "2">/dev/null in out`).
+        # `2>/dev/null` is a redirect only when the 2 is completely unquoted (no empty quotes
+        # like `""2` or `2""` either) and touches the operator. `"2">/dev/null`, `""2>/dev/null`,
+        # and `2 >/dev/null` pass 2 as an argument and redirect stdout, so stripping them would
+        # hide an argument from the checks (`uniq -f ""2>/dev/null - /tmp/out`).
         if (len(window) == 3 and not isinstance(window[0], Op) and isinstance(window[1], Op)
                 and not isinstance(window[2], Op) and tuple(window) in SAFE_REDIRECTS
-                and window[0].glued and window[0].unquoted == str(window[0])):
+                and window[0].glued and not window[0].has_quotes
+                and window[0].unquoted == str(window[0])):
             i += 3
             continue
         cleaned.append(tokens[i])
@@ -296,7 +305,7 @@ def _load_module(name: str, path: Path):
     return module
 
 
-SHELL_TOOLS = {"Bash", "run_terminal_command"}
+SHELL_TOOLS = {"Bash", "run_terminal_command", "Shell"}
 
 
 def normalize(payload: dict) -> dict:

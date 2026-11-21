@@ -16,7 +16,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash|run_terminal_command",
+        "matcher": "Bash|run_terminal_command|Shell",
         "hooks": [
           {
             "type": "command",
@@ -25,7 +25,7 @@
         ]
       },
       {
-        "matcher": "Write|Edit|MultiEdit|search_replace",
+        "matcher": "Write|Edit|MultiEdit|search_replace|write|hashline_edit|StrReplace|EditNotebook|Delete",
         "hooks": [
           {
             "type": "command",

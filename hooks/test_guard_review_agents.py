@@ -124,6 +124,68 @@ class GuardReviewAgentsTest(unittest.TestCase):
         self.assertIn("not a read-only git command", blocked.stderr)
         self.assertEqual(grok("rm -rf x", "leek-skills:browser-tester").returncode, 2)
 
+    def test_dispatcher_guards_shell_tool_and_additional_review_agents(self):
+        # Grok daemon routes shell calls under tool name "Shell".
+        def shell_call(command, agent):
+            payload = {"tool_name": "Shell", "tool_input": {"command": command}, "agent_type": agent}
+            return subprocess.run([sys.executable, str(DISPATCHER)], input=json.dumps(payload),
+                                  text=True, capture_output=True)
+
+        self.assertEqual(shell_call("git log --oneline -5", "leek-skills:finding-verifier").returncode, 0)
+        self.assertEqual(shell_call("git commit -m x", "leek-skills:pr-reviewer").returncode, 2)
+        self.assertEqual(shell_call("rm -rf x", "leek-skills:browser-tester").returncode, 2)
+
+        # Read-only git-only agents are guarded; agents that run bash/composer/agent-browser are not.
+        for agent in ("leek-skills:standards-reviewer", "leek-skills:spec-reviewer",
+                      "leek-skills:deepening-scout", "standards-reviewer",
+                      "spec-reviewer", "deepening-scout"):
+            self.assertAllowed("git diff main...HEAD", agent=agent)
+            self.assertAllowed("git log --oneline -10", agent=agent)
+            self.assertBlocked("git commit -m x", "not a read-only git command", agent=agent)
+            self.assertBlocked("rm -rf app", "`rm` is not allowed", agent=agent)
+        self.assertAllowed("bash extract-signal.sh log.jsonl", agent="leek-skills:session-miner")
+        self.assertAllowed("composer audit --format=json", agent="leek-skills:dependency-auditor")
+        self.assertAllowed("agent-browser snapshot -i", agent="leek-skills:ui-reviewer")
+
+    def test_empty_quote_io_number_desync_is_blocked(self):
+        # Empty quotes disqualify IO_NUMBER in bash/zsh, so `""2>/dev/null` passes `2` as an
+        # argument and redirects stdout instead of stderr.
+        self.assertBlocked('echo pwned | uniq -f ""2>/dev/null - /tmp/pwned', "redirects")
+        self.assertBlocked("echo pwned | uniq -f ''2>/dev/null - /tmp/pwned", "redirects")
+        self.assertBlocked('echo pwned | uniq -f 2"">/dev/null - /tmp/pwned', "redirects")
+        self.assertBlocked("echo pwned | uniq -f 2''>/dev/null - /tmp/pwned", "redirects")
+        self.assertBlocked('gh api -q ""2>/dev/null -X DELETE repos/o/r', "redirects")
+        self.assertBlocked('git log ""2>&1', "redirects")
+        self.assertAllowed("git log --oneline -5 2>/dev/null")
+        self.assertAllowed("git log 2>&1 | head -5")
+
+    def test_jq_env_secret_exposure_is_blocked(self):
+        self.assertBlocked("jq -n env", "environment variables")
+        self.assertBlocked("jq 'env'", "environment variables")
+        self.assertBlocked("jq '$ENV'", "environment variables")
+        self.assertBlocked("jq -n 'env.GITHUB_TOKEN'", "environment variables")
+        self.assertBlocked("jq -n '$ENV.AWS_SECRET_ACCESS_KEY'", "environment variables")
+        self.assertBlocked("jq -n '{t: env}'", "environment variables")
+        self.assertBlocked('jq -n \'"\\(env.TOKEN)"\'', "environment variables")
+        self.assertBlocked('jq -n \'"\\($ENV.TOKEN)"\'', "environment variables")
+        self.assertBlocked("jq -f evil.jq data.json", "--from-file")
+        self.assertBlocked("jq --from-file=evil.jq data.json", "--from-file")
+        self.assertBlocked("gh pr view 1 --json title --jq env", "environment variables")
+        self.assertBlocked("gh pr view 1 --json title -q '$ENV'", "environment variables")
+        self.assertBlocked("gh pr list --json number --jq 'env.GITHUB_TOKEN'", "environment variables")
+        self.assertBlocked("gh api user --jq 'env'", "environment variables")
+        self.assertBlocked("gh api user -q'$ENV'", "environment variables")
+        self.assertBlocked("gh api user --jq='env.SECRET'", "environment variables")
+        # Field access and longer identifiers stay allowed.
+        self.assertAllowed("jq -r '.env' config.json")
+        self.assertAllowed("jq -r '.foo.env' config.json")
+        self.assertAllowed("jq -r '.environment' config.json")
+        self.assertAllowed("jq -r '.[\"env\"]' config.json")
+        self.assertAllowed("jq -r '.my_env' config.json")
+        self.assertAllowed("gh api user --jq '.env'")
+        self.assertAllowed("gh pr list --json name --jq '.[].environment'")
+        self.assertAllowed("gh pr view 1 --json title -q '.title'")
+
     def test_gh_writes_are_blocked(self):
         self.assertBlocked("gh pr merge 12 --squash", "not a read-only gh command")
         self.assertBlocked("gh pr view 12 --web", "opens a browser")

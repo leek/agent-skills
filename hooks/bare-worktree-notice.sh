@@ -8,6 +8,10 @@ set -e
 
 dir="${CLAUDE_PROJECT_DIR:-$PWD}"
 [[ -f "$dir/.git" ]] || exit 0  # a linked worktree has a .git file; the main checkout has a directory
+grep -qE '^gitdir:[[:space:]]+' "$dir/.git" 2>/dev/null || exit 0
+if grep -qE '^gitdir:[[:space:]]+(.*/)?modules(/|$)' "$dir/.git" 2>/dev/null; then
+  exit 0  # git submodule, not a linked worktree
+fi
 [[ -f "$dir/artisan" && -f "$dir/composer.json" && ! -e "$dir/vendor" ]] || exit 0
 
 echo "This session is in a bare git worktree of a Laravel app: no vendor/ yet, and likely no .env. Before running tests, artisan, or the app, make it runnable with the laravel-herd-worktrees skill's \"Bootstrap a bare worktree\" section."

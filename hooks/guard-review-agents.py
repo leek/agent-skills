@@ -16,7 +16,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from shell_guard import Blocked, check_filter, long_option_in, parse_command  # noqa: E402
 
-FILTERS = {"cat", "head", "tail", "wc", "sort", "uniq", "cut", "tr", "echo", "ls", "jq",
+FILTERS = {"cat", "head", "tail", "wc", "sort", "uniq", "cut", "tr", "echo", "ls",
            "grep", "egrep", "cd", "pwd", "basename", "dirname", "true"}
 GIT_READ = {"log", "show", "diff", "ls-files", "ls-tree", "blame", "grep", "rev-parse",
             "rev-list", "merge-base", "cat-file", "status", "range-diff", "shortlog",
@@ -160,6 +160,9 @@ def check_gh(args: list[str]) -> None:
         # OWNER/REPO only: HOST/OWNER/REPO and a URL send the call to another host.
         if any(name == "--repo" and not OWNER_REPO.fullmatch(v) for name, v in flags):
             raise Blocked("`-R` takes OWNER/REPO on github.com, never a host or a URL")
+        for name, v in flags:
+            if name == "--jq":
+                check_jq_filter(v)
         # `gh repo view host/owner/repo` and `gh pr view git@host:o/r` reach another host
         # with no -R at all, so every positional is held to the same shapes.
         for a in positional:
@@ -171,6 +174,9 @@ def check_gh(args: list[str]) -> None:
     if args[:1] != ["api"]:
         raise Blocked(f"`gh {' '.join(args[:2])}` is not a read-only gh command")
     flags, positional = parse_pflags(args[1:], GH_API_VALUE, GH_API_BOOL, GH_API_SHORT, "gh api")
+    for name, v in flags:
+        if name == "--jq":
+            check_jq_filter(v)
     methods = [v.upper() for name, v in flags if name == "--method"]
     fields = [(name, v) for name, v in flags if name in ("--field", "--raw-field")]
     if any(m != "GET" for m in methods):
@@ -217,6 +223,24 @@ def check_sed(args: list[str]) -> None:
         raise Blocked("only `sed -n '<start>,<end>p' <file>` is allowed; use the Read tool")
 
 
+# `env` builtin and `$ENV` object read process environment variables (tokens, keys).
+# Field access (`.env`, `.foo.env`), string keys (`.["env"]`), and longer words (`.environment`) stay allowed.
+JQ_ENV = re.compile(r'(?<![.\w$"])env\b|\$ENV\b')
+
+
+def check_jq_filter(expr: str) -> None:
+    if JQ_ENV.search(expr):
+        raise Blocked("`jq` filters may not read environment variables (`env`, `$ENV`)")
+
+
+def check_jq(args: list[str]) -> None:
+    for a in args:
+        if long_option_in(a, ("--from-file",)) or (
+                a.startswith("-") and not a.startswith("--") and "f" in a[1:]):
+            raise Blocked("`jq -f` / `--from-file` is not allowed")
+        check_jq_filter(a)
+
+
 def check(command: str) -> None:
     parts = parse_command(command)
     for seg in parts:
@@ -234,6 +258,8 @@ def check(command: str) -> None:
             check_find(args)
         elif name == "sed":
             check_sed(args)
+        elif name == "jq":
+            check_jq(args)
         else:
             raise Blocked(f"`{name}` is not allowed — only read-only git, gh, rg, find, and text filters")
 

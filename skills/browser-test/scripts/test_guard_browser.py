@@ -110,6 +110,64 @@ class GuardBrowserTest(unittest.TestCase):
             with self.subTest(cmd=cmd):
                 self.assertBlocked(cmd, reason)
 
+    def test_find_flag_stripping_and_nth_form(self):
+        for cmd in [
+            f"{S} find --json text Settings click",
+            f"{S} find text Settings click --json",
+            f"{S} find nth 0 '.item' click",
+            f"{S} find nth 0 text text",
+            f"{S} find --timeout 5000 role searchbox fill acme",
+        ]:
+            with self.subTest(cmd=cmd):
+                self.assertAllowed(cmd)
+        for cmd, reason in [
+            (f"{S} find --json text text fill pwned", "only allowed into a search box"),
+            (f"{S} find --json text click fill pwned", "only allowed into a search box"),
+            (f"{S} find --timeout 5000 label Email fill pwned", "only allowed into a search box"),
+            (f"{S} find nth 0 text fill pwned", "only allowed into a search box"),
+            (f"{S} find nth 0 focus dblclick", "not a read-only action"),
+            (f"{S} find nth abc '.item' click", "`find nth` needs"),
+            (f"{S} find text Settings click extra", "takes no extra arguments"),
+            (f"{S} find role searchbox fill acme extra", "needs exactly one text argument"),
+            (f"{S} find role searchbox fill", "needs exactly one text argument"),
+            (f"{S} find --unknown text Settings click", "flag `--unknown`"),
+        ]:
+            with self.subTest(cmd=cmd):
+                self.assertBlocked(cmd, reason)
+
+    def test_screenshot_relative_paths_and_short_flags(self):
+        # Relative paths resolve against payload cwd, not the hook process's os.getcwd().
+        self.assertAllowed(f"{S} screenshot .scratch/browser-test/{RUN}/1-rel.png")
+        self.assertAllowed(f"{S} screenshot --full {self.run_dir}/1-full.png")
+        self.assertAllowed(f"{S} screenshot -s '#main' {self.run_dir}/1-sel.png")
+        self.assertAllowed(f"{S} screenshot --selector='#main' {self.run_dir}/1-sel2.png")
+        self.assertAllowed(f"{S} screenshot -i -c -d 2 {self.run_dir}/1-flags.png")
+        self.assertBlocked(f"{S} screenshot 1-outside.png", "must be saved under")
+        self.assertBlocked(f"{S} screenshot ~/1-home.png", "must be saved under")
+        self.assertBlocked(f"{S} screenshot -s '#main' /tmp/evil.png", "must be saved under")
+        self.assertBlocked(f"{S} screenshot -x {self.run_dir}/1.png", "flag `-x`")
+        self.assertBlocked(f"{S} screenshot --bad {self.run_dir}/1.png", "flag `--bad`")
+        self.assertBlocked(f"{S} screenshot -s", "needs a value")
+
+    def test_scope_is_validated_per_segment(self):
+        run2 = "20260927-130000"
+        run_dir2 = self.cwd / ".scratch" / "browser-test" / run2
+        run_dir2.mkdir(parents=True)
+        state2 = str(self.cwd / "auth2.json")
+        (run_dir2 / "scope.json").write_text(
+            json.dumps({"origin": "https://other.test", "state": state2}))
+        s2 = f"agent-browser --session bt-{run2}-1"
+        s_missing = "agent-browser --session bt-20260101-000000-1"
+
+        self.assertAllowed(f"{S} snapshot -i && {s2} open https://other.test/page")
+        self.assertBlocked(f"{S} snapshot -i && {s_missing} open https://app.test/", "no scope.json")
+        self.assertBlocked(f"{S} snapshot -i && {s2} open https://app.test/",
+                           "only allowed on https://other.test")
+        self.assertBlocked(f"{S} snapshot -i && {s2} screenshot {self.run_dir}/1.png",
+                           "must be saved under")
+        self.assertBlocked(f"{S} snapshot -i && {s2} --state {self.state} open https://other.test/",
+                           "exact auth file")
+
     def test_agent_files_carry_the_exact_probe(self):
         agents = Path(__file__).resolve().parents[3] / "agents"
         for name in ["browser-tester.md", "browser-writer.md"]:
