@@ -582,6 +582,9 @@ check "bare-worktree notice speaks only in a bare Laravel worktree" \
     echo "gitdir: ../.git/modules/sub" > "$t/sub/.git"
     echo "gitdir: /src/modules/shop/.git/worktrees/feat" > "$t/mod/.git"
     test -z "$(run "$t/sub")" && test -n "$(run "$t/mod")" || exit 1
+    mkdir -p "$t/wsub"; touch "$t/wsub/artisan" "$t/wsub/composer.json"
+    echo "gitdir: ../../.git/modules/worktrees/app" > "$t/wsub/.git"
+    test -z "$(run "$t/wsub")" || exit 1
     mkdir "$t/wt/vendor"; test -z "$(run "$t/wt")"'
 check "scratch-state.sh classifies open, mismatched, and done efforts" \
   bash -c '

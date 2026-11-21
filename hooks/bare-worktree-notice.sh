@@ -12,7 +12,8 @@ grep -qE '^gitdir:[[:space:]]+' "$dir/.git" 2>/dev/null || exit 0
 # A submodule's gitdir is <...>/.git/modules/<name>; a linked worktree's is <...>/.git/worktrees/<name>,
 # even when its repo sits under a directory named modules/.
 gitdir=$(sed -n 's/^gitdir:[[:space:]]*//p' "$dir/.git" | head -n 1)
-if [[ "$gitdir" == *.git/modules/* && "$gitdir" != */worktrees/* ]]; then
+# Only a `.git/worktrees/` segment marks a worktree: a submodule may be named worktrees/.
+if [[ "$gitdir" == *.git/modules/* && "$gitdir" != *.git/worktrees/* ]]; then
   exit 0  # git submodule, not a linked worktree
 fi
 [[ -f "$dir/artisan" && -f "$dir/composer.json" && ! -e "$dir/vendor" ]] || exit 0
