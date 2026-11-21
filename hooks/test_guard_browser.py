@@ -127,14 +127,21 @@ class GuardBrowserTest(unittest.TestCase):
             f"{S} find text Settings click --json",
             f"{S} find nth 0 '.item' click",
             f"{S} find nth 0 text text",
-            f"{S} find --timeout 5000 role searchbox fill acme",
+            f"{S} find role button click --name Submit",
+            f"{S} find --exact text Settings click",
+            f"{S} find role searchbox fill acme --name Search",
         ]:
             with self.subTest(cmd=cmd):
                 self.assertAllowed(cmd)
         for cmd, reason in [
             (f"{S} find --json text text fill pwned", "only allowed into a search box"),
             (f"{S} find --json text click fill pwned", "only allowed into a search box"),
-            (f"{S} find --timeout 5000 label Email fill pwned", "only allowed into a search box"),
+            (f"{S} find --timeout 5000 role searchbox fill acme", "flag `--timeout`"),
+            (f"{S} find --timeout 5000 label Email fill pwned", "flag `--timeout`"),
+            # find has no --timeout: read as a value flag this looked like a hover but ran a fill.
+            (f"{S} find --timeout label Password fill hover", "flag `--timeout`"),
+            (f"{S} find -s x text Settings click", "flag `-s`"),
+            (f"{S} find --name", "needs a value"),
             (f"{S} find nth 0 text fill pwned", "only allowed into a search box"),
             (f"{S} find nth 0 focus dblclick", "not a read-only action"),
             (f"{S} find nth abc '.item' click", "`find nth` needs"),
@@ -150,22 +157,27 @@ class GuardBrowserTest(unittest.TestCase):
         # Relative paths resolve against payload cwd, not the hook process's os.getcwd().
         self.assertAllowed(f"{S} screenshot .scratch/browser-test/{RUN}/1-rel.png")
         self.assertAllowed(f"{S} screenshot --full {self.run_dir}/1-full.png")
-        self.assertAllowed(f"{S} screenshot -s '#main' {self.run_dir}/1-sel.png")
-        self.assertAllowed(f"{S} screenshot --selector='#main' {self.run_dir}/1-sel2.png")
-        self.assertAllowed(f"{S} screenshot -i -c -d 2 {self.run_dir}/1-flags.png")
+        self.assertAllowed(f"{S} screenshot '#main' {self.run_dir}/1-sel.png")
+        self.assertBlocked(f"{S} screenshot -s '#main' {self.run_dir}/1-sel.png", "flag `-s`")
+        self.assertBlocked(f"{S} screenshot --selector='#main' {self.run_dir}/1-sel2.png", "flag `--selector")
+        self.assertBlocked(f"{S} screenshot -i -c -d 2 {self.run_dir}/1-flags.png", "flag `-i`")
         self.assertBlocked(f"{S} screenshot 1-outside.png", "must be saved under")
         self.assertBlocked(f"{S} screenshot ~/1-home.png", "must be saved under")
-        self.assertBlocked(f"{S} screenshot -s '#main' /tmp/evil.png", "must be saved under")
+        self.assertBlocked(f"{S} screenshot '#main' /tmp/evil.png", "must be saved under")
         self.assertBlocked(f"{S} screenshot -x {self.run_dir}/1.png", "flag `-x`")
         self.assertBlocked(f"{S} screenshot --bad {self.run_dir}/1.png", "flag `--bad`")
         self.assertBlocked(f"{S} screenshot --threshold", "needs a value")
 
     def test_screenshot_path_cannot_hide_behind_a_value_flag(self):
-        # `screenshot` takes only --threshold, --screenshot-dir, --screenshot-quality and
-        # --screenshot-format as value flags, so `--timeout /tmp/evil.png` leaves the path positional.
+        # `screenshot` takes only its own flags; any other (--timeout, -s) is refused outright.
         for cmd in [
             f"{S} screenshot --timeout /tmp/evil.png",
             f"{S} screenshot -s /tmp/evil.png",
+            f"{S} screenshot /tmp/evil.png --timeout {self.run_dir}/x.png",
+        ]:
+            with self.subTest(cmd=cmd):
+                self.assertBlocked(cmd, "is not allowed")
+        for cmd in [
             f"{S} screenshot --screenshot-dir /tmp",
             f"{S} screenshot --screenshot-dir=/tmp {self.run_dir}/1.png",
             f"{S} screenshot --annotate '#main'",
@@ -173,7 +185,6 @@ class GuardBrowserTest(unittest.TestCase):
             with self.subTest(cmd=cmd):
                 self.assertBlocked(cmd, "must be saved under")
         for cmd in [
-            f"{S} screenshot --timeout 5000 {self.run_dir}/1.png",
             f"{S} screenshot -f --if-changed --threshold 0.01 {self.run_dir}/1.png",
             f"{S} screenshot --annotate --json '#main' {self.run_dir}/1.png",
             f"{S} screenshot --screenshot-format jpeg --screenshot-quality 80 {self.run_dir}/1.jpg",
@@ -190,7 +201,6 @@ class GuardBrowserTest(unittest.TestCase):
         self.assertAllowed(f"{S} screenshot '#el' {self.run_dir}/x.png")
         self.assertAllowed(f"{S} screenshot {self.run_dir}/x.png")
         for cmd in [f"{S} screenshot a b {self.run_dir}/x.png",
-                    f"{S} screenshot --timeout 5000 /tmp/evil.png {self.run_dir}/1.png",
                     f"{S} screenshot '#el' {self.run_dir}/x.png extra"]:
             with self.subTest(cmd=cmd):
                 self.assertBlocked(cmd, "at most a selector and a path")

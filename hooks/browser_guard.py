@@ -29,7 +29,7 @@ SESSION = re.compile(r"^bt-(\d{8}-\d{6})-[a-z0-9]+$")
 SAFE_KEYS = {"Escape", "Tab", "Shift+Tab", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
              "PageUp", "PageDown", "Home", "End"}
 FIND_READ_ACTIONS = {"click", "hover", "focus", "text", "scrollintoview"}
-# Flags any verb may carry. Everything else (--fn, --download, --profile, --auto-connect,
+# Flags the other verbs may carry (find and screenshot take only their own, below). Everything else (--fn, --download, --profile, --auto-connect,
 # --cdp, --headers, --headed, …) runs JS, writes files, or swaps the browser, so it is refused.
 SAFE_BOOL_FLAGS = {"--clear", "--json", "--full", "-i", "--interactive", "-c", "--compact"}
 SAFE_VALUE_FLAGS = {"--filter", "--type", "--status", "--method", "--load", "--url", "--text",
@@ -38,7 +38,11 @@ SAFE_FLAGS = SAFE_BOOL_FLAGS | SAFE_VALUE_FLAGS
 # `agent-browser screenshot --help` (0.43): usage `screenshot [selector] [path]`, booleans
 # --full/-f, --if-changed, --annotate, and these four value flags. Legal on screenshot only.
 SCREENSHOT_VALUE_FLAGS = {"--threshold", "--screenshot-dir", "--screenshot-quality", "--screenshot-format"}
-SCREENSHOT_FLAGS = {"-f", "--full", "--if-changed", "--annotate"} | SCREENSHOT_VALUE_FLAGS
+SCREENSHOT_FLAGS = {"-f", "--full", "--if-changed", "--annotate", "--json"} | SCREENSHOT_VALUE_FLAGS
+# `agent-browser find --help` (0.43): only --name <name> and --exact, plus the global --json.
+FIND_BOOL_FLAGS = {"--exact", "--json"}
+FIND_VALUE_FLAGS = {"--name"}
+VERB_FLAGS = {"screenshot": SCREENSHOT_FLAGS, "find": FIND_BOOL_FLAGS | FIND_VALUE_FLAGS}
 ELEMENT_STATES = {"visible", "hidden", "attached", "detached"}
 FILTERS = {"grep", "head", "tail", "wc", "sort", "uniq", "echo"}
 
@@ -89,8 +93,8 @@ def check_screenshot(rest: list[str], run_dir: str, cwd: str) -> None:
         raise Blocked(f"screenshots must be saved under {run_dir}/")
 
 
-def strip_safe_flags(rest: list[str]) -> list[str]:
-    """Strip allowed SAFE_FLAGS (and values of value-taking flags), returning positionals."""
+def strip_find_flags(rest: list[str]) -> list[str]:
+    """Strip find's own flags (and --name's value), returning positionals."""
     positional: list[str] = []
     i = 0
     while i < len(rest):
@@ -100,12 +104,12 @@ def strip_safe_flags(rest: list[str]) -> list[str]:
             break
         if a.startswith("-"):
             name, eq, _ = a.partition("=")
-            if name in SAFE_BOOL_FLAGS:
+            if name in FIND_BOOL_FLAGS:
                 if eq:
                     raise Blocked(f"flag `{a}` is not allowed")
                 i += 1
                 continue
-            if name in SAFE_VALUE_FLAGS:
+            if name in FIND_VALUE_FLAGS:
                 if not eq:
                     if i + 1 >= len(rest):
                         raise Blocked(f"flag `{name}` needs a value")
@@ -119,7 +123,7 @@ def strip_safe_flags(rest: list[str]) -> list[str]:
 
 
 def check_find(rest: list[str]) -> None:
-    pos = strip_safe_flags(rest)
+    pos = strip_find_flags(rest)
     if not pos:
         raise Blocked("`find` needs <locator> <value> <action>")
     if pos[0] == "nth":
@@ -182,7 +186,7 @@ def check_browser(args: list[str], cwd: str) -> None:
             continue
         if a == "--state" and verb == "wait" and rest[i + 1:i + 2] and rest[i + 1] in ELEMENT_STATES:
             continue
-        allowed = SAFE_FLAGS | SCREENSHOT_FLAGS if verb == "screenshot" else SAFE_FLAGS
+        allowed = VERB_FLAGS.get(verb, SAFE_FLAGS)
         if a.split("=", 1)[0] not in allowed:
             raise Blocked(f"flag `{a}` is not allowed")
     if verb in ("snapshot", "click", "hover", "focus", "scroll", "scrollintoview", "wait", "get",
