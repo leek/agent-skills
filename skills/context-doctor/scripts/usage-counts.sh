@@ -69,8 +69,9 @@ done | jq -s 'add // {}' > "$out/sessions/in_project.json"
 
 # One row per log: the parent and each child, all stamped with the parent's id and timestamp.
 jq -r --slurpfile f "$out/sessions/in_project.json" '. as $r | ($f[0][$r.id] // false) as $in
-  | ([$r.path] + ($r.children // []))[] | [., $r.id, ($r.timestamp // ""), $in] | @tsv' "$out/sessions/parents.jsonl" |
+  | ([$r.path] + ($r.children // []))[] | [., $r.id, (if ($r.timestamp // "") == "" then "-" else $r.timestamp end), $in] | @tsv' "$out/sessions/parents.jsonl" |
 while IFS=$'\t' read -r log id ts inproj; do
+  [ "$ts" = "-" ] && ts=""
   # A large --max-chars: an Agent call's subagent_type comes after its prompt, so a short cut
   # would drop it. Fields are matched by pattern because a cut input is no longer valid JSON.
   bash "$retro/extract-signal.sh" "$log" --max-chars 1000000 2>/dev/null |

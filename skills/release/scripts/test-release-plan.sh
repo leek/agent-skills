@@ -135,6 +135,18 @@ plan
 want '[.behind, .upstream]' '[null,null]'
 ok "no upstream is behind null, not 0"
 
+case_name="gone upstream"
+git init -q --bare -b main "$T/gone.git"
+repo; commit "chore: init"; tag v1.2.3; commit "fix: mine"
+git remote add origin "$T/gone.git"; git push -q -u origin main v1.2.3
+git checkout -q -b topic; git push -q -u origin topic
+git push -q origin --delete topic
+git fetch -q --prune origin
+plan
+[ "$code" -eq 0 ] || fail "$case_name: exit $code: $(cat "$T/stderr")"
+want '[.behind, .upstream]' '[null,null]'
+ok "a gone upstream is null, not literal @{u}"
+
 case_name="non-version tag sorts highest"
 repo; commit "chore: init"; tag v1.2.3; tag weekly; commit "fix: a bug"
 [ "$(git tag --sort=-v:refname | sed -n 1p)" = weekly ] || fail "$case_name: fixture: weekly must sort above v1.2.3"

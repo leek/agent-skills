@@ -41,12 +41,20 @@ for d in "$sib" "$sub"; do
   } > "$dir/$(printf '%s' "$d" | shasum | cut -c1-8)-0000-0000-0000-000000000000.jsonl"
 done
 
+# A session whose events carry null/missing timestamps must not shift TSV columns.
+{
+  echo '{"type":"user","timestamp":null,"message":{"role":"user","content":"No timestamps here."}}'
+  echo '{"type":"assistant","timestamp":null,"message":{"role":"assistant","content":[{"type":"tool_use","name":"Skill","input":{"skill":"acme:notime"}}]}}'
+} > "$inside/77777777-8888-9999-aaaa-bbbbbbbbbbbb.jsonl"
+
 u=$(bash "$here/usage-counts.sh" --out "$tmp/out" --count 10 --project "$proj" 2>/dev/null)
-[ "$(echo "$u" | jq .sessions)" = 4 ] || fail "sessions: $u"
-[ "$(echo "$u" | jq .project_sessions)" = 2 ] || fail "project sessions (sibling counted, or subdir missed): $u"
+[ "$(echo "$u" | jq .sessions)" = 5 ] || fail "sessions: $u"
+[ "$(echo "$u" | jq .project_sessions)" = 3 ] || fail "project sessions (sibling counted, or subdir missed): $u"
 [ "$(echo "$u" | jq '.skills["acme:lint"].count')" = 5 ] || fail "skill count: $u"
 [ "$(echo "$u" | jq '.skills["acme:lint"].sessions')" = 4 ] || fail "skill sessions: $u"
 [ "$(echo "$u" | jq '.skills["acme:lint"].project_count')" = 3 ] || fail "skill project count: $u"
+[ "$(echo "$u" | jq '.skills["acme:notime"].count')" = 1 ] || fail "null-timestamp skill count: $u"
+[ "$(echo "$u" | jq '.skills["acme:notime"].project_count')" = 1 ] || fail "null-timestamp skill project count: $u"
 [ "$(echo "$u" | jq '.mcp_servers.plugin_acme_srv.count')" = 2 ] || fail "plugin MCP key: $u"
 [ "$(echo "$u" | jq '.agents["acme:reviewer"].count')" = 1 ] || fail "agent behind a long prompt: $u"
 [ "$(echo "$u" | jq '.mcp_servers.posthog.count')" = 1 ] || fail "mcp: $u"

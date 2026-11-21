@@ -188,3 +188,14 @@ run --remove "$t/wt-fork-behind"
 [ "$rc" = 1 ] || fail "fork PRs: --remove of the worktree that only shares a branch name exits 1, got $rc"
 [ -d "$t/wt-fork-behind" ] || fail "fork PRs: the worktree was removed"
 ok "a fork PR's branch name alone makes no worktree a candidate; its exact head commit does"
+
+# --- a registry name with regex metacharacters never makes a registered database an orphan ------
+registry_before=$(cat "$registry")
+printf '%s\tpgsql\tfoo(bar\t-\n%s\tpgsql\tapp_pr43\t-\n' "$(date +%s)" "$(date +%s)" >> "$registry"
+printf 'app_pr43 8 MB\napp_pr43_test_2 8 MB\n' >> "$STUB_DBS"
+run
+[ "$rc" = 0 ] || fail "metacharacter registry name: exit $rc ($(cat "$t/err"))"
+printf '%s' "$out" | jq -e '[.databases[].database | select(startswith("app_pr43"))] == []' >/dev/null \
+  || fail "metacharacter registry name: a registered database and its copy are offered: $out"
+printf '%s\n' "$registry_before" > "$registry"
+ok "a registry name like foo(bar does not make the other registered databases orphans"

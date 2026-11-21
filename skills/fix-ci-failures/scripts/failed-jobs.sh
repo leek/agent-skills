@@ -79,7 +79,8 @@ while IFS= read -r run; do
       # A runner "##[error]" annotation comes first, then test-runner and compiler failure
       # lines. "Process completed with exit code" is never the real error, and config
       # echoes (display_errors=..., fail-on-cache-miss: ...) are not errors.
-      cut -f3- "$log" | sed -E 's/^[0-9T:.-]+Z ?//; s/\x1b\[[0-9;]*[A-Za-z]//g; s/\^\[\[[0-9;]*[A-Za-z]//g' > "$tmp.txt"
+      ESC=$(printf '\033')
+      cut -f3- "$log" | sed -E "s/^[0-9T:.-]+Z ?//; s/${ESC}\\[[0-9;]*[A-Za-z]//g; s/\\^\\[\\[[0-9;]*[A-Za-z]//g" > "$tmp.txt"
       errs=$( { grep -E '##\[error\]' "$tmp.txt" | grep -v 'Process completed with exit code' || true
                 grep -E '(^|[[:space:]])(FAILED|FAIL|Failed asserting|Error:|error:|ERROR|Exception|ERR!|Fatal|fatal:|✗|⨯|×)' "$tmp.txt" \
                   | grep -vE 'display_errors|fail-on-|fail_on|##\[(group|endgroup|error)\]' || true

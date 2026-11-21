@@ -115,8 +115,12 @@ git -C "$repo" switch -q main
 GH_STATE=MERGED
 run feat
 eq merged-values "$(field '[.branch, .mode, (.finished | type), (.finished | join(" "))] | @csv')" '"feat-3","fresh","array","feat feat-2"'
+# An older CLOSED PR alongside a current OPEN PR is NOT finished (resume, not fresh)
+GH_STATE=$'CLOSED\nOPEN'
+run feat
+eq reopened-values "$(field '[.branch, .mode, (.finished | join(" "))] | @csv')" '"feat-2","resume","feat"'
 GH_STATE=""
-echo "ok <slug>-3 when a PR merged"
+echo "ok <slug>-3 when a PR merged, and CLOSED+OPEN stays resume"
 
 # decision_sweep_done, build_decisions and local_default_scratch_only
 new_repo
