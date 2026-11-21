@@ -207,6 +207,27 @@ class GuardReviewAgentsTest(unittest.TestCase):
         self.assertAllowed("jq --indent 2 -S . data.json")
         self.assertAllowed("jq -s --slurpfile a a.json '.' b.json")
 
+    def test_jq_env_check_reads_only_the_filter_and_builtin_calls(self):
+        # File arguments are not filters, and an object key named env is not the builtin.
+        for cmd in ["jq '.name' config/env.json",
+                    "jq . src/include/x.json",
+                    "jq -r . import.json env",
+                    "jq -- . env.json",
+                    "gh pr view 1 --json body --jq '{env: .environment}'",
+                    "jq '{a: 1, env: .e}' data.json",
+                    "jq -n '$__loc__'"]:
+            with self.subTest(cmd=cmd):
+                self.assertAllowed(cmd)
+        for cmd in ["jq -n '{a: env}'",
+                    "jq -n '{env: env}'",
+                    "jq -n '{env: 1} | env'",
+                    "jq '.[env:]' data.json",
+                    "jq -n 'env::x'",
+                    "jq -n -- env",
+                    "gh api user --jq '{env: env.HOME}'"]:
+            with self.subTest(cmd=cmd):
+                self.assertBlocked(cmd, "environment variables")
+
     def test_gh_writes_are_blocked(self):
         self.assertBlocked("gh pr merge 12 --squash", "not a read-only gh command")
         self.assertBlocked("gh pr view 12 --web", "opens a browser")

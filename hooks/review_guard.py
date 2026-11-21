@@ -218,8 +218,16 @@ def check_sed(args: list[str]) -> None:
 
 
 # `env` builtin and `$ENV` object read process environment variables (tokens, keys).
-# Field access (`.env`, `.foo.env`), string keys (`.["env"]`), and longer words (`.environment`) stay allowed.
+# Field access (`.env`, `.foo.env`), string keys (`.["env"]`), longer words (`.environment`),
+# and an object key (`{env: .e}`, see env_is_key) stay allowed.
 JQ_ENV = re.compile(r'(?<![.\w$"])env\b|\$ENV\b')
+
+
+def env_is_key(expr: str, m: "re.Match[str]") -> bool:
+    """`env` written as an object key: `{env: …}` or `{…, env: …}`, never `.[env:]` or `env::f`."""
+    before, after = expr[:m.start()].rstrip(), expr[m.end():].lstrip()
+    return (m.group() == "env" and before.endswith(("{", ","))
+            and after.startswith(":") and not after.startswith("::"))
 
 
 # `include` / `import` load a module from jq's search path (or -L), whose definitions the
@@ -235,23 +243,26 @@ JQ_VALUE = {"--indent": 1, "--arg": 2, "--argjson": 2, "--slurpfile": 2, "--rawf
 
 
 def check_jq_filter(expr: str) -> None:
-    if JQ_ENV.search(expr):
+    if any(not env_is_key(expr, m) for m in JQ_ENV.finditer(expr)):
         raise Blocked("`jq` filters may not read environment variables (`env`, `$ENV`)")
     if JQ_MODULE.search(expr):
         raise Blocked("`jq` filters may not load modules (`include`, `import`)")
 
 
 def check_jq(args: list[str]) -> None:
-    i = 0
+    """The first positional is the filter and is checked; later ones are input files."""
+    i, filter_seen = 0, False
     while i < len(args):
         a = args[i]
         i += 1
         if a == "--":
-            for rest in args[i:]:
-                check_jq_filter(rest)
+            if not filter_seen and i < len(args):
+                check_jq_filter(args[i])
             return
         if not a.startswith("-") or a == "-":
-            check_jq_filter(a)
+            if not filter_seen:
+                check_jq_filter(a)
+                filter_seen = True
             continue
         if long_option_in(a, ("--from-file",)) or (not a.startswith("--") and "f" in a[1:]):
             raise Blocked("`jq -f` / `--from-file` is not allowed")
