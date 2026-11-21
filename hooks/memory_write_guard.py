@@ -83,8 +83,16 @@ def check(tool_input: dict, cwd: str, scope: str, raw_agent: str) -> None:
     if cwd and not isinstance(cwd, str):
         raise TypeError(f"cwd must be a str, got {type(cwd).__name__}")
     agent = raw_agent.rsplit(":", 1)[-1]
-    path = next((tool_input[k] for k in PATH_KEYS if isinstance(tool_input.get(k), str)), "")
-    if path and memory_path(path, cwd, scope, raw_agent, agent):
+    # Every path key present must pass: a tool may carry two (`file_path` and `target_file`).
+    paths = []
+    for k in PATH_KEYS:
+        v = tool_input.get(k)
+        if v is None:
+            continue
+        if not isinstance(v, str):
+            raise TypeError(f"{k} must be a str, got {type(v).__name__}")
+        paths.append(v)
+    if paths and all(p and memory_path(p, cwd, scope, raw_agent, agent) for p in paths):
         return
     where = (f".claude/agent-memory/{agent}/" if scope == "project"
              else f"~/.claude/agent-memory/{agent}/ (or $CLAUDE_CONFIG_DIR/agent-memory/{agent}/)")

@@ -132,6 +132,25 @@ class MemoryWriteGuardTest(unittest.TestCase):
             self.assertEqual(self.run_guard(os.path.join(
                 repo, ".claude", "agent-memory", "standards-reviewer", "x.md"), cwd=repo), 2)
 
+    def test_every_path_key_must_be_memory(self):
+        ok = "/repo/.claude/agent-memory/standards-reviewer/notes.md"
+        agent = "leek-skills:standards-reviewer"
+        for extra in ({"target_file": "/repo/app/Foo.php"}, {"path": "/repo/app/Foo.php"},
+                      {"notebook_path": "/repo/app/x.ipynb"}):
+            with self.subTest(extra=extra):
+                result = self.invoke({"tool_name": "Delete", "agent_type": agent, "cwd": "/repo",
+                                      "tool_input": {"file_path": ok, **extra}})
+                self.assertEqual(result.returncode, 2, result.stderr)
+        both_ok = self.invoke({"tool_name": "Delete", "agent_type": agent, "cwd": "/repo",
+                               "tool_input": {"file_path": ok, "target_file": ok}})
+        self.assertEqual(both_ok.returncode, 0, both_ok.stderr)
+        # A path key with a non-string value fails closed.
+        for bad in (["/repo/app/Foo.php"], 1, {"p": "x"}):
+            with self.subTest(bad=bad):
+                result = self.invoke({"tool_name": "Delete", "agent_type": agent, "cwd": "/repo",
+                                      "tool_input": {"file_path": ok, "target_file": bad}})
+                self.assertEqual(result.returncode, 2, result.stderr)
+
     def test_path_keys_cover_all_write_tools(self):
         for key, tool in (("file_path", "Write"), ("path", "write"), ("target_file", "Delete"),
                           ("notebook_path", "EditNotebook"), ("target_notebook", "EditNotebook"),
