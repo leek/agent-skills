@@ -59,17 +59,17 @@ When the reply says no pane shows the run, post `implement-spec`'s progress line
 
 Also act on these lines as they arrive:
 
-- **`ticket <NN> assumed: <choice>`**: the worker built on a reversible assumption. Ask the user to confirm it (a structured question, the built answer first). A different answer is a follow-up fix after the run: record it in the spec's `decisions/`, never interrupt the runner for it.
-- **`question <NN>: <text>`**: the choice was not reversible, so the worker stopped and the runner released the ticket. It keeps building every ticket that does not depend on it. Ask the user now; the answer is used in step 4.
+- **`ticket <NN> assumed: <choice>`**: the worker built on a reversible assumption. Ask the user to confirm it (a structured question ([harness-tools](../harness-tools/SKILL.md)), otherwise in chat, the built answer first). A different answer is a follow-up fix after the run: record it in the spec's `decisions/`, never interrupt the runner for it.
+- **`question <NN>: <text>`**: the choice was not reversible, so the worker stopped and the runner released the ticket. It keeps building every ticket that does not depend on it. Ask the user now (a structured question ([harness-tools](../harness-tools/SKILL.md)), otherwise in chat); the answer is used in step 4.
 - **`worker <NN> alive (…); quiet threshold reached`**: no provider event for two heartbeats (`AUTOPILOT_HEARTBEAT_SECONDS`, default five minutes each). Read the log or attach before you call it hung. The runner never kills quiet work.
 
 ## 4. When the runner exits
 
 Read the result object: its `status` and `reason` say what happened. Ping the user on any exit but 0 (`PushNotification` where available).
 
-When a worker failed or was blocked, the finish worker mines those sessions with `retro` and writes its proposals to `$notes/retro.md`, without applying any. Whatever the exit, if that file exists, show its list in your report and let the user pick which to apply, as `retro` step 6 says.
+When a worker failed or was blocked, the finish worker mines those sessions with [`retro`](../retro/SKILL.md) and writes its proposals to `$notes/retro.md`, without applying any. Whatever the exit, if that file exists, show its list in your report and let the user pick which to apply, as [`retro` step 6](../retro/SKILL.md#6-output-a-numbered-proposal-list) says.
 
-- **`0` complete**: every ticket is closed and delivered. Run `implement-spec`'s screenshot check (`screenshots-report.sh $notes`), ask about the leftovers the result names when cleanup was `list` (per [`leftovers.md`](../implement-spec/references/leftovers.md)), and report.
+- **`0` complete**: every ticket is closed and delivered. Run `implement-spec`'s screenshot check (`bash <this-skill-dir>/../implement-spec/scripts/screenshots-report.sh $notes`), ask about the leftovers the result names when cleanup was `list` (per [`leftovers.md`](../implement-spec/references/leftovers.md)), and report.
 - **`2` needs input**, with questions: write each answer into the spec's `decisions/` on the integration branch as a closed decision ticket and commit it, then run the same command again. It builds the released tickets and their dependents, then finishes once. When the user would rather ship without them, add `--finish-now`.
 - **`2` needs input**, at a deploy gate or a delivery ticket at `ready-for-human`: the delivery is done. The user deploys; then run this skill again for a gate's dependents, or `/implement <delivery ticket>` for its after-deploy steps.
 - **`3` blocked**: a ticket could not be built, or the open tickets are claimed by someone else. Name them.
@@ -78,7 +78,7 @@ When a worker failed or was blocked, the finish worker mines those sessions with
 
 Run state, the log, and raw provider events are under the repository's Git directory, keyed by the spec; a per-spec lock stops two runners sharing a run. Rerunning the same command resumes an unfinished run (its claims carry the run ID) and starts a new one after a completed run.
 
-Print the end-of-session block as `implement-spec`'s [When you're done](../implement-spec/SKILL.md#when-youre-done) gives it, with `/autopilot <spec>` where it says `/implement-spec <spec>`.
+Print the end-of-session block using the frame in [`wayfinder/references/pipeline-end-block.md`](../wayfinder/references/pipeline-end-block.md), as `implement-spec`'s [When you're done](../implement-spec/SKILL.md#when-youre-done) gives it, with `/autopilot <spec>` where it says `/implement-spec <spec>`.
 
 ## What the runner guarantees
 

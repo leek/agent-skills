@@ -113,10 +113,14 @@ Close with a **Recommended next steps** block:
    curate: a Lone finding is a real finding until verified otherwise. For a Conflict, list both
    sides and say which one the code supports. After `ReportFindings`, the reported
    findings are the list; name their count instead of repeating them.
-2. **Offer the shortcut**: ask whether to verify and apply the whole list as one commit, naming
-   the count, e.g. "Reply *fix all* to verify and apply all 11 points."
+2. **Offer the shortcut**: ask whether to verify and apply the whole list as one commit
+   (a structured question ([harness-tools](../harness-tools/SKILL.md)), otherwise in chat),
+   naming the count, e.g. "Verify and apply all 11 points as one commit?" (or reply
+   *fix all*).
 
-On *fix all*, work every point: verify each against the code, apply the ones that hold, and
+On *fix all* (or choosing to apply all points), work every point: verify each against the
+code, apply the ones that hold, commit per the `commit` skill's
+[Staging](../commit/SKILL.md#staging) and [Subject](../commit/SKILL.md#subject), and
 report the ones that do not with a one-line reason. Never apply only the confident subset and
 hand the rest back as "weigh individually"; the user asked for the panel so they would not have
 to re-adjudicate it. Ask only about a point that conflicts with a recorded decision.

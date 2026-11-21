@@ -84,8 +84,9 @@ The symptom rarely points at the layer that needs the fix:
   chunk, or move the work to a queue.
 
 Make the minimal change. Verify it locally where you can. For infra that cannot run
-locally, say so plainly. Commit one logical fix per commit, and list every Nightwatch
-ref the commit covers in its body (for example `Nightwatch: #106, #107-#115`). **Use
+locally, say so plainly. Commit one logical fix per commit, per the `commit` skill's
+[Staging](../commit/SKILL.md#staging) and [Subject](../commit/SKILL.md#subject), and
+list every Nightwatch ref the commit covers in its body (for example `Nightwatch: #106, #107-#115`). **Use
 plain refs only, never `fixes #NNN`**: a GitHub auto-close keyword would close the
 unrelated GitHub issue that has the same number.
 
@@ -108,7 +109,8 @@ with a comment that names its blocker. Report the tally with one line per cluste
 
 ## 6. Offer a deploy re-check
 
-If any issue is pending deploy verification, ask once whether to re-check it in 24–48
+If any issue is pending deploy verification, ask once (a structured question
+([harness-tools](../harness-tools/SKILL.md)), otherwise in chat) whether to re-check it in 24–48
 hours. On yes, schedule a one-time run where the harness can (in Claude Code, the
 `schedule` skill's cloud routine; failing that, `CronCreate` with `recurring: false`,
 which fires only while this session stays open, so say so). The prompt is plain text,

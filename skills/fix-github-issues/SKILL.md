@@ -3,7 +3,7 @@ name: fix-github-issues
 description: Verify, triage, fix, and close review-bot GitHub issues one finding at a time.
 disable-model-invocation: true
 argument-hint: "Optional issue numbers or a label (defaults to the project's review-bot label, else ai-review)"
-allowed-tools: "Bash(gh issue view *) Bash(gh issue list *) Bash(gh issue comment *) Bash(gh issue close *) Bash(gh api repos/{owner}/{repo}/issues/*)"
+allowed-tools: "Bash(gh repo view *) Bash(gh label list *) Bash(gh issue view *) Bash(gh issue list *) Bash(gh issue comment *) Bash(gh issue close *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/laravel-herd-worktrees/scripts/scratch-db.sh register *)"
 ---
 
 # Fix GitHub Issues
@@ -50,7 +50,9 @@ Finding N: [STALE | AUTO-DISMISS | HALLUCINATION | LEGIT] — <one-line evidence
 
 Verify each line, delegate a set of 3 or more, and run the second pass against the
 project's auto-dismiss and never-dismiss lists before any code, all by
-[Verify findings](references/verify-findings.md), with `origin/<default>` as the ref.
+[Verify findings](references/verify-findings.md), with `origin/<default>` as the ref
+(in Claude Code, the verifier writes recurring false premises to `.claude/agent-memory/`,
+which step 3's `commit` staging carries).
 You re-read the LEGIT code for the fix anyway.
 
 Completion criterion: every finding in the working set has a line, and the second pass is done.
