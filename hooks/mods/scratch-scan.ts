@@ -42,8 +42,10 @@ const TICKET_DIRS: Record<string, ScratchKind> = {
   issues: 'ticket',
 }
 const NO_VALUE = ['none', 'null', '-']
-const SCRATCH_PATH_RE = /(?:^|[\s"'=/\\])\.scratch(?:\/|$|[\s"';&|)])/
-const START_BRANCH_RE = /(?:^|[\s"'=/\\])start-branch\.sh(?:$|[\s"';&|)])/
+// `.scratch` as a whole path segment, whatever sits beside it (`>.scratch/`, `$(cat .scratch/x)`,
+// `` `ls .scratch` ``), but not inside a longer name (`foo.scratchpad`, `my.scratch`).
+const SCRATCH_PATH_RE = /(?<![\w.-])\.scratch(?![\w.-])/
+const START_BRANCH_RE = /(?<![\w.-])start-branch\.sh(?![\w.-])/
 
 export const isClosed = (file: ScratchFile, extraClosed: readonly string[] = []) =>
   CLOSED.has(file.status) || extraClosed.includes(file.status)

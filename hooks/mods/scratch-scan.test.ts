@@ -426,3 +426,21 @@ test('isScratchWriteTool matches .scratch with or without trailing slash and sta
   expect(isScratchWriteTool('Read', { file_path: '/repo/.scratch/auth/spec.md' })).toBe(false)
   expect(isScratchWriteTool('Bash', { command: 'cat foo.scratchpad' })).toBe(false)
 })
+
+test('isScratchWriteTool sees .scratch right after a redirect, pipe, separator, paren, or backtick', async () => {
+  for (const command of [
+    'echo x >.scratch/auth/tickets/01-a.md',
+    'cat <<EOF >.scratch/auth/spec.md',
+    'echo x >>.scratch/auth/spec.md',
+    'sort <.scratch/auth/spec.md',
+    'true;rm -r .scratch/auth',
+    'true&&rm -r .scratch/auth',
+    'ls|tee .scratch/x',
+    '(cd .scratch&&rm -r auth)',
+    'echo `ls .scratch`',
+    'bash x.sh;start-branch.sh auth',
+  ]) {
+    expect([command, isScratchWriteTool('Bash', { command })]).toEqual([command, true])
+  }
+  expect(isScratchWriteTool('Bash', { command: 'echo x > my.scratch' })).toBe(false)
+})
