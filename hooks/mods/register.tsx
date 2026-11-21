@@ -117,19 +117,34 @@ async function resolveRepoRoot($: EngineInterface, cwd: string): Promise<string>
   return cwd
 }
 
+// At most this many `git log -1 -- <path>` lookups per scan when the bulk log came back cut short.
+const FALLBACK_LOOKUPS = 8
+// Those lookups' answers, by repo and path, for the session. Safe to keep: a path committed again
+// shows at the top of the next bulk log, which is read before this cache.
+const fallbackTimes = new Map<string, number>()
+
 // Last commit time of each tracked path, as scratch-state.sh reads it: `git ls-files` and one
-// `git log` over .scratch/ once per scan, both fixed commands (the plugin README lists them).
-// The log runs newest first, so a path's first appearance is its last commit. If git log
-// stdout is truncated, missing tracked paths fall back to a per-file `git log -1` so old files
-// are not silently marked fresh; any failure leaves the path to its mtime.
+// `git log` over .scratch/ once per scan, run from the repository root (the plugin README lists
+// them). The log runs newest first, so a path's first appearance is its last commit. If git log
+// stdout is truncated, up to FALLBACK_LOOKUPS missing tracked paths per scan get their own
+// `git log -1`, cached for the session; any other missing tracked path is older than every
+// commit the cut log did show, so it takes that oldest time, never a fresh checkout mtime.
+// Any failure leaves the path to its mtime.
 function commitTimes($: EngineInterface, cwd: string) {
-  type GitState = { times: Map<string, number>; tracked: Set<string>; truncated: boolean; lsTruncated: boolean }
+  type GitState = {
+    times: Map<string, number>
+    tracked: Set<string>
+    truncated: boolean
+    lsTruncated: boolean
+    oldestMs: number
+  }
   let lastCommits: Promise<GitState> | undefined
+  let budget = FALLBACK_LOOKUPS
   const readGit = async (): Promise<GitState> => {
     const times = new Map<string, number>()
     const ls = await $.process.run(['git', 'ls-files', '-z', '.scratch'], { cwd })
     if (ls.exitCode !== 0) {
-      return { times, tracked: new Set(), truncated: false, lsTruncated: false }
+      return { times, tracked: new Set(), truncated: false, lsTruncated: false, oldestMs: 0 }
     }
     const lsTruncated = Boolean(ls.isStdoutTruncated)
     const tracked = new Set(ls.stdout.split('\0').filter(Boolean))
@@ -138,19 +153,21 @@ function commitTimes($: EngineInterface, cwd: string) {
       { cwd },
     )
     if (log.exitCode !== 0) {
-      return { times, tracked, truncated: false, lsTruncated }
+      return { times, tracked, truncated: false, lsTruncated, oldestMs: 0 }
     }
     const logTruncated = Boolean(log.isStdoutTruncated)
     const blocks = log.stdout.split('\0')
     // When stdout was truncated, the trailing block may be cut off mid-filename; drop it and
     // look up any remaining tracked files individually below.
     const completeBlocks = logTruncated ? blocks.slice(0, -1) : blocks
+    let oldestMs = 0
     for (const block of completeBlocks) {
       const [stamp = '', ...names] = block.split('\n')
       const seconds = Number(stamp)
       if (!(seconds > 0)) {
         continue
       }
+      oldestMs = oldestMs === 0 ? seconds * 1000 : Math.min(oldestMs, seconds * 1000)
       for (const name of names) {
         if ((lsTruncated || tracked.has(name)) && !times.has(name)) {
           times.set(name, seconds * 1000)
@@ -158,7 +175,7 @@ function commitTimes($: EngineInterface, cwd: string) {
       }
     }
 
-    return { times, tracked, truncated: logTruncated || lsTruncated, lsTruncated }
+    return { times, tracked, truncated: logTruncated || lsTruncated, lsTruncated, oldestMs }
   }
 
   return async (paths: readonly string[]) => {
@@ -167,21 +184,35 @@ function commitTimes($: EngineInterface, cwd: string) {
       tracked: new Set<string>(),
       truncated: false,
       lsTruncated: false,
+      oldestMs: 0,
     }))
-    const { times, tracked, truncated, lsTruncated } = await lastCommits
+    const { times, tracked, truncated, lsTruncated, oldestMs } = await lastCommits
     if (truncated) {
       for (const p of paths) {
         if (times.has(p) || (!lsTruncated && !tracked.has(p))) {
           continue
         }
-        try {
-          const one = await $.process.run(['git', 'log', '-1', '--format=%ct', '--', p], { cwd })
-          const seconds = Number(one.stdout.trim())
-          if (one.exitCode === 0 && seconds > 0) {
-            times.set(p, seconds * 1000)
+        const cached = fallbackTimes.get(`${cwd}\0${p}`)
+        if (cached !== undefined) {
+          times.set(p, cached)
+          continue
+        }
+        if (budget > 0) {
+          budget -= 1
+          try {
+            const one = await $.process.run(['git', 'log', '-1', '--format=%ct', '--', p], { cwd })
+            const seconds = Number(one.stdout.trim())
+            if (one.exitCode === 0 && seconds > 0) {
+              times.set(p, seconds * 1000)
+              fallbackTimes.set(`${cwd}\0${p}`, seconds * 1000)
+              continue
+            }
+          } catch {
+            // Fall through to the bound or the mtime.
           }
-        } catch {
-          // Fall back to mtime for this file.
+        }
+        if (tracked.has(p) && oldestMs > 0) {
+          times.set(p, oldestMs)
         }
       }
     }
@@ -238,6 +269,7 @@ export const register: Register = on => {
     refreshSeq = 0
     isTicketsDismissed = false
     retired.clear()
+    fallbackTimes.clear()
     await $.command.register({
       name: 'scratch',
       description: 'Live board of .scratch/ efforts: open tickets, blockers, next step',

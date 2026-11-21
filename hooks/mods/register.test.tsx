@@ -631,3 +631,50 @@ test('/scratch resolves repo root from subdirectories, handles truncated git log
   expect(await pane.find({ type: 'Text', text: /9 Unclaimed wip$/ })).toBeDefined()
   expect(await pane.find({ type: 'Text', text: /10 Waiting {2}\[blocked by 09\]/ })).toBeDefined()
 })
+
+test('a cut-short git log costs at most 8 per-file lookups a scan, cached, and the rest take the oldest time it showed', async ($, on) => {
+  const DAY = 86_400_000
+  const now = 100 * DAY
+  const names = Array.from({ length: 20 }, (_, i) => `${String(i + 1).padStart(2, '0')}-t.md`)
+  const files = Object.fromEntries(
+    names.map(n => [`/repo/.scratch/auth/tickets/${n}`, '---\ntitle: T\nstatus: ready-for-agent\n---\n']),
+  )
+  on('ui.render', async ($, e) => engineDraw($, e))
+  mock.clock(on, { now })
+  on('session.cwd', async () => ({ value: '/repo' }) as never)
+  on('fs.exists', async (_$, e) => ({ value: e.path === '/repo/.scratch' }) as never)
+  on('fs.read', async (_$, e) => ({ value: files[(e as { path: string }).path] ?? '' }) as never)
+  on('fs.list', async (_$, e) => {
+    const seen = new Map<string, 'file' | 'dir'>()
+    for (const full of Object.keys(files)) {
+      if (!full.startsWith(`${e.path}/`)) continue
+      const parts = full.slice(e.path.length + 1).split('/')
+      seen.set(parts[0] ?? '', parts.length > 1 ? 'dir' : 'file')
+    }
+    return { value: [...seen].map(([name, kind]) => ({ name, kind, size: 1, mtimeMs: now, isLink: false })) } as never
+  })
+  const looked: string[] = []
+  on('process.run', async (_$, e) => {
+    const argv = (e as { argv: readonly string[] }).argv
+    const ok = (stdout: string, isStdoutTruncated = false) =>
+      ({ value: { exitCode: 0, stdout, stderr: '', isStdoutTruncated, isStderrTruncated: false } }) as never
+    if (argv[1] === 'rev-parse') return ok('/repo\n')
+    if (argv[1] === 'ls-files') return ok(names.map(n => `.scratch/auth/tickets/${n}\0`).join(''))
+    if (argv.includes('-1')) {
+      looked.push(String(argv.at(-1)))
+      return ok(`${(now - 50 * DAY) / 1000}\n`)
+    }
+    // One whole commit 40 days back that touched a file outside the effort, then the cut.
+    return ok(`\0${(now - 40 * DAY) / 1000}\n\n.scratch/other.md\n\0${(now - 45 * DAY) / 1000}\n\n.scratch/au`, true)
+  })
+  on('ui.open', async () => ({ value: { isPlaced: true } }) as never)
+
+  const first = await $.command.run({ command: 'scratch', args: '' } as never)
+  expect(looked.length).toBe(8)
+  // Every file is at least 40 days old: none reads as freshly changed by its checkout mtime.
+  expect(first.text).toContain('1 stale')
+
+  await $.command.run({ command: 'scratch', args: '' } as never)
+  expect(looked.length).toBe(16)
+  expect(new Set(looked).size).toBe(16)
+})
