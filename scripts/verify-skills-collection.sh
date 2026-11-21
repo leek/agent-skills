@@ -494,7 +494,7 @@ check "claude plugin validate passes the directory profile" \
 check "claude plugin test passes" \
   claude plugin test .
 check "browser-test guard tests pass" \
-  python3 -m unittest -q skills/browser-test/scripts/test_guard_browser.py
+  python3 -m unittest -q hooks/test_guard_browser.py
 check "review-agent guard tests pass" \
   python3 -m unittest -q hooks/test_guard_review_agents.py
 check "memory-write guard tests pass" \

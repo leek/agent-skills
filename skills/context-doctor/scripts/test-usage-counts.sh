@@ -21,6 +21,10 @@ long=$(printf 'x%.0s' $(seq 1 900))
   echo '{"type":"assistant","timestamp":"2026-11-01T10:00:07Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"mcp__posthog__query","input":{"q":"x"}}]}}'
   echo '{"type":"user","timestamp":"2026-11-01T10:00:08Z","message":{"role":"user","content":"<command-name>/acme:audit</command-name><command-args></command-args>"}}'
   echo '{"type":"assistant","timestamp":"2026-11-01T10:00:09Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Skill","input":{"skill":"acme:lint"}}]}}'
+  # The shape Claude Code writes for a typed skill command: the message tag, then the name tag.
+  echo '{"type":"user","timestamp":"2026-11-01T10:00:10Z","message":{"role":"user","content":"<command-message>acme:audit</command-message>\n<command-name>/acme:audit</command-name>\n<command-args>x</command-args>"}}'
+  # A pasted tag inside other text is not a typed command.
+  echo '{"type":"user","timestamp":"2026-11-01T10:00:11Z","message":{"role":"user","content":"Why did this log show <command-name>/fake</command-name> here?"}}'
 } > "$inside/11111111-2222-3333-4444-555555555555.jsonl"
 {
   echo '{"type":"user","timestamp":"2026-11-02T10:00:00Z","message":{"role":"user","content":"Fix the build."}}'
@@ -54,6 +58,7 @@ u=$(bash "$here/usage-counts.sh" --out "$tmp/out" --count 10 --project "$proj" 2
 [ "$(echo "$u" | jq '.mcp_servers.plugin_acme_srv.count')" = 2 ] || fail "plugin MCP key: $u"
 [ "$(echo "$u" | jq '.agents["acme:reviewer"].count')" = 1 ] || fail "agent behind a long prompt: $u"
 [ "$(echo "$u" | jq '.mcp_servers.posthog.count')" = 1 ] || fail "mcp: $u"
-[ "$(echo "$u" | jq '.slash["acme:audit"].count')" = 1 ] || fail "slash: $u"
+[ "$(echo "$u" | jq '.slash["acme:audit"].count')" = 2 ] || fail "slash: $u"
+[ "$(echo "$u" | jq '.slash.fake')" = null ] || fail "pasted command tag counted as slash: $u"
 
 echo "test-usage-counts: ok"

@@ -85,6 +85,36 @@ test('/scratch draws the board and answers with a tally, or the table where no p
   expect(await pane.find({ type: 'Text', text: /01 Login form/ })).toBeDefined()
 })
 
+test('the scratch pane tags a ticket only with blockers still open', async ($, on) => {
+  const files: Record<string, string> = {
+    '/repo/.scratch/auth/tickets/01-login.md': '---\ntitle: Login form\nstatus: closed\n---\n',
+    '/repo/.scratch/auth/tickets/02-logout.md': '---\ntitle: Logout\nstatus: ready-for-agent\n---\n',
+    '/repo/.scratch/auth/tickets/03-reset.md': '---\ntitle: Reset\nstatus: ready-for-agent\nblocked-by: [01, 02]\n---\n',
+    '/repo/.scratch/auth/tickets/04-audit.md': '---\ntitle: Audit\nstatus: in-progress\nblocked-by: [01]\n---\n',
+  }
+  on('ui.render', async ($, e) => engineDraw($, e))
+  mock.clock(on, { now: 0 })
+  on('session.cwd', async () => ({ value: '/repo' }) as never)
+  on('fs.exists', async (_$, e) => ({ value: e.path === '/repo/.scratch' }) as never)
+  on('fs.read', async (_$, e) => ({ value: files[(e as { path: string }).path] ?? '' }) as never)
+  on('fs.list', async (_$, e) => {
+    const names = new Map<string, 'file' | 'dir'>()
+    for (const full of Object.keys(files)) {
+      if (!full.startsWith(`${e.path}/`)) continue
+      const parts = full.slice(e.path.length + 1).split('/')
+      names.set(parts[0] ?? '', parts.length > 1 ? 'dir' : 'file')
+    }
+    const value = [...names].map(([name, kind]) => ({ name, kind, size: 1, mtimeMs: 0, isLink: false }))
+    return { value } as never
+  })
+  on('ui.open', async () => ({ value: { isPlaced: true } }) as never)
+
+  await $.command.run({ command: 'scratch', args: '' } as never)
+  const pane = await $.ui.mount({ plugin: 'leek-skills', surface: 'terminal', ...PANE } as never)
+  expect(await pane.find({ type: 'Text', text: /03 Reset\s+\[blocked by 02\]$/ })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: /04 Audit$/ })).toBeDefined()
+})
+
 test('/scratch takes a path as the slug, ages a tracked file by its last commit, and empties the pane when .scratch/ is gone', async ($, on) => {
   const DAY = 86_400_000
   const now = 100 * DAY

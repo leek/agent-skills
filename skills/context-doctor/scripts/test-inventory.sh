@@ -170,7 +170,7 @@ printf -- '---\nname: same\n---\n' > "$p3/.claude/agent-memory/rev/a.md"; cp "$p
 printf '#!/bin/bash\necho "BLOCKED: this deny message is long enough to become a unit." >&2\n' > "$p3/.claude/hooks/guard.sh"
 cat > "$p3/.claude/settings.json" <<'JSON'
 {"disabledMcpjsonServers": ["ghost"],
- "permissions": {"allow": ["mcp__plugin_nothere_srv__*"]},
+ "permissions": {"allow": ["mcp__plugin_nothere_srv__*", "mcp__plugin_nothere_srv__get(Authorization: Bearer ghp_ISSUETOKEN0123456789abcdef)"]},
  "hooks": {"PreToolUse": [{"hooks": [{"type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard.sh\""},
                                      {"type": "command", "command": "case \"$f\" in *.blade.php) true ;; esac"}]}],
            "SessionStart": [{"hooks": [{"type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/gone.sh\""}]}]}}
@@ -198,6 +198,8 @@ has_issue permission-dead "nothere"
 has_issue hook-script-missing "gone.sh"
 has_issue memory-index-duplicate-row "a.md"
 has_issue memory-name-duplicate '"same"'
+# Every issue detail is redacted, not only the fields that call redact() by hand.
+! grep -rq 'ISSUETOKEN' "$out" || fail "a token in an issue detail reached the output"
 none() { jq -e --arg t "$1" --arg d "$2" '[.issues[] | select(.type==$t and (.detail | contains($d)))] | length == 0' "$out/inventory.json" >/dev/null || fail "false $1 ($2)"; }
 none glob-unmatched "src/*.php"            # matches src/a.php
 none glob-unmatched "Infolist"             # a prose table row, not an index row
@@ -252,8 +254,10 @@ cat > "$p4/CLAUDE.md" <<'MD'
 </laravel-boost-guidelines>
 Install @types/node first.
 @.env
+@.env.copy
 MD
-echo "PLAINENVVALUE=hello" > "$p4/.env"
+# A secrets file is never read: not for its size, its @ imports, or the identical-files hash.
+echo "PLAINENVVALUE=hello @leaky/ENVIMPORTVALUE_42.md" > "$p4/.env"; cp "$p4/.env" "$p4/.env.copy"
 cat > "$p4/.claude/rules/secrets.md" <<'MD'
 - Export GITHUB_TOKEN=ghxsecretvalue123456 before running.
 - Send Authorization: Bearer bearervalue12345678 to the API.
@@ -317,6 +321,9 @@ jq -e --arg p "$p4r/.claude/settings.json" '[.issues[] | select(.type=="skill-ov
 unit "COMMANDBODY"
 ! grep -rq 'PLAINENVVALUE' "$out" || fail "an imported .env reached the output"
 has_issue sensitive-file-skipped "secrets file"
+! grep -rq 'ENVIMPORTVALUE' "$out" || fail "an imported .env was walked for @ imports"
+none identical-files ".env.copy"
+jq -e --arg p "$p4r/.env" '.sources[] | select(.path==$p) | .bytes == 0' "$out/inventory.json" >/dev/null || fail "an imported .env was read for its size"
 jq -e 'select(.kind=="bullet" and .text=="- AFTERFENCE rule.")' "$out/units.jsonl" >/dev/null || fail "text after a nested fence lost"
 ! jq -e 'select(.kind=="paragraph" and .text=="inner")' "$out/units.jsonl" >/dev/null || fail "a nested fence closed early"
 

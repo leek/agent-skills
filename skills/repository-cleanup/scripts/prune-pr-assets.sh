@@ -65,6 +65,7 @@ jq -n --slurpfile o "$open_prs_file" --slurpfile a "$all_prs_file" '($o[0] + $a[
 git ls-tree -d --name-only "$tip" | while IFS= read -r dir; do
   bytes="$(git ls-tree -r -l "$tip" -- "$dir" | awk '{ s += $4 } END { print s + 0 }')"
   last="$(git log -1 --format=%ct "$tip" -- "$dir")"
+  # The branch -> folder gsub is the pr skill's upload-screenshots.sh expression; keep them identical.
   jq -c --arg d "$dir" --argjson bytes "$bytes" \
     --argjson last "${last:-0}" --argjson cutoff "$cutoff" '
     [.[] | select((.headRefName | gsub("[^A-Za-z0-9._-]"; "-")) == $d)] as $m

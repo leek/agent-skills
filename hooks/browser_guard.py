@@ -1,24 +1,20 @@
-#!/usr/bin/env python3
-"""PreToolUse guard for the browser-test read-only agents.
+"""Read-only shell policy for the browser-test agents (browser-tester, browser-test-planner).
 
-hooks/shell_guard.py calls run_payload only for those agents' shell calls. Every
-segment of the command (split on &&, ||, ;, |) must be an allowed read-only
-agent-browser call or a read-only text filter under both bash and zsh rules.
-Anything else returns 2, which blocks the call and shows stderr to the agent.
+hooks/pre_tool_guard.py enforces this policy on their shell calls. Every segment
+of the command (split on &&, ||, ;, |) must be an allowed read-only agent-browser
+call or a read-only text filter under both bash and zsh rules.
 
 Per-run scope comes from .scratch/browser-test/<run-id>/scope.json, written by
-start-run.sh. The run id is read from the session name, bt-<run-id>-<tag>.
+skills/browser-test/scripts/start-run.sh. The run id is read from the session
+name, bt-<run-id>-<tag>.
 """
 
 import json
 import os
-from pathlib import Path
 import re
-import sys
 from urllib.parse import urlsplit
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "hooks"))
-from shell_guard import Blocked, check_filter, parse_command  # noqa: E402
+from shell_syntax import Blocked, check_filter, parse_command
 
 PROBE = (
     "(() => { const t = document.body.innerText; "
@@ -158,15 +154,3 @@ def check(command: str, cwd: str) -> None:
         if seg[0] != "agent-browser":
             raise Blocked(f"`{seg[0]}` is not allowed — only agent-browser and read-only filters")
         check_browser(seg[1:], scope, run_dir)
-
-
-def run_payload(payload: dict) -> int:
-    command = (payload.get("tool_input") or {}).get("command", "")
-    cwd = payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
-    try:
-        check(command, cwd)
-    except Blocked as reason:
-        print(f"BLOCKED by browser-test guard: {reason}. This is a read-only test; do not look for "
-              "another way. Record what you could not do and move on.", file=sys.stderr)
-        return 2
-    return 0
