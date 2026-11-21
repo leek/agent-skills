@@ -195,8 +195,8 @@ an agreement is `LEGIT <severity>` with `directed by <author>: "<quote>"` as its
 evidence, and is eligible for the current batch whatever its grade; a refusal is
 `decided by owner`. It never goes to a verifier worker or the second pass. A direction
 to remove, defer, or narrow what the PR deliberately does settles **Never reverse a
-decision without asking** only when it comes from your user or the PR author; from
-anyone else it is a QUESTION.
+decision without asking** only when it comes from your user, or from the PR author
+while their row is `owner`; from anyone else, other owners included, it is a QUESTION.
 
 **Repeats next.** Bots review every push and raise answered findings again. A bot
 finding on the same file and topic as an earlier answer is STALE with `repeat of <link>`
