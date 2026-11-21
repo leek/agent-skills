@@ -215,7 +215,9 @@ export function classify(
     .sort((a, b) => byNumber(a.number, b.number))
     .map(f => f.path)
 
-  const base = { slug, files, lastChangeMs, frontier, isStale: false }
+  // The pane shows these, not the raw `blockedBy`: a closed blocker no longer holds anything.
+  const stillOpen = [...blockers].filter(([, ids]) => ids.length > 0).map(([f, ids]) => [f.path, ids])
+  const base = { slug, files, lastChangeMs, frontier, openBlockers: Object.fromEntries(stillOpen), isStale: false }
   const mismatch = findMismatch(files)
   if (mismatch !== '') {
     return { ...base, state: 'mismatched', next: mismatch }
