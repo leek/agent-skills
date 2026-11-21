@@ -107,6 +107,15 @@ class AgentPoliciesTest(unittest.TestCase):
         self.assertBlocked("agent-browser open http://169.254.169.254/latest/meta-data/", "metadata", a)
         self.assertBlocked("agent-browser open http://metadata.google.internal/", "metadata", a)
         self.assertAllowed("agent-browser open http://localhost:8000/", a)
+        # The browser reads these numeric forms as 169.254.169.254 too.
+        for host in ("2852039166", "0xA9FEA9FE", "0251.0376.0251.0376", "169.254.43518",
+                     "[::ffff:169.254.169.254]", "[::ffff:a9fe:a9fe]", "[fe80::1]"):
+            self.assertBlocked(f"agent-browser open 'http://{host}/'", "metadata", a)
+        self.assertBlocked("agent-browser open http://1.2.3.4.5/", "more than four parts", a)
+        self.assertBlocked("agent-browser open http://09.1.1.1/", "not an address", a)
+        self.assertAllowed("agent-browser open http://127.0.0.1:8000/", a)
+        self.assertAllowed("agent-browser open http://2130706433/", a)
+        self.assertAllowed("agent-browser open https://app.test/1.2", a)
         self.assertBlocked("rm -rf app", "`rm` is not allowed", a)
 
 

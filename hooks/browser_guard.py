@@ -51,18 +51,55 @@ SEARCH_LABEL = re.compile(r"\s*search\b", re.IGNORECASE)
 GET_SUBCOMMANDS = {"text", "html", "value", "attr", "title", "url", "count", "box", "styles"}
 
 
+def whatwg_ipv4(host: str) -> int | None:
+    """The host as the browser reads an IPv4 address: 1-4 dot parts, each decimal, 0x hex, or
+    0-leading octal, the last part filling the remaining bytes (`2852039166`, `0xA9FEA9FE`,
+    `169.254.43518`). None when the host is not numeric; a numeric-looking host that does not
+    parse raises Blocked (fail closed)."""
+    if ":" in host:
+        return None  # IPv6, parsed by ipaddress
+    parts = host.split(".")
+    if parts and parts[-1] == "":
+        parts = parts[:-1]
+    if not parts or not re.fullmatch(r"(0[xX][0-9a-fA-F]*|[0-9]+)", parts[-1]):
+        return None
+    if len(parts) > 4:
+        raise Blocked("a numeric host with more than four parts is not an address")
+    values = []
+    for part in parts:
+        try:
+            if part[:2].lower() == "0x":
+                values.append(int(part[2:] or "0", 16))
+            elif len(part) > 1 and part.startswith("0"):
+                values.append(int(part, 8))
+            else:
+                values.append(int(part, 10))
+        except ValueError:
+            raise Blocked(f"`{host}` looks numeric but is not an address") from None
+    if any(v > 255 for v in values[:-1]) or values[-1] >= 256 ** (5 - len(values)):
+        raise Blocked(f"`{host}` is out of range for an IPv4 address")
+    number = values[-1]
+    for i, v in enumerate(values[:-1]):
+        number += v << (8 * (3 - i))
+    return number
+
+
 def metadata_host(host: str) -> bool:
-    """Link-local addresses (169.254.0.0/16, fe80::/10) and the cloud metadata names: a page
-    the reviewer reads must not steer it to instance credentials. Loopback and private ranges
-    stay open, since the app under review usually runs there."""
+    """Link-local addresses (169.254.0.0/16, fe80::/10, their IPv4-mapped forms) and the cloud
+    metadata names: a page the reviewer reads must not steer it to instance credentials. Loopback
+    and private ranges stay open, since the app under review usually runs there. A name that
+    resolves to such an address through DNS is not caught: the browser resolves it, not the hook."""
     import ipaddress
     host = host.strip("[]").lower().rstrip(".")
     if host in ("metadata.google.internal", "metadata", "instance-data"):
         return True
+    number = whatwg_ipv4(host)
     try:
-        ip = ipaddress.ip_address(host)
+        ip = ipaddress.ip_address(number if number is not None else host)
     except ValueError:
         return False
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
     return ip.is_link_local or str(ip) == "fd00:ec2::254"
 
 
