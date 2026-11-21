@@ -143,3 +143,28 @@ eq "begin after failed push exit" "$rc" 0
 land 01 finish --integration "$r" --ticket 05 --stack
 eq "next cut after failed push" "$(printf '%s' "$out" | jq -c '[.position, .cut, .base, .pushed]')" '[4,"foo-stack-05","foo-stack-04",true]'
 echo "ok a failed stack push still records the cut, so the next ticket stacks on it"
+
+# begin again while a merge is still in progress (conflicts resolved and staged, not yet
+# committed): keep the merge and the lock, and answer locked:true with no conflicts left.
+commit_file 03 shared.txt "three again"
+printf 'integration again\n' >"$r/shared.txt"
+git -C "$r" add -- shared.txt
+git -C "$r" commit -q -m "integration changes shared.txt"
+land 03 begin --integration "$r"
+eq "in-progress conflict exit" "$rc" 1
+eq "in-progress conflict" "$(printf '%s' "$out" | jq -c '.conflicts')" '["shared.txt"]'
+printf 'resolved again\n' >"$t/wt-03/shared.txt"
+git -C "$t/wt-03" add -- shared.txt
+land 03 begin --integration "$r"
+eq "begin mid-merge exit" "$rc" 1
+eq "begin mid-merge" "$(printf '%s' "$out" | jq -c '.')" '{"locked":true,"merged":false,"conflicts":[]}'
+git -C "$t/wt-03" rev-parse -q --verify MERGE_HEAD >/dev/null || fail "begin mid-merge aborted the merge"
+eq "begin mid-merge keeps the staged resolution" "$(git -C "$t/wt-03" show :shared.txt)" "resolved again"
+eq "begin mid-merge keeps the lock" "$(cat "$notes/land.lock/owner")" "foo--03"
+git -C "$t/wt-03" commit -q --no-edit
+land 03 begin --integration "$r"
+eq "begin after committing the merge exit" "$rc" 0
+land 03 finish --integration "$r" --ticket 06
+eq "finish after mid-merge begin" "$(printf '%s' "$out" | jq -r '.landed')" "true"
+eq "mid-merge resolution landed" "$(cat "$r/shared.txt")" "resolved again"
+echo "ok begin during an unfinished merge keeps the merge and the lock"

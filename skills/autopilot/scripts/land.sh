@@ -17,6 +17,9 @@
 # Output: one JSON object on stdout; messages on stderr.
 #   begin   {"locked":true,"merged":true,"tip":sha}
 #           {"locked":true,"merged":false,"conflicts":[paths]}   exit 1: resolve, commit, go on
+#                    (also while a merge is still uncommitted; conflicts lists what is unresolved)
+#           {"locked":false,"merged":false,"reason":text}        exit 1: the merge failed without
+#                    conflicts; it was aborted and the lock freed: fix the cause, call begin again
 #           {"locked":false,"owner":branch}                      exit 3: busy, call begin again
 #   finish  {"landed":true,"ticket","merge_sha","position":n|null,"cut":branch|null,
 #            "base":branch|null,"pushed":true|false|null}        exit 1 when pushed is false
@@ -97,12 +100,17 @@ case "$action" in
       done
       printf '%s\n' "$branch" >"$lock/owner"
     fi
+    # A merge still in progress is the worker's resolution: keep it and the lock.
+    if git rev-parse -q --verify MERGE_HEAD >/dev/null; then
+      git diff --name-only --diff-filter=U | jq -Rsc '{locked: true, merged: false, conflicts: (split("\n") | map(select(. != "")))}'
+      exit 1
+    fi
     if git merge --no-edit "$ibranch" >&2; then
       jq -cn --arg tip "$(git rev-parse "$ibranch")" '{locked: true, merged: true, tip: $tip}'
       exit 0
     fi
     conflicts="$(git diff --name-only --diff-filter=U)"
-    if [ -z "$conflicts" ]; then
+    if [ -z "$conflicts" ] && ! git rev-parse -q --verify MERGE_HEAD >/dev/null; then
       git merge --abort 2>/dev/null || true
       release_lock
       echo "land.sh: merge of $ibranch failed without merge conflicts" >&2
