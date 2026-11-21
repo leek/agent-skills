@@ -414,6 +414,28 @@ test('a SendMessage that is denied, errors, or throws leaves the finished worker
   }
 })
 
+test('a SendMessage by name wakes only the newest worker with that name', async ($, on) => {
+  mock.clock(on, { now: 1_000 })
+  on('ui.render', async ($, e) => engineDraw($, e))
+  let spawnSeq = 0
+  on('agent.spawn', async () => ({ model: 'sonnet', agentId: `a${++spawnSeq}` }))
+  on('tool.call', async () => ({ result: 'ok' }) as never)
+  on('turn.complete', async () => ({ text: '' }))
+
+  for (const turnId of ['x1', 'x2']) {
+    await $.agent.spawn({ prompt: 'fix', description: 'fix things', name: 'fixer', subagentType: 'general-purpose' } as never)
+    await $.turn.complete({ agentId: `a${spawnSeq}`, reason: 'answer', answer: '', durationMs: 5, isAborted: false, turnId })
+  }
+  const band = await $.ui.mount({ plugin: 'leek-skills', surface: 'terminal', ...BAND } as never)
+  expect(await band.find({ type: 'Text', text: /Workers 2\/2 done/ })).toBeDefined()
+
+  await $.tool.call({ tool: 'SendMessage', to: 'fixer', message: 'one more', tool_use_id: 'm1' } as never)
+  expect(await band.find({ type: 'Text', text: /Workers 1\/2 done/ })).toBeDefined()
+  // By id, the older one wakes alone.
+  await $.tool.call({ tool: 'SendMessage', to: 'a1', message: 'you too', tool_use_id: 'm2' } as never)
+  expect(await band.find({ type: 'Text', text: /Workers 0\/2 done/ })).toBeDefined()
+})
+
 test('followed-up subagent resumes running state and parallel fixers render on ticket board', async ($, on) => {
   mock.clock(on, { now: 1_000 })
   on('ui.render', async ($, e) => engineDraw($, e))

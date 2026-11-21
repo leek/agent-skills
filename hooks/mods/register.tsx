@@ -93,14 +93,20 @@ function retire(list: readonly Worker[]) {
   }
 }
 
-// The worker `to` (an id or a name) back to running: from the band, or from the retired ones.
+// One worker `to` names: the agent id exactly, else the newest with that name.
+function pick(list: readonly Worker[], to: string): Worker | undefined {
+  return list.find(w => w.id === to) ?? [...list].reverse().find(w => w.name !== '' && w.name === to)
+}
+
+// The worker `to` (an id or a name) back to running, exactly one row: from the band, or else
+// from the retired ones.
 function resume(list: Worker[], to: string, change: (w: Worker) => Partial<Worker> = () => ({})): Worker[] {
-  const isIt = (w: Worker) => w.id === to || (w.name !== '' && w.name === to)
   const awake = (w: Worker): Worker => ({ ...w, outcome: 'running', endedAt: 0, ...change(w) })
-  if (list.some(isIt)) {
-    return list.map(w => (isIt(w) ? awake(w) : w))
+  const onBand = pick(list, to)
+  if (onBand !== undefined) {
+    return list.map(w => (w === onBand ? awake(w) : w))
   }
-  const back = [...retired.values()].reverse().find(isIt)
+  const back = pick([...retired.values()], to)
   // Pure, as update may run it more than once: the retired copy stays until a newer one replaces it.
   return back === undefined ? list : trimWorkers([...list, awake(back)], KEEP)
 }
