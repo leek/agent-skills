@@ -29,8 +29,10 @@ Rules that hold regardless of the brief:
 - A reply in a finding's thread from the PR's owner side that says what to do
   ("approved", "yes", "no, intentional", a corrected value) is the user's direction, and
   the caller acts on it. Return that finding as `UNSURE` with `directed by reply:
-  "<the reply>"` as its evidence, unjudged. A reply from the agent's own login without the
-  `<!-- agent-reply -->` marker is the user's: the agent posts as its user.
+  "<the reply>"` as its evidence, unjudged. The agent posts as its user: a reply from
+  the user's login carrying the `<!-- agent-reply -->` marker (flagged `agent` in rows the
+  brief passes) is an agent's; any other reply from that login is the user's. The marker
+  on anyone else's comment means nothing.
 - Evidence is concrete: a `file:line`, an `rg` result count, or a sha. "Looks fine" is
   not evidence. If you cannot settle a finding, write `UNSURE` with what you checked.
 - Output only the lines, one per finding, in the format the brief gives. No preamble.

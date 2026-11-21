@@ -2,7 +2,7 @@
 name: resolve-review-comments
 description: Fix or rebut every review comment on a pull request, human or AI-review bot (Codex, Copilot, Gemini), then reply and resolve each thread. Use when the user wants a PR's review comments addressed, answered, or cleared.
 argument-hint: "A PR number or URL (defaults to the PR for the current branch)"
-allowed-tools: "Bash(gh repo view *) Bash(gh pr view *) Bash(gh pr diff *) Bash(gh pr checks *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/triage-github-pr/scripts/pr-comments.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/triage-github-pr/scripts/pr-reply.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/fix-ci-failures/scripts/failed-jobs.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/closeout/scripts/pr-state.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/run-after/scripts/wait-until.sh * -- bash ${CLAUDE_PLUGIN_ROOT}/skills/closeout/scripts/pr-state.sh * --in-flight*)"
+allowed-tools: "Bash(gh repo view *) Bash(gh pr view *) Bash(gh pr diff *) Bash(gh pr checks *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/triage-github-pr/scripts/pr.sh comments *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/triage-github-pr/scripts/pr.sh reply *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/fix-ci-failures/scripts/failed-jobs.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/triage-github-pr/scripts/pr.sh state *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/run-after/scripts/wait-until.sh * -- bash ${CLAUDE_PLUGIN_ROOT}/skills/triage-github-pr/scripts/pr.sh state * --in-flight*)"
 ---
 
 # Resolve Review Comments
@@ -100,7 +100,7 @@ threads resolve against the pushed state.
 
 ## 6. Reply and resolve every thread
 
-Reply to every thread and resolve it, all in one `pr-reply.sh` batch (the call is in the
+Reply to every thread and resolve it, all in one `pr.sh reply` batch (the call is in the
 references file):
 
 - **fixed** → name the commit and the behaviour now, and the test that pins it (for a

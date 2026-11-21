@@ -17,7 +17,7 @@ merges into the trunk last, so the trunk receives the stack once, verified.
 ## Build the stack
 
 ```bash
-bash <this-skill-dir>/../closeout/scripts/pr-state.sh N   # base, head, head_sha, cross_repo, stacked_above, repo.default_branch
+bash <this-skill-dir>/scripts/pr.sh state N   # base, head, head_sha, cross_repo, stacked_above, repo.default_branch
 gh pr list --head <base> --state open --json number,headRefName,baseRefName,isCrossRepository   # the PR whose head is that base
 ```
 
@@ -176,7 +176,7 @@ list. Continue only when that exact head is reviewed and validated; pin it in th
 A fix landed on a lower PR conflicts with every PR above it that touches the same lines,
 and each of those then pays a merge, a conflict resolution, a re-test and a re-review.
 So a stack lands first and fixes once, wherever its shape allows. Replies and resolves
-on the stack's PRs go as one `pr-reply.sh` batch per PR
+on the stack's PRs go as one `pr.sh reply` batch per PR
 ([Reply and resolve](gh-mechanics.md#reply-and-resolve)).
 
 **Fix on the integration PR** when the stack has one:

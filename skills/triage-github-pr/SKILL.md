@@ -3,7 +3,7 @@ name: triage-github-pr
 description: Review and merge a pull request with up to two fix rounds, carrying later findings into a follow-up PR.
 disable-model-invocation: true
 argument-hint: "One or more PR numbers, then optional instructions (\"don't merge\", \"exhaustive\", merge method)"
-allowed-tools: "Bash(gh pr view *) Bash(gh pr diff *) Bash(gh pr checks *) Bash(gh pr list *) Bash(gh run view *) Bash(gh api repos/{owner}/{repo}/issues/*/comments -F body=@*) Bash(gh api -X PATCH repos/{owner}/{repo}/issues/comments/* -F body=@*) Bash(gh api --paginate repos/{owner}/{repo}/issues/*/timeline *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/triage-github-pr/scripts/pr-comments.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/triage-github-pr/scripts/pr-reply.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/closeout/scripts/pr-state.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/fix-ci-failures/scripts/failed-jobs.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/run-after/scripts/wait-until.sh * -- bash ${CLAUDE_PLUGIN_ROOT}/skills/closeout/scripts/pr-state.sh * --in-flight*) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/laravel-herd-worktrees/scripts/scratch-db.sh register *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/harness-tools/scripts/wait-task-output.sh *)"
+allowed-tools: "Bash(gh pr view *) Bash(gh pr diff *) Bash(gh pr checks *) Bash(gh pr list *) Bash(gh run view *) Bash(gh api --paginate repos/{owner}/{repo}/issues/*/timeline *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/triage-github-pr/scripts/pr.sh state *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/triage-github-pr/scripts/pr.sh comments *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/triage-github-pr/scripts/pr.sh reply *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/triage-github-pr/scripts/pr.sh disposition *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/fix-ci-failures/scripts/failed-jobs.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/run-after/scripts/wait-until.sh * -- bash ${CLAUDE_PLUGIN_ROOT}/skills/triage-github-pr/scripts/pr.sh state * --in-flight*) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/laravel-herd-worktrees/scripts/scratch-db.sh register *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/harness-tools/scripts/wait-task-output.sh *)"
 ---
 
 # Triage GitHub PR
@@ -145,7 +145,7 @@ A review is **in flight** while a requested reviewer (bot or human) has not
 submitted, a bot shows its "running" signal (an 👀 reaction, Codex's review state not
 completed, a review bot's own check run still pending), a bot that reviews every push
 has not yet reviewed the head, or the head was pushed too recently for the bots to have
-registered it. `pr-state.sh --in-flight` reads all of these; the fields are in
+registered it. `pr.sh state --in-flight` reads all of these; the fields are in
 [In-flight signals](references/gh-mechanics.md#in-flight-signals).
 
 When anything is in flight, watch it until it clears, by the
@@ -287,7 +287,7 @@ and every completed fix is published before proceeding to merge.
 At each merge checkpoint before batch 2, watch the reviewers until none is in flight,
 by the [shipping budget](#shipping-budget) (skipped on "merge now"), then refresh
 metadata and the comment surfaces once and compare them with the snapshot
-(`pr-comments.sh --since`). Review any head changes since your last covered SHA using
+(`pr.sh comments --since`). Review any head changes since your last covered SHA using
 step 1's re-review range; your own fixes must already be covered before their push.
 Classify new claims in step 4; the shipping budget decides which get a batch in step 5
 and which are carried. An unexpected external head change must be reviewed, never

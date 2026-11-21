@@ -1,44 +1,52 @@
 # GitHub mechanics for PR triage
 
-`gh` expands `{owner}/{repo}` when run inside the repo. `N` is the PR number.
+`N` is the PR number. `<this-skill-dir>` is the triage-github-pr skill's directory.
+
+Every read and write of a PR's review state goes through one script,
+[`scripts/pr.sh`](../scripts/pr.sh), run from the repo: `state` (the gate snapshot),
+`comments` (the comment surfaces, grouped into threads), `reply` (reply and resolve), and
+`disposition` (your disposition comment). Its header names every subcommand's fields,
+flags, and exit codes; never write a raw `gh api` call or a comment marker for these by
+hand. Other skills run it as `<this-skill-dir>/../triage-github-pr/scripts/pr.sh`.
 
 ## Gather
 
 ```bash
-bash <this-skill-dir>/../closeout/scripts/pr-state.sh N    # the gate snapshot; several numbers give one row each
+bash <this-skill-dir>/scripts/pr.sh state N    # the gate snapshot; several numbers give one row each
 gh pr view N --json body,commits
 gh pr diff N
 ```
 
 The gate snapshot holds, per PR, the metadata and merge gates, the finished failures on
 the head (`checks_failed`), the in-flight signals, `threads_open`, `rounds`,
-`stacked_above`, and the `repo` settings; the script's header names every field, and the
-sections below name the ones they use. A field listed in `unchecked` is null because its
-read failed: not checked, never zero or empty. Run it again wherever a step re-reads a gate.
+`stacked_above`, and the `repo` settings; the sections below name the fields they use.
+A field listed in `unchecked` is null because its read failed: not checked, never zero
+or empty. Run it again wherever a step re-reads a gate.
 
-The three comment surfaces (reviews, inline comments, issue comments), your login, and
-each inline comment's review thread come from one script,
-[`scripts/pr-comments.sh`](../scripts/pr-comments.sh), run from the repo with
-`<this-skill-dir>` the triage-github-pr skill's directory. Save the first run as the snapshot:
+The three comment surfaces (reviews, inline review threads, issue comments) and your
+login come from `pr.sh comments`. Save the first run as the snapshot:
 
 ```bash
-bash <this-skill-dir>/scripts/pr-comments.sh N | tee <scratch>/pr-N-snapshot.json   # step 3
-bash <this-skill-dir>/scripts/pr-comments.sh N --since <scratch>/pr-N-snapshot.json  # step 6: new or edited only
-bash <this-skill-dir>/scripts/pr-comments.sh N --count                              # unresolved threads
+bash <this-skill-dir>/scripts/pr.sh comments N | tee <scratch>/pr-N-snapshot.json   # step 3
+bash <this-skill-dir>/scripts/pr.sh comments N --since <scratch>/pr-N-snapshot.json  # step 6: new or edited only
+bash <this-skill-dir>/scripts/pr.sh comments N --count                              # unresolved threads
 ```
 
-Its JSON holds `reviews`, `inline` (each with `thread`, the id to resolve, and
-`resolved`), `issue`, `me`, `pr_author`, `head`, `threads_open`, and `disposition`, and
-every row carries `bot`, `assoc` (author_association), and `agent`; the script's header
-names every field. The snapshot is every `{id, at}` pair in it. `--since` prints only an id
-not in it, or an id whose `at` changed (bots often edit a summary comment in place
-instead of posting another), and never an agent's replies or your disposition comment.
+Its JSON holds `reviews`, `threads`, `issue`, `me`, `pr_author`, `head`, `threads_open`,
+and `disposition`. Each entry in `threads` is one inline review thread, already whole:
+its `root` (the comment a reply goes to), `thread` (the id that resolves it), `resolved`,
+the root's `path`, `line`, and reviewed `commit`, and its `comments`, oldest first. Every
+row carries `bot`, `assoc` (author_association), `agent` (an agent wrote it, though it
+shows under your login), and `owner` (a human owner wrote it, so its answer is a
+direction). The snapshot is every `{id, at}` pair in it. `--since` prints only an id not
+in it, or an id whose `at` changed (bots often edit a summary comment in place instead of
+posting another), and never an agent's row; a thread with any new comment comes back
+whole, each comment marked `new`.
 
-**Earlier answers.** An agent's reply (told apart from your user's own by
-[Claims and directions](../../resolve-review-comments/references/threads.md#claims-and-directions))
-is an earlier answer to the thread it replies to; its `url` is the link a repeat cites.
-An owner's reply is a direction, never an earlier answer. The disposition comment's
-table is the rest: the findings that live outside inline threads.
+**Earlier answers.** A comment with `agent` true is an earlier answer to its thread; the
+thread's `agent_reply` is the newest one's url, the link a repeat cites. An `owner`
+comment is a direction, never an earlier answer. The disposition comment's table is the
+rest: the findings that live outside inline threads.
 
 ## In-flight signals
 
@@ -57,7 +65,7 @@ command, capped at what is left of the PR's 10-minute review-wait budget. Wait o
 the reviewers still running and treat it as the cap):
 
 ```bash
-bash <this-skill-dir>/../run-after/scripts/wait-until.sh --interval 30 --timeout <seconds left of the PR's 10-minute budget> -- bash <this-skill-dir>/../closeout/scripts/pr-state.sh N --in-flight --no-required --check "<a review bot's own check>"
+bash <this-skill-dir>/../run-after/scripts/wait-until.sh --interval 30 --timeout <seconds left of the PR's 10-minute budget> -- bash <this-skill-dir>/scripts/pr.sh state N --in-flight --no-required --check "<a review bot's own check>"
 ```
 
 `--in-flight` counts every requested reviewer, every bot `eyes` reaction, every entry
@@ -132,7 +140,7 @@ use its one CI fix pass within its round budget.
   `REVIEW_REQUIRED` blocks when branch protection requires a review, and your own
   review does not satisfy it: GitHub never lets a PR's author approve it.
 - `draft`: run `gh pr ready N` only when the context implies the PR should ship.
-- in flight: before batch 2, `pr-state.sh N --in-flight --no-required` (with the review
+- in flight: before batch 2, `pr.sh state N --in-flight --no-required` (with the review
   bots' own `--check`s) must read clear after the last push. Watch it by
   [Taking the wait](#in-flight-signals). After a spent budget or batch 2 it is not a
   gate: the late-review sweep collects what is still running.
@@ -199,28 +207,35 @@ batch when the shipping budget makes it eligible; otherwise it is carried.
 
 ## Reply and resolve
 
-Reply to inline comments and resolve their threads as one batch. Write one item per
-thread to a scratch file, then run [`pr-reply.sh`](../scripts/pr-reply.sh), which writes
-to GitHub:
+Reply to review threads and resolve them as one batch. Write one item per thread to a
+scratch file, then run `pr.sh reply`, which writes to GitHub:
 
 ```json
-[{"comment_id": 123, "thread": "PRRT_…", "body": "fixed in abc123; validated; push pending", "resolve": true}]
+[{"comment_id": 3790734403, "thread": "PRRT_kwDO…0W", "body": "fixed in abc123; validated; push pending", "resolve": true},
+ {"comment_id": 3790734406, "thread": "PRRT_kwDO…0Y", "body": "Reviewed, not a defect. <evidence>.", "resolve": true}]
 ```
 
 ```bash
-bash <this-skill-dir>/scripts/pr-reply.sh N <scratch>/pr-N-replies.json
+bash <this-skill-dir>/scripts/pr.sh reply N <scratch>/pr-N-replies.json
 ```
 
-`comment_id` is the thread's root comment (`reply_to` null) and `thread` its `thread` in
-[`pr-comments.sh`](../scripts/pr-comments.sh)'s output; `body` is sent exactly as written
-plus a trailing `<!-- agent-reply -->` marker,
-and `resolve` follows the table below. It prints each item's `reply_url`, `replied`,
-`resolved`, and `error`, then `threads_open`. On exit 1, retry only the items with an
-`error`, never the whole file: an item with `replied: false` goes again as it was; an item
-with `replied: true, resolved: false` already has its reply on GitHub, so send it
-resolve-only (`"body": null`, the same `thread`, `"resolve": true`), which posts nothing.
+`comment_id` is the thread's `root` and `thread` its `thread` in `pr.sh comments`'
+output; `body` is sent exactly as written, marked as the agent's so later reads flag it
+`agent`, and `resolve` follows the table below. It prints each item's `reply_url`,
+`replied`, `resolved`, and `error`, then `threads_open`; an invalid file exits 2 with
+nothing sent. On exit 1, retry only the items with an `error`, never the whole file: an
+item with `replied: false` goes again as it was; an item with `replied: true, resolved:
+false` already has its reply on GitHub, so send it resolve-only, which posts nothing:
+
+```json
+[{"comment_id": 3790734403, "thread": "PRRT_kwDO…0W", "body": null, "resolve": true}]
+```
+
 An `error` on the resolve means no write access or a stale thread id: run
-`pr-comments.sh N` again for the thread id first.
+`pr.sh comments N` again for the thread id first. Outdated comments (the code moved)
+resolve the same way. `threads_open` there (or `pr.sh comments N --count`) is 0 when
+every thread is resolved, across every page; null means the count was not read, so run
+`--count`.
 
 Bodies and resolution by delivery state:
 
@@ -240,7 +255,7 @@ Publish the classification reply before coding, then reply again when its state
 changes. Before each batch is sent, run the directed-reply check in
 [Reply to a directed thread](../../resolve-review-comments/references/threads.md#reply-to-a-directed-thread). A local fix SHA is the same after pushing, but is not yet remotely available;
 record the published head in the disposition only after the push succeeds. Re-query
-the unresolved thread count (`pr-comments.sh N --count`; `pr-reply.sh` prints it too) before pushing, right after each push, and before merging:
+the unresolved thread count (`pr.sh comments N --count`; `pr.sh reply` prints it too) before pushing, right after each push, and before merging:
 a reviewer watching the PR sees each batch's threads close as it lands, not all at the end. An unresolved owner decision
 or accepted-but-unfixed current-batch finding stays visible, not falsely resolved.
 
@@ -264,7 +279,6 @@ batch. It records the delivery mode, starting SHA, snapshot, batch checkpoint,
 review-wait budget used, verdicts and push count; GitHub activity owns that count:
 
 ```markdown
-<!-- triage-disposition -->
 **Triage, round N** at `<head sha>`
 Mode: bounded | exhaustive
 Starting head: <sha>; snapshot: <ids and timestamps, or artifact link>
@@ -282,20 +296,21 @@ Open threads: <live count, separated into fixing and pending decisions>
 Blocker: <only in a stop case>
 ```
 
-Find it in `pr-comments.sh N`'s `disposition` (`{id, url, body}`: your newest comment
-carrying the marker; null when you have none, or when `me` is empty, which means not
-checked). Then create or edit it:
+Read the current one from `pr.sh comments N`'s `disposition` (`{id, url, body}`; null
+when you have none, or when `me` is empty, which means not checked). Write the whole new
+body to a scratch file, then:
 
 ```bash
-gh api repos/{owner}/{repo}/issues/N/comments -F body=@<file>                 # first time
-gh api -X PATCH repos/{owner}/{repo}/issues/comments/COMMENT_ID -F body=@<file>   # later rounds
+bash <this-skill-dir>/scripts/pr.sh disposition N <scratch>/pr-N-disposition.md
 ```
 
-Write the body to a scratch file and pass it with `-F body=@<file>` (`-f` would send the literal path), so markdown and
-quotes survive. Never mention a bot (`@codex`) in it: a mention triggers a review.
-An older run's
-`<!-- triage-round: N -->` marker is replaced by `<!-- triage-disposition -->` on the
-first edit.
+It edits your disposition comment in place, or posts it the first time, and prints
+`{pr, id, url, action}`. It adds the comment's marker itself (and replaces an older
+run's), so the body never carries one. It refuses a body that @-mentions anyone, since a
+mention of a bot (`@codex`) triggers a review: write the login without the `@`, or put it (or code such as
+`@param`) in backticks. Exit 1
+means nothing was written or the write failed (its stderr says which); run it again
+once the cause is fixed.
 
 ## Scratch databases
 
@@ -371,9 +386,9 @@ branching from an unmerged base.
 
 **Late-review sweep.** A review that was in flight at the merge lands after that one
 gather. So as the run's last GitHub step, after the last named PR and before clean-up,
-gather every PR this run merged once more (`pr-comments.sh --since` its snapshot, and
+gather every PR this run merged once more (`pr.sh comments --since` its snapshot, and
 every review or comment dated after its merge). When a review is still in flight on one
-(`pr-state.sh` on merged PRs reads the same), watch it first by
+(`pr.sh state` on merged PRs reads the same), watch it first by
 [Taking the wait](#in-flight-signals), one wait for all of them, capped at 20 minutes.
 Classify what arrived; verified findings join that PR's
 follow-up PR (opened now if it had none). The report carries one line per merged PR:
