@@ -35,10 +35,6 @@ export type Vocabulary = {
 
 export const DEFAULT_VOCABULARY: Vocabulary = { roles: Object.fromEntries(TRIAGE_ROLES.map(r => [r, r])), wontfix: [] }
 
-// The wontfix strings of the repo last scanned. A file keeps the status it has on disk, as
-// scratch-state.sh reports it, so `isClosed` and `openFiles` (which the pane calls with a
-// stored board and no vocabulary) ask here whether that string is a closed one.
-let repoClosed: ReadonlySet<string> = new Set()
 const STALE_MS = 30 * 24 * 60 * 60 * 1000
 const TICKET_DIRS: Record<string, ScratchKind> = {
   decisions: 'decision',
@@ -46,8 +42,22 @@ const TICKET_DIRS: Record<string, ScratchKind> = {
   issues: 'ticket',
 }
 const NO_VALUE = ['none', 'null', '-']
+// `.scratch` as a whole path segment, whatever sits beside it (`>.scratch/`, `$(cat .scratch/x)`,
+// `` `ls .scratch` ``), but not inside a longer name (`foo.scratchpad`, `my.scratch`).
+const SCRATCH_PATH_RE = /(?<![\w.-])\.scratch(?![\w.-])/
+const START_BRANCH_RE = /(?<![\w.-])start-branch\.sh(?![\w.-])/
 
-export const isClosed = (file: ScratchFile) => CLOSED.has(file.status) || repoClosed.has(file.status)
+export const isClosed = (file: ScratchFile, extraClosed: readonly string[] = []) =>
+  CLOSED.has(file.status) || extraClosed.includes(file.status)
+
+/** Whether a non-Read tool call may have changed `.scratch/` (including `start-branch.sh`). */
+export function isScratchWriteTool(tool: string, input: Record<string, unknown>): boolean {
+  if (tool === 'Read') return false
+  const filePath = typeof input.file_path === 'string' ? input.file_path : ''
+  const command = typeof input.command === 'string' ? input.command : ''
+
+  return SCRATCH_PATH_RE.test(filePath) || SCRATCH_PATH_RE.test(command) || START_BRANCH_RE.test(command)
+}
 
 // Code-point order, as Python sorts strings; localeCompare would order by locale.
 const byText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
@@ -55,7 +65,7 @@ const byText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
 const unquote = (s: string) => s.replace(/^["']+|["']+$/g, '')
 
 // Lowest number first, as number_key in scratch-state.sh: 9 before 10, no number last.
-const byNumber = (a: string, b: string) => {
+export const byNumber = (a: string, b: string) => {
   const rank = (n: string) => (/^\d+$/.test(n) ? Number(n) : Infinity)
 
   return rank(a) - rank(b) || byText(a, b)
@@ -106,8 +116,10 @@ export function parseFile(path: string, kind: ScratchKind, text: string): Scratc
 
   let status = field('status')
   if (status === '') {
+    // `[^\n]+`, not `\S.*`: as in scratch-state.sh, the first `**Status:**` line holding anything
+    // (even only spaces) decides, and a later line is not read in its place.
     const head = text.split(/\r?\n/).slice(0, 30).join('\n')
-    status = (head.match(/^\*\*Status:\*\*\s*(.+)$/m)?.[1] ?? head.match(/^Status:\s*(.+)$/m)?.[1] ?? '').trim()
+    status = (head.match(/^\*\*Status:\*\*[ \t]*([^\n]+)$/m)?.[1] ?? head.match(/^Status:[ \t]*([^\n]+)$/m)?.[1] ?? '').trim()
   }
 
   // Older files carry the claim and the blockers as body lines, not frontmatter.
@@ -117,9 +129,10 @@ export function parseFile(path: string, kind: ScratchKind, text: string): Scratc
     const legacy = body.match(/^(?:\*\*Claimed by:\*\*|Claimed by:)[ \t]*(\S.*)$/im)?.[1]?.trim() ?? ''
     claimedBy = NO_VALUE.includes(legacy.toLowerCase()) ? '' : legacy
   }
+  const hasBlockedByFrontmatter = /^blocked-by:[ \t]*/m.test(front)
   let blockedBy = parseList(front, 'blocked-by').map(blockerId)
-  if (blockedBy.length === 0) {
-    const legacy = body.match(/^(?:\*\*Blocked by:\*\*|Blocked by:)\s*(.+)$/im)?.[1]?.trim() ?? ''
+  if (!hasBlockedByFrontmatter) {
+    const legacy = body.match(/^(?:\*\*Blocked by:\*\*|Blocked by:)[ \t]*([^\n]+)$/im)?.[1]?.trim() ?? ''
     blockedBy = NO_VALUE.includes(legacy.toLowerCase()) ? [] : (legacy.match(/\b\d+\b/g) ?? [])
   }
 
@@ -151,7 +164,7 @@ function parseList(front: string, key: string): string[] {
   if (inline) {
     return items(inline[1] ?? '')
   }
-  const block = front.match(new RegExp(`^${name}:[ \\t]*\\r?\\n((?:[ \\t]*-.*\\r?\\n?)+)`, 'm'))
+  const block = front.match(new RegExp(`^${name}:[ \\t]*(?:#[^\\r\\n]*)?\\r?\\n((?:[ \\t]*-.*\\r?\\n?)+)`, 'm'))
   if (block) {
     return (block[1] ?? '')
       .split(/\r?\n/)
@@ -170,11 +183,12 @@ type Derived = 'unreadable' | 'closed' | 'in progress' | 'blocked' | 'ready'
  * every ticket is closed: nothing writes `closed` onto it, so its own status is not asked.
  * A spec with no tickets was implemented directly and needs its own closed status.
  */
-export function openFiles(files: readonly ScratchFile[]): ScratchFile[] {
+export function openFiles(files: readonly ScratchFile[], extraClosed: readonly string[] = []): ScratchFile[] {
+  const closed = (f: ScratchFile) => isClosed(f, extraClosed)
   const tickets = files.filter(f => f.kind === 'ticket')
-  const isSpecComplete = tickets.length > 0 && tickets.every(isClosed)
+  const isSpecComplete = tickets.length > 0 && tickets.every(closed)
 
-  return files.filter(f => !isClosed(f) && !(f.kind === 'spec' && isSpecComplete))
+  return files.filter(f => !closed(f) && !(f.kind === 'spec' && isSpecComplete))
 }
 
 export function classify(
@@ -183,27 +197,29 @@ export function classify(
   lastChangeMs: number,
   now: number,
   roles: Record<string, string> = DEFAULT_VOCABULARY.roles,
+  extraClosed: readonly string[] = [],
 ): ScratchEffort {
+  const closed = (file: ScratchFile) => isClosed(file, extraClosed)
   const human = new Set(HUMAN_ROLES.map(role => roles[role] ?? role))
   const deployHold = roles['ready-for-human'] ?? 'ready-for-human'
   const at = (path: string) => `.scratch/${slug}/${path}`
-  const byKind = (kind: ScratchKind) => files.filter(f => f.kind === kind)
   const isWork = (file: ScratchFile) => file.kind === 'decision' || file.kind === 'ticket'
 
   // Each open decision or ticket's blockers that are not closed, zero-padded to its own width.
   const openBlockers = (file: ScratchFile) =>
-    !isWork(file) || isClosed(file) || file.status === ''
+    !isWork(file) || closed(file) || file.status === ''
       ? []
       : file.blockedBy.flatMap(raw => {
           const id = /^\d+$/.test(raw) ? raw.padStart(file.number.length || 2, '0') : raw
           const blocker = files.find(f => f.kind === file.kind && (f.number === id || f.number === raw))
 
-          return blocker === undefined || !isClosed(blocker) ? [id] : []
+          return blocker === undefined || !closed(blocker) ? [id] : []
         })
   const blockers = new Map(files.map(f => [f, openBlockers(f)]))
+  const byKind = (kind: ScratchKind) => files.filter(f => f.kind === kind)
   const derived = (file: ScratchFile): Derived => {
     if (file.status === '') return 'unreadable'
-    if (isClosed(file)) return 'closed'
+    if (closed(file)) return 'closed'
     if (file.claimedBy !== '' || file.status === 'in-progress') return 'in progress'
 
     return (blockers.get(file) ?? []).length > 0 ? 'blocked' : 'ready'
@@ -218,11 +234,11 @@ export function classify(
   // The pane shows these, not the raw `blockedBy`: a closed blocker no longer holds anything.
   const stillOpen = [...blockers].filter(([, ids]) => ids.length > 0).map(([f, ids]) => [f.path, ids])
   const base = { slug, files, lastChangeMs, frontier, openBlockers: Object.fromEntries(stillOpen), isStale: false }
-  const mismatch = findMismatch(files)
+  const mismatch = findMismatch(files, extraClosed)
   if (mismatch !== '') {
     return { ...base, state: 'mismatched', next: mismatch }
   }
-  const open = openFiles(files)
+  const open = openFiles(files, extraClosed)
   if (open.length === 0) {
     return { ...base, state: 'done', next: '/scratch-cleanup' }
   }
@@ -231,8 +247,8 @@ export function classify(
   const spec = byKind('spec')[0]
   const tickets = byKind('ticket')
   const decisions = byKind('decision')
-  const isMapOpen = map !== undefined && !isClosed(map)
-  const isSpecOpen = spec !== undefined && !isClosed(spec)
+  const isMapOpen = map !== undefined && !closed(map)
+  const isSpecOpen = spec !== undefined && !closed(spec)
   const readyDecision = decisions.filter(isReady).sort((a, b) => byNumber(a.number, b.number))[0]
   const isWaitingOnDeploy = (t: ScratchFile) => t.delivery && t.status === deployHold
   // Lowest number first, the tracker's Frontier rule (scratch-state.sh adds the unblock count
@@ -251,9 +267,9 @@ export function classify(
     next = isMapOpen ? `/wayfinder ${at(map.path)}` : `/grill-me ${at(readyDecision.path)}`
   } else if (isMapOpen && decisions.length === 0) {
     next = `/wayfinder ${at(map.path)}`
-  } else if (isMapOpen && decisions.every(isClosed) && !spec) {
+  } else if (isMapOpen && decisions.every(closed) && !spec) {
     next = `/to-spec ${at(map.path)}`
-  } else if (isSpecOpen && spec.openQuestions > 0 && !tickets.some(t => isClosed(t) || derived(t) === 'in progress')) {
+  } else if (isSpecOpen && spec.openQuestions > 0 && !tickets.some(t => closed(t) || derived(t) === 'in progress')) {
     next = `/grill-me ${at(spec.path)}`
   } else if (isSpecOpen && tickets.length === 0) {
     next = `/to-tickets ${at(spec.path)}`
@@ -264,7 +280,7 @@ export function classify(
     next = `after deploy: /implement ${at(waiting.path)}`
   } else if (held) {
     next = `waiting on a human: ${at(held.path)} (${held.status})`
-  } else if (byKind('request').some(f => !isClosed(f))) {
+  } else if (byKind('request').some(f => !closed(f))) {
     next = '/triage'
   } else {
     const claimed = open.filter(f => f.claimedBy !== '').map(f => `${f.number || f.path} by ${f.claimedBy}`)
@@ -274,13 +290,13 @@ export function classify(
   return { ...base, state: 'open', isStale: now - lastChangeMs > STALE_MS, next }
 }
 
-function findMismatch(files: ScratchFile[]): string {
+function findMismatch(files: ScratchFile[], extraClosed: readonly string[] = []): string {
   const unread = files.find(f => f.status === '')
   if (unread) {
     return `no readable status: ${unread.path}`
   }
   const map = files.find(f => f.kind === 'map')
-  if (map && !isClosed(map) && files.some(f => f.kind === 'spec')) {
+  if (map && !isClosed(map, extraClosed) && files.some(f => f.kind === 'spec')) {
     return 'map still open though spec.md exists'
   }
 
@@ -357,7 +373,6 @@ async function readText(fs: Reader, path: string): Promise<string> {
 export async function scan(fs: Reader, root: string, now: number, only = ''): Promise<ScratchBoard> {
   const efforts: ScratchEffort[] = []
   const vocab = await readVocabulary(fs, root)
-  repoClosed = new Set(vocab.wontfix)
   const dirs = (await listSorted(fs, root)).filter(
     d => d.kind === 'dir' && d.name !== 'research' && !d.name.startsWith('.') && (only === '' || d.name === only),
   )
@@ -395,13 +410,13 @@ export async function scan(fs: Reader, root: string, now: number, only = ''): Pr
       }
     }
     if (files.length > 0) {
-      efforts.push(classify(dir.name, files, await lastChange(fs, kept), now, vocab.roles))
+      efforts.push(classify(dir.name, files, await lastChange(fs, kept), now, vocab.roles, vocab.wontfix))
     }
   }
 
   efforts.sort((a, b) => rank(a) - rank(b) || b.lastChangeMs - a.lastChangeMs)
 
-  return { root, scannedAt: now, efforts }
+  return { root, scannedAt: now, closedStatuses: vocab.wontfix, efforts }
 }
 
 // The newest kept file: a tracked file's last commit time, an untracked file's mtime.
@@ -435,8 +450,9 @@ export function summary(board: ScratchBoard): string {
   if (board.efforts.length === 0) {
     return 'No efforts in .scratch/.'
   }
+  const closedStatuses = board.closedStatuses ?? []
   const rows = board.efforts.map(e => {
-    const open = openFiles(e.files).map(f => f.number || f.path).join(', ')
+    const open = openFiles(e.files, closedStatuses).map(f => f.number || f.path).join(', ')
     return `| \`${e.slug}\` | ${e.state}${e.isStale ? ' (stale)' : ''} | ${open} | ${e.next} |`
   })
 

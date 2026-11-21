@@ -24,6 +24,10 @@ Codex limits how many agent threads are live at once. When `spawn_agent` fails w
 
 `interrupt_agent`. It stops the current turn; the agent stays available for follow-ups.
 
+## Waiting on a background shell command
+
+Start it with `exec_command`, then poll with an empty `write_stdin` at `yield_time_ms: 300000` on every poll until it exits, the longest an empty poll takes (verified on Codex CLI 0.169). Each poll re-reads the whole context, so a 1- to 60-second yield costs a full step for nothing. Between polls, send nothing: one waiting message covers the checkpoint, and the next message reports its verdict.
+
 ## Structured question
 
 `request_user_input`, only when it is in your tool list for this turn (Plan mode): 1–3 questions, each with a `header` (12 characters at most), an `id`, and 2–3 single-select options of `label` and `description`. No `preview` and no multi-select: put a short snippet in the option description, or show side-by-side artifacts in chat first.

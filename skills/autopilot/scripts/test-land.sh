@@ -111,3 +111,83 @@ land 01 abort
 eq "abort" "$(printf '%s' "$out" | jq -r '.released')" "true"
 [ ! -e "$notes/land.lock" ] || fail "the lock outlived abort"
 echo "ok abort frees only the caller's lock"
+
+# Non-conflict merge failure in begin (untracked file collides with integration branch):
+# must abort the merge, release the lock, and refuse instead of returning locked:true, conflicts:[].
+printf 'untracked blocker\n' >"$t/wt-01/collision.txt"
+printf 'tracked on integration\n' >"$r/collision.txt"
+git -C "$r" add -- collision.txt
+git -C "$r" commit -q -m "add collision.txt on integration"
+land 01 begin --integration "$r"
+eq "non-conflict merge exit" "$rc" 1
+eq "non-conflict merge unlocked" "$(printf '%s' "$out" | jq -c '[.locked, .merged, (has("conflicts"))]')" '[false,false,false]'
+[ ! -e "$notes/land.lock" ] || fail "non-conflict merge failure left lock behind"
+rm -f "$t/wt-01/collision.txt"
+echo "ok non-conflict merge failure releases lock and refuses cleanly"
+
+# A hook that rejects the merge commit leaves MERGE_HEAD with no conflicts: still refuse and free the lock.
+mkdir -p "$t/hooks"
+printf '#!/bin/sh\nexit 1\n' >"$t/hooks/pre-merge-commit"
+chmod +x "$t/hooks/pre-merge-commit"
+commit_file 01 hooked-ticket.txt ticket
+printf 'integration side\n' >"$r/hooked.txt"
+git -C "$r" add -- hooked.txt
+git -C "$r" commit -q -m "add hooked.txt on integration"
+git -C "$r" config core.hooksPath "$t/hooks"
+land 01 begin --integration "$r"
+git -C "$r" config --unset core.hooksPath
+eq "hook-rejected merge exit" "$rc" 1
+eq "hook-rejected merge unlocked" "$(printf '%s' "$out" | jq -c '[.locked, .merged, (has("reason"))]')" '[false,false,true]'
+[ ! -e "$notes/land.lock" ] || fail "hook-rejected merge left lock behind"
+! git -C "$t/wt-01" rev-parse -q --verify MERGE_HEAD >/dev/null || fail "hook-rejected merge was not aborted"
+echo "ok a hook-rejected merge commit refuses and releases the lock"
+
+# A failed stack push still records the cut: the worker pushes it itself and opens the PR, so
+# the next ticket's position and base must move past it.
+commit_file 01 four.txt four
+land 01 begin --integration "$r"
+eq "begin before failed push exit" "$rc" 0
+git -C "$r" remote set-url origin "$t/nonexistent-remote.git"
+land 01 finish --integration "$r" --ticket 04 --stack
+eq "failed push exit" "$rc" 1
+eq "failed push json" "$(printf '%s' "$out" | jq -c '[.landed, .position, .cut, .base, .pushed]')" '[true,3,"foo-stack-04","foo-stack-03",false]'
+eq "failed push records the cut" "$(tail -n 1 "$notes/stack")" "$(printf '3\t04\tfoo-stack-04\tfoo-stack-03')"
+[ ! -e "$notes/land.lock" ] || fail "failed push left lock behind"
+# Retrying the same ticket reuses its recorded line instead of stacking the cut on itself.
+land 01 begin --integration "$r"
+eq "begin retry after failed push exit" "$rc" 0
+land 01 finish --integration "$r" --ticket 04 --stack
+eq "retry after failed push json" "$(printf '%s' "$out" | jq -c '[.position, .cut, .base]')" '[3,"foo-stack-04","foo-stack-03"]'
+eq "retry keeps one stack line for the ticket" "$(awk -F'\t' '$2 == "04"' "$notes/stack" | wc -l | tr -d ' ')" 1
+git -C "$r" remote set-url origin "$t/origin.git"
+commit_file 01 five.txt five
+land 01 begin --integration "$r"
+eq "begin after failed push exit" "$rc" 0
+land 01 finish --integration "$r" --ticket 05 --stack
+eq "next cut after failed push" "$(printf '%s' "$out" | jq -c '[.position, .cut, .base, .pushed]')" '[4,"foo-stack-05","foo-stack-04",true]'
+echo "ok a failed stack push still records the cut, so the next ticket stacks on it"
+
+# begin again while a merge is still in progress (conflicts resolved and staged, not yet
+# committed): keep the merge and the lock, and answer locked:true with no conflicts left.
+commit_file 03 shared.txt "three again"
+printf 'integration again\n' >"$r/shared.txt"
+git -C "$r" add -- shared.txt
+git -C "$r" commit -q -m "integration changes shared.txt"
+land 03 begin --integration "$r"
+eq "in-progress conflict exit" "$rc" 1
+eq "in-progress conflict" "$(printf '%s' "$out" | jq -c '.conflicts')" '["shared.txt"]'
+printf 'resolved again\n' >"$t/wt-03/shared.txt"
+git -C "$t/wt-03" add -- shared.txt
+land 03 begin --integration "$r"
+eq "begin mid-merge exit" "$rc" 1
+eq "begin mid-merge" "$(printf '%s' "$out" | jq -c '.')" '{"locked":true,"merged":false,"conflicts":[]}'
+git -C "$t/wt-03" rev-parse -q --verify MERGE_HEAD >/dev/null || fail "begin mid-merge aborted the merge"
+eq "begin mid-merge keeps the staged resolution" "$(git -C "$t/wt-03" show :shared.txt)" "resolved again"
+eq "begin mid-merge keeps the lock" "$(cat "$notes/land.lock/owner")" "foo--03"
+git -C "$t/wt-03" commit -q --no-edit
+land 03 begin --integration "$r"
+eq "begin after committing the merge exit" "$rc" 0
+land 03 finish --integration "$r" --ticket 06
+eq "finish after mid-merge begin" "$(printf '%s' "$out" | jq -r '.landed')" "true"
+eq "mid-merge resolution landed" "$(cat "$r/shared.txt")" "resolved again"
+echo "ok begin during an unfinished merge keeps the merge and the lock"

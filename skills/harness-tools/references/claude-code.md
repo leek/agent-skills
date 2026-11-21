@@ -23,6 +23,10 @@ The interim notice that an unnamed agent "is waiting on its own background work"
 
 `TaskStop` with its `agentId` or task id.
 
+## Waiting on a background shell command
+
+Bash with `run_in_background: true`; the harness wakes you when it exits. With no background commands, `ScheduleWakeup` for a periodic check.
+
 ## Structured question
 
 `AskUserQuestion`: up to 4 questions per call, 2–4 options each. Each question has a `header` (12 characters at most); each option a `label` and a `description`, and may have a `preview` (single-select only). `multiSelect: true` for a pick-several question.

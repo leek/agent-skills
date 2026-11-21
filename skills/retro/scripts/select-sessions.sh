@@ -183,8 +183,8 @@ if want agy; then
       id=$(basename "$f" .db)
       p=""; ts=""
       if [ -f "$agy/history.jsonl" ]; then
-        p=$(jq -rc --arg id "$id" 'select(.conversationId==$id) | .display' "$agy/history.jsonl" 2>/dev/null | head -n 1 | cut -c1-200) || true
-        ts=$(jq -rc --arg id "$id" 'select(.conversationId==$id) | .timestamp' "$agy/history.jsonl" 2>/dev/null | tail -n 1) || true
+        p=$(jq -rc --arg id "$id" 'select(.conversationId==$id and .display != null) | .display' "$agy/history.jsonl" 2>/dev/null | head -n 1 | cut -c1-200) || true
+        ts=$(jq -rc --arg id "$id" 'select(.conversationId==$id and .timestamp != null and .timestamp != "") | .timestamp' "$agy/history.jsonl" 2>/dev/null | tail -n 1) || true
       fi
       # Not in history: a human prompt still shows as a step 14 in the .db; only relayed
       # (step 101) or empty conversations are treated as automated.
@@ -201,7 +201,19 @@ if want agy; then
           case "$p14" in *"You are one panelist"*) panel14=1 ;; esac ;;
         esac
       fi
-      if [ -n "$ts" ]; then ts=$(date -u -r $((ts / 1000)) +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "@$((ts / 1000))" +%Y-%m-%dT%H:%M:%SZ); else ts=$(mtime_iso "$f"); fi
+      case "$ts" in
+        ""|null)
+          ts=$(mtime_iso "$f")
+          ;;
+        *[!0-9]*)
+          if ! printf '%s' "$ts" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}'; then
+            ts=$(mtime_iso "$f")
+          fi
+          ;;
+        *)
+          ts=$(date -u -r $((ts / 1000)) +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "@$((ts / 1000))" +%Y-%m-%dT%H:%M:%SZ)
+          ;;
+      esac
       jq -nc --arg id "$id" --arg path "$f" --arg ts "$ts" --arg p "$p" --arg steps "$steps" --arg p14 "$p14" --argjson panel14 "$panel14" \
         '{harness:"agy", id:$id, path:$path, timestamp:$ts, children:[], first_prompt:(if $p=="" then $p14 else $p end),
           hint:(if $p=="" and ($steps|split(",")|index("14")|not) then "not in history (relayed or headless)"

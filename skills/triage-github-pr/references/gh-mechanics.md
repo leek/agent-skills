@@ -51,18 +51,10 @@ flight; ignore the rest for that purpose. Required human approvals are checked
 separately.
 
 **Taking the wait.** Each checkpoint watches the reviewers with this one background
-command, capped at what is left of the PR's 10-minute review-wait budget. How to wait
-on it:
-
-- **Claude Code:** Bash with `run_in_background`; the harness wakes you when it exits.
-- **Codex:** start it with `exec_command`, then poll with an empty `write_stdin` at
-  `yield_time_ms: 300000` on every poll until it exits, the longest an empty poll takes
-  (verified on Codex CLI 0.169). Each poll re-reads the whole context, so a 1- to
-  60-second yield costs a full step for nothing. Between polls, send nothing: one waiting
-  message covers the checkpoint, and the next message reports its verdict.
-- **A harness with no background commands:** schedule one check every 5 minutes up to
-  the cap (`ScheduleWakeup` in Claude Code).
-- **A harness with neither:** name the reviewers still running, and treat it as the cap.
+command, capped at what is left of the PR's 10-minute review-wait budget. Wait on it per
+[harness-tools](../../harness-tools/SKILL.md) (move: waiting on a background shell command)
+(without background commands, schedule one check every 5 minutes up to the cap, or name
+the reviewers still running and treat it as the cap):
 
 ```bash
 bash <this-skill-dir>/../run-after/scripts/wait-until.sh --interval 30 --timeout <seconds left of the PR's 10-minute budget> -- bash <this-skill-dir>/../closeout/scripts/pr-state.sh N --in-flight --no-required --check "<a review bot's own check>"
@@ -277,7 +269,7 @@ review-wait budget used, verdicts and push count; GitHub activity owns that coun
 Mode: bounded | exhaustive
 Starting head: <sha>; snapshot: <ids and timestamps, or artifact link>
 Batch: <number>; not needed | fixing | validated at <sha>
-Checkpoint: <initial / after batch 1 / after batch 2 / exhaustive round N>; review wait used: <minutes of the PR's 20>, <clear | capped: reviewers still running | not waited: after batch 2>
+Checkpoint: <initial / after batch 1 / after batch 2 / exhaustive round N>; review wait used: <minutes of the PR's 10>, <clear | capped: reviewers still running | not waited: after batch 2>
 Active wait started: <timestamp, or not waiting>
 Published head: <sha, or push pending>
 
@@ -312,7 +304,7 @@ needs its own (a worktree `.env`, a throwaway test database), name it
 `<app db>_pr<N>`, never a name the main checkout's `.env`, `.env.testing`, or
 `phpunit.xml` uses, and register it the moment you create it, per `laravel-herd-worktrees`'
 [Scratch database registry](../../laravel-herd-worktrees/SKILL.md#scratch-database-registry)
-(`scratch-db.sh register <pgsql|mysql> <database> <worktree path, or ->`).
+(`bash <this-skill-dir>/../laravel-herd-worktrees/scripts/scratch-db.sh register <pgsql|mysql> <database> <worktree path, or ->`).
 
 A browser check needs a database at the PR branch's schema. The main checkout's
 development database is often behind the base branch, and a login that fails on a

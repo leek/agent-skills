@@ -1,6 +1,7 @@
-"""Read-only shell policy for the PR-review agents (finding-verifier, pr-reviewer).
+"""Read-only shell policy for the review agents in pre_tool_guard.REVIEW_GUARDED
+(deepening-scout, finding-verifier, pr-reviewer, spec-reviewer, standards-reviewer).
 
-Both agents read untrusted text: review comments, bot findings, and the PR diff.
+Each reads untrusted text: review comments, bot findings, the PR diff, or the codebase.
 Their bodies say read-only; hooks/pre_tool_guard.py enforces this policy on their
 shell calls. Every segment of the command (split on &&, ||, ;, |) must be a read-only
 git, gh, rg, find, `sed -n '<range>p'`, or text command under both bash and zsh rules.
@@ -10,7 +11,7 @@ import re
 
 from shell_syntax import Blocked, check_filter, long_option_in, parse_command
 
-FILTERS = {"cat", "head", "tail", "wc", "sort", "uniq", "cut", "tr", "echo", "ls", "jq",
+FILTERS = {"cat", "head", "tail", "wc", "sort", "uniq", "cut", "tr", "echo", "ls",
            "grep", "egrep", "cd", "pwd", "basename", "dirname", "true"}
 GIT_READ = {"log", "show", "diff", "ls-files", "ls-tree", "blame", "grep", "rev-parse",
             "rev-list", "merge-base", "cat-file", "status", "range-diff", "shortlog",
@@ -153,6 +154,9 @@ def check_gh(args: list[str]) -> None:
         # OWNER/REPO only: HOST/OWNER/REPO and a URL send the call to another host.
         if any(name == "--repo" and not OWNER_REPO.fullmatch(v) for name, v in flags):
             raise Blocked("`-R` takes OWNER/REPO on github.com, never a host or a URL")
+        for name, v in flags:
+            if name == "--jq":
+                check_jq_filter(v)
         # `gh repo view host/owner/repo` and `gh pr view git@host:o/r` reach another host
         # with no -R at all, so every positional is held to the same shapes.
         for a in positional:
@@ -164,6 +168,9 @@ def check_gh(args: list[str]) -> None:
     if args[:1] != ["api"]:
         raise Blocked(f"`gh {' '.join(args[:2])}` is not a read-only gh command")
     flags, positional = parse_pflags(args[1:], GH_API_VALUE, GH_API_BOOL, GH_API_SHORT, "gh api")
+    for name, v in flags:
+        if name == "--jq":
+            check_jq_filter(v)
     methods = [v.upper() for name, v in flags if name == "--method"]
     fields = [(name, v) for name, v in flags if name in ("--field", "--raw-field")]
     if any(m != "GET" for m in methods):
@@ -210,6 +217,120 @@ def check_sed(args: list[str]) -> None:
         raise Blocked("only `sed -n '<start>,<end>p' <file>` is allowed; use the Read tool")
 
 
+# `env` builtin and `$ENV` object read process environment variables (tokens, keys).
+# Field access (`.env`, `.foo.env`), string keys (`.["env"]`, `{"env": …}`), and longer words
+# (`.environment`) stay allowed. An unquoted key (`{env: …}`) is refused: telling it from a
+# slice (`.[0,env:]`, which runs env) needs a jq parser.
+# jq 1.6 lexes `$` and `ENV` as two tokens, so `$ ENV` reads it too.
+JQ_ENV = re.compile(r'(?<![.\w$"])env\b|\$\s*ENV\b')
+
+
+# `include` / `import` load a module from jq's search path (or -L), whose definitions the
+# filter check never sees: `def leak: env;` in m.jq, then `include "m"; leak`.
+JQ_MODULE = re.compile(r'(?<![.\w$"])(include|import)\b')
+JQ_BOOL = {"--null-input", "--raw-input", "--slurp", "--compact-output", "--raw-output",
+           "--raw-output0", "--join-output", "--ascii-output", "--sort-keys", "--color-output",
+           "--monochrome-output", "--tab", "--unbuffered", "--stream", "--stream-errors", "--seq",
+           "--exit-status", "--args", "--jsonargs"}
+JQ_SHORT_BOOL = set("nRscrjaSCMe")
+# Long options that take values, and how many words follow.
+JQ_VALUE = {"--indent": 1, "--arg": 2, "--argjson": 2, "--slurpfile": 2, "--rawfile": 2}
+
+
+def jq_code(expr: str) -> str:
+    """The filter with every string literal's text blanked to spaces, so a word inside one
+    (`contains("missing import")`) is data. A `\\(…)` interpolation is code and is kept, so
+    `"\\(env)"` still shows env. An unterminated string is refused."""
+    out: list[str] = []
+    stack = ["code"]  # "code", "str", or an interpolation's paren depth (int)
+    i = 0
+    while i < len(expr):
+        c, top = expr[i], stack[-1]
+        if top == "str":
+            if c == "\\" and expr[i + 1:i + 2] == "(":
+                stack.append(0)
+                out.append(" (")
+                i += 2
+                continue
+            if c == "\\":
+                out.append("  ")
+                i += 2
+                continue
+            if c == '"':
+                stack.pop()
+                out.append('"')
+            else:
+                out.append(" ")
+            i += 1
+            continue
+        if c == '"':
+            stack.append("str")
+        elif top != "code" and c == "(":
+            stack[-1] = top + 1
+        elif top != "code" and c == ")":
+            if top == 0:
+                stack.pop()
+            else:
+                stack[-1] = top - 1
+        out.append(c)
+        i += 1
+    if stack != ["code"]:
+        raise Blocked("`jq` filter has an unterminated string")
+    return "".join(out)
+
+
+def check_jq_filter(expr: str) -> None:
+    code = jq_code(expr)
+    # A comment can split a token the env check matches: `$ #x<newline>ENV`.
+    if "#" in code:
+        raise Blocked("`jq` filters may not contain comments (`#`)")
+    if JQ_ENV.search(code):
+        raise Blocked("`jq` filters may not read environment variables (`env`, `$ENV`)")
+    if JQ_MODULE.search(code):
+        raise Blocked("`jq` filters may not load modules (`include`, `import`)")
+
+
+def jq_input_file(word: str) -> bool:
+    """An argument that is plainly an input file, never a program: stdin, a path, or *.json."""
+    return word == "-" or "/" in word or word.endswith(".json")
+
+
+def check_jq_positional(a: str, filter_seen: bool) -> bool:
+    """The first positional other than `-` is the filter. Every later one is checked too unless
+    it is plainly an input file, so `jq -n - 'env'` cannot hide the program behind a stand-in."""
+    if a == "-":
+        return filter_seen
+    if not filter_seen or not jq_input_file(a):
+        check_jq_filter(a)
+    return True
+
+
+def check_jq(args: list[str]) -> None:
+    i, filter_seen = 0, False
+    while i < len(args):
+        a = args[i]
+        i += 1
+        if a == "--":
+            for rest in args[i:]:
+                filter_seen = check_jq_positional(rest, filter_seen)
+            return
+        if not a.startswith("-") or a == "-":
+            filter_seen = check_jq_positional(a, filter_seen)
+            continue
+        if long_option_in(a, ("--from-file",)) or (not a.startswith("--") and "f" in a[1:]):
+            raise Blocked("`jq -f` / `--from-file` is not allowed")
+        if long_option_in(a, ("--library-path",)) or (not a.startswith("--") and "L" in a[1:]):
+            raise Blocked("`jq -L` / `--library-path` is not allowed: it loads modules")
+        if a in JQ_BOOL:
+            continue
+        if a in JQ_VALUE:
+            i += JQ_VALUE[a]
+            continue
+        if not a.startswith("--") and set(a[1:]) <= JQ_SHORT_BOOL:
+            continue
+        raise Blocked(f"`jq {a}` is not an allowed jq option")
+
+
 def check(command: str) -> None:
     parts = parse_command(command)
     for seg in parts:
@@ -227,5 +348,7 @@ def check(command: str) -> None:
             check_find(args)
         elif name == "sed":
             check_sed(args)
+        elif name == "jq":
+            check_jq(args)
         else:
             raise Blocked(f"`{name}` is not allowed — only read-only git, gh, rg, find, and text filters")

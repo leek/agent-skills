@@ -35,6 +35,8 @@ export type ScratchEffort = {
 export type ScratchBoard = {
   root: string
   scannedAt: number
+  /** Repo-specific wontfix statuses from triage-labels.md; closed like the built-in words. */
+  closedStatuses: string[]
   efforts: ScratchEffort[]
 }
 

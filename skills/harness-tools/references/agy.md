@@ -23,6 +23,10 @@ The moves, their fallbacks, and the rules for every sub-agent are in [../SKILL.m
 
 `manage_subagents` with `Action: "kill"` and its `ConversationIds`. This also kills its own sub-agents and deletes any branched workspace.
 
+## Waiting on a background shell command
+
+Run the command in the background (or let the shell tool background it at its timeout) and wait for its completion notification; never poll in a loop.
+
 ## Structured question
 
 `ask_question`: `questions` of `{question, options, is_multi_select}`. Options are plain strings with no description or preview: put each option's trade-off in its text, start the recommended one with `(Recommended)`, and show any preview in chat first. Ask a trivial yes/no in plain text instead.

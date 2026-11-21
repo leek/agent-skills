@@ -6,7 +6,7 @@ user-invocable: false
 
 # Harness Tools
 
-Skills name a **move** (dispatch and wait, dispatch in the background, follow up, stop, structured question) and point here for the tool. This file holds what every harness shares: what each move means, its fallback, and the rules for every sub-agent. The tools are in one file per harness. Read only yours:
+Skills name a **move** (dispatch and wait, dispatch in the background, follow up, stop, waiting on a background shell command, structured question) and point here for the tool. This file holds what every harness shares: what each move means, its fallback, and the rules for every sub-agent. The tools are in one file per harness. Read only yours:
 
 | Harness | File |
 |---|---|
@@ -33,6 +33,8 @@ Use your harness's tool with the skill's own content (the brief, the agent type,
 **Follow up.** Send more work to a sub-agent that is running or has finished, so it keeps its context. Fallback: brief a fresh sub-agent with everything the follow-up needs (paths, the finding, the failure output).
 
 **Stop.** Fallback: leave it running and say so in the report.
+
+**Waiting on a background shell command.** A long-running shell wait started from the main session (such as `wait-until.sh` or an idle watch). Fallback (no background commands): schedule a periodic check where the harness offers one, or name what is still running and treat it as the cap.
 
 **Structured question.** A click-to-answer question: the recommended option first and marked as recommended, real options only, and a free-text Other that the harness adds. When the skill asks for more questions or options than your tool takes, split them over further calls; when it asks for multi-select and your tool has none, ask that question in chat. Fallback: the same shape in chat: the question, the numbered options with the recommendation first, then wait for the answer.
 

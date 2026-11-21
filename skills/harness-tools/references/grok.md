@@ -22,6 +22,10 @@ The moves, their fallbacks, and the rules for every sub-agent are in [../SKILL.m
 
 `kill_command_or_subagent`.
 
+## Waiting on a background shell command
+
+Run the command in the background (or let the shell tool background it at its timeout) and wait for its completion notification; never poll in a loop.
+
 ## Structured question
 
 `ask_user_question`: like Claude Code's, but the pick-several flag is `multi_select` and there is no `header`. Up to 4 questions per call, 2–4 options each; options take `label`, `description`, and `preview`.

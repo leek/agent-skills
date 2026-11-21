@@ -33,6 +33,7 @@ Most work runs one straight line (**decide → spec → tickets → build**) ove
 | a spec | the whole thing built fast, in parallel, this session | `implement-spec` (`implement <spec> all` for one-by-one, no subagents) |
 | a spec, and no wish to babysit | it built in parallel while you are away, as one PR or a stack | `autopilot` |
 | a change with no ticket | it built test-first, red then green | `tdd` (the loop `implement` runs; the agent also reaches for it on its own) |
+| a prompt, plan, or diff | consensus from four independent models | `panel` |
 
 **Before any of it, once per repo:** `setup` writes the tracker, status vocabulary, and domain doc layout.
 
@@ -40,7 +41,7 @@ Most work runs one straight line (**decide → spec → tickets → build**) ove
 
 ## After the code exists
 
-- Review the diff → `code-review`. Want four independent models on it instead of one → `panel`.
+- Review the diff → `code-review`. Want consensus from four independent models on a diff or any open prompt → `panel`.
 - Prove it in the running app → `verify`.
 - Test a web app from a URL and a prompt → `browser-test`.
 - Ship the session's work → `commit`.

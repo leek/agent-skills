@@ -24,11 +24,14 @@ fi
 command -v jq >/dev/null || { echo "ERROR: jq is required" >&2; exit 1; }
 
 TMP=$(mktemp)
-trap 'rm -f "$TMP"' EXIT
+SEEN_FILE=$(mktemp)
+LEDGER_TMP=""
+trap 'rm -f "$TMP" "$SEEN_FILE" ${LEDGER_TMP:+"$LEDGER_TMP"}' EXIT
 
-SEEN='[]'
 if [[ -s "$LEDGER" ]]; then
-  SEEN=$(jq -c 'if type == "array" then . else error("ledger is not a JSON array") end' "$LEDGER")
+  jq -c 'if type == "array" then . else error("ledger is not a JSON array") end' "$LEDGER" > "$SEEN_FILE"
+else
+  printf '[]\n' > "$SEEN_FILE"
 fi
 
 NORM='
@@ -48,21 +51,23 @@ def norm:
 
 case "$MODE" in
   filter)
-    jq -c --argjson seen "$SEEN" "$NORM"'
-      ($seen | map(norm)) as $s
+    jq -c --slurpfile seen "$SEEN_FILE" "$NORM"'
+      ($seen[0] | map(norm)) as $s
       | map(.url |= norm)
       | map(select(.url as $u | $s | index([$u]) | not))
       | unique_by(.url)
     '
     ;;
   add)
-    jq -c --argjson seen "$SEEN" "$NORM"'
-      ($seen | map(norm)) as $s
+    jq -c --slurpfile seen "$SEEN_FILE" "$NORM"'
+      ($seen[0] | map(norm)) as $s
       | (map(norm) | unique | map(select(. as $u | $s | index([$u]) | not))) as $new
-      | {added: ($new | length), all: ($seen + $new)}
+      | {added: ($new | length), all: ($seen[0] + $new)}
     ' > "$TMP"
     mkdir -p "$(dirname "$LEDGER")"
-    jq '.all' "$TMP" > "$LEDGER.tmp" && mv "$LEDGER.tmp" "$LEDGER"
+    LEDGER_TMP=$(mktemp "$LEDGER.tmp.XXXXXX")
+    jq '.all' "$TMP" > "$LEDGER_TMP" && mv "$LEDGER_TMP" "$LEDGER"
+    LEDGER_TMP=""
     jq -c '{added, total: (.all | length)}' "$TMP"
     echo "ledger updated: $LEDGER" >&2
     ;;

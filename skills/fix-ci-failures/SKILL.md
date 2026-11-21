@@ -88,8 +88,12 @@ Every landing writes the fixes on `<default>`, so work from `origin/<default>` w
 disturbing a dirty tree or another worktree's checkout. When the tree is dirty or the
 branch is checked out elsewhere, use
 `git worktree add .claude/worktrees/ci-<branch> origin/<default>` (at that path, never a
-sibling directory), then make it runnable with `laravel-herd-worktrees`' **Bootstrap a
-bare worktree** section before running anything in it. Leave it in place until step 6.
+sibling directory), then make it runnable with `laravel-herd-worktrees`'
+[Bootstrap a bare worktree](../laravel-herd-worktrees/SKILL.md#bootstrap-a-bare-worktree)
+section before running anything in it. When tests need their own database, name and
+register it per `laravel-herd-worktrees`'
+[Scratch database registry](../laravel-herd-worktrees/SKILL.md#scratch-database-registry).
+Leave it in place until step 6.
 
 When `B` is not `<default>`, first run each LEGIT failure's command at the base: a failure
 that does not reproduce there is already fixed on `<default>`, so name it in the report
@@ -114,7 +118,8 @@ Land the commits the way step 3 chose, without asking again:
 - **Push to `B` too:** push to `<default>` first, then cherry-pick each fix commit onto
   `origin/B`, re-run each fixed command, and push that to `B`. A fix that does not apply
   to `B` is named in the report, not forced. A cherry-pick conflict stops this step: ask
-  the user.
+  the user (a structured question ([harness-tools](../harness-tools/SKILL.md)), otherwise
+  in chat).
 - **Commit only:** push nothing.
 
 Never push to `B` on any answer other than **Push to `B` too**.
@@ -129,11 +134,14 @@ request, or kept local by the user's answer.
 
 ## 6. Clean up and report
 
-If step 4 created a worktree and its commits are on their landing branch (or in the
-open pull request), remove it without asking, from the main checkout, by `laravel-herd-worktrees`' **Remove a served worktree**
-(it never forces). If it refuses,
-or the commits are kept local, keep it and ask one yes/no question: "Can I delete the
-worktree I created?" Remove it only on yes, never with `--force`; otherwise name it in
+If step 4 created a worktree (and any registered scratch databases), clean them up from
+the main checkout by `laravel-herd-worktrees`'
+[Remove a served worktree](../laravel-herd-worktrees/SKILL.md#remove-a-served-worktree)
+and its **What is left** rule: remove without asking when the commits are on their
+landing branch (or in the open pull request), never with `--force`. If git refuses, or
+the commits are kept local, keep it and ask once (a structured question
+([harness-tools](../harness-tools/SKILL.md)), otherwise in chat) whether to remove what
+is left. Remove only what the user selects, never with `--force`; otherwise name it in
 the report as kept.
 
 One line per failed job: fixed in `<sha>`, stale (`<sha>`), flaky, infra (what it

@@ -297,7 +297,7 @@ run_grok_provider() {
 
 extract_claude_result() {
   local event_file="$1" result_file="$2"
-  jq -c 'select(.structured_output | type == "object") | .structured_output' "$event_file" | tail -n 1 >"$result_file"
+  jq -R -c 'fromjson? | select(type == "object") | select(.structured_output | type == "object") | .structured_output' "$event_file" | tail -n 1 >"$result_file"
 }
 
 extract_grok_result() {

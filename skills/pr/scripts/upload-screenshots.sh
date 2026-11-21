@@ -49,7 +49,7 @@ for attempt in 1 2 3; do
   tree="$(GIT_INDEX_FILE="$index" git write-tree)"
   commit="$(git commit-tree "$tree" ${parent:+-p "$parent"} -m "screenshots: $branch")"
 
-  if git push -q origin "$commit:refs/heads/pr-assets" 2>/dev/null; then
+  if err="$(git push -q origin "$commit:refs/heads/pr-assets" 2>&1)"; then
     echo "pushed $# screenshot(s) to pr-assets/$dir" >&2
     for f in "$@"; do
       name="$(basename "$f")"
@@ -58,7 +58,16 @@ for attempt in 1 2 3; do
     done
     exit 0
   fi
-  echo "pr-assets moved; retrying ($attempt)" >&2
+  case "$err" in
+    *non-fast-forward*|*"fetch first"*|*"stale info"*|*"cannot lock ref"*|*"reference already exists"*)
+      echo "pr-assets moved; retrying ($attempt)" >&2
+      ;;
+    *)
+      printf '%s\n' "$err" >&2
+      exit 1
+      ;;
+  esac
 done
+printf '%s\n' "$err" >&2
 echo "could not push pr-assets after 3 attempts" >&2
 exit 1

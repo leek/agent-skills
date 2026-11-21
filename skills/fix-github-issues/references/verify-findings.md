@@ -36,8 +36,9 @@ reply in the thread), the
 ref, the calling skill's line format, and the rules above. In Claude Code with this
 plugin installed, dispatch `subagent_type=leek-skills:finding-verifier` for each batch
 in parallel; it keeps the bots' recurring false premises in project memory, under the
-target repo's `.claude/`. In other harnesses, dispatch and wait per
-[harness-tools](../../harness-tools/SKILL.md) with the full brief, on a cheaper model where offered, or
+target repo's `.claude/agent-memory/`. In other harnesses, dispatch and wait per
+[harness-tools](../../harness-tools/SKILL.md) with a fresh context and the full brief,
+on a cheaper model where offered, or
 classify inline when the harness has no sub-agents. Re-verify yourself every line that
 comes back LEGIT or UNSURE.
 

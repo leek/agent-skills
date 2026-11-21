@@ -19,7 +19,7 @@ gh label list --search <label>
 gh issue list --state open --limit 50 --json number,title,labels
 ```
 
-When open issues exist but none carries the label (the label is missing here, or the repo names it differently), tell the user the open count and the labels in use, and ask which to work.
+When open issues exist but none carries the label (the label is missing here, or the repo names it differently), tell the user the open count and the labels in use, and ask which to work (a structured question ([harness-tools](../../harness-tools/SKILL.md)), otherwise in chat).
 
 ## Branch or worktree
 

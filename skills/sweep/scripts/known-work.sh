@@ -19,11 +19,16 @@ prefix=sweep
 limit=300   # per request; merged PRs are fetched in 5-day windows to keep each one small
 while [ $# -gt 0 ]; do
   case "$1" in
-    --days) days="$2"; shift 2 ;;
-    --prefix) prefix="$2"; shift 2 ;;
+    --days)
+      [ $# -ge 2 ] || { echo "--days requires a non-negative integer" >&2; exit 2; }
+      days="$2"; shift 2 ;;
+    --prefix)
+      [ $# -ge 2 ] || { echo "--prefix requires a name" >&2; exit 2; }
+      prefix="$2"; shift 2 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
+case "$days" in '' | *[!0-9]*) echo "--days must be a non-negative integer: $days" >&2; exit 2 ;; esac
 
 command -v gh >/dev/null || { echo "gh is required" >&2; exit 1; }
 command -v jq >/dev/null || { echo "jq is required" >&2; exit 1; }
@@ -54,9 +59,10 @@ for f in "$tmp"/open.json "$tmp"/closed-*.json; do
 done
 
 # `*` stops at `/`, so the `/**` patterns are what match prefix/<topic> branches.
-git -C "$main" for-each-ref --format='%(refname:short)' \
-  "refs/heads/$prefix*" "refs/heads/$prefix*/**" "refs/remotes/*/$prefix*" "refs/remotes/*/$prefix*/**" \
-  | sed "s#^[^/]*/\($prefix\)#\1#" | sort -u | jq -R . | jq -s . > "$tmp/branches.json"
+{
+  git -C "$main" for-each-ref --format='%(refname:lstrip=2)' "refs/heads/$prefix*" "refs/heads/$prefix*/**"
+  git -C "$main" for-each-ref --format='%(refname:lstrip=3)' "refs/remotes/*/$prefix*" "refs/remotes/*/$prefix*/**"
+} | sort -u | jq -R . | jq -s . > "$tmp/branches.json"
 
 find "$main/.scratch/$prefix/findings" -name '*.md' 2>/dev/null | sort | jq -R . | jq -s . > "$tmp/findings.json"
 

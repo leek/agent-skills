@@ -3,7 +3,7 @@ name: triage-github-pr
 description: Review and merge a pull request with up to two fix rounds, carrying later findings into a follow-up PR.
 disable-model-invocation: true
 argument-hint: "One or more PR numbers, then optional instructions (\"don't merge\", \"exhaustive\", merge method)"
-allowed-tools: "Bash(gh pr view *) Bash(gh pr diff *) Bash(gh pr checks *) Bash(gh run view *) Bash(gh api repos/{owner}/{repo}/pulls/*) Bash(gh api repos/{owner}/{repo}/issues/*) Bash(gh api --paginate repos/{owner}/{repo}/activity*) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/triage-github-pr/scripts/pr-comments.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/triage-github-pr/scripts/pr-reply.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/closeout/scripts/pr-state.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/fix-ci-failures/scripts/failed-jobs.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/run-after/scripts/wait-until.sh * -- bash ${CLAUDE_PLUGIN_ROOT}/skills/closeout/scripts/pr-state.sh * --in-flight*)"
+allowed-tools: "Bash(gh pr view *) Bash(gh pr diff *) Bash(gh pr checks *) Bash(gh pr list *) Bash(gh run view *) Bash(gh api repos/{owner}/{repo}/issues/*/comments -F body=@*) Bash(gh api -X PATCH repos/{owner}/{repo}/issues/comments/* -F body=@*) Bash(gh api --paginate repos/{owner}/{repo}/issues/*/timeline *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/triage-github-pr/scripts/pr-comments.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/triage-github-pr/scripts/pr-reply.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/closeout/scripts/pr-state.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/fix-ci-failures/scripts/failed-jobs.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/run-after/scripts/wait-until.sh * -- bash ${CLAUDE_PLUGIN_ROOT}/skills/closeout/scripts/pr-state.sh * --in-flight*) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/laravel-herd-worktrees/scripts/scratch-db.sh register *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/harness-tools/scripts/wait-task-output.sh *)"
 ---
 
 # Triage GitHub PR
@@ -124,7 +124,7 @@ an installed `vendor/` or `node_modules/` tree.
 Run it in a fresh context so the bots cannot frame it. In Claude Code with this plugin
 installed, dispatch `subagent_type=leek-skills:pr-reviewer` with the brief, in the
 background (pass `run_in_background: true` where the Agent tool offers it), while
-gathering review state; its completion notification brings the findings. In other harnesses, dispatch it in the background per [harness-tools](../harness-tools/SKILL.md) with the full brief, or use any read-only sub-agent on
+gathering review state; its completion notification brings the findings. In other harnesses, dispatch it in the background per [harness-tools](../harness-tools/SKILL.md) with a fresh context and the full brief, or use any read-only sub-agent on
 your strongest model, or review inline before you open the comment surfaces. Record the
 head sha it covered.
 
@@ -207,7 +207,7 @@ never a repeat: a human who raises it again disagrees with the answer, so verify
 Verify the rest (undirected) before you believe them, by
 [Verify findings](../fix-github-issues/references/verify-findings.md): its rules, its
 delegation of 3 or more findings to read-only verifier sub-agents (each batch from one
-PR, the PR head sha as the ref, the line format above), and its second pass against the project's auto-dismiss
+PR, the PR head sha as the ref, the line format above; in other harnesses, dispatch and wait per [harness-tools](../harness-tools/SKILL.md) with a fresh context and the full brief; in Claude Code, the verifier writes recurring false premises to `.claude/agent-memory/`, which step 5's `commit` staging carries), and its second pass against the project's auto-dismiss
 and never-dismiss lists before you write code. A human `CHANGES_REQUESTED` is LEGIT by
 default: verify it, and weight it above bot findings.
 
@@ -252,7 +252,7 @@ for presentation), run the tests green, then commit per the `commit` skill's
 [Staging](../commit/SKILL.md#staging) and [Subject](../commit/SKILL.md#subject).
 A batch whose fixes split into at least 2 groups of separate files is written by fixer
 sub-agents in parallel, per [Parallel fix batch](references/parallel-fixes.md), and a
-stack's integration PR batch always is.
+stack's integration PR batch always is (in other harnesses, dispatch and wait per [harness-tools](../harness-tools/SKILL.md) with a fresh context and the full brief).
 You write the fixes yourself only when the batch is one group.
 A test failing outside your fix runs on the starting SHA first, by
 [A test failing outside your fix](references/gh-mechanics.md#a-test-failing-outside-your-fix).

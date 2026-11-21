@@ -17,6 +17,9 @@
 # Output: one JSON object on stdout; messages on stderr.
 #   begin   {"locked":true,"merged":true,"tip":sha}
 #           {"locked":true,"merged":false,"conflicts":[paths]}   exit 1: resolve, commit, go on
+#                    (also while a merge is still uncommitted; conflicts lists what is unresolved)
+#           {"locked":false,"merged":false,"reason":text}        exit 1: the merge failed without
+#                    conflicts; it was aborted and the lock freed: fix the cause, call begin again
 #           {"locked":false,"owner":branch}                      exit 3: busy, call begin again
 #   finish  {"landed":true,"ticket","merge_sha","position":n|null,"cut":branch|null,
 #            "base":branch|null,"pushed":true|false|null}        exit 1 when pushed is false
@@ -97,11 +100,24 @@ case "$action" in
       done
       printf '%s\n' "$branch" >"$lock/owner"
     fi
+    # A merge still in progress is the worker's resolution: keep it and the lock.
+    if git rev-parse -q --verify MERGE_HEAD >/dev/null; then
+      git diff --name-only --diff-filter=U | jq -Rsc '{locked: true, merged: false, conflicts: (split("\n") | map(select(. != "")))}'
+      exit 1
+    fi
     if git merge --no-edit "$ibranch" >&2; then
       jq -cn --arg tip "$(git rev-parse "$ibranch")" '{locked: true, merged: true, tip: $tip}'
       exit 0
     fi
-    git diff --name-only --diff-filter=U | jq -Rsc '{locked: true, merged: false, conflicts: (split("\n") | map(select(. != "")))}'
+    conflicts="$(git diff --name-only --diff-filter=U)"
+    if [ -z "$conflicts" ]; then
+      git merge --abort 2>/dev/null || true
+      release_lock
+      echo "land.sh: merge of $ibranch failed without merge conflicts" >&2
+      jq -cn --arg reason "merge of $ibranch failed without merge conflicts" '{locked: false, merged: false, reason: $reason}'
+      exit 1
+    fi
+    printf '%s\n' "$conflicts" | jq -Rsc '{locked: true, merged: false, conflicts: (split("\n") | map(select(. != "")))}'
     exit 1
     ;;
 
@@ -130,13 +146,26 @@ case "$action" in
     pushed=null
     if [ "$stack" = 1 ]; then
       touch "$notes/stack"
-      position=$(( $(wc -l <"$notes/stack" | tr -d ' ') + 1 ))
       cut="$ibranch-stack-$ticket"
-      base="$ibranch"
-      [ "$position" = 1 ] || base="$(tail -n 1 "$notes/stack" | cut -f3)"
-      printf '%s\t%s\t%s\t%s\n' "$position" "$ticket" "$cut" "$base" >>"$notes/stack"
+      # A retry after pushed:false reuses the ticket's recorded line rather than stacking on itself.
+      recorded="$(awk -F'\t' -v t="$ticket" '$2 == t' "$notes/stack" | tail -n 1)"
+      if [ -n "$recorded" ]; then
+        position="$(printf '%s' "$recorded" | cut -f1)"
+        base="$(printf '%s' "$recorded" | cut -f4)"
+      else
+        position=$(( $(wc -l <"$notes/stack" | tr -d ' ') + 1 ))
+        base="$ibranch"
+        [ "$position" = 1 ] || base="$(tail -n 1 "$notes/stack" | cut -f3)"
+      fi
       git branch -f "$cut" "$merge_sha" >&2
-      if git push -u origin "$cut" >&2; then pushed=true; else pushed=false; fi
+      if git push -u origin "$cut" >&2; then
+        pushed=true
+      else
+        pushed=false
+      fi
+      # Recorded either way: on pushed:false the worker pushes the cut itself and opens its PR,
+      # so the next ticket still stacks on it.
+      [ -n "$recorded" ] || printf '%s\t%s\t%s\t%s\n' "$position" "$ticket" "$cut" "$base" >>"$notes/stack"
     fi
     release_lock
     jq -cn --arg ticket "$ticket" --arg merge_sha "$merge_sha" --argjson position "$position" \
