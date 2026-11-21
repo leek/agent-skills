@@ -28,6 +28,43 @@ check() {
   fi
 }
 
+# check_bg is check for a slow, self-contained check: it starts in the background so it overlaps
+# the slower serial checks, and check_wait (run once, before the summary) prints each one's
+# output and PASS/FAIL in start order. A check that recorded no exit code fails.
+BG_DIR="$(mktemp -d)"
+trap 'rm -rf "$BG_DIR"' EXIT
+bg_n=0
+check_bg() {
+  local name="$1"
+  shift
+  if [[ -n "${VERIFY_ONLY:-}" && "$name" != *"$VERIFY_ONLY"* ]]; then
+    return 0
+  fi
+  (
+    code=0
+    "$@" >"$BG_DIR/$bg_n.out" 2>"$BG_DIR/$bg_n.err" </dev/null || code=$?
+    echo "$code" >"$BG_DIR/$bg_n.code"
+  ) &
+  bg_pids[bg_n]=$!
+  bg_names[bg_n]="$name"
+  bg_n=$((bg_n + 1))
+}
+check_wait() {
+  local i code
+  for ((i = 0; i < bg_n; i++)); do
+    wait "${bg_pids[i]}" || true
+    cat "$BG_DIR/$i.out"
+    cat "$BG_DIR/$i.err" >&2
+    code=$(cat "$BG_DIR/$i.code" 2>/dev/null || true)
+    if [[ "$code" == "0" ]]; then
+      echo "PASS: ${bg_names[i]}"
+    else
+      echo "FAIL: ${bg_names[i]}" >&2
+      fail=1
+    fi
+  done
+}
+
 # 1. SKILL.md frontmatter validity and folder-name parity
 check "every SKILL.md has valid frontmatter and name matching its folder" \
   python3 -c '
@@ -576,7 +613,10 @@ run_python_tests() (
     return 1
   fi
 )
-check "every python guard/script test passes" run_python_tests
+check_bg "every python guard/script test passes" run_python_tests
+# maintaining.md asks for this after every card edit; strict mode is the ship gate.
+check_bg "code-smells-audit cards pass validate-cards.sh" \
+  bash -c 'out=$(bash skills/code-smells-audit/scripts/validate-cards.sh 2>&1 >/dev/null) || { printf "%s\n" "$out" | grep "^FAIL" >&2; exit 1; }'
 check "bare-worktree notice speaks only in a bare Laravel worktree" \
   bash -c '
     t=$(mktemp -d); trap "rm -rf \"$t\"" EXIT
@@ -624,38 +664,74 @@ check "scratch-state.sh classifies open, mismatched, and done efforts" \
 #     path names the skill directory.
 #     Every skills/*/scripts/test-*.sh runs with bash from the repo root, each in its own process
 #     group under a time limit (SKILL_TEST_TIMEOUT seconds, default 120; perl, because macOS has no
-#     `timeout`). No test files is a pass.
-run_skill_script_tests() {
-  local t out code failed=""
+#     `timeout`). No test files is a pass. The tests run in parallel, up to VERIFY_JOBS at once
+#     (default: the CPU count), each with its own output file; results print in path order once
+#     all finish, and a test that recorded no exit code counts as failed. VERIFY_JOBS=1 runs them
+#     one at a time. Bash 3.2 has no `wait -n`, so a full pool polls for any job's .code file
+#     (waiting on the oldest job would stall the queue behind the slowest test).
+run_skill_script_tests() (
+  local t i=0 k n running code failed="" dir max_jobs
+  local tests pids
+  dir=$(mktemp -d)
+  trap 'rm -rf "$dir"' EXIT
+  max_jobs="${VERIFY_JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)}"
+  [[ "$max_jobs" =~ ^[1-9][0-9]*$ ]] || max_jobs=4
   for t in skills/*/scripts/test-*.sh; do
     [[ -e "$t" ]] || continue
-    code=0
-    out=$(perl -e '
-      my $limit = shift;
-      my $pid = fork();
-      die "fork: $!" unless defined $pid;
-      if (!$pid) { setpgrp(0, 0); exec @ARGV; exit 127; }
-      setpgrp($pid, $pid);
-      $SIG{ALRM} = sub { kill "KILL", -$pid; waitpid($pid, 0); exit 124; };
-      alarm $limit;
-      waitpid($pid, 0);
-      exit($? & 127 ? 128 + ($? & 127) : $? >> 8);
-    ' "${SKILL_TEST_TIMEOUT:-120}" bash "$t" 2>&1) || code=$?
-    if [[ "$code" -ne 0 ]]; then
-      failed="$failed $t"
-      if [[ "$code" -eq 124 ]]; then
-        echo "$t: timed out after ${SKILL_TEST_TIMEOUT:-120}s" >&2
-      else
-        echo "$t: exit $code" >&2
-      fi
-      printf '%s\n' "$out" | tail -n 15 | sed 's/^/    /' >&2
+    # A job is done once it writes its .code file or its process is gone; wait for a free slot.
+    while :; do
+      running=0
+      for ((k = 0; k < i; k++)); do
+        if [[ ! -e "$dir/$k.code" ]] && kill -0 "${pids[k]}" 2>/dev/null; then
+          running=$((running + 1))
+        fi
+      done
+      (( running < max_jobs )) && break
+      sleep 0.1
+    done
+    tests[i]="$t"
+    (
+      code=0
+      perl -e '
+        my $limit = shift;
+        my $pid = fork();
+        die "fork: $!" unless defined $pid;
+        if (!$pid) { setpgrp(0, 0); exec @ARGV; exit 127; }
+        setpgrp($pid, $pid);
+        $SIG{ALRM} = sub { kill "KILL", -$pid; waitpid($pid, 0); exit 124; };
+        alarm $limit;
+        waitpid($pid, 0);
+        exit($? & 127 ? 128 + ($? & 127) : $? >> 8);
+      ' "${SKILL_TEST_TIMEOUT:-120}" bash "$t" >"$dir/$i.out" 2>&1 </dev/null || code=$?
+      echo "$code" >"$dir/$i.code"
+    ) &
+    pids[i]=$!
+    i=$((i + 1))
+  done
+  n=$i
+  for ((i = 0; i < n; i++)); do
+    wait "${pids[i]}" || true
+  done
+  for ((i = 0; i < n; i++)); do
+    t="${tests[i]}"
+    code=$(cat "$dir/$i.code" 2>/dev/null || true)
+    [[ "$code" =~ ^[0-9]+$ ]] || code=""
+    [[ "$code" == "0" ]] && continue
+    failed="$failed $t"
+    if [[ -z "$code" ]]; then
+      echo "$t: recorded no exit code" >&2
+    elif [[ "$code" -eq 124 ]]; then
+      echo "$t: timed out after ${SKILL_TEST_TIMEOUT:-120}s" >&2
+    else
+      echo "$t: exit $code" >&2
     fi
+    tail -n 15 "$dir/$i.out" 2>/dev/null | sed 's/^/    /' >&2
   done
   if [[ -n "$failed" ]]; then
     echo "failed script tests:$failed" >&2
     return 1
   fi
-}
+)
 check "every shell script passes bash -n" \
   bash -c '
     bad=0
@@ -665,10 +741,6 @@ check "every shell script passes bash -n" \
     exit "$bad"
   '
 check "every skills/*/scripts/test-*.sh passes" run_skill_script_tests
-
-# maintaining.md asks for this after every card edit; strict mode is the ship gate.
-check "code-smells-audit cards pass validate-cards.sh" \
-  bash -c 'out=$(bash skills/code-smells-audit/scripts/validate-cards.sh 2>&1 >/dev/null) || { printf "%s\n" "$out" | grep "^FAIL" >&2; exit 1; }'
 
 # A skill with allowed-tools that names one of its own scripts/*.sh, in SKILL.md or in any
 # other .md file of the skill (references/, skill-root companions), runs that script, so
@@ -796,6 +868,8 @@ if bad:
     print("\n".join(bad), file=sys.stderr)
     sys.exit(1)
 '
+
+check_wait
 
 if [[ "$fail" -ne 0 ]]; then
   echo "verify-skills-collection: FAILED" >&2

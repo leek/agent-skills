@@ -67,7 +67,7 @@ if [ "$mode" = "build" ]; then
   git commit -q -m "feat: ticket $ticket"
   rm -f "$STUB_DIR/running/$ticket"
   until LAND_WAIT_SECONDS=3 bash "$(m .land)" begin --notes "$(m .notes)" --integration "$(m .integration)" >/dev/null 2>&1; do
-    sleep 1
+    sleep 0.2
   done
   bash "$(m .land)" finish --notes "$(m .notes)" --integration "$(m .integration)" --ticket "$ticket" >/dev/null 2>&1
   printf 'Built %s.\nAssumed: colour -> blue\n' "$ticket" >"$(m .report_file)"
@@ -119,7 +119,7 @@ ap() {
     cd "$repo"
     env -u AUTOPILOT_MODEL -u AUTOPILOT_EFFORT -u AUTOPILOT_TMUX_CHILD -u AUTOPILOT_TMUX_ENV_FILE \
       HOME="$t/home" CLAUDE_CONFIG_DIR="$t/home/.claude" TMPDIR="$t/tmp" \
-      AUTOPILOT_CLAUDE_BIN="$t/bin/claude-stub" AUTOPILOT_POLL_SECONDS=1 \
+      AUTOPILOT_CLAUDE_BIN="$t/bin/claude-stub" AUTOPILOT_POLL_SECONDS=0.2 \
       STUB_DIR="$stub_dir" TICKET_SH="$ticket_sh" \
       bash "$autopilot_sh" "$@" 2>"$t/err"
   )
