@@ -96,10 +96,13 @@ case "$cmd" in
     mkdir -p "$state"
     ledger="$state/declined.jsonl"; touch "$ledger"
     before=$(wc -l < "$ledger" | tr -d ' ')
-    tmp=$(mktemp); trap 'rm -f "$tmp"' EXIT
-    input=${1:-/dev/stdin}
-    [ -r "$input" ] || { echo "Unreadable: $input" >&2; exit 1; }
-    jq -c --arg d "$(date -u +%Y-%m-%d)" 'select(.fingerprint) | . + {declined_on: (.declined_on // $d)}' "$input" > "$tmp"
+    tmp=$(mktemp); trap 'rm -f "$tmp" "$ledger.new"' EXIT
+    if [ $# -eq 0 ]; then
+      jq -c --arg d "$(date -u +%Y-%m-%d)" 'select(.fingerprint) | . + {declined_on: (.declined_on // $d)}' > "$tmp"
+    else
+      [ -r "$1" ] || { echo "Unreadable: $1" >&2; exit 1; }
+      jq -c --arg d "$(date -u +%Y-%m-%d)" 'select(.fingerprint) | . + {declined_on: (.declined_on // $d)}' "$1" > "$tmp"
+    fi
     { cat "$ledger"; cat "$tmp"; } | jq -sc 'unique_by(.fingerprint)[]' > "$ledger.new"
     mv "$ledger.new" "$ledger"
     after=$(wc -l < "$ledger" | tr -d ' ')

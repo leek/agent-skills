@@ -66,7 +66,8 @@ if command -v gh >/dev/null && gh auth status >/dev/null 2>&1; then authenticate
 
 branch="$(git symbolic-ref --short -q HEAD || true)"
 # No upstream is "not checked" (null), never 0: 0 would read as "not behind".
-upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)"
+# On a gone upstream, git prints "@{u}" before failing, so keep the output only on success.
+upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)" || upstream=""
 behind=null
 if [ -n "$upstream" ]; then
   behind="$(git rev-list --count 'HEAD..@{u}' 2>/dev/null || echo null)"

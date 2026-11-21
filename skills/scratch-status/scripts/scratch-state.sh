@@ -151,8 +151,19 @@ HUMAN_STATUSES = {ROLE_STRINGS[role] for role in ("ready-for-human", "needs-info
 DEFAULT_BRANCH = detect_default_branch()
 HAS_GH = shutil.which("gh") is not None
 
-rc_tracked, tracked_out = run_cmd(["git", "ls-files", ".scratch"])
-TRACKED_FILES = set(tracked_out.splitlines()) if rc_tracked == 0 and tracked_out else set()
+try:
+    _res_tracked = subprocess.run(
+        ["git", "-c", "core.quotePath=false", "ls-files", "-z", ".scratch"],
+        text=True,
+        capture_output=True,
+    )
+    TRACKED_FILES = (
+        {p for p in _res_tracked.stdout.split("\0") if p}
+        if _res_tracked.returncode == 0 and _res_tracked.stdout
+        else set()
+    )
+except OSError:
+    TRACKED_FILES = set()
 
 
 def file_date_and_ts(path: Path) -> tuple[str, float, bool]:
@@ -215,7 +226,7 @@ def parse_list(front: str, key: str) -> list[str]:
             for s in inline.group(1).split(",")
             if s.strip().strip("\"'")
         ]
-    block = re.search(rf"^{re.escape(key)}:[ \t]*\r?\n((?:[ \t]*-.*\r?\n?)+)", front, re.M)
+    block = re.search(rf"^{re.escape(key)}:[ \t]*(?:#[^\r\n]*)?\r?\n((?:[ \t]*-.*\r?\n?)+)", front, re.M)
     if block is not None:
         return [
             clean_value(re.sub(r"^\s*-\s*", "", line))
@@ -313,7 +324,7 @@ def parse_md(full_path: Path, rel_in_effort: str, kind: str) -> dict:
     status_raw = field("status")
     if not status_raw:
         head = "\n".join(text.splitlines()[:30])
-        m_st = re.search(r"^\*\*Status:\*\*\s*(.+)$", head, re.M) or re.search(r"^Status:\s*(.+)$", head, re.M)
+        m_st = re.search(r"^\*\*Status:\*\*[ \t]*(.+)$", head, re.M) or re.search(r"^Status:[ \t]*(.+)$", head, re.M)
         status_raw = m_st.group(1).strip() if m_st else ""
 
     tokens = status_raw.strip().replace("`", "").replace("*", "").split()
@@ -333,9 +344,10 @@ def parse_md(full_path: Path, rel_in_effort: str, kind: str) -> dict:
             if val.lower() not in ("none", "null", "-"):
                 claimed_by = val
 
+    has_front_blocked_by = bool(re.search(r"^blocked-by:[ \t]*", front, re.M))
     blocked_by = [normalize_blocker_id(x) for x in parse_list(front, "blocked-by")]
-    if not blocked_by:
-        m_bl = re.search(r"^(?:\*\*Blocked by:\*\*|Blocked by:)\s*(.+)$", body, re.M | re.I)
+    if not has_front_blocked_by:
+        m_bl = re.search(r"^(?:\*\*Blocked by:\*\*|Blocked by:)[ \t]*(.+)$", body, re.M | re.I)
         if m_bl:
             raw_bl = m_bl.group(1).strip()
             if raw_bl.lower() not in ("none", "null", "-"):

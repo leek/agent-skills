@@ -655,6 +655,11 @@ dispatch_frontier() {
       if unit_is_skipped "$number" || worker_is_running "$number" || ticket_is_landed "$number"; then
         continue
       fi
+      ticket_waits_on_gate "$number" && continue
+      if ticket_overlaps_running "$number"; then
+        record_activity "ticket $number waits: its Files overlap a running ticket's"
+        continue
+      fi
       start_build_worker "$number" resume
     done
   fi

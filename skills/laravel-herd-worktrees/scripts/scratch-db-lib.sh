@@ -52,18 +52,39 @@ env_dbs() {  # env_dbs <dir>: the DB_DATABASE of its .env and .env.testing
 db_protected_set() {
   local f w
   {
-    env_dbs "$main" | sed 's/^/MAIN\t/'
+    env_dbs "$main" | awk -v owner=MAIN 'NF { print owner "\t" $0 }'
     for f in "$main/phpunit.xml" "$main/phpunit.xml.dist"; do
-      [ -f "$f" ] && sed -n 's/.*name="DB_DATABASE"[^>]*value="\([^"]*\)".*/MAIN\t\1/p' "$f"
+      [ -f "$f" ] && awk '
+        { buf = buf " " $0 }
+        END {
+          while (match(buf, /<[A-Za-z]+[[:space:]][^>]*>/)) {   # <env>, and <server>/<var> (Laravel <= 7)
+            tag = substr(buf, RSTART, RLENGTH)
+            buf = substr(buf, RSTART + RLENGTH)
+            if (tag ~ /[[:space:]]name[[:space:]]*=[[:space:]]*("DB_DATABASE"|\047DB_DATABASE\047)/) {
+              if (match(tag, /[[:space:]]value[[:space:]]*=[[:space:]]*"[^"]*"/)) {
+                v = substr(tag, RSTART, RLENGTH)
+                sub(/^[^"]*"/, "", v); sub(/"$/, "", v)
+                if (v != "") print "MAIN\t" v
+              } else if (match(tag, /[[:space:]]value[[:space:]]*=[[:space:]]*\047[^\047]*\047/)) {
+                v = substr(tag, RSTART, RLENGTH)
+                sub(/^[^\047]*\047/, "", v); sub(/\047$/, "", v)
+                if (v != "") print "MAIN\t" v
+              }
+            }
+          }
+        }' "$f"
     done
-    git worktree list --porcelain | awk '/^worktree /{ print substr($0, 10) }' | while read -r w; do
-      [ "$w" = "$main" ] || env_dbs "$w" | sed "s|^|$w\t|"
+    git worktree list --porcelain | awk '/^worktree /{ print substr($0, 10) }' | while IFS= read -r w; do
+      [ "$w" = "$main" ] || env_dbs "$w" | OWNER="$w" awk 'NF { print ENVIRON["OWNER"] "\t" $0 }'
     done
   } | awk -F'\t' '$2 != ""'
 }
 
 is_protected() {  # is_protected <db> <worktree being removed, or "">: named, or a parallel-testing copy of one
-  printf '%s\n' "$protected" | awk -F'\t' -v d="$1" -v w="$2" '$1 != w && (d == $2 || d ~ ("^" $2 "_test_[0-9]+$")) { f = 1 } END { exit !f }'
+  printf '%s\n' "$protected" | D="$1" W="$2" awk -F'\t' '
+    BEGIN { d = ENVIRON["D"]; w = ENVIRON["W"] }
+    $1 != w && $2 != "" && (d == $2 || (substr(d, 1, length($2) + 6) == $2 "_test_" && substr(d, length($2) + 7) ~ /^[0-9]+$/)) { f = 1 }
+    END { exit !f }'
 }
 
 creds_default() {  # creds_default <connection>: sets host port user pass to the defaults
@@ -186,14 +207,14 @@ registry_add() {  # registry_add <connection field> <db> <worktree|->: 0 added, 
   return $rc
 }
 
-registry_remove() {  # registry_remove <db>: delete its registry lines
-  local rc=0
+registry_remove() {  # registry_remove <connection|""> <db>: delete its registry lines (all connections when "")
+  local c=${1%%@*} d=$2 rc=0
   [ -f "$registry" ] || return 0
   registry_lock || return 1
   if [ -f "$registry" ]; then
     registry_tmp=$(mktemp "$registry.XXXXXX") || rc=1
     if [ "$rc" = 0 ]; then
-      { awk -F'\t' -v d="$1" '$3 != d' "$registry" > "$registry_tmp" && mv "$registry_tmp" "$registry"; } || rc=1
+      { awk -F'\t' -v c="$c" -v d="$d" '{ x = $2; sub(/@.*/, "", x) } !(($3 == d) && (c == "" || x == c))' "$registry" > "$registry_tmp" && mv "$registry_tmp" "$registry"; } || rc=1
       rm -f "$registry_tmp"; registry_tmp=""
     fi
   fi
@@ -210,5 +231,5 @@ drop_database() {  # drop_database <connection> <db>; uses host port user pass
     mysql) sql mysql "DROP DATABASE IF EXISTS \`$2\`" ;;
     *) return 1 ;;
   esac || return 1
-  registry_remove "$2" || echo ">> $2 is dropped, but its registry line stays: run scratch-db.sh unregister $2" >&2
+  registry_remove "$1" "$2" || echo ">> $2 is dropped, but its registry line stays: run scratch-db.sh unregister $2" >&2
 }

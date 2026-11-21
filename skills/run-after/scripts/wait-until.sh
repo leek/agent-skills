@@ -5,6 +5,7 @@
 #   1   not yet  -> wait <interval> seconds, check again
 #   2+  failed   -> print {"result":"failed", ...}, exit 2
 # Budget spent  -> print {"result":"timeout", ...}, exit 3
+# Usage error   -> exit 64, no verdict
 # "detail" is the last line the check printed, so the verdict carries its evidence.
 #
 # Usage: wait-until.sh [--interval <seconds>] [--timeout <seconds>] -- <check> [args ...]
@@ -12,18 +13,20 @@
 # Run it in the background; it changes nothing itself, it runs only the check you pass.
 set -e
 
-usage() { echo "usage: wait-until.sh [--interval <s>] [--timeout <s>] -- <check> [args ...]" >&2; exit 64; }
+usage() { echo "usage: wait-until.sh [--interval <s>] [--timeout <s>] -- <check> [args ...]" >&2; exit 64; }  # 64: not a verdict code
 
 interval=30
 timeout=3600
 while [ $# -gt 0 ]; do
   case "$1" in
-    --interval) interval=$2; shift 2 ;;
-    --timeout) timeout=$2; shift 2 ;;
+    --interval) [ $# -ge 2 ] || usage; interval=$2; shift 2 ;;
+    --timeout) [ $# -ge 2 ] || usage; timeout=$2; shift 2 ;;
     --) shift; break ;;
     *) usage ;;
   esac
 done
+case "$interval" in '' | *[!0-9]*) echo "--interval must be a non-negative integer: $interval" >&2; usage ;; esac
+case "$timeout" in '' | *[!0-9]*) echo "--timeout must be a non-negative integer: $timeout" >&2; usage ;; esac
 [ $# -gt 0 ] || usage
 command -v jq >/dev/null || { echo "jq is required" >&2; exit 1; }
 

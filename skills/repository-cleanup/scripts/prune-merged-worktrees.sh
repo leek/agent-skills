@@ -204,9 +204,15 @@ if [ -f "$registry" ]; then
   done <<< "$stale"
 fi
 
+# A line matches <db> when it names it, or <db> is its parallel-testing copy <line>_test_<N>.
+# Literal comparison: a name is never a regex, so foo(bar cannot make awk fail open.
+copy_of='BEGIN { d = ENVIRON["D"] }
+  $0 != "" && (d == $0 || (substr(d, 1, length($0) + 6) == $0 "_test_" && substr(d, length($0) + 7) ~ /^[0-9]+$/)) { f = 1 }
+  END { exit !f }'
+
 is_recent() {  # is_recent <db>: registered in the last 12 hours, or a parallel-testing copy of one
   [ -n "$recent" ] || return 1
-  printf '%s\n' "$recent" | awk -v d="$1" '$0 != "" && (d == $0 || d ~ ("^" $0 "_test_[0-9]+$")) { f = 1 } END { exit !f }'
+  printf '%s\n' "$recent" | D="$1" awk "$copy_of"
 }
 
 # A name a registry line holds is never an orphan: an old line with no worktree is a
@@ -215,7 +221,7 @@ registered=""
 [ -f "$registry" ] && registered=$(cut -f3 "$registry")
 is_registered() {  # is_registered <db>: named by a registry line, or a parallel-testing copy of one
   [ -n "$registered" ] || return 1
-  printf '%s\n' "$registered" | awk -v d="$1" '$0 != "" && (d == $0 || d ~ ("^" $0 "_test_[0-9]+$")) { f = 1 } END { exit !f }'
+  printf '%s\n' "$registered" | D="$1" awk "$copy_of"
 }
 
 # The names the skills give a scratch database, after "<app db>_" (rg "<app db>_" skills):
