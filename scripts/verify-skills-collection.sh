@@ -3,7 +3,8 @@
 # Compatible with both bash and zsh.
 set -euo pipefail
 
-export ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+export ROOT
 cd "$ROOT"
 fail=0
 
@@ -233,6 +234,63 @@ if bad:
     sys.exit(1)
 '
 
+# 5a. Relative markdown #anchor links resolve to a heading in the target file
+check "every relative markdown #anchor link resolves to a heading" \
+  python3 -c '
+import glob, os, re, sys
+
+def slugify(h):
+    s = h.strip().lower()
+    s = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", s)
+    s = re.sub(r"[`*_~]", "", s)
+    s = re.sub(r"[^\w\s-]", "", s)
+    s = re.sub(r"\s", "-", s)
+    return s
+
+def headings_of(path):
+    text = open(path, encoding="utf-8").read()
+    text = re.sub(r"^```.*?^```", "", text, flags=re.S | re.M)
+    text = re.sub(r"^~~~.*?^~~~", "", text, flags=re.S | re.M)
+    seen = {}
+    out = set()
+    for m in re.finditer(r"^#{1,6}\s+(.+?)\s*#*$", text, re.M):
+        base = slugify(m.group(1))
+        if base in seen:
+            seen[base] += 1
+            out.add(f"{base}-{seen[base]}")
+        else:
+            seen[base] = 0
+            out.add(base)
+    return out
+
+bad = []
+cache = {}
+files = (sorted(glob.glob("skills/**/*.md", recursive=True)) + sorted(glob.glob("docs/**/*.md", recursive=True))
+         + sorted(glob.glob("agents/*.md")) + ["README.md", "AGENTS.md"])
+for root_file in files:
+    content = open(root_file, encoding="utf-8").read()
+    content = re.sub(r"```.*?```", "", content, flags=re.S)
+    content = re.sub(r"~~~.*?~~~", "", content, flags=re.S)
+    content = re.sub(r"`[^`\n]+`", "code", content)
+    base = os.path.dirname(root_file)
+    for m in re.finditer(r"\[[^\]]+\]\(([^)\s]*?)#([^)\s]+)\)", content):
+        target, anchor = m.group(1).strip(), m.group(2).strip()
+        if target.startswith(("http://", "https://", "mailto:", "file://", "<")):
+            continue
+        if anchor.startswith("<"):
+            continue
+        resolved = root_file if not target else os.path.normpath(os.path.join(base, target))
+        if not os.path.isfile(resolved):
+            continue
+        if resolved not in cache:
+            cache[resolved] = headings_of(resolved)
+        if anchor.lower() not in cache[resolved]:
+            bad.append(f"{root_file}: {target}#{anchor} -> {resolved} (missing heading anchor #{anchor})")
+if bad:
+    print("\n".join(bad), file=sys.stderr)
+    sys.exit(1)
+'
+
 # 5b. Frontmatter inside a template (a ```markdown block that opens with ---) is what a
 # skill writes into every file it generates, so it must be valid YAML with a quoted title.
 check "every template frontmatter block is valid YAML with a quoted title" \
@@ -292,13 +350,13 @@ check "marketplace description not Claude-only product claim" \
 # 7. Pipeline end-block SSOT and code-review portability
 check "pipeline-end-block reference exists" \
   test -f skills/wayfinder/references/pipeline-end-block.md
-# The eight skills pipeline-end-block.md names as its users, by name: each one points at the
+# The ten skills pipeline-end-block.md names as its users, by name: each one points at the
 # file, the file names each one, and no other SKILL.md points at it without being added here
 # and there.
 check "pipeline skills point at end-block" \
   python3 -c '
 import glob, sys
-USERS = ["code-review", "grill-me", "implement", "implement-spec", "to-questionnaire", "to-spec", "to-tickets", "wayfinder"]
+USERS = ["autopilot", "code-review", "grill-me", "grill-with-docs", "implement", "implement-spec", "to-questionnaire", "to-spec", "to-tickets", "wayfinder"]
 ref = "skills/wayfinder/references/pipeline-end-block.md"
 try:
     owner = open(ref, encoding="utf-8").read()
@@ -428,7 +486,7 @@ PY
 check "harness-tools is the only skill file naming non-Claude harness tools" \
   python3 -c '
 import os, re, sys
-tools = re.compile(r"\b(spawn_subagent|spawn_agent|wait_agent|fork_turns|followup_task|send_message|resume_from|interrupt_agent|request_user_input|request_user_input_async|ask_user_question|multi_select|send_subagent_message|get_command_or_subagent_output|kill_command_or_subagent|invoke_subagent|manage_subagents|ask_question|is_multi_select)\b")
+tools = re.compile(r"\b(spawn_subagent|spawn_agent|wait_agent|fork_turns|followup_task|send_message|resume_from|interrupt_agent|request_user_input|request_user_input_async|ask_user_question|multi_select|send_subagent_message|get_command_or_subagent_output|kill_command_or_subagent|invoke_subagent|manage_subagents|ask_question|is_multi_select|exec_command|write_stdin)\b")
 bad = []
 for root, dirs, files in os.walk("skills"):
     if root.startswith(os.path.join("skills", "harness-tools")):
@@ -493,12 +551,26 @@ check "claude plugin validate passes the directory profile" \
   claude plugin validate . --profile directory
 check "claude plugin test passes" \
   claude plugin test .
-check "browser-test guard tests pass" \
-  python3 -m unittest -q hooks/test_guard_browser.py
-check "review-agent guard tests pass" \
-  python3 -m unittest -q hooks/test_guard_review_agents.py
-check "memory-write guard tests pass" \
-  python3 -m unittest -q hooks/test_memory_write_guard.py
+# A subshell scopes nullglob; discovery must find hooks/'s three guard tests, so a moved or
+# renamed test cannot make this check pass with nothing run.
+run_python_tests() (
+  shopt -s nullglob
+  local t failed="" tests=(hooks/test_*.py skills/*/scripts/test_*.py)
+  if (( ${#tests[@]} < 3 )); then
+    echo "found ${#tests[@]} python test files, want at least 3" >&2
+    return 1
+  fi
+  for t in "${tests[@]}"; do
+    if ! python3 -m unittest -q "$t"; then
+      failed="$failed $t"
+    fi
+  done
+  if [[ -n "$failed" ]]; then
+    echo "failed python tests:$failed" >&2
+    return 1
+  fi
+)
+check "every python guard/script test passes" run_python_tests
 check "bare-worktree notice speaks only in a bare Laravel worktree" \
   bash -c '
     t=$(mktemp -d); trap "rm -rf \"$t\"" EXIT
@@ -575,6 +647,14 @@ run_skill_script_tests() {
     return 1
   fi
 }
+check "every shell script passes bash -n" \
+  bash -c '
+    bad=0
+    while IFS= read -r f; do
+      bash -n "$f" || bad=1
+    done < <(find skills hooks scripts -type f -name "*.sh" | sort)
+    exit "$bad"
+  '
 check "every skills/*/scripts/test-*.sh passes" run_skill_script_tests
 
 # maintaining.md asks for this after every card edit; strict mode is the ship gate.
@@ -589,6 +669,10 @@ check "code-smells-audit cards pass validate-cards.sh" \
 check "allowed-tools covers each script a skill body runs" \
   python3 -c '
 import glob, os, re, sys
+try:
+    import yaml
+except ImportError:
+    yaml = None
 EXEMPT = {
     # Maintainer-only: references/maintaining.md runs it after a card edit, never a skill run.
     "code-smells-audit/validate-cards.sh",
@@ -599,8 +683,23 @@ for md in sorted(glob.glob("skills/*/SKILL.md")):
     m = re.match(r"^---\n(.*?)\n---\n(.*)$", open(md, encoding="utf-8").read(), re.S)
     if not m:
         continue
-    allowed = re.search(r"^allowed-tools:\s*(.+)$", m.group(1), re.M)
-    if not allowed:
+    fm_raw = m.group(1)
+    allowed_text = None
+    if yaml is not None:
+        try:
+            data = yaml.safe_load(fm_raw) or {}
+        except Exception:
+            data = {}
+        val = data.get("allowed-tools") if isinstance(data, dict) else None
+        if isinstance(val, list):
+            allowed_text = "\n".join(str(x) for x in val)
+        elif isinstance(val, str):
+            allowed_text = val
+    else:
+        am = re.search(r"^allowed-tools:(.*(?:\n[ \t]+.*|\n[ \t]*(?=\n[ \t]))*)", fm_raw, re.M)
+        if am:
+            allowed_text = am.group(1)
+    if not allowed_text:
         continue
     # SKILL.md body first (line numbers count from the top of the file), then every other
     # .md file of the skill.
@@ -612,7 +711,7 @@ for md in sorted(glob.glob("skills/*/SKILL.md")):
         name = os.path.basename(script)
         if name.startswith("test-") or f"{d}/{name}" in EXEMPT:
             continue
-        if f"scripts/{name}" in allowed.group(1):
+        if f"scripts/{name}" in allowed_text:
             continue
         # Its own script: scripts/<name> with no other skill folder in front of it.
         own = re.compile(rf"(?:(?<![A-Za-z0-9_-]/)|(?<=/{re.escape(d)}/)|(?<=\*{re.escape(d)}/))scripts/{re.escape(name)}(?![A-Za-z0-9_.-])")
@@ -658,7 +757,7 @@ with_shell = re.compile(r"(?<![A-Za-z0-9_>}/.*-])(?:bash|sh|zsh)\s+" + script)
 line_start = re.compile(r"^\s*(?:\$\s+)?" + script + r"(?![A-Za-z0-9_.-])")
 span = re.compile(r"`" + script + r"\s+[^`]+`")
 link = re.compile(r"\[[^\]]*\]\([^)]*\)")
-script_link = re.compile(r"\[[^\]]*\]\((?:\.\.?/)*scripts/([A-Za-z0-9_.-]+\.sh)\)")
+script_link = re.compile(r"\[[^\]]*\]\((?:\.\.?/)*(?:[A-Za-z0-9_-]+/)*scripts/([A-Za-z0-9_.-]+\.sh)\)")
 LINK_EXEMPT = set()
 bad = []
 for p in sorted(glob.glob("skills/**/*.md", recursive=True)):

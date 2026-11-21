@@ -9,4 +9,4 @@ argument-hint: "The plan, decision, or idea to stress-test"
 
 Run a `grilling` session, using the `domain-modeling` skill alongside it: canonical terms land in `GLOSSARY.md` and load-bearing decisions become ADRs *as they resolve*, not in a cleanup pass afterwards.
 
-When done, print `grill-me`'s routing block, only the outermost skill prints one.
+When done, print the end-of-session block using the frame in [`wayfinder/references/pipeline-end-block.md`](../wayfinder/references/pipeline-end-block.md) and [`grill-me`'s routing block](../grill-me/SKILL.md#when-youre-done); only the outermost skill prints one.
