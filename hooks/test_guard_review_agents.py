@@ -228,6 +228,22 @@ class GuardReviewAgentsTest(unittest.TestCase):
             with self.subTest(cmd=cmd):
                 self.assertBlocked(cmd, "environment variables")
 
+    def test_jq_env_split_by_space_or_comment_is_blocked(self):
+        # jq 1.6 lexes `$` and `ENV` as separate tokens, so whitespace or a comment may sit between.
+        self.assertBlocked("jq -n '$ ENV.PATH'", "environment variables")
+        self.assertBlocked("jq -n '$\tENV.PATH'", "environment variables")
+        for cmd in ["jq -n '$ #x\nENV.PATH'",
+                    "jq -n '. # note'",
+                    "jq -n 'e#x\nnv'",
+                    "jq -n '\"\\(1 # c\n)\"'"]:
+            with self.subTest(cmd=cmd):
+                self.assertBlocked(cmd, "comments")
+        self.assertBlocked("jq -n '\"abc'", "unterminated string")
+        # `#` inside a string literal is text, not a comment.
+        self.assertAllowed("gh pr list --json number,title --jq '.[] | \"#\\(.number) \\(.title)\"'")
+        self.assertAllowed("jq -r '\"a\\\"#b\"' data.json")
+        self.assertAllowed("jq -r '\"\\(\"#\" + .x)\"' data.json")
+
     def test_gh_writes_are_blocked(self):
         self.assertBlocked("gh pr merge 12 --squash", "not a read-only gh command")
         self.assertBlocked("gh pr view 12 --web", "opens a browser")

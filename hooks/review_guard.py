@@ -220,7 +220,8 @@ def check_sed(args: list[str]) -> None:
 # `env` builtin and `$ENV` object read process environment variables (tokens, keys).
 # Field access (`.env`, `.foo.env`), string keys (`.["env"]`), longer words (`.environment`),
 # and an object key (`{env: .e}`, see env_is_key) stay allowed.
-JQ_ENV = re.compile(r'(?<![.\w$"])env\b|\$ENV\b')
+# jq 1.6 lexes `$` and `ENV` as two tokens, so `$ ENV` reads it too.
+JQ_ENV = re.compile(r'(?<![.\w$"])env\b|\$\s*ENV\b')
 
 
 def env_is_key(expr: str, m: "re.Match[str]") -> bool:
@@ -242,7 +243,43 @@ JQ_SHORT_BOOL = set("nRscrjaSCMe")
 JQ_VALUE = {"--indent": 1, "--arg": 2, "--argjson": 2, "--slurpfile": 2, "--rawfile": 2}
 
 
+def jq_has_comment(expr: str) -> bool:
+    """A `#` outside every string literal (string-aware, `\\(…)` interpolations are code).
+    A comment can split a token the env check matches: `$ #x<newline>ENV`."""
+    stack = ["code"]  # "code", "str", or an interpolation's paren depth (int)
+    i = 0
+    while i < len(expr):
+        c, top = expr[i], stack[-1]
+        if top == "str":
+            if c == "\\" and expr[i + 1:i + 2] == "(":
+                stack.append(0)
+                i += 2
+                continue
+            if c == "\\":
+                i += 2
+                continue
+            if c == '"':
+                stack.pop()
+        elif c == "#":
+            return True
+        elif c == '"':
+            stack.append("str")
+        elif top != "code" and c == "(":
+            stack[-1] = top + 1
+        elif top != "code" and c == ")":
+            if top == 0:
+                stack.pop()
+            else:
+                stack[-1] = top - 1
+        i += 1
+    if stack != ["code"]:
+        raise Blocked("`jq` filter has an unterminated string")
+    return False
+
+
 def check_jq_filter(expr: str) -> None:
+    if jq_has_comment(expr):
+        raise Blocked("`jq` filters may not contain comments (`#`)")
     if any(not env_is_key(expr, m) for m in JQ_ENV.finditer(expr)):
         raise Blocked("`jq` filters may not read environment variables (`env`, `$ENV`)")
     if JQ_MODULE.search(expr):
