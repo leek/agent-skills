@@ -49,10 +49,16 @@ export type BoardUpdate = {
   tickets: { number: string; title?: string; status: TicketStatus; note?: string }[]
   stage?: string
   findings?: { id: string; title?: string; status: FindingStatus; note?: string }[]
-  open?: { id: string; title?: string; kind: OpenKind; where?: string; done?: boolean }[]
+  open?: { id: string; title?: string; kind?: OpenKind; where?: string; done?: boolean }[]
   stack?: { number: string; position?: number; status: StackStatus; note?: string }[]
   integration?: { number: string; into?: string; safe: boolean; note?: string }
 }
+
+const UPDATE_FIELDS = ['tickets', 'findings', 'stage', 'open', 'stack', 'integration'] as const
+
+/** A call with only `board` and `kind` reads the active board and unfinished ids without changing state. */
+export const isReadOnlyQuery = (input: Record<string, unknown>) =>
+  UPDATE_FIELDS.every(key => input[key] === undefined)
 
 /** The input schema the model reads; kept beside the type it describes. */
 export const SCHEMA = {
@@ -100,20 +106,24 @@ export const SCHEMA = {
     open: {
       type: 'array',
       description:
-        'Work still open after this run, drawn as "Open after this run"; send the entries that changed, each with its title and where on its first call. Send done: true the moment one is resolved. The reply lists every unfinished entry with its id; a call with only board and kind changes nothing and returns that list.',
+        'Work still open after this run, drawn as "Open after this run"; send the entries that changed, each with its kind, title and where on its first call. Send done: true (kind may be omitted on an existing id) the moment one is resolved. The reply lists every unfinished entry with its id and kind; a call with only board and kind changes nothing and returns that list.',
       items: {
         type: 'object',
         properties: {
           id: { type: 'string', description: 'A key that stays the same across calls. Never shown.' },
           title: { type: 'string', description: 'What is open, in plain words a reader new to the run understands.' },
-          kind: { type: 'string', enum: OPEN_KINDS },
+          kind: {
+            type: 'string',
+            enum: OPEN_KINDS,
+            description: 'Required when adding an entry; may be omitted when marking an existing entry done: true.',
+          },
           where: {
             type: 'string',
             description: 'Where it is tracked: a ticket path, a decision record, a pull request, or the literal "untracked".',
           },
           done: { type: 'boolean', description: 'true once it is resolved; the pane strikes it.' },
         },
-        required: ['id', 'kind'],
+        required: ['id'],
       },
     },
     stack: {
@@ -191,16 +201,25 @@ export function parseUpdate(input: Record<string, unknown>): BoardUpdate | strin
   const open: NonNullable<BoardUpdate['open']> = []
   for (const raw of (input.open ?? []) as unknown[]) {
     const o = (raw ?? {}) as Record<string, unknown>
-    const openKind = o.kind as OpenKind
-    if (typeof o.id !== 'string' || o.id === '' || !OPEN_KINDS.includes(openKind)) {
+    const hasKind = o.kind !== undefined
+    const openKind = o.kind as OpenKind | undefined
+    const done = typeof o.done === 'boolean' ? o.done : undefined
+    if (typeof o.id !== 'string' || o.id === '') {
       return `Each open entry needs an id and a kind of ${OPEN_KINDS.join(', ')}.`
+    }
+    if (hasKind) {
+      if (typeof o.kind !== 'string' || !OPEN_KINDS.includes(openKind as OpenKind)) {
+        return `Each open entry needs an id and a kind of ${OPEN_KINDS.join(', ')}.`
+      }
+    } else if (done !== true) {
+      return `Each open entry needs an id and a kind of ${OPEN_KINDS.join(', ')} (kind may be omitted only when done is true on an existing id).`
     }
     open.push({
       id: o.id,
-      kind: openKind,
+      kind: hasKind ? openKind : undefined,
       title: typeof o.title === 'string' ? o.title : undefined,
       where: typeof o.where === 'string' ? o.where : undefined,
-      done: typeof o.done === 'boolean' ? o.done : undefined,
+      done,
     })
   }
   const stack: NonNullable<BoardUpdate['stack']> = []
@@ -208,14 +227,20 @@ export function parseUpdate(input: Record<string, unknown>): BoardUpdate | strin
     const p = (raw ?? {}) as Record<string, unknown>
     const number = prNumber(p.number)
     const status = p.status as StackStatus
-    const position = Number(p.position)
     if (number === '' || !STACK_STATUSES.includes(status)) {
       return `Each stack entry needs a PR number and a status of ${STACK_STATUSES.join(', ')}.`
+    }
+    let position: number | undefined
+    if (p.position !== undefined) {
+      if (typeof p.position !== 'number' || !Number.isInteger(p.position) || p.position <= 0) {
+        return `Stack PR #${number} position must be a positive integer (bottom = 1).`
+      }
+      position = p.position
     }
     stack.push({
       number,
       status,
-      position: Number.isInteger(position) && position > 0 ? position : undefined,
+      position,
       note: typeof p.note === 'string' ? p.note : undefined,
     })
   }
@@ -245,10 +270,25 @@ function prNumber(v: unknown): string {
   return /^\d+$/.test(digits) ? digits : ''
 }
 
+/** Checks constraints that depend on the current board (e.g. omitting `kind` on a new open entry). */
+export function validateChange(previous: TicketBoard | null, change: BoardUpdate): string | null {
+  const isSame = previous?.slug === change.board && previous.kind === change.kind
+  const knownOpen = new Set(isSame ? (previous.open ?? []).map(o => o.id) : [])
+  for (const o of change.open ?? []) {
+    if (o.kind !== undefined) {
+      knownOpen.add(o.id)
+    } else if (!knownOpen.has(o.id)) {
+      return `Open entry "${o.id}" does not exist on this board yet and needs a kind of ${OPEN_KINDS.join(', ')}.`
+    }
+  }
+
+  return null
+}
+
 /** Upserts by ticket number; a new slug or kind starts a new board. */
 export function apply(previous: TicketBoard | null, change: BoardUpdate, now: number): TicketBoard {
   const isSame = previous?.slug === change.board && previous.kind === change.kind
-  const tickets: BoardTicket[] = isSame ? [...previous.tickets] : []
+  const tickets: BoardTicket[] = isSame ? [...(previous.tickets ?? [])] : []
   for (const t of change.tickets) {
     const at = tickets.findIndex(one => one.number === t.number)
     const old = at === -1 ? undefined : tickets[at]
@@ -293,10 +333,14 @@ export function apply(previous: TicketBoard | null, change: BoardUpdate, now: nu
   for (const o of change.open ?? []) {
     const at = open.findIndex(one => one.id === o.id)
     const old = at === -1 ? undefined : open[at]
+    const kind = o.kind ?? old?.kind
+    if (kind === undefined) {
+      continue
+    }
     const next: BoardOpenItem = {
       id: o.id,
       title: o.title ?? old?.title ?? '',
-      kind: o.kind,
+      kind,
       // An entry that names no tracking place has none.
       where: (o.where ?? old?.where ?? '').trim() || UNTRACKED,
       done: o.done ?? old?.done ?? false,
@@ -349,27 +393,46 @@ export function apply(previous: TicketBoard | null, change: BoardUpdate, now: nu
  * bottom, the first PR that stops it, and whether the integration PR closes the chain.
  */
 export function safeStack(board: TicketBoard) {
-  const all = board.stack ?? []
+  const all = [...(board.stack ?? [])].sort((a, b) => a.position - b.position)
   const pending = all.filter(p => p.status !== 'landed')
-  // The chain runs only through consecutive positions from 1, landed ones included: a position
-  // with no PR yet is a base no open PR heads, and it blocks everything above it.
-  let missing = 0
-  const reachable: BoardStackPr[] = []
+  // The chain runs only through consecutive unique positions from 1, landed ones included:
+  // a missing position or duplicate position stops everything above it.
+  const byPos = new Map<number, BoardStackPr[]>()
   for (const p of all) {
-    if (p.position !== reachable.length + 1) {
-      missing = reachable.length + 1
+    const group = byPos.get(p.position)
+    if (group === undefined) byPos.set(p.position, [p])
+    else group.push(p)
+  }
+  let missing = 0
+  let duplicate: { position: number; prs: BoardStackPr[] } | undefined
+  const reachable: BoardStackPr[] = []
+  let visited = 0
+  for (let pos = 1; visited < all.length; pos++) {
+    const group = byPos.get(pos)
+    if (group === undefined) {
+      missing = pos
       break
     }
-    reachable.push(p)
+    if (group.length > 1) {
+      duplicate = { position: pos, prs: group }
+      break
+    }
+    reachable.push(group[0]!)
+    visited += 1
   }
   const open = reachable.filter(p => p.status !== 'landed')
   const stop = open.findIndex(p => p.status !== 'safe')
   const safe = stop === -1 ? open : open.slice(0, stop)
   const blocker = stop === -1 ? undefined : open[stop]
-  if (blocker !== undefined) missing = 0
+  if (blocker !== undefined) {
+    missing = 0
+    duplicate = undefined
+  }
   const integration = board.integration ?? null
-  const isStopped = blocker !== undefined || missing > 0
+  const isStopped = blocker !== undefined || missing > 0 || duplicate !== undefined
   const isIntegrationSafe = !isStopped && integration !== null && integration.safe
+  const stoppedOpen =
+    blocker !== undefined ? 1 : duplicate !== undefined ? duplicate.prs.filter(p => p.status !== 'landed').length : 0
 
   return {
     pending,
@@ -377,8 +440,10 @@ export function safeStack(board: TicketBoard) {
     blocker,
     /** The landing position with no PR yet that stops the chain, or 0. */
     missing,
+    /** Two or more PRs sharing one landing position, or undefined. */
+    duplicate,
     /** PRs above whatever stops the chain, still waiting behind it. */
-    behind: pending.length - safe.length - (blocker === undefined ? 0 : 1),
+    behind: pending.length - safe.length - stoppedOpen,
     landed: all.length - pending.length,
     integration,
     isIntegrationSafe,
@@ -416,9 +481,12 @@ export function chainRows(tokens: readonly string[], width: number): string[] {
   return rows
 }
 
-/** The section's count: `5 of 21 safe · 3 landed`. */
+/** The section's count: `5 of 21 safe · 3 landed`, or `all 3 landed` when none remain open. */
 export function stackTally(board: TicketBoard): string {
   const view = safeStack(board)
+  if (view.pending.length === 0 && view.landed > 0) {
+    return `all ${view.landed} landed`
+  }
   const parts = [`${view.safe.length} of ${view.pending.length} safe`]
   if (view.landed > 0) parts.push(`${view.landed} landed`)
 
@@ -430,11 +498,13 @@ export function stackWarnings(board: TicketBoard): string[] {
   const view = safeStack(board)
   const lines: string[] = []
   const why = (note: string) => (note === '' ? '' : ` · ${note}`)
-  if (view.blocker !== undefined || view.missing > 0) {
+  if (view.blocker !== undefined || view.missing > 0 || view.duplicate !== undefined) {
     lines.push(
       view.blocker !== undefined
         ? `✗ #${view.blocker.number} not safe${why(view.blocker.note)}`
-        : `✗ position ${view.missing} has no open PR yet`,
+        : view.duplicate !== undefined
+          ? `✗ position ${view.duplicate.position} has multiple PRs (${view.duplicate.prs.map(p => `#${p.number}`).join(', ')})`
+          : `✗ position ${view.missing} has no open PR yet`,
     )
     const after = [view.behind > 0 ? `${view.behind} more PR${view.behind === 1 ? '' : 's'}` : '', view.integration === null ? '' : `#${view.integration.number}`]
       .filter(part => part !== '')
@@ -453,10 +523,11 @@ const DONE = new Set<TicketStatus>(['built', 'merged', 'resolved', 'closed'])
 export const title = (board: TicketBoard) => `${board.kind === 'map' ? 'Map' : 'Spec'}: ${board.slug}`
 
 export function tally(board: TicketBoard): string {
-  const count = (s: TicketStatus) => board.tickets.filter(t => t.status === s).length
-  const done = board.tickets.filter(t => DONE.has(t.status)).length
+  const list = board.tickets ?? []
+  const count = (s: TicketStatus) => list.filter(t => t.status === s).length
+  const done = list.filter(t => DONE.has(t.status)).length
   // Only a skipped ticket leaves the total: not-built and released tickets are open work.
-  const parts = [`${done} of ${board.tickets.length - count('skipped')} done`]
+  const parts = [`${done} of ${list.length - count('skipped')} done`]
   for (const s of ['not-built', 'running', 'fixing', 'ready', 'blocked', 'released', 'awaiting-deploy'] as const) {
     if (count(s) > 0) parts.push(`${count(s)} ${s === 'not-built' ? 'not built' : s}`)
   }
@@ -465,8 +536,9 @@ export function tally(board: TicketBoard): string {
 }
 
 export function findingTally(board: TicketBoard): string {
-  const count = (s: FindingStatus) => board.findings.filter(f => f.status === s).length
-  const parts = [`${count('fixed')} of ${board.findings.length} fixed`]
+  const list = board.findings ?? []
+  const count = (s: FindingStatus) => list.filter(f => f.status === s).length
+  const parts = [`${count('fixed')} of ${list.length} fixed`]
   for (const s of ['fixing', 'open', 'asking', 'deferred'] as const) {
     if (count(s) > 0) parts.push(`${count(s)} ${s}`)
   }
@@ -474,12 +546,13 @@ export function findingTally(board: TicketBoard): string {
   return parts.join(' · ')
 }
 
-export const isUntracked = (o: BoardOpenItem) => o.where.toLowerCase() === UNTRACKED
+export const isUntracked = (o: BoardOpenItem) => (o.where ?? '').toLowerCase() === UNTRACKED
 
 /** The open list's count, or empty when the run has sent no list. */
 export function openTally(board: TicketBoard): string {
-  if (board.open.length === 0) return ''
-  const left = board.open.filter(o => !o.done)
+  const list = board.open ?? []
+  if (list.length === 0) return ''
+  const left = list.filter(o => !o.done)
   const untracked = left.filter(isUntracked).length
 
   return `${left.length} open after this run${untracked > 0 ? ` (${untracked} untracked)` : ''}`
@@ -492,8 +565,8 @@ export const header = (board: TicketBoard) => [tally(board), openTally(board)].f
 export const summary = (board: TicketBoard) =>
   [
     header(board),
-    board.stage,
-    board.findings.length > 0 ? findingTally(board) : '',
+    board.stage ?? '',
+    (board.findings ?? []).length > 0 ? findingTally(board) : '',
     hasStack(board) ? `stack ${stackTally(board)}${safeStack(board).isIntegrationSafe ? ' + integration' : ''}` : '',
   ]
     .filter(part => part !== '')
@@ -508,8 +581,10 @@ const UNSETTLED = new Set<FindingStatus>(['open', 'fixing', 'asking'])
  */
 export function pending(board: TicketBoard): string[] {
   const one = (id: string, title: string) => `${id}: ${title === '' ? '(no title)' : title}`
-  const open = board.open.filter(o => !o.done).map(o => one(o.id, o.title))
-  const findings = board.findings.filter(f => UNSETTLED.has(f.status)).map(f => one(f.id, f.title))
+  const open = (board.open ?? [])
+    .filter(o => !o.done)
+    .map(o => `${o.id} (${o.kind}): ${o.title === '' ? '(no title)' : o.title}`)
+  const findings = (board.findings ?? []).filter(f => UNSETTLED.has(f.status)).map(f => one(f.id, f.title))
   const lines: string[] = []
   if (open.length > 0) lines.push(`Still open, by id (send done: true once one is resolved): ${open.join('; ')}`)
   if (findings.length > 0) lines.push(`Findings not settled, by id: ${findings.join('; ')}`)
