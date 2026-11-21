@@ -766,3 +766,50 @@ test('files a cut-short git log left out never make an effort fresher than its k
   const reply = await $.command.run({ command: 'scratch', args: '' } as never)
   expect(reply.text).toContain('1 stale')
 })
+
+test('a per-file commit time looked up on one branch is looked up again after HEAD moves', async ($, on) => {
+  const DAY = 86_400_000
+  const now = 100 * DAY
+  const names = ['01-a.md', '02-b.md', '03-c.md']
+  const files = Object.fromEntries(
+    names.map(n => [`/repo/.scratch/auth/tickets/${n}`, '---\ntitle: T\nstatus: ready-for-agent\n---\n']),
+  )
+  on('ui.render', async ($, e) => engineDraw($, e))
+  mock.clock(on, { now })
+  on('session.cwd', async () => ({ value: '/repo' }) as never)
+  on('fs.exists', async (_$, e) => ({ value: e.path === '/repo/.scratch' }) as never)
+  on('fs.read', async (_$, e) => ({ value: files[(e as { path: string }).path] ?? '' }) as never)
+  on('fs.list', async (_$, e) => {
+    const seen = new Map<string, 'file' | 'dir'>()
+    for (const full of Object.keys(files)) {
+      if (!full.startsWith(`${e.path}/`)) continue
+      const parts = full.slice(e.path.length + 1).split('/')
+      seen.set(parts[0] ?? '', parts.length > 1 ? 'dir' : 'file')
+    }
+    return { value: [...seen].map(([name, kind]) => ({ name, kind, size: 1, mtimeMs: now, isLink: false })) } as never
+  })
+  let sha = 'aaa111'
+  let lookups = 0
+  on('process.run', async (_$, e) => {
+    const argv = (e as { argv: readonly string[] }).argv
+    const ok = (stdout: string, isStdoutTruncated = false) =>
+      ({ value: { exitCode: 0, stdout, stderr: '', isStdoutTruncated, isStderrTruncated: false } }) as never
+    if (argv[1] === 'rev-parse') return ok(argv.includes('HEAD') ? `${sha}\n` : '/repo\n')
+    if (argv[1] === 'ls-files') return ok(names.map(n => `.scratch/auth/tickets/${n}\0`).join(''))
+    if (argv.includes('-1')) {
+      lookups += 1
+      return ok(`${(now - 50 * DAY) / 1000}\n`)
+    }
+    return ok(`\0${(now - 40 * DAY) / 1000}\n\n.scratch/other.md\n\0x`, true)
+  })
+  on('ui.open', async () => ({ value: { isPlaced: true } }) as never)
+
+  await $.command.run({ command: 'scratch', args: '' } as never)
+  expect(lookups).toBe(3)
+  await $.command.run({ command: 'scratch', args: '' } as never)
+  expect(lookups).toBe(3)
+
+  sha = 'bbb222'
+  await $.command.run({ command: 'scratch', args: '' } as never)
+  expect(lookups).toBe(6)
+})

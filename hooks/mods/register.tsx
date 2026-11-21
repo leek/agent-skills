@@ -127,8 +127,8 @@ async function resolveRepoRoot($: EngineInterface, cwd: string): Promise<string>
 
 // At most this many `git log -1 -- <path>` lookups per scan when the bulk log came back cut short.
 const FALLBACK_LOOKUPS = 8
-// Those lookups' answers, by repo and path, for the session. Safe to keep: a path committed again
-// shows at the top of the next bulk log, which is read before this cache.
+// Those lookups' answers, by repo, HEAD commit and path, for the session. Safe to keep: a path
+// committed again moves HEAD, and a checkout of another branch moves it too.
 const fallbackTimes = new Map<string, number>()
 
 // Last commit time of each tracked path, as scratch-state.sh reads it: `git ls-files` and one
@@ -150,6 +150,16 @@ function commitTimes($: EngineInterface, cwd: string) {
   }
   let lastCommits: Promise<GitState> | undefined
   let budget = FALLBACK_LOOKUPS
+  // HEAD's sha, asked once a scan and only when a lookup is needed; '' when git cannot say.
+  let head: Promise<string> | undefined
+  const headSha = async () => {
+    try {
+      const out = await $.process.run(['git', 'rev-parse', 'HEAD'], { cwd })
+      return out.exitCode === 0 ? out.stdout.trim() : ''
+    } catch {
+      return ''
+    }
+  }
   const readGit = async (): Promise<GitState> => {
     const times = new Map<string, number>()
     const ls = await $.process.run(['git', 'ls-files', '-z', '.scratch'], { cwd })
@@ -203,7 +213,10 @@ function commitTimes($: EngineInterface, cwd: string) {
         if (times.has(p) || (!lsTruncated && !tracked.has(p))) {
           continue
         }
-        const cached = fallbackTimes.get(`${cwd}\0${p}`)
+        head ??= headSha()
+        const sha = await head
+        const key = `${cwd}\0${sha}\0${p}`
+        const cached = sha === '' ? undefined : fallbackTimes.get(key)
         if (cached !== undefined) {
           times.set(p, cached)
           continue
@@ -215,7 +228,9 @@ function commitTimes($: EngineInterface, cwd: string) {
             const seconds = Number(one.stdout.trim())
             if (one.exitCode === 0 && seconds > 0) {
               times.set(p, seconds * 1000)
-              fallbackTimes.set(`${cwd}\0${p}`, seconds * 1000)
+              if (sha !== '') {
+                fallbackTimes.set(key, seconds * 1000)
+              }
               continue
             }
           } catch {

@@ -120,7 +120,7 @@ Nothing below makes a network call or sends data anywhere. Everything the hooks 
 - `git rev-parse --show-toplevel`, in the session's working directory: the repository root, so `/scratch` finds `.scratch/` from a subdirectory. Outside a repository the mod stays in the working directory.
 - `git ls-files -z .scratch`, from the repository root: which `.scratch/` files are tracked.
 - `git -c core.quotePath=false log --relative --format=%x00%ct --name-only -- .scratch`, from the repository root: the last commit time of each tracked file, so the board can mark stale tickets. A file git does not track falls back to its modified time.
-- `git log -1 --format=%ct -- <path>`, from the repository root, only when the previous command's output was cut short: the last commit time of one tracked `.scratch/` file it left out, at most 8 a scan, each answer kept for the session. Any other file it left out takes the oldest commit time the cut output did show.
+- `git rev-parse HEAD` and `git log -1 --format=%ct -- <path>`, from the repository root, only when the previous command's output was cut short: the current commit, then the last commit time of one tracked `.scratch/` file it left out, at most 8 a scan, each answer kept for the session until `HEAD` moves. Any other file it left out takes the oldest known commit time of its own effort, or, where the effort has none, the oldest commit time the cut output did show.
 
 The mod parses their output into timestamps for the pane and sends it nowhere.
 
