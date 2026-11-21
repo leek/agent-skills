@@ -186,7 +186,7 @@ leave the tree as it is.
 
 At step 7, once the PR shows merged, `cd` back to the main checkout and remove
 `.claude/worktrees/pr-N` by `laravel-herd-worktrees`' **Remove a served worktree**
-(`remove-worktree.sh`; it never forces, and a refusal means unsaved work, so report it).
+(`remove-worktree.sh --drop-databases`; it never forces, and a refusal means unsaved work, so report it).
 A stopped or `--auto`-queued PR keeps its worktree unless the user selects it at step 7.
 
 ## A test failing outside your fix
@@ -314,11 +314,13 @@ repo's own commands (`php artisan migrate --seed` unless its docs name another).
 migrate the main checkout's database for a review. Record a browser check as skipped
 only after this was tried and failed, with the error.
 
-At step 7, once the PR shows merged (or the user selected it), run
+At step 7, once the PR shows merged (or the user selected it), a database registered for
+the worktree goes with it (the removal's `--drop-databases`). For one registered with `-`
+(no worktree), run
 `bash <this-skill-dir>/../laravel-herd-worktrees/scripts/scratch-db.sh drop <database>`: it
 drops the database and its parallel-testing copies (`<database>_test_<N>`) and unregisters
-each. It prints `dropped` and `kept` (each with its `reason`); name a kept one in the
-report. A database the user kept stays registered for `repository-cleanup`.
+each. Either way the JSON has `dropped` and `kept` (each with its `reason`); name a kept one
+in the report. A database the user kept stays registered for `repository-cleanup`.
 
 ## Merge
 

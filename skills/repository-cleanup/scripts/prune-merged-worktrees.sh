@@ -21,6 +21,9 @@
 # submodules), unserves the worktree from Herd when Herd serves that exact path, runs
 # `git worktree remove` without --force, and deletes the worktree's Pest cache. Local
 # branches stay; only the directory goes. A refusal keeps the worktree, with its reason.
+# Herd drops a database it made for a worktree (`--database=clone|empty`) when it unserves
+# it, so --remove of a Herd-served worktree whose .herd-workspace.json names such a database
+# needs a --drop naming that database too; otherwise the run stops before anything changes.
 #
 # The database half is laravel-herd-worktrees' scratch-db.sh: `scratch-db.sh plan` lists
 # the candidates, and `scratch-db.sh drop-selected` drops each selected name, exactly that
@@ -169,9 +172,32 @@ in_list() {  # in_list <value> <items...>
 wt_paths=()
 for w in ${wt_cands[@]+"${wt_cands[@]}"}; do wt_paths+=("${w%%	*}"); done
 
+# The database Herd drops itself when remove-worktree.sh unserves this path: one Herd made
+# (`--database=clone|empty`, named in the worktree's .herd-workspace.json) for a worktree
+# Herd serves. Read from the file even when it is tracked: a planted name only refuses more.
+herd_db() {  # herd_db <worktree>: that database's name, or nothing
+  local real served meta
+  command -v herd >/dev/null 2>&1 || return 0
+  real=$(cd "$1" && pwd -P) || return 0
+  served=$(herd workspaces --all --json 2>/dev/null | jq -r --arg p "$real" '[.[]? | select(.path == $p and .served == true)] | length' 2>/dev/null) || served=0
+  [ "${served:-0}" -gt 0 ] || return 0
+  meta="$real/.herd-workspace.json"
+  [ -f "$meta" ] || return 0
+  case "$(jq -r '.database_mode // "shared"' "$meta" 2>/dev/null)" in
+    clone|empty) jq -r '.database_name // empty' "$meta" 2>/dev/null || true ;;
+  esac
+}
+
 errors=()
 for p in ${remove_args[@]+"${remove_args[@]}"}; do
-  in_list "$p" ${wt_paths[@]+"${wt_paths[@]}"} || errors+=("--remove $p: not a candidate worktree")
+  if ! in_list "$p" ${wt_paths[@]+"${wt_paths[@]}"}; then errors+=("--remove $p: not a candidate worktree"); continue; fi
+  # Removing it would drop that database too, so it must be selected as well.
+  hdb=$(herd_db "$p")
+  if [ -n "$hdb" ]; then
+    picked=0
+    for a in ${drop_args[@]+"${drop_args[@]}"}; do [ "${a#*:}" != "$hdb" ] || picked=1; done
+    [ "$picked" = 1 ] || errors+=("--remove $p: Herd made database $hdb for it and drops it when the worktree is unserved; select --drop <connection>:$hdb too, or keep the worktree")
+  fi
 done
 selected_dbs=()   # one plan entry (compact JSON) each
 for a in ${drop_args[@]+"${drop_args[@]}"}; do

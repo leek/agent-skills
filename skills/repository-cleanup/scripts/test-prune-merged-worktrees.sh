@@ -217,6 +217,8 @@ ok "a registry name like foo(bar does not make the other registered databases or
 git worktree add -q -b feat/served "$t/wt-served"
 printf 'DB_CONNECTION=pgsql\nDB_HOST=127.0.0.1\nDB_DATABASE=app_served\n' > "$t/wt-served/.env"
 printf '%s\tserved.app.test\n' "$t/wt-served" > "$STUB_SERVED"
+printf '.herd-workspace.json\n' >> "$repo/.git/info/exclude"
+printf '{"database_mode":"clone","database_name":"app_served"}\n' > "$t/wt-served/.herd-workspace.json"
 tia="$HOME/.pest/tia/wt-served-$(printf '%s' "$t/wt-served" | shasum -a 256 | cut -c1-16)"
 mkdir -p "$tia"
 git init -q -b main "$t/sub"
@@ -231,6 +233,16 @@ printf 'app_served 8 MB\napp_sub 8 MB\n' >> "$STUB_DBS"
 run
 printf '%s' "$out" | jq -e --arg a "$t/wt-served" --arg b "$t/wt-sub" '.worktrees | map(.path) == [$a, $b]' >/dev/null \
   || fail "through remove-worktree: expected wt-served and wt-sub as candidates: $out"
+# Herd made app_served for wt-served and drops it on unserve: removing the worktree alone
+# would drop a database nobody selected, so the run stops before anything changes.
+: > "$STUB_LOG"; : > "$STUB_HERD"
+run --remove "$t/wt-served"
+[ "$rc" = 1 ] || fail "Herd-made database not selected: exit $rc, expected 1"
+grep -q "Herd made database app_served" "$t/err" || fail "Herd-made database not selected: stderr does not say why: $(cat "$t/err")"
+[ -d "$t/wt-served" ] || fail "Herd-made database not selected: the worktree was removed"
+grep -q 'workspace:delete' "$STUB_HERD" && fail "Herd-made database not selected: Herd was asked to unserve"
+[ "$(drops)" = 0 ] || fail "Herd-made database not selected: a DROP ran"
+ok "--remove of a served worktree whose Herd-made database is not selected stops the run"
 : > "$STUB_LOG"; : > "$STUB_HERD"
 run --remove "$t/wt-served" --remove "$t/wt-sub" --drop pgsql:app_served --drop pgsql:app_sub
 [ "$rc" = 0 ] || fail "through remove-worktree: exit $rc ($(cat "$t/err"))"
