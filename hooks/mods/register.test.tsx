@@ -364,6 +364,33 @@ test('ticket_board keeps the safe-to-merge stack under the header, wrapped to th
   expect(await pane.find({ type: 'Text', text: /waiting behind it: 3 more PRs and #6486/ })).toBeDefined()
 })
 
+test('a worker a new prompt cleared comes back running when SendMessage resumes it', async ($, on) => {
+  mock.clock(on, { now: 1_000 })
+  on('ui.render', async ($, e) => engineDraw($, e))
+  on('agent.spawn', async () => ({ model: 'sonnet', agentId: 'a1' }))
+  on('tool.call', async () => ({ result: 'ok' }) as never)
+  on('turn.complete', async () => ({ text: '' }))
+  on('prompt.submit', async ($, e) => ({ text: e.text }))
+
+  await $.agent.spawn({ prompt: 'build', description: 'auth--01 build login', subagentType: 'general-purpose' } as never)
+  await $.tool.call({ tool: 'Bash', command: 'test 1', tool_use_id: 't1', agentId: 'a1' } as never)
+  await $.turn.complete({ agentId: 'a1', reason: 'answer', answer: '', durationMs: 5, isAborted: false, turnId: 'x1' })
+  await $.prompt.submit({ text: 'and the logout too' } as never)
+
+  const band = await $.ui.mount({ plugin: 'leek-skills', surface: 'terminal', ...BAND } as never)
+  expect(await band.find({ type: 'Text', text: /Workers/ })).toBeUndefined()
+
+  await $.tool.call({ tool: 'SendMessage', to: 'a1', message: 'add logout', tool_use_id: 'm1' } as never)
+  expect(await band.find({ type: 'Text', text: /Workers 0\/1 done/ })).toBeDefined()
+  await $.tool.call({ tool: 'Bash', command: 'test 2', tool_use_id: 't2', agentId: 'a1' } as never)
+  expect(await band.find({ type: 'Text', text: /auth--01 build login · 2 tools .*Bash: test 2/ })).toBeDefined()
+
+  // A SendMessage to an id no worker ever had draws nothing.
+  await $.turn.complete({ agentId: 'a1', reason: 'answer', answer: '', durationMs: 5, isAborted: false, turnId: 'x2' })
+  await $.tool.call({ tool: 'SendMessage', to: 'nobody', message: 'hi', tool_use_id: 'm2' } as never)
+  expect(await band.find({ type: 'Text', text: /Workers 1\/1 done/ })).toBeDefined()
+})
+
 test('followed-up subagent resumes running state and parallel fixers render on ticket board', async ($, on) => {
   mock.clock(on, { now: 1_000 })
   on('ui.render', async ($, e) => engineDraw($, e))

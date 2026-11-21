@@ -77,6 +77,32 @@ let refreshSeq = 0
 // The person closed the ticket pane; later updates for the same board leave it closed.
 let isTicketsDismissed = false
 
+// Finished workers a new prompt cleared from the band, by id (at most KEEP, oldest dropped first),
+// so a SendMessage follow-up that resumes one brings its row back instead of losing it.
+const retired = new Map<string, Worker>()
+
+function retire(list: readonly Worker[]) {
+  for (const w of list) {
+    retired.delete(w.id)
+    retired.set(w.id, w)
+  }
+  for (const id of [...retired.keys()].slice(0, Math.max(0, retired.size - KEEP))) {
+    retired.delete(id)
+  }
+}
+
+// The worker `to` (an id or a name) back to running: from the band, or from the retired ones.
+function resume(list: Worker[], to: string, change: (w: Worker) => Partial<Worker> = () => ({})): Worker[] {
+  const isIt = (w: Worker) => w.id === to || (w.name !== '' && w.name === to)
+  const awake = (w: Worker): Worker => ({ ...w, outcome: 'running', endedAt: 0, ...change(w) })
+  if (list.some(isIt)) {
+    return list.map(w => (isIt(w) ? awake(w) : w))
+  }
+  const back = [...retired.values()].reverse().find(isIt)
+  // Pure, as update may run it more than once: the retired copy stays until a newer one replaces it.
+  return back === undefined ? list : trimWorkers([...list, awake(back)], KEEP)
+}
+
 async function resolveRepoRoot($: EngineInterface, cwd: string): Promise<string> {
   try {
     const top = await $.process.run(['git', 'rev-parse', '--show-toplevel'], { cwd })
@@ -211,6 +237,7 @@ export const register: Register = on => {
     isScratchPaneOpen = false
     refreshSeq = 0
     isTicketsDismissed = false
+    retired.clear()
     await $.command.register({
       name: 'scratch',
       description: 'Live board of .scratch/ efforts: open tickets, blockers, next step',
@@ -355,19 +382,18 @@ export const register: Register = on => {
       }
     }
     const id = e.agentId
-    if (id !== undefined) {
-      try {
+    try {
+      if (id !== undefined) {
+        // A finished worker making a tool call was resumed by a follow-up: running again.
         const line = describeTool(tool, input)
-        await update($, workers, list =>
-          list.some(w => w.id === id)
-            ? list.map(w =>
-                w.id === id ? { ...w, outcome: 'running' as const, endedAt: 0, tools: w.tools + 1, lastTool: line } : w,
-              )
-            : list,
-        )
-      } catch {
-        // Observer never blocks the tool call.
+        await update($, workers, list => resume(list, id, w => ({ tools: w.tools + 1, lastTool: line })))
+      } else if (tool === 'SendMessage' && typeof input.to === 'string' && input.to !== '') {
+        // The parent's follow-up resumes a finished worker, even one a new prompt cleared away.
+        const to = input.to
+        await update($, workers, list => resume(list, to))
       }
+    } catch {
+      // Observer never blocks the tool call.
     }
 
     const result = await next(e)
@@ -424,7 +450,14 @@ export const register: Register = on => {
 
   // A new prompt with nothing running starts a clean slate.
   on('prompt.submit', async ($, e, next) => {
-    await update($, workers, list => (list.some(w => w.outcome === 'running') ? list : []))
+    await update($, workers, list => {
+      if (list.some(w => w.outcome === 'running')) {
+        return list
+      }
+      retire(list)
+
+      return []
+    })
 
     return next(e)
   }).catch(($, e, next) => next(e))
