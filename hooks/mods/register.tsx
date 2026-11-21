@@ -73,6 +73,8 @@ let only = ''
 let isScratchPaneOpen = false
 // Monotonic generation counter so an older refresh() never overwrites a newer one or a close.
 let refreshSeq = 0
+// How many times the person closed the /scratch pane: a close during /scratch's scan wins.
+let scratchCloses = 0
 
 // The person closed the ticket pane; later updates for the same board leave it closed.
 let isTicketsDismissed = false
@@ -267,6 +269,7 @@ export const register: Register = on => {
     only = ''
     isScratchPaneOpen = false
     refreshSeq = 0
+    scratchCloses = 0
     isTicketsDismissed = false
     retired.clear()
     fallbackTimes.clear()
@@ -313,6 +316,7 @@ export const register: Register = on => {
   on('command.run', { command: 'scratch' }, async ($, e) => {
     only = normalizeSlug(e.args)
     const seq = ++refreshSeq
+    const closes = scratchCloses
     const { root, result } = await scanScratch($)
     if (result === null) {
       if (seq === refreshSeq && isScratchPaneOpen) {
@@ -326,12 +330,19 @@ export const register: Register = on => {
 
       return { text: 'No .scratch/ directory here.' }
     }
+    if (closes !== scratchCloses) {
+      // The pane was closed while this scan ran: leave it closed and answer with the table.
+      return { text: summary(result) }
+    }
     const opened = await $.ui.open({ id: PANE, title: only === '' ? 'Scratch' : `Scratch: ${only}` })
-    if (seq === refreshSeq) {
-      isScratchPaneOpen = opened.isPlaced
-      if (opened.isPlaced) {
+    if (opened.isPlaced) {
+      isScratchPaneOpen = true
+      // A newer scan (a background rescan) may have drawn already; never leave the pane empty.
+      if (seq === refreshSeq || (await read($, board)) === null) {
         await update($, board, () => result)
       }
+    } else if (seq === refreshSeq) {
+      isScratchPaneOpen = false
     }
 
     // The pane carries the board; the text table is only for surfaces that cannot draw it.
@@ -341,6 +352,7 @@ export const register: Register = on => {
   on('ui.close', { id: PANE }, async ($, e, next) => {
     isScratchPaneOpen = false
     refreshSeq += 1
+    scratchCloses += 1
     await update($, board, () => null)
 
     return next(e)
