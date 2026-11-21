@@ -89,3 +89,12 @@ Fallback: the same shape in chat: the question, the numbered options with the re
 ## Workspaces
 
 A skill that makes its own git worktree passes that path in the brief. In agy, keep `invoke_subagent`'s `Workspace` at its default (`inherit`), so the path in the brief is the path the sub-agent sees.
+
+## Waiting on a background shell command
+
+For a long-running shell wait started from the main session (such as `wait-until.sh` or an idle watch):
+
+- **Claude Code:** Bash with `run_in_background: true`; the harness wakes you when it exits.
+- **Codex:** start it with `exec_command`, then poll with an empty `write_stdin` at `yield_time_ms: 300000` on every poll until it exits, the longest an empty poll takes (verified on Codex CLI 0.169). Each poll re-reads the whole context, so a 1- to 60-second yield costs a full step for nothing. Between polls, send nothing: one waiting message covers the checkpoint, and the next message reports its verdict.
+- **Grok / agy:** run the command in the background (or let the shell tool background it at its timeout) and wait for its completion notification; never poll in a loop.
+- **Fallback (no background commands):** schedule a periodic check where the harness offers one (`ScheduleWakeup` in Claude Code), or name what is still running and treat it as the cap.

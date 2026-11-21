@@ -39,8 +39,11 @@ mkdir -p "$T/gitonly/.git"
 writer=$!
 start=$(date +%s)
 out=$(bash "$script" "$T/gitonly" 2>"$T/err") || fail "gitonly: exit $?"
+# Time the watch alone: the writer runs 5s+, so timing after its wait would bound the writer, not the watch.
+end=$(date +%s)
 wait "$writer"
-[ $(( $(date +%s) - start )) -lt 6 ] || fail "gitonly: .git writes held the alarm off"
+eq "gitonly status" "$(printf '%s' "$out" | jq -r .status)" idle
+[ $(( end - start )) -lt 6 ] || fail "gitonly: .git writes held the alarm off"
 echo "ok .git writes are ignored"
 
 # worktree removed mid-watch: reports gone
