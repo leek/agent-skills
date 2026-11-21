@@ -14,7 +14,9 @@ shift
 for f in "$@"; do [ -f "$f" ] || { echo "not a file: $f" >&2; exit 1; }; done
 
 repo="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
-dir="$(printf '%s' "$branch" | tr -c 'A-Za-z0-9._-' '-')"
+# One `-` per character, in any locale; repository-cleanup's prune-pr-assets.sh maps a PR's
+# branch with this same jq expression to find its folder, so the two must stay identical.
+dir="$(jq -rn --arg b "$branch" '$b | gsub("[^A-Za-z0-9._-]"; "-")')"
 index="$(mktemp)"
 trap 'rm -f "$index"' EXIT
 

@@ -4,7 +4,7 @@ import sys
 import unittest
 from pathlib import Path
 
-DISPATCHER = Path(__file__).with_name("shell_guard.py")
+DISPATCHER = Path(__file__).with_name("pre_tool_guard.py")
 
 
 class GuardReviewAgentsTest(unittest.TestCase):
@@ -321,6 +321,20 @@ class GuardReviewAgentsTest(unittest.TestCase):
         self.assertBlocked("rg -z foo app", "decompression")
         self.assertBlocked("rg --search-zip foo app", "runs a program")
 
+    def test_unparseable_or_non_object_payloads_pass_through(self):
+        for raw in ("", "{not json", "null", "[1, 2]", '"hello"'):
+            with self.subTest(raw=raw):
+                result = subprocess.run([sys.executable, str(DISPATCHER)], input=raw,
+                                        text=True, capture_output=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stderr, "")
+
+    def test_unguarded_agent_with_malformed_input_passes_through(self):
+        payload = {"tool_name": "Bash", "tool_input": 5, "agent_type": "leek-skills:browser-writer"}
+        result = subprocess.run([sys.executable, str(DISPATCHER)], input=json.dumps(payload),
+                                text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_a_crashing_guard_blocks(self):
         payload = {"tool_name": "Bash", "tool_input": {"command": 5},
                    "agent_type": "leek-skills:pr-reviewer"}
@@ -328,6 +342,27 @@ class GuardReviewAgentsTest(unittest.TestCase):
                                 text=True, capture_output=True)
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertIn("guard failed", result.stderr)
+
+    def test_unknown_tool_for_guarded_agent_blocks(self):
+        payload = {"tool_name": "FutureShellTool", "tool_input": {"command": "rm -rf /"},
+                   "agent_type": "leek-skills:pr-reviewer"}
+        result = subprocess.run([sys.executable, str(DISPATCHER)], input=json.dumps(payload),
+                                text=True, capture_output=True)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("guard failed", result.stderr)
+
+    def test_policies_never_reimport_entrypoint_or_duplicate_blocked(self):
+        code = (
+            "import runpy, sys; "
+            f"sys.path.insert(0, {str(DISPATCHER.parent)!r}); "
+            "import shell_syntax, review_guard, browser_guard, memory_write_guard; "
+            "assert 'pre_tool_guard' not in sys.modules; "
+            "assert review_guard.Blocked is shell_syntax.Blocked; "
+            "assert browser_guard.Blocked is shell_syntax.Blocked; "
+            "assert memory_write_guard.Blocked is shell_syntax.Blocked"
+        )
+        result = subprocess.run([sys.executable, "-c", code], text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,4 @@
 import json
-import runpy
 import shlex
 import subprocess
 import sys
@@ -7,9 +6,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-GUARD = Path(__file__).with_name("guard-browser.py")
-DISPATCHER = Path(__file__).resolve().parents[3] / "hooks" / "shell_guard.py"
-PROBE = runpy.run_path(str(GUARD))["PROBE"]
+HOOKS_DIR = Path(__file__).resolve().parent
+if str(HOOKS_DIR) not in sys.path:
+    sys.path.insert(0, str(HOOKS_DIR))
+
+from browser_guard import PROBE  # noqa: E402
+
+DISPATCHER = HOOKS_DIR / "pre_tool_guard.py"
 RUN = "20260927-120000"
 S = f"agent-browser --session bt-{RUN}-1"
 
@@ -96,7 +99,7 @@ class GuardBrowserTest(unittest.TestCase):
             (f"{S} screenshot {self.run_dir}/../../../x.png", "must be saved under"),
             (f"{S} close --all", "flag `--all`"),
             ("agent-browser --session dsc-x snapshot", "must start with `--session bt-"),
-            (f"agent-browser --session bt-20260101-000000-1 snapshot", "no scope.json"),
+            ("agent-browser --session bt-20260101-000000-1 snapshot", "no scope.json"),
             (f"{S} snapshot > out.txt", "redirects are not allowed"),
             (f"{S} snapshot $(rm x)", "command substitution"),
             (f"{S} snapshot =(rm x)", "command substitution"),
@@ -109,6 +112,14 @@ class GuardBrowserTest(unittest.TestCase):
         ]:
             with self.subTest(cmd=cmd):
                 self.assertBlocked(cmd, reason)
+
+    def test_a_crashing_browser_guard_blocks(self):
+        payload = {"tool_name": "Bash", "tool_input": {"command": 5},
+                   "agent_type": "leek-skills:browser-tester"}
+        result = subprocess.run([sys.executable, str(DISPATCHER)], input=json.dumps(payload),
+                                text=True, capture_output=True)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("guard failed", result.stderr)
 
     def test_find_flag_stripping_and_nth_form(self):
         for cmd in [
@@ -169,7 +180,7 @@ class GuardBrowserTest(unittest.TestCase):
                            "exact auth file")
 
     def test_agent_files_carry_the_exact_probe(self):
-        agents = Path(__file__).resolve().parents[3] / "agents"
+        agents = HOOKS_DIR.parent / "agents"
         for name in ["browser-tester.md", "browser-writer.md"]:
             with self.subTest(agent=name):
                 self.assertIn(f'eval "{PROBE}"', (agents / name).read_text())

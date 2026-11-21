@@ -1,29 +1,19 @@
-#!/usr/bin/env python3
-"""PreToolUse guard: read-only agents with `memory:` may write only their own memory files.
+"""File-write policy: read-only agents with `memory:` may write only their own memory files.
 
 These agents read untrusted input (PR comments, transcripts, diffs), so they stay
-read-only, but `memory:` needs Write and Edit to keep its notes. Wired from
-hooks/hooks.json on the file-write tools. For an agent in MEMORY_ONLY, a write passes
-only when its real path lies under that agent's own memory directory matching its
-declared scope (`memory: project` → `<cwd-or-parent>/.claude/agent-memory/<agent>/`,
-never user memory; `memory: user` → `~/.claude/agent-memory/<agent>/` or
-`$CLAUDE_CONFIG_DIR/agent-memory/<agent>/`, never project memory); anything else,
-a symlink that leads out of those included, exits 2. Every other caller passes.
+read-only, but `memory:` needs Write and Edit to keep its notes. hooks/pre_tool_guard.py
+enforces this policy on file-write tool calls (including Grok's `search_replace`). A write
+passes only when its real path lies under that agent's own memory directory matching its
+declared scope (`memory: project` → `<cwd-or-parent>/.claude/agent-memory/<agent>/`, never
+user memory; `memory: user` → `~/.claude/agent-memory/<agent>/` or
+`$CLAUDE_CONFIG_DIR/agent-memory/<agent>/`, never project memory). Symlinks leading outside
+those directories are blocked.
 """
 
-import json
 import os
-import sys
 
-MEMORY_ONLY = {
-    "deepening-scout": "project",
-    "dependency-auditor": "project",
-    "finding-verifier": "project",
-    "release-notes-collector": "user",
-    "session-miner": "user",
-    "standards-reviewer": "project",
-    "upgrade-impact-scout": "project",
-}
+from shell_syntax import Blocked
+
 PATH_KEYS = ("file_path", "path", "target_file", "notebook_path", "target_notebook")
 
 
@@ -70,53 +60,15 @@ def memory_path(path: str, cwd: str, scope: str, raw_agent: str, agent: str) -> 
     return any(full.startswith(root + os.sep) for root in memory_roots(cwd, scope, subdirs))
 
 
-def _check_payload(payload: dict) -> int:
-    if not isinstance(payload, dict):
-        raise TypeError("payload must be a JSON object")
-    raw_agent = payload.get("agent_type") or payload.get("subagentType") or ""
-    if not isinstance(raw_agent, str):
-        raise TypeError("agent_type must be a string")
-    agent = raw_agent.rsplit(":", 1)[-1]
-    scope = MEMORY_ONLY.get(agent)
-    if scope is None:
-        return 0
-    tool_input = payload.get("tool_input") if payload.get("tool_input") is not None else payload.get("toolInput")
-    if tool_input is None:
-        tool_input = {}
+def check(tool_input: dict, cwd: str, scope: str, raw_agent: str) -> None:
     if not isinstance(tool_input, dict):
-        raise TypeError("tool_input must be a JSON object")
+        raise TypeError(f"tool_input must be a dict, got {type(tool_input).__name__}")
+    if cwd and not isinstance(cwd, str):
+        raise TypeError(f"cwd must be a str, got {type(cwd).__name__}")
+    agent = raw_agent.rsplit(":", 1)[-1]
     path = next((tool_input[k] for k in PATH_KEYS if isinstance(tool_input.get(k), str)), "")
-    cwd = payload.get("cwd", "")
-    if not isinstance(cwd, str):
-        raise TypeError("cwd must be a string")
     if path and memory_path(path, cwd, scope, raw_agent, agent):
-        return 0
+        return
     where = (f".claude/agent-memory/{agent}/" if scope == "project"
              else f"~/.claude/agent-memory/{agent}/ (or $CLAUDE_CONFIG_DIR/agent-memory/{agent}/)")
-    print(f"BLOCKED: {agent} is read-only; it may write only its own {scope} memory files under "
-          f"{where}. Report what you found instead of changing files.",
-          file=sys.stderr)
-    return 2
-
-
-def run_payload(payload: dict) -> int:
-    try:
-        return _check_payload(payload)
-    except Exception as error:  # noqa: BLE001
-        print(f"BLOCKED: memory-write guard failed ({type(error).__name__}: {error}). "
-              "Report what you found instead of changing files.", file=sys.stderr)
-        return 2
-
-
-def main() -> int:
-    try:
-        payload = json.load(sys.stdin)
-    except Exception as error:  # noqa: BLE001
-        print(f"BLOCKED: memory-write guard failed ({type(error).__name__}: {error}). "
-              "Report what you found instead of changing files.", file=sys.stderr)
-        return 2
-    return run_payload(payload)
-
-
-if __name__ == "__main__":
-    sys.exit(main())
+    raise Blocked(f"it may write only its own {scope} memory files under {where}")

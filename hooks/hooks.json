@@ -1,5 +1,5 @@
 {
-  "description": "browser-test: block non-read-only browser commands from the browser-tester and browser-test-planner agents. finding-verifier and pr-reviewer: allow only read-only git, gh, rg, and text commands. Read-only agents with memory: Write and Edit only under .claude/agent-memory/. Every other caller passes through untouched. A structured question (AskUserQuestion, Grok ask_user_question, Codex request_user_input, agy ask_question) and Notification: in Ghostty, ring the bell so the tab shows 🔔 while Claude waits on the user. SessionStart: in a bare Laravel worktree (no vendor/), point the agent at laravel-herd-worktrees' bootstrap; silent everywhere else.",
+  "description": "browser-test: block non-read-only browser commands from the browser-tester and browser-test-planner agents. finding-verifier, pr-reviewer, spec-reviewer, standards-reviewer, and deepening-scout: allow only read-only git, gh, rg, and text commands. Read-only agents with memory: file writes only under their own agent-memory/<agent>/ directory. Every other caller passes through untouched. A structured question (AskUserQuestion, Grok ask_user_question, Codex request_user_input, agy ask_question) and Notification: in Ghostty, ring the bell so the tab shows 🔔 while Claude waits on the user. SessionStart: in a bare Laravel worktree (no vendor/), point the agent at laravel-herd-worktrees' bootstrap; silent everywhere else.",
   "modules": [
     "./mods/register.tsx"
   ],
@@ -20,7 +20,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/shell_guard.py\""
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/pre_tool_guard.py\""
           }
         ]
       },
@@ -29,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/memory_write_guard.py\""
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/pre_tool_guard.py\""
           }
         ]
       },

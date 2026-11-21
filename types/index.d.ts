@@ -27,6 +27,8 @@ export type ScratchEffort = {
   isStale: boolean
   /** Open tickets and decisions ready to start: blockers all closed, unclaimed, not `in-progress`. */
   frontier: string[]
+  /** Each open ticket or decision's blockers still open, by path; one with none is left out. */
+  openBlockers: Record<string, string[]>
   next: string
 }
 

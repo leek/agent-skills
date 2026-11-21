@@ -6,15 +6,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-GUARD = Path(__file__).with_name("memory_write_guard.py")
+GUARD = Path(__file__).with_name("pre_tool_guard.py")
 
 
 class MemoryWriteGuardTest(unittest.TestCase):
-    def run_guard_result(self, path, agent="leek-skills:standards-reviewer", tool="Write", cwd="/repo",
-                         config_dir=None, path_key="file_path"):
-        payload = {"tool_name": tool, "tool_input": {path_key: path}, "cwd": cwd}
-        if agent:
-            payload["agent_type"] = agent
+    def invoke(self, payload, config_dir=None):
         env = {k: v for k, v in os.environ.items() if k != "CLAUDE_CONFIG_DIR"}
         if config_dir:
             env["CLAUDE_CONFIG_DIR"] = config_dir
@@ -23,8 +19,10 @@ class MemoryWriteGuardTest(unittest.TestCase):
 
     def run_guard(self, path, agent="leek-skills:standards-reviewer", tool="Write", cwd="/repo",
                   config_dir=None, path_key="file_path"):
-        return self.run_guard_result(path, agent=agent, tool=tool, cwd=cwd,
-                                     config_dir=config_dir, path_key=path_key).returncode
+        payload = {"tool_name": tool, "tool_input": {path_key: path}, "cwd": cwd}
+        if agent:
+            payload["agent_type"] = agent
+        return self.invoke(payload, config_dir=config_dir).returncode
 
     def test_user_memory_follows_claude_config_dir(self):
         # A profile (CLAUDE_CONFIG_DIR) keeps user memory at <config dir>/agent-memory/.
@@ -97,6 +95,16 @@ class MemoryWriteGuardTest(unittest.TestCase):
             self.assertEqual(self.run_guard(f"~/.claude/agent-memory/{bare}/p.md",
                                             agent=agent, cwd="/repo"), 0)
 
+    def test_path_keys_cover_all_write_tools(self):
+        for key, tool in (("file_path", "Write"), ("path", "write"), ("target_file", "Delete"),
+                          ("notebook_path", "EditNotebook"), ("target_notebook", "EditNotebook"),
+                          ("file_path", "StrReplace"), ("path", "hashline_edit")):
+            with self.subTest(tool=tool, key=key):
+                self.assertEqual(
+                    self.run_guard("/repo/.claude/agent-memory/standards-reviewer/notes.md",
+                                   tool=tool, path_key=key), 0)
+                self.assertEqual(self.run_guard("/repo/app/Foo.ipynb", tool=tool, path_key=key), 2)
+
     def test_memory_must_be_this_sessions_own(self):
         # A `.claude/agent-memory` segment somewhere else is not this session's memory.
         self.assertEqual(self.run_guard("/elsewhere/.claude/agent-memory/standards-reviewer/x.md"), 2)
@@ -113,50 +121,75 @@ class MemoryWriteGuardTest(unittest.TestCase):
             self.assertEqual(self.run_guard(os.path.join(memory, "notes.md"), cwd=repo), 0)
             self.assertEqual(self.run_guard(os.path.join(memory, "out", "Foo.php"), cwd=repo), 2)
 
-    def test_path_keys_cover_all_write_tools(self):
-        for key, tool in (("file_path", "Write"), ("path", "write"), ("target_file", "Delete"),
-                          ("notebook_path", "EditNotebook"), ("target_notebook", "EditNotebook")):
-            self.assertEqual(
-                self.run_guard("/repo/.claude/agent-memory/standards-reviewer/notes.md",
-                               tool=tool, path_key=key), 0)
-            self.assertEqual(
-                self.run_guard("/repo/app/Foo.ipynb", tool=tool, path_key=key), 2)
-
-    def test_malformed_payloads_fail_closed(self):
-        for raw in (
-            "not json{{{",
-            "[]",
-            '"just a string"',
-            json.dumps({"agent_type": "leek-skills:finding-verifier", "tool_input": ["bad"]}),
-            json.dumps({"agent_type": "leek-skills:finding-verifier", "tool_input": {"file_path": "/repo/x"}, "cwd": 123}),
-        ):
-            res = subprocess.run([sys.executable, str(GUARD)], input=raw, text=True, capture_output=True)
-            self.assertEqual(res.returncode, 2, f"did not fail closed for {raw!r}")
-            self.assertIn("BLOCKED:", res.stderr)
-
     def test_other_callers_pass_through(self):
         self.assertEqual(self.run_guard("/repo/app/Foo.php", agent=None), 0)
         self.assertEqual(self.run_guard("/repo/app/Foo.php", agent="leek-skills:researcher"), 0)
+
+    def test_grok_write_payloads_are_guarded(self):
+        blocked = self.invoke({
+            "hookEventName": "pre_tool_use",
+            "toolName": "search_replace",
+            "toolInput": {"file_path": "/repo/app/Foo.php"},
+            "subagentType": "leek-skills:standards-reviewer",
+            "cwd": "/repo",
+        })
+        self.assertEqual(blocked.returncode, 2)
+        self.assertIn("BLOCKED:", blocked.stderr)
+
+        allowed = self.invoke({
+            "hookEventName": "pre_tool_use",
+            "toolName": "search_replace",
+            "toolInput": {"file_path": "/repo/.claude/agent-memory/standards-reviewer/notes.md"},
+            "subagentType": "leek-skills:standards-reviewer",
+            "cwd": "/repo",
+        })
+        self.assertEqual(allowed.returncode, 0, allowed.stderr)
+
+    def test_malformed_write_payloads_fail_closed(self):
+        for bad in [
+            {"tool_name": "Write", "tool_input": None, "agent_type": "leek-skills:standards-reviewer"},
+            {"tool_name": "Write", "tool_input": "not-a-dict", "agent_type": "leek-skills:standards-reviewer"},
+            {"tool_name": "Write", "tool_input": {"file_path": "/repo/.claude/agent-memory/x.md"},
+             "cwd": 123, "agent_type": "leek-skills:standards-reviewer"},
+        ]:
+            with self.subTest(payload=bad):
+                result = self.invoke(bad)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("guard failed", result.stderr)
+
+    def test_dual_guarded_agent_is_enforced_on_both_shell_and_write(self):
+        self.assertEqual(self.run_guard("/repo/app/Foo.php", agent="leek-skills:finding-verifier"), 2)
+        self.assertEqual(self.run_guard("/repo/.claude/agent-memory/finding-verifier/notes.md",
+                                        agent="leek-skills:finding-verifier"), 0)
+        shell_blocked = self.invoke({
+            "tool_name": "Bash",
+            "tool_input": {"command": "git commit -m x"},
+            "agent_type": "leek-skills:finding-verifier",
+        })
+        self.assertEqual(shell_blocked.returncode, 2)
+        self.assertIn("not a read-only git command", shell_blocked.stderr)
 
     def test_every_memory_agent_is_guarded_or_a_named_writer(self):
         # `memory:` gives an agent Write and Edit even when its `tools:` line has neither.
         # `researcher` writes its findings file, so it is the one agent left unguarded.
         import importlib.util
-        spec = importlib.util.spec_from_file_location("memory_write_guard", GUARD)
+        spec = importlib.util.spec_from_file_location("pre_tool_guard", GUARD)
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         writers = {"researcher"}
         for agent in sorted(GUARD.parent.parent.glob("agents/*.md")):
             frontmatter = agent.read_text().split("---")[1]
-            for line in frontmatter.splitlines():
-                if line.startswith("memory:") and agent.stem not in writers:
-                    declared = line.split(":", 1)[1].strip()
-                    self.assertIn(agent.stem, mod.MEMORY_ONLY,
-                                  f"{agent.stem} has memory: but is not in MEMORY_ONLY")
-                    self.assertEqual(mod.MEMORY_ONLY[agent.stem], declared,
-                                     f"{agent.stem} scope mismatch: guard={mod.MEMORY_ONLY[agent.stem]} vs agent={declared}")
-        self.assertEqual(self.run_guard("/repo/app/Foo.php", agent="leek-skills:upgrade-impact-scout"), 2)
-        self.assertEqual(self.run_guard("/repo/app/Foo.php", agent="leek-skills:release-notes-collector"), 2)
+            declared = next((line.split(":", 1)[1].strip() for line in frontmatter.splitlines()
+                             if line.startswith("memory:")), None)
+            if declared and agent.stem not in writers:
+                with self.subTest(agent=agent.stem):
+                    self.assertEqual(mod.MEMORY_ONLY.get(agent.stem), declared,
+                                     f"{agent.stem} declares memory: {declared} but MEMORY_ONLY disagrees")
+                    self.assertEqual(
+                        self.run_guard("/repo/app/Foo.php", agent=f"leek-skills:{agent.stem}"),
+                        2,
+                        f"{agent.stem} has memory: but is not blocked from writing outside agent-memory",
+                    )
 
 
 if __name__ == "__main__":

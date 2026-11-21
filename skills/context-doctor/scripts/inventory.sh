@@ -192,7 +192,8 @@ def glob_rxs(g):
     return [glob_rx(x) for x in expand_braces(g)]
 
 def read(p):
-    if blocked(p, p):
+    # The one read seam: a secrets file is never opened, so it is never sized, walked, or hashed.
+    if blocked(p, p) or SENSITIVE.search(p) or SENSITIVE.search(os.path.realpath(p)):
         return None
     try:
         with open(p, encoding="utf-8", errors="replace") as fh:
@@ -1198,8 +1199,10 @@ totals = dict(
     shadowed_skills=sum(1 for s in sources.values() if s.get("shadowed_by")),
     mcp_servers=len(mcp), hooks=len(hooks), plugins_enabled=sum(1 for p in plugins if p["enabled"]))
 
-# Issues get a fingerprint too, so a declined one stays quiet on later runs.
+# Issues get a fingerprint too, so a declined one stays quiet on later runs. Every string field is
+# redacted here, the one place issues leave the script, before the fingerprint is taken.
 for it in issues:
+    it.update({k: redact(v) for k, v in it.items() if isinstance(v, str)})
     it["fingerprint"] = hashlib.sha1((it["type"] + "\0" + it.get("path", "") + "\0" + it["detail"]).encode()).hexdigest()[:12]
     it["declined"] = it["fingerprint"] in declined
 inv = dict(project=project, repo_root=repo_root, config_dir=config, memory_dir=mem_dir,
