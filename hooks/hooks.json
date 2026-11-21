@@ -1,5 +1,5 @@
 {
-  "description": "browser-test: block non-read-only browser commands from the browser-tester and browser-test-planner agents. finding-verifier and pr-reviewer: allow only read-only git, gh, rg, and text commands. Read-only agents with memory: Write and Edit only under .claude/agent-memory/. Every other caller passes through untouched. A structured question (AskUserQuestion, Grok ask_user_question, Codex request_user_input, agy ask_question) and Notification: in Ghostty, ring the bell so the tab shows 🔔 while Claude waits on the user. SessionStart: in a bare Laravel worktree (no vendor/), point the agent at laravel-herd-worktrees' bootstrap; silent everywhere else.",
+  "description": "browser-test: block non-read-only browser commands from the browser-tester and browser-test-planner agents. finding-verifier, pr-reviewer, spec-reviewer, standards-reviewer, and deepening-scout: allow only read-only git, gh, rg, and text commands. Read-only agents with memory: file writes only under their own agent-memory/<agent>/ directory. Every other caller passes through untouched. A structured question (AskUserQuestion, Grok ask_user_question, Codex request_user_input, agy ask_question) and Notification: in Ghostty, ring the bell so the tab shows 🔔 while Claude waits on the user. SessionStart: in a bare Laravel worktree (no vendor/), point the agent at laravel-herd-worktrees' bootstrap; silent everywhere else.",
   "modules": [
     "./mods/register.tsx"
   ],
@@ -16,7 +16,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash|run_terminal_command",
+        "matcher": "Bash|run_terminal_command|Shell",
         "hooks": [
           {
             "type": "command",
@@ -25,7 +25,7 @@
         ]
       },
       {
-        "matcher": "Write|Edit|MultiEdit|search_replace",
+        "matcher": "Write|Edit|MultiEdit|search_replace|write|hashline_edit|StrReplace|EditNotebook|Delete",
         "hooks": [
           {
             "type": "command",

@@ -29,11 +29,20 @@ SESSION = re.compile(r"^bt-(\d{8}-\d{6})-[a-z0-9]+$")
 SAFE_KEYS = {"Escape", "Tab", "Shift+Tab", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
              "PageUp", "PageDown", "Home", "End"}
 FIND_READ_ACTIONS = {"click", "hover", "focus", "text", "scrollintoview"}
-# Flags any verb may carry. Everything else (--fn, --download, --profile, --auto-connect,
+# Flags the other verbs may carry (find and screenshot take only their own, below). Everything else (--fn, --download, --profile, --auto-connect,
 # --cdp, --headers, --headed, …) runs JS, writes files, or swaps the browser, so it is refused.
-SAFE_FLAGS = {"--clear", "--filter", "--type", "--status", "--method", "--load", "--url", "--text", "--timeout",
-              "--json", "--full", "-i", "--interactive", "-c", "--compact", "-d", "--depth",
-              "-s", "--selector"}
+SAFE_BOOL_FLAGS = {"--clear", "--json", "--full", "-i", "--interactive", "-c", "--compact"}
+SAFE_VALUE_FLAGS = {"--filter", "--type", "--status", "--method", "--load", "--url", "--text",
+                    "--timeout", "-d", "--depth", "-s", "--selector"}
+SAFE_FLAGS = SAFE_BOOL_FLAGS | SAFE_VALUE_FLAGS
+# `agent-browser screenshot --help` (0.43): usage `screenshot [selector] [path]`, booleans
+# --full/-f, --if-changed, --annotate, and these four value flags. Legal on screenshot only.
+SCREENSHOT_VALUE_FLAGS = {"--threshold", "--screenshot-dir", "--screenshot-quality", "--screenshot-format"}
+SCREENSHOT_FLAGS = {"-f", "--full", "--if-changed", "--annotate", "--json"} | SCREENSHOT_VALUE_FLAGS
+# `agent-browser find --help` (0.43): only --name <name> and --exact, plus the global --json.
+FIND_BOOL_FLAGS = {"--exact", "--json"}
+FIND_VALUE_FLAGS = {"--name"}
+VERB_FLAGS = {"screenshot": SCREENSHOT_FLAGS, "find": FIND_BOOL_FLAGS | FIND_VALUE_FLAGS}
 ELEMENT_STATES = {"visible", "hidden", "attached", "detached"}
 FILTERS = {"grep", "head", "tail", "wc", "sort", "uniq", "echo"}
 
@@ -43,19 +52,97 @@ def same_origin(url: str, origin: str) -> bool:
     return a.scheme in ("http", "https") and (a.scheme, a.netloc) == (b.scheme, b.netloc)
 
 
-def inside(path: str, run_dir: str) -> bool:
-    real = os.path.realpath(path)
+def inside(path: str, run_dir: str, cwd: str) -> bool:
+    real = os.path.realpath(os.path.join(cwd, os.path.expanduser(path)))
     return real.startswith(os.path.realpath(run_dir) + os.sep)
 
 
+def check_screenshot(rest: list[str], run_dir: str, cwd: str) -> None:
+    """Only screenshot's own value flags consume a word, so every other flag's would-be value
+    stays positional: `--timeout /tmp/x.png` saves to /tmp/x.png. Usage is `[selector] [path]`,
+    so a third positional is refused and the last one (the path, or a lone word that may be one)
+    must lie inside the run directory whatever it looks like, and so must --screenshot-dir."""
+    positional: list[str] = []
+    dirs: list[str] = []
+    i = 0
+    while i < len(rest):
+        a = rest[i]
+        i += 1
+        if a == "--":
+            positional.extend(rest[i:])
+            break
+        if not a.startswith("-"):
+            positional.append(a)
+            continue
+        name, eq, value = a.partition("=")
+        if name in SCREENSHOT_VALUE_FLAGS:
+            if not eq:
+                if i >= len(rest):
+                    raise Blocked(f"flag `{name}` needs a value")
+                value = rest[i]
+                i += 1
+            if name == "--screenshot-dir":
+                dirs.append(value)
+    if len(positional) > 2:
+        raise Blocked("`screenshot` takes at most a selector and a path")
+    real_run = os.path.realpath(run_dir)
+    for d in dirs:
+        if os.path.realpath(os.path.join(cwd, os.path.expanduser(d))) != real_run and not inside(d, run_dir, cwd):
+            raise Blocked(f"screenshots must be saved under {run_dir}/")
+    if positional and not inside(positional[-1], run_dir, cwd):
+        raise Blocked(f"screenshots must be saved under {run_dir}/")
+
+
+def strip_find_flags(rest: list[str]) -> list[str]:
+    """Strip find's own flags (and --name's value), returning positionals."""
+    positional: list[str] = []
+    i = 0
+    while i < len(rest):
+        a = rest[i]
+        if a == "--":
+            positional.extend(rest[i + 1:])
+            break
+        if a.startswith("-"):
+            name, eq, _ = a.partition("=")
+            if name in FIND_BOOL_FLAGS:
+                if eq:
+                    raise Blocked(f"flag `{a}` is not allowed")
+                i += 1
+                continue
+            if name in FIND_VALUE_FLAGS:
+                if not eq:
+                    if i + 1 >= len(rest):
+                        raise Blocked(f"flag `{name}` needs a value")
+                    i += 1
+                i += 1
+                continue
+            raise Blocked(f"flag `{a}` is not allowed")
+        positional.append(a)
+        i += 1
+    return positional
+
+
 def check_find(rest: list[str]) -> None:
-    # find <locator> <value> <action> [text]
-    if len(rest) < 3:
+    pos = strip_find_flags(rest)
+    if not pos:
         raise Blocked("`find` needs <locator> <value> <action>")
-    locator, value, action = rest[0], rest[1], rest[2]
+    if pos[0] == "nth":
+        # find nth <n> <selector> <action> [text]
+        if len(pos) < 4 or not pos[1].isdigit():
+            raise Blocked("`find nth` needs <n> <selector> <action>")
+        locator, value, action, extra = pos[0], pos[2], pos[3], pos[4:]
+    else:
+        # find <locator> <value> <action> [text]
+        if len(pos) < 3:
+            raise Blocked("`find` needs <locator> <value> <action>")
+        locator, value, action, extra = pos[0], pos[1], pos[2], pos[3:]
     if action in FIND_READ_ACTIONS:
+        if extra:
+            raise Blocked(f"`find … {action}` takes no extra arguments")
         return
     if action in ("fill", "type"):
+        if len(extra) != 1:
+            raise Blocked(f"`find … {action}` needs exactly one text argument")
         search = (locator == "role" and value == "searchbox") or (
             locator in ("placeholder", "label") and "search" in value.lower())
         if search:
@@ -64,9 +151,25 @@ def check_find(rest: list[str]) -> None:
     raise Blocked(f"`find … {action}` is not a read-only action")
 
 
-def check_browser(args: list[str], scope: dict | None, run_dir: str | None) -> None:
-    if len(args) < 2 or args[0] != "--session" or not SESSION.match(args[1]):
+def load_scope(cwd: str, run_id: str) -> tuple[dict | None, str]:
+    run_dir = os.path.join(cwd, ".scratch", "browser-test", run_id)
+    try:
+        with open(os.path.join(run_dir, "scope.json")) as fh:
+            data = json.load(fh)
+            if not isinstance(data, dict):
+                return None, run_dir
+            return data, run_dir
+    except (OSError, ValueError):
+        return None, run_dir
+
+
+def check_browser(args: list[str], cwd: str) -> None:
+    if len(args) < 2 or args[0] != "--session":
         raise Blocked("every agent-browser call must start with `--session bt-<run-id>-<tag>`")
+    m = SESSION.match(args[1])
+    if not m:
+        raise Blocked("every agent-browser call must start with `--session bt-<run-id>-<tag>`")
+    scope, run_dir = load_scope(cwd, m.group(1))
     if scope is None:
         raise Blocked("no scope.json for this run under .scratch/browser-test/ — the run was not started")
     args = args[2:]
@@ -83,7 +186,8 @@ def check_browser(args: list[str], scope: dict | None, run_dir: str | None) -> N
             continue
         if a == "--state" and verb == "wait" and rest[i + 1:i + 2] and rest[i + 1] in ELEMENT_STATES:
             continue
-        if a.split("=", 1)[0] not in SAFE_FLAGS:
+        allowed = VERB_FLAGS.get(verb, SAFE_FLAGS)
+        if a.split("=", 1)[0] not in allowed:
             raise Blocked(f"flag `{a}` is not allowed")
     if verb in ("snapshot", "click", "hover", "focus", "scroll", "scrollintoview", "wait", "get",
                 "is", "back", "forward", "reload"):
@@ -103,9 +207,7 @@ def check_browser(args: list[str], scope: dict | None, run_dir: str | None) -> N
             raise Blocked(f"`{verb}` is only allowed on {scope['origin']} — navigate by clicking")
         return
     if verb == "screenshot":
-        paths = [a for a in rest if not a.startswith("--")]
-        if any(not inside(p, run_dir) for p in paths):
-            raise Blocked(f"screenshots must be saved under {run_dir}/")
+        check_screenshot(rest, run_dir, cwd)
         return
     if verb == "press":
         if len(rest) != 1 or rest[0] not in SAFE_KEYS:
@@ -130,27 +232,13 @@ def check_browser(args: list[str], scope: dict | None, run_dir: str | None) -> N
     raise Blocked(f"`{verb}` is not an allowed verb for a read-only browser test")
 
 
-def load_scope(cwd: str, parts: list[list[str]]) -> tuple[dict | None, str | None]:
-    for seg in parts:
-        if seg[:2] == ["agent-browser", "--session"] and len(seg) > 2:
-            m = SESSION.match(seg[2])
-            if m:
-                run_dir = os.path.join(cwd, ".scratch", "browser-test", m.group(1))
-                try:
-                    with open(os.path.join(run_dir, "scope.json")) as fh:
-                        return json.load(fh), run_dir
-                except (OSError, ValueError):
-                    return None, run_dir
-    return None, None
-
-
 def check(command: str, cwd: str) -> None:
     parts = parse_command(command)
-    scope, run_dir = load_scope(cwd, parts)
     for seg in parts:
         if seg[0] in FILTERS:
             check_filter(seg[0], seg[1:])
             continue
         if seg[0] != "agent-browser":
             raise Blocked(f"`{seg[0]}` is not allowed — only agent-browser and read-only filters")
-        check_browser(seg[1:], scope, run_dir)
+        check_browser(seg[1:], cwd)
+

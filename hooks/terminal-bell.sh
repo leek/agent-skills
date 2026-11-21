@@ -7,11 +7,15 @@
 [ "$TERM_PROGRAM" = ghostty ] || exit 0
 
 p=$$
-while [ "$p" -gt 1 ]; do
-  t=$(ps -o tty= -p "$p" | tr -d ' ')
-  if [ -n "$t" ] && [ "$t" != "??" ]; then
-    printf '\a' > "/dev/$t"
+while :; do
+  case "$p" in ''|*[!0-9]*) exit 0 ;; esac
+  [ "$p" -gt 1 ] || exit 0
+  t=$(ps -o tty= -p "$p" 2>/dev/null | tr -d ' \t\n')
+  if [ -n "$t" ] && [ "$t" != "??" ] && [ "$t" != "?" ] && [ -w "/dev/$t" ]; then
+    { printf '\a' > "/dev/$t"; } 2>/dev/null || true
     exit 0
   fi
-  p=$(ps -o ppid= -p "$p" | tr -d ' ')
+  next=$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' \t\n')
+  [ "$next" != "$p" ] || exit 0
+  p=$next
 done

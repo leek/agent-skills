@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """PreToolUse guard entrypoint for read-only plugin agents.
 
-Wired from hooks/hooks.json on both the shell (Bash|run_terminal_command) and
-file-write (Write|Edit|MultiEdit|search_replace) matchers. Every call spawns one
+Wired from hooks/hooks.json on both the shell (Bash|run_terminal_command|Shell) and
+file-write (Write|Edit|MultiEdit|search_replace|write|hashline_edit|StrReplace|EditNotebook|
+Delete) matchers. Every call spawns one
 Python process, exiting 0 before importing any parser or policy unless agent_type
 names a guarded agent.
 
@@ -16,21 +17,24 @@ import json
 import os
 import sys
 
-SHELL_TOOLS = {"Bash", "run_terminal_command"}
-WRITE_TOOLS = {"Write", "Edit", "MultiEdit", "search_replace"}
+SHELL_TOOLS = {"Bash", "run_terminal_command", "Shell"}
+WRITE_TOOLS = {"Write", "Edit", "MultiEdit", "search_replace", "write", "hashline_edit",
+               "StrReplace", "EditNotebook", "Delete"}
 
-REVIEW_GUARDED = {"finding-verifier", "pr-reviewer"}
+REVIEW_GUARDED = {"deepening-scout", "finding-verifier", "pr-reviewer",
+                  "spec-reviewer", "standards-reviewer"}
 BROWSER_GUARDED = {"browser-tester", "browser-test-planner"}
+# Each read-only agent with `memory:`, mapped to its declared memory scope.
 MEMORY_ONLY = {
-    "deepening-scout",
-    "dependency-auditor",
-    "finding-verifier",
-    "release-notes-collector",
-    "session-miner",
-    "standards-reviewer",
-    "upgrade-impact-scout",
+    "deepening-scout": "project",
+    "dependency-auditor": "project",
+    "finding-verifier": "project",
+    "release-notes-collector": "user",
+    "session-miner": "user",
+    "standards-reviewer": "project",
+    "upgrade-impact-scout": "project",
 }
-ALL_GUARDED = REVIEW_GUARDED | BROWSER_GUARDED | MEMORY_ONLY
+ALL_GUARDED = REVIEW_GUARDED | BROWSER_GUARDED | set(MEMORY_ONLY)
 
 
 def _agent_name(payload: dict) -> str:
@@ -91,7 +95,8 @@ def _run_write_guard(agent: str, payload: dict) -> int:
     from shell_syntax import Blocked
     cwd = payload.get("cwd") or ""
     try:
-        memory_write_guard.check(tool_input, cwd)
+        raw_agent = payload.get("agent_type") or payload.get("subagentType") or ""
+        memory_write_guard.check(tool_input, cwd, MEMORY_ONLY[agent], raw_agent)
     except Blocked as reason:
         print(f"BLOCKED: {agent} is read-only; {reason}. Report what you found instead of changing files.",
               file=sys.stderr)

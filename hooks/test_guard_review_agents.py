@@ -124,6 +124,152 @@ class GuardReviewAgentsTest(unittest.TestCase):
         self.assertIn("not a read-only git command", blocked.stderr)
         self.assertEqual(grok("rm -rf x", "leek-skills:browser-tester").returncode, 2)
 
+    def test_dispatcher_guards_shell_tool_and_additional_review_agents(self):
+        # Grok daemon routes shell calls under tool name "Shell".
+        def shell_call(command, agent):
+            payload = {"tool_name": "Shell", "tool_input": {"command": command}, "agent_type": agent}
+            return subprocess.run([sys.executable, str(DISPATCHER)], input=json.dumps(payload),
+                                  text=True, capture_output=True)
+
+        self.assertEqual(shell_call("git log --oneline -5", "leek-skills:finding-verifier").returncode, 0)
+        self.assertEqual(shell_call("git commit -m x", "leek-skills:pr-reviewer").returncode, 2)
+        self.assertEqual(shell_call("rm -rf x", "leek-skills:browser-tester").returncode, 2)
+
+        # Read-only git-only agents are guarded; agents that run bash/composer/agent-browser are not.
+        for agent in ("leek-skills:standards-reviewer", "leek-skills:spec-reviewer",
+                      "leek-skills:deepening-scout", "standards-reviewer",
+                      "spec-reviewer", "deepening-scout"):
+            self.assertAllowed("git diff main...HEAD", agent=agent)
+            self.assertAllowed("git log --oneline -10", agent=agent)
+            self.assertBlocked("git commit -m x", "not a read-only git command", agent=agent)
+            self.assertBlocked("rm -rf app", "`rm` is not allowed", agent=agent)
+        self.assertAllowed("bash extract-signal.sh log.jsonl", agent="leek-skills:session-miner")
+        self.assertAllowed("composer audit --format=json", agent="leek-skills:dependency-auditor")
+        self.assertAllowed("agent-browser snapshot -i", agent="leek-skills:ui-reviewer")
+
+    def test_empty_quote_io_number_desync_is_blocked(self):
+        # Empty quotes disqualify IO_NUMBER in bash/zsh, so `""2>/dev/null` passes `2` as an
+        # argument and redirects stdout instead of stderr.
+        self.assertBlocked('echo pwned | uniq -f ""2>/dev/null - /tmp/pwned', "redirects")
+        self.assertBlocked("echo pwned | uniq -f ''2>/dev/null - /tmp/pwned", "redirects")
+        self.assertBlocked('echo pwned | uniq -f 2"">/dev/null - /tmp/pwned', "redirects")
+        self.assertBlocked("echo pwned | uniq -f 2''>/dev/null - /tmp/pwned", "redirects")
+        self.assertBlocked('gh api -q ""2>/dev/null -X DELETE repos/o/r', "redirects")
+        self.assertBlocked('git log ""2>&1', "redirects")
+        self.assertAllowed("git log --oneline -5 2>/dev/null")
+        self.assertAllowed("git log 2>&1 | head -5")
+
+    def test_jq_env_secret_exposure_is_blocked(self):
+        self.assertBlocked("jq -n env", "environment variables")
+        self.assertBlocked("jq 'env'", "environment variables")
+        self.assertBlocked("jq '$ENV'", "environment variables")
+        self.assertBlocked("jq -n 'env.GITHUB_TOKEN'", "environment variables")
+        self.assertBlocked("jq -n '$ENV.AWS_SECRET_ACCESS_KEY'", "environment variables")
+        self.assertBlocked("jq -n '{t: env}'", "environment variables")
+        self.assertBlocked('jq -n \'"\\(env.TOKEN)"\'', "environment variables")
+        self.assertBlocked('jq -n \'"\\($ENV.TOKEN)"\'', "environment variables")
+        self.assertBlocked("jq -f evil.jq data.json", "--from-file")
+        self.assertBlocked("jq --from-file=evil.jq data.json", "--from-file")
+        self.assertBlocked("gh pr view 1 --json title --jq env", "environment variables")
+        self.assertBlocked("gh pr view 1 --json title -q '$ENV'", "environment variables")
+        self.assertBlocked("gh pr list --json number --jq 'env.GITHUB_TOKEN'", "environment variables")
+        self.assertBlocked("gh api user --jq 'env'", "environment variables")
+        self.assertBlocked("gh api user -q'$ENV'", "environment variables")
+        self.assertBlocked("gh api user --jq='env.SECRET'", "environment variables")
+        # Field access and longer identifiers stay allowed.
+        self.assertAllowed("jq -r '.env' config.json")
+        self.assertAllowed("jq -r '.foo.env' config.json")
+        self.assertAllowed("jq -r '.environment' config.json")
+        self.assertAllowed("jq -r '.[\"env\"]' config.json")
+        self.assertAllowed("jq -r '.my_env' config.json")
+        self.assertAllowed("gh api user --jq '.env'")
+        self.assertAllowed("gh pr list --json name --jq '.[].environment'")
+        self.assertAllowed("gh pr view 1 --json title -q '.title'")
+
+    def test_jq_module_loading_is_blocked(self):
+        # A module on -L defining `def leak: env;` reads the environment past the filter check.
+        for cmd in ["jq -n -L /tmp/jqmod 'include \"m\"; leak'",
+                    "jq -n -L/tmp/jqmod 'leak'",
+                    "jq -nL /tmp/jqmod 'leak'",
+                    "jq --library-path /tmp/jqmod 'leak'",
+                    "jq --library-path=/tmp/jqmod 'leak'",
+                    "jq -n 'include \"m\"; leak'",
+                    "jq -n 'import \"m\" as m; m::leak'",
+                    "jq -n 'import \"m\" as $m; $m'",
+                    "gh api user --jq 'include \"m\"; leak'"]:
+            with self.subTest(cmd=cmd):
+                self.assertBlocked(cmd, "modules")
+        self.assertBlocked("jq --run-tests t.txt", "`jq --run-tests`")
+        self.assertBlocked("jq -nZ .", "`jq -nZ`")
+        self.assertAllowed("jq -r '.include' data.json")
+        self.assertAllowed("jq -r '.[] | select(.kind == \"import\")' data.json")
+        self.assertAllowed("jq -nr --arg x -L '$x'")
+        self.assertAllowed("jq --indent 2 -S . data.json")
+        self.assertAllowed("jq -s --slurpfile a a.json '.' b.json")
+
+    def test_jq_env_check_reads_only_the_filter_and_builtin_calls(self):
+        # Path-like file arguments are not filters, and a quoted object key is not the builtin.
+        for cmd in ["jq '.name' config/env.json",
+                    "jq . src/include/x.json",
+                    "jq -r . import.json ./env",
+                    "jq -- . env.json",
+                    "jq . - data.json",
+                    "gh pr view 1 --json body --jq '{\"env\": .environment}'",
+                    "jq '{a: 1, \"env\": .e}' data.json",
+                    "jq -n '$__loc__'"]:
+            with self.subTest(cmd=cmd):
+                self.assertAllowed(cmd)
+        for cmd in ["jq -n '{a: env}'",
+                    "jq -n '{env: env}'",
+                    "jq -n '{env: 1} | env'",
+                    "jq '.[env:]' data.json",
+                    "jq -n 'env::x'",
+                    "jq -n -- env",
+                    "gh api user --jq '{env: env.HOME}'",
+                    # A bare `-` must not stand in for the filter and hide the real one.
+                    "jq -n - 'env'",
+                    "jq - 'env' file.json",
+                    "jq -n - 'env.x/1'",
+                    # No unquoted-key exemption: `.[0,env:]` is a slice that evaluates env.
+                    "jq -nc '[1,2,3] | .[0,env:]'",
+                    "jq '{env: .environment}' data.json",
+                    "jq . data.json env"]:
+            with self.subTest(cmd=cmd):
+                self.assertBlocked(cmd, "environment variables")
+
+    def test_jq_env_split_by_space_or_comment_is_blocked(self):
+        # jq 1.6 lexes `$` and `ENV` as separate tokens, so whitespace or a comment may sit between.
+        self.assertBlocked("jq -n '$ ENV.PATH'", "environment variables")
+        self.assertBlocked("jq -n '$\tENV.PATH'", "environment variables")
+        for cmd in ["jq -n '$ #x\nENV.PATH'",
+                    "jq -n '. # note'",
+                    "jq -n 'e#x\nnv'",
+                    "jq -n '\"\\(1 # c\n)\"'"]:
+            with self.subTest(cmd=cmd):
+                self.assertBlocked(cmd, "comments")
+        self.assertBlocked("jq -n '\"abc'", "unterminated string")
+        # `#` inside a string literal is text, not a comment.
+        self.assertAllowed("gh pr list --json number,title --jq '.[] | \"#\\(.number) \\(.title)\"'")
+        self.assertAllowed("jq -r '\"a\\\"#b\"' data.json")
+        self.assertAllowed("jq -r '\"\\(\"#\" + .x)\"' data.json")
+
+    def test_jq_words_inside_string_literals_pass(self):
+        # A string literal is data; only code (including `\(…)` interpolations) is checked.
+        for cmd in ["gh pr list --json body --jq '.[]|select(.body|contains(\"missing import\"))'",
+                    "jq '.[]|select(.title|test(\"set env\"))' x.json",
+                    "jq -r '\"include \\\"m\\\"; env\"' x.json",
+                    "jq -r '\"\\(.a) uses $ENV\"' x.json",
+                    "jq -r '\"\\(\"env\" + .b)\"' x.json"]:
+            with self.subTest(cmd=cmd):
+                self.assertAllowed(cmd)
+        for cmd in ["jq -n '\"\\(env)\"'",
+                    "jq -n '\"a \\(1 + (\"x\" | env.HOME))\"'",
+                    "jq -n '\"\\(\"x\") \\($ENV.PATH)\"'",
+                    "jq -n '\"\\\"\" + env.HOME'"]:
+            with self.subTest(cmd=cmd):
+                self.assertBlocked(cmd, "environment variables")
+        self.assertBlocked("jq -n '\"x\" | include \"m\"; .'", "modules")
+
     def test_gh_writes_are_blocked(self):
         self.assertBlocked("gh pr merge 12 --squash", "not a read-only gh command")
         self.assertBlocked("gh pr view 12 --web", "opens a browser")
@@ -203,8 +349,16 @@ class GuardReviewAgentsTest(unittest.TestCase):
         self.assertBlocked("cat ^notes.txt", "unquoted glob")
         self.assertBlocked("find . -delete~x", "unquoted glob")
         self.assertBlocked("rg -n x app/Foo#Bar.php", "unquoted glob")
-        self.assertBlocked("git show HEAD~3", "unquoted glob")
         self.assertAllowed("git show 'HEAD~3' 'HEAD^' ~/notes.txt")
+        # code-review's review-scope.sh hands spec/standards reviewers unquoted revisions. Under
+        # zsh extended glob `X~Y` can only shrink to the file X, so `~` mid-word is refused only
+        # where X could be a flag (a word starting with `-`).
+        for agent in ("leek-skills:spec-reviewer", "leek-skills:standards-reviewer"):
+            self.assertAllowed("git diff HEAD~1...HEAD", agent=agent)
+            self.assertAllowed("git log HEAD~1..HEAD --oneline", agent=agent)
+            self.assertAllowed("git show main~3", agent=agent)
+        self.assertBlocked("git log --output=x~y", "unquoted glob")
+        self.assertBlocked("find . -delete~x", "unquoted glob")
         self.assertAllowed("rg -n 'a{1,3}' app")
         self.assertAllowed("gh api 'repos/{owner}/{repo}/pulls?per_page=5'")
 

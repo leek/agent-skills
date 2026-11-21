@@ -31,6 +31,7 @@ class Word(str):
 
     unquoted: str = ""
     glued: bool = False  # an operator follows with no space between: `2>` but not `2 >`
+    has_quotes: bool = False  # any quote or backslash appeared (disqualifies IO_NUMBER)
 
 
 def check_expansion(word: "Word") -> None:
@@ -42,16 +43,19 @@ def check_expansion(word: "Word") -> None:
     a quoted one (`-g '*.php'`, `-name '*.php'`) reaches the command as written.
 
     Braces nest (`{-o,o{u}t}`), so no pattern is matched: any unquoted `{` with an unquoted
-    `,` or `..` in the same word is refused. `^`, `#` and a `~` after the first character are
-    zsh extended-glob operators (`^x` is every file but x), so they are refused too, which
-    means a revision such as `HEAD~3` or `HEAD^` must be quoted.
+    `,` or `..` in the same word is refused. `^` and `#` are zsh extended-glob operators
+    (`^x` is every file but x, `inA^x` can be several files and so add an argument), so they
+    are refused too, which means a revision such as `HEAD^` must be quoted. A `~` after the
+    first character is one as well, but `X~Y` (X free of other glob characters) can only become
+    the file X itself or stay as typed, never more words; so it is refused only in a word that
+    starts with `-`, where a file named X could become a flag (`-delete~x`). `HEAD~3` passes.
     """
     live = word.unquoted
     if "{" in live and ("," in live or ".." in live):
         raise Blocked("brace expansion is not allowed; write the arguments out, or quote the word")
-    if any(c in live for c in "*?[^#") or "~" in live[1:]:
+    if any(c in live for c in "*?[^#") or ("~" in live[1:] and live.startswith("-")):
         raise Blocked("an unquoted glob character (* ? [ ^ # ~) is not allowed; quote the word, "
-                      "as in 'HEAD~3' or -g '*.php'")
+                      "as in 'HEAD^' or -g '*.php'")
 
 
 def is_parameter(command: str, at: int) -> bool:
@@ -98,16 +102,18 @@ def tokenize(command: str) -> list[str]:
     word: list[str] = []
     live: list[str] = []  # the same word with every quoted or escaped character blanked
     in_word = False
+    has_quotes = False
     i, n = 0, len(command)
 
     def flush(glued: bool = False) -> None:
-        nonlocal word, live, in_word
+        nonlocal word, live, in_word, has_quotes
         if in_word:
             token = Word("".join(word))
             token.unquoted = "".join(live)
             token.glued = glued
+            token.has_quotes = has_quotes
             tokens.append(token)
-        word, live, in_word = [], [], False
+        word, live, in_word, has_quotes = [], [], False, False
 
     def quoted(text: str) -> None:
         word.append(text)
@@ -125,6 +131,7 @@ def tokenize(command: str) -> list[str]:
                 continue
             quoted(command[i + 1])
             in_word = True
+            has_quotes = True
             i += 2
             continue
         if c == "'":
@@ -133,6 +140,7 @@ def tokenize(command: str) -> list[str]:
                 raise Blocked("could not parse the command (no closing quotation)")
             quoted(command[i + 1:end])
             in_word = True
+            has_quotes = True
             i = end + 1
             continue
         if c == '"':
@@ -157,6 +165,7 @@ def tokenize(command: str) -> list[str]:
                 quoted(d)
                 j += 1
             in_word = True
+            has_quotes = True
             i = j + 1
             continue
         if c == "`" or command.startswith(("$(", "$[", "=(", "$'"), i):
@@ -196,12 +205,14 @@ def segments(command: str) -> list[list[str]]:
     cleaned, i = [], 0
     while i < len(tokens):
         window = tokens[i:i + 3]
-        # `2>/dev/null` is a redirect only when the 2 is unquoted and touches the operator.
-        # `"2">/dev/null` and `2 >/dev/null` pass 2 as an argument and redirect stdout, so
-        # stripping them would hide an argument from the checks (`uniq -f "2">/dev/null in out`).
+        # `2>/dev/null` is a redirect only when the 2 is completely unquoted (no empty quotes
+        # like `""2` or `2""` either) and touches the operator. `"2">/dev/null`, `""2>/dev/null`,
+        # and `2 >/dev/null` pass 2 as an argument and redirect stdout, so stripping them would
+        # hide an argument from the checks (`uniq -f ""2>/dev/null - /tmp/out`).
         if (len(window) == 3 and not isinstance(window[0], Op) and isinstance(window[1], Op)
                 and not isinstance(window[2], Op) and tuple(window) in SAFE_REDIRECTS
-                and window[0].glued and window[0].unquoted == str(window[0])):
+                and window[0].glued and not window[0].has_quotes
+                and window[0].unquoted == str(window[0])):
             i += 3
             continue
         cleaned.append(tokens[i])
