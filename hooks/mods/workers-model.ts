@@ -15,7 +15,7 @@ export function describeTool(tool: string, input: Record<string, unknown>): stri
 
 export function duration(ms: number): string {
   // Round once, to whole seconds, then split: rounding each part alone gives `60s` and `1m60s`.
-  const seconds = Math.round(ms / 1000)
+  const seconds = Math.round(Math.max(0, ms) / 1000)
   if (seconds < 60) {
     return `${seconds}s`
   }
@@ -34,12 +34,38 @@ export const isFailed = (w: Worker) => w.outcome === 'error' || w.outcome === 'r
 
 /** Running first, then failures, then finished, newest first, cut to the rows the band has. */
 export function ordered(list: readonly Worker[], rows: number): Worker[] {
+  if (rows <= 0) {
+    return []
+  }
   const newest = (fn: (w: Worker) => boolean) => list.filter(fn).reverse()
 
   return [...list.filter(w => w.outcome === 'running'), ...newest(isFailed), ...newest(w => w.outcome === 'answer')].slice(
     0,
-    Math.max(1, rows),
+    rows,
   )
+}
+
+/** Trims to at most `limit` workers, evicting oldest finished workers before any still running. */
+export function trimWorkers(list: readonly Worker[], limit = KEEP): Worker[] {
+  if (list.length <= limit) {
+    return [...list]
+  }
+  let drop = list.length - limit
+  const dropped = new Set<number>()
+  for (let i = 0; i < list.length && drop > 0; i++) {
+    if (list[i]?.outcome !== 'running') {
+      dropped.add(i)
+      drop--
+    }
+  }
+  for (let i = 0; i < list.length && drop > 0; i++) {
+    if (!dropped.has(i)) {
+      dropped.add(i)
+      drop--
+    }
+  }
+
+  return list.filter((_, i) => !dropped.has(i))
 }
 
 export const mark = (w: Worker) =>

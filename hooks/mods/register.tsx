@@ -21,8 +21,8 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { BoardTicket, ScratchEffort, TicketBoard, Worker } from '../../types'
-import { normalizeSlug, openFiles, scan, summary, tally } from './scratch-scan'
+import type { BoardTicket, ScratchBoard, ScratchEffort, TicketBoard, Worker } from '../../types'
+import { byNumber, isScratchWriteTool, normalizeSlug, openFiles, scan, summary, tally } from './scratch-scan'
 import {
   SCHEMA,
   apply,
@@ -33,6 +33,7 @@ import {
   findingTally,
   hasStack,
   header as boardHeader,
+  isReadOnlyQuery,
   isUntracked,
   openColor,
   openLabel,
@@ -46,8 +47,9 @@ import {
   ticketMark,
   title,
   summary as boardSummary,
+  validateChange,
 } from './ticket-board'
-import { KEEP, describeTool, duration, isFailed, mark, ordered, workerKey } from './workers-model'
+import { KEEP, describeTool, duration, isFailed, mark, ordered, trimWorkers, workerKey } from './workers-model'
 
 const PANE = 'scratch'
 const board = atom({ plugin: 'leek-skills', key: 'scratch' } as const, null)
@@ -58,78 +60,146 @@ const TICKETS_TOOL = 'mcp__leek-skills__ticket_board'
 const tickets = atom({ plugin: 'leek-skills', key: 'tickets' } as const, null)
 
 const ago = (ms: number) => {
-  const days = Math.floor(ms / 86_400_000)
-  const hours = Math.floor(ms / 3_600_000)
+  const clamped = Math.max(0, ms)
+  const days = Math.floor(clamped / 86_400_000)
+  const hours = Math.floor(clamped / 3_600_000)
 
   return days >= 1 ? `${days}d ago` : hours >= 1 ? `${hours}h ago` : 'just now'
 }
 
 // The slug /scratch was last given; empty means every effort.
 let only = ''
+// Whether the /scratch pane is currently placed and open (guards background rescans).
+let isScratchPaneOpen = false
+// Monotonic generation counter so an older refresh() never overwrites a newer one or a close.
+let refreshSeq = 0
 
 // The person closed the ticket pane; later updates for the same board leave it closed.
 let isTicketsDismissed = false
 
+async function resolveRepoRoot($: EngineInterface, cwd: string): Promise<string> {
+  try {
+    const top = await $.process.run(['git', 'rev-parse', '--show-toplevel'], { cwd })
+    const dir = top.stdout.trim()
+    if (top.exitCode === 0 && dir !== '') {
+      return dir
+    }
+  } catch {
+    // Not a git repository, or git is unavailable: stay in cwd.
+  }
+
+  return cwd
+}
+
 // Last commit time of each tracked path, as scratch-state.sh reads it: `git ls-files` and one
 // `git log` over .scratch/ once per scan, both fixed commands (the plugin README lists them).
-// The log runs newest first, so a path's first appearance is its last commit. Any failure,
-// or a path the log does not name, leaves the path to its mtime.
+// The log runs newest first, so a path's first appearance is its last commit. If git log
+// stdout is truncated, missing tracked paths fall back to a per-file `git log -1` so old files
+// are not silently marked fresh; any failure leaves the path to its mtime.
 function commitTimes($: EngineInterface, cwd: string) {
-  let lastCommits: Promise<Map<string, number>> | undefined
-  const readGit = async () => {
+  type GitState = { times: Map<string, number>; tracked: Set<string>; truncated: boolean; lsTruncated: boolean }
+  let lastCommits: Promise<GitState> | undefined
+  const readGit = async (): Promise<GitState> => {
     const times = new Map<string, number>()
     const ls = await $.process.run(['git', 'ls-files', '-z', '.scratch'], { cwd })
     if (ls.exitCode !== 0) {
-      return times
+      return { times, tracked: new Set(), truncated: false, lsTruncated: false }
     }
+    const lsTruncated = Boolean(ls.isStdoutTruncated)
     const tracked = new Set(ls.stdout.split('\0').filter(Boolean))
     const log = await $.process.run(
       ['git', '-c', 'core.quotePath=false', 'log', '--relative', '--format=%x00%ct', '--name-only', '--', '.scratch'],
       { cwd },
     )
     if (log.exitCode !== 0) {
-      return times
+      return { times, tracked, truncated: false, lsTruncated }
     }
-    for (const block of log.stdout.split('\0')) {
+    const logTruncated = Boolean(log.isStdoutTruncated)
+    const blocks = log.stdout.split('\0')
+    // When stdout was truncated, the trailing block may be cut off mid-filename; drop it and
+    // look up any remaining tracked files individually below.
+    const completeBlocks = logTruncated ? blocks.slice(0, -1) : blocks
+    for (const block of completeBlocks) {
       const [stamp = '', ...names] = block.split('\n')
       const seconds = Number(stamp)
       if (!(seconds > 0)) {
         continue
       }
       for (const name of names) {
-        if (tracked.has(name) && !times.has(name)) {
+        if ((lsTruncated || tracked.has(name)) && !times.has(name)) {
           times.set(name, seconds * 1000)
         }
       }
     }
 
-    return times
+    return { times, tracked, truncated: logTruncated || lsTruncated, lsTruncated }
   }
 
   return async (paths: readonly string[]) => {
-    lastCommits ??= readGit().catch(() => new Map<string, number>())
-    const known = await lastCommits
+    lastCommits ??= readGit().catch(() => ({
+      times: new Map<string, number>(),
+      tracked: new Set<string>(),
+      truncated: false,
+      lsTruncated: false,
+    }))
+    const { times, tracked, truncated, lsTruncated } = await lastCommits
+    if (truncated) {
+      for (const p of paths) {
+        if (times.has(p) || (!lsTruncated && !tracked.has(p))) {
+          continue
+        }
+        try {
+          const one = await $.process.run(['git', 'log', '-1', '--format=%ct', '--', p], { cwd })
+          const seconds = Number(one.stdout.trim())
+          if (one.exitCode === 0 && seconds > 0) {
+            times.set(p, seconds * 1000)
+          }
+        } catch {
+          // Fall back to mtime for this file.
+        }
+      }
+    }
 
-    return new Map(paths.flatMap(p => (known.has(p) ? [[p, known.get(p) ?? 0] as const] : [])))
+    return new Map(paths.flatMap(p => (times.has(p) ? [[p, times.get(p) ?? 0] as const] : [])))
   }
 }
 
-async function refresh($: EngineInterface) {
+async function scanScratch($: EngineInterface): Promise<{ root: string; result: ScratchBoard | null }> {
   const cwd = await $.session.cwd()
-  const root = `${cwd}/.scratch`
+  const repoRoot = await resolveRepoRoot($, cwd)
+  const root = `${repoRoot}/.scratch`
   if (!(await $.fs.exists(root))) {
-    // .scratch/ is gone: an open pane shows an empty board, not the last one it drew.
-    const now = await $.clock.now()
-    await update($, board, shown => (shown === null ? null : { root, scannedAt: now, efforts: [] }))
-
-    return null
+    return { root, result: null }
   }
   const reader = {
     list: (path: string) => $.fs.list(path),
     read: (path: string) => $.fs.read(path),
-    commitTimes: commitTimes($, cwd),
+    commitTimes: commitTimes($, repoRoot),
   }
   const result = await scan(reader, root, await $.clock.now(), only)
+
+  return { root, result }
+}
+
+async function refresh($: EngineInterface, options: { background?: boolean } = {}) {
+  const seq = ++refreshSeq
+  if (!options.background) {
+    isScratchPaneOpen = true
+  }
+  const { root, result } = await scanScratch($)
+  if (seq !== refreshSeq || (options.background && !isScratchPaneOpen)) {
+    return null
+  }
+  if (result === null) {
+    // .scratch/ is gone: an open pane shows an empty board, not the last one it drew.
+    const now = await $.clock.now()
+    if (seq !== refreshSeq || (options.background && !isScratchPaneOpen)) {
+      return null
+    }
+    await update($, board, shown => (shown === null ? null : { root, scannedAt: now, closedStatuses: [], efforts: [] }))
+
+    return null
+  }
   await update($, board, () => result)
 
   return result
@@ -137,6 +207,10 @@ async function refresh($: EngineInterface) {
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
+    only = ''
+    isScratchPaneOpen = false
+    refreshSeq = 0
+    isTicketsDismissed = false
     await $.command.register({
       name: 'scratch',
       description: 'Live board of .scratch/ efforts: open tickets, blockers, next step',
@@ -179,17 +253,35 @@ export const register: Register = on => {
 
   on('command.run', { command: 'scratch' }, async ($, e) => {
     only = normalizeSlug(e.args)
-    const result = await refresh($)
+    const seq = ++refreshSeq
+    const { root, result } = await scanScratch($)
     if (result === null) {
+      if (seq === refreshSeq && isScratchPaneOpen) {
+        const now = await $.clock.now()
+        if (seq === refreshSeq && isScratchPaneOpen) {
+          await update($, board, shown =>
+            shown === null ? null : { root, scannedAt: now, closedStatuses: [], efforts: [] },
+          )
+        }
+      }
+
       return { text: 'No .scratch/ directory here.' }
     }
     const opened = await $.ui.open({ id: PANE, title: only === '' ? 'Scratch' : `Scratch: ${only}` })
+    if (seq === refreshSeq) {
+      isScratchPaneOpen = opened.isPlaced
+      if (opened.isPlaced) {
+        await update($, board, () => result)
+      }
+    }
 
     // The pane carries the board; the text table is only for surfaces that cannot draw it.
     return { text: opened.isPlaced ? tally(result) : summary(result) }
   })
 
   on('ui.close', { id: PANE }, async ($, e, next) => {
+    isScratchPaneOpen = false
+    refreshSeq += 1
     await update($, board, () => null)
 
     return next(e)
@@ -202,39 +294,90 @@ export const register: Register = on => {
     // A tool's parameters sit on the event itself (e.command, e.file_path), not under an input key.
     const input = e as unknown as Record<string, unknown>
     if (tool === TICKETS_TOOL) {
-      const change = parseUpdate(input)
-      if (typeof change === 'string') {
-        return { deny: change }
-      }
-      const before = await read($, tickets)
-      const run = apply(before, change, await $.clock.now())
-      await update($, tickets, () => run)
-      if (before?.slug !== run.slug || before.kind !== run.kind) {
-        isTicketsDismissed = false
-      }
-      const isPlaced = !isTicketsDismissed && (await $.ui.open({ id: TICKETS_PANE, title: title(run) })).isPlaced
+      try {
+        const change = parseUpdate(input)
+        if (typeof change === 'string') {
+          return { deny: change }
+        }
+        if (isReadOnlyQuery(input)) {
+          const current = await read($, tickets)
+          if (current === null) {
+            return { result: 'No active ticket board.' }
+          }
+          if (current.slug !== change.board || current.kind !== change.kind) {
+            return {
+              result: `Board ${change.board} (${change.kind}) is not active; active board is ${current.slug} (${current.kind}).`,
+            }
+          }
 
-      const said = isPlaced
-        ? `Shown in the ticket pane (${boardSummary(run)}). Skip the chat progress line.`
-        : `Recorded (${boardSummary(run)}), but no pane shows it: post the progress line in chat.`
+          return { result: [`Current board (${boardSummary(current)}).`, ...pending(current)].join('\n') }
+        }
+        const now = await $.clock.now()
+        let switched = false
+        let updated: TicketBoard | undefined
+        let error = ''
+        await update($, tickets, before => {
+          error = ''
+          const check = validateChange(before, change)
+          if (check !== null) {
+            error = check
 
-      // Every reply names what is still unfinished with its id, so a later call can settle it.
-      return { result: [said, ...pending(run)].join('\n') }
+            return before
+          }
+          const nextRun = apply(before, change, now)
+          switched = before?.slug !== nextRun.slug || before?.kind !== nextRun.kind
+          updated = nextRun
+
+          return nextRun
+        })
+        if (error !== '') {
+          return { deny: error }
+        }
+        const run = updated ?? (await read($, tickets))
+        if (run === null) {
+          return { deny: 'ticket_board failed: board state unavailable.' }
+        }
+        if (switched) {
+          isTicketsDismissed = false
+        }
+        const isPlaced = !isTicketsDismissed && (await $.ui.open({ id: TICKETS_PANE, title: title(run) })).isPlaced
+
+        const said = isPlaced
+          ? `Shown in the ticket pane (${boardSummary(run)}). Skip the chat progress line.`
+          : `Recorded (${boardSummary(run)}), but no pane shows it: post the progress line in chat.`
+
+        // Every reply names what is still unfinished with its id, so a later call can settle it.
+        return { result: [said, ...pending(run)].join('\n') }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+
+        return { deny: `ticket_board failed: ${message}` }
+      }
     }
     const id = e.agentId
     if (id !== undefined) {
-      const line = describeTool(tool, input)
-      await update($, workers, list =>
-        list.some(w => w.id === id) ? list.map(w => (w.id === id ? { ...w, tools: w.tools + 1, lastTool: line } : w)) : list,
-      )
+      try {
+        const line = describeTool(tool, input)
+        await update($, workers, list =>
+          list.some(w => w.id === id)
+            ? list.map(w =>
+                w.id === id ? { ...w, outcome: 'running' as const, endedAt: 0, tools: w.tools + 1, lastTool: line } : w,
+              )
+            : list,
+        )
+      } catch {
+        // Observer never blocks the tool call.
+      }
     }
 
     const result = await next(e)
 
-    const isScratchWrite =
-      tool !== 'Read' && [input.file_path, input.command].some(v => typeof v === 'string' && v.includes('.scratch/'))
-    if (isScratchWrite && (await read($, board)) !== null) {
-      await refresh($)
+    try {
+      if (isScratchWriteTool(tool, input) && isScratchPaneOpen && (await read($, board)) !== null) {
+        await refresh($, { background: true })
+      }
+    } catch {
+      // Observer never breaks or re-runs a tool call that already ran.
     }
 
     return result
@@ -242,20 +385,24 @@ export const register: Register = on => {
 
   on('agent.spawn', async ($, e, next) => {
     const result = await next(e)
-    if (result.agentId !== undefined) {
-      const worker: Worker = {
-        id: result.agentId,
-        name: e.name ?? '',
-        type: e.subagentType,
-        description: e.description,
-        startedAt: await $.clock.now(),
-        endedAt: 0,
-        tools: 0,
-        lastTool: '',
-        outcome: 'running',
+    try {
+      if (result.agentId !== undefined) {
+        const worker: Worker = {
+          id: result.agentId,
+          name: e.name ?? '',
+          type: e.subagentType,
+          description: e.description,
+          startedAt: await $.clock.now(),
+          endedAt: 0,
+          tools: 0,
+          lastTool: '',
+          outcome: 'running',
+        }
+        await update($, workers, list => trimWorkers([...list, worker], KEEP))
+        await update($, isWorkersHidden, () => false)
       }
-      await update($, workers, list => [...list, worker].slice(-KEEP))
-      await update($, isWorkersHidden, () => false)
+    } catch {
+      // Observer never breaks or re-runs a spawn that already happened.
     }
 
     return result
@@ -264,12 +411,16 @@ export const register: Register = on => {
   on('turn.complete', async ($, e, next) => {
     const id = e.agentId
     if (id !== undefined) {
-      const now = await $.clock.now()
-      await update($, workers, list => list.map(w => (w.id === id ? { ...w, outcome: e.reason, endedAt: now } : w)))
+      try {
+        const now = await $.clock.now()
+        await update($, workers, list => list.map(w => (w.id === id ? { ...w, outcome: e.reason, endedAt: now } : w)))
+      } catch {
+        // Observer never blocks turn.complete.
+      }
     }
 
     return next(e)
-  })
+  }).catch(($, e, next) => next(e))
 
   // A new prompt with nothing running starts a clean slate.
   on('prompt.submit', async ($, e, next) => {
@@ -297,7 +448,7 @@ export const register: Register = on => {
             Workers {list.length - running}/{list.length} done
           </Text>
           {failed > 0 && <Text color="error">{failed} failed</Text>}
-          <Button key="hide" label="hide" plain dimColor onPress={() => update($, isWorkersHidden, () => true)} />
+          <Button key="hide" label="hide" plain dimColor onPress={() => update($, isWorkersHidden, () => true).catch(() => {})} />
         </Box>
         {ordered(list, e.props.maxRows - 1).map(w => (
           <Text key={w.id} wrap="truncate-end">
@@ -318,13 +469,16 @@ export const register: Register = on => {
     const { Box, Text, Button } = $.ui.resolve(e)
     const current = await read($, board)
     const now = await $.clock.now()
+    const closedStatuses = current?.closedStatuses ?? []
 
     const row = (effort: ScratchEffort) => {
-      const open = openFiles(effort.files)
+      const open = openFiles(effort.files, closedStatuses)
       const color = effort.state === 'mismatched' ? 'warning' : effort.state === 'done' ? undefined : 'success'
       const sign =
         effort.state === 'done' ? '✓' : effort.state === 'mismatched' ? '!' : effort.frontier.length > 0 ? '●' : '○'
-      const work = open.filter(f => f.kind === 'ticket' || f.kind === 'decision')
+      const work = open
+        .filter(f => f.kind === 'ticket' || f.kind === 'decision')
+        .sort((a, b) => byNumber(a.number, b.number))
 
       return (
         <Box key={effort.slug} flexDirection="column" marginBottom={1}>
@@ -341,8 +495,13 @@ export const register: Register = on => {
           {effort.state === 'open' &&
             work.slice(0, 8).map(f => {
               const isReady = effort.frontier.includes(f.path)
+              const blockers = f.openBlockers ?? (f.status === 'in-progress' ? [] : f.blockedBy)
               const tag =
-                f.claimedBy !== '' ? `  [${f.claimedBy}]` : !isReady && f.blockedBy.length > 0 ? `  [blocked by ${f.blockedBy.join(', ')}]` : ''
+                f.claimedBy !== ''
+                  ? `  [${f.claimedBy}]`
+                  : !isReady && blockers.length > 0
+                    ? `  [blocked by ${blockers.join(', ')}]`
+                    : ''
 
               return (
                 <Text key={f.path} wrap="truncate-end" dimColor={!isReady}>
@@ -364,7 +523,7 @@ export const register: Register = on => {
     return (
       <Box flexDirection="column" width={e.props.bodyColumns}>
         <Box gap={1}>
-          <Button key="refresh" label="Refresh" hotkey="r" onPress={() => void refresh($)} />
+          <Button key="refresh" label="Refresh" hotkey="r" onPress={() => void refresh($).catch(() => {})} />
           <Text dimColor>commit checks: /scratch-status</Text>
         </Box>
         {current === null && <Text dimColor>Run /scratch to scan.</Text>}
@@ -382,12 +541,22 @@ export const register: Register = on => {
     }
     const list = await read($, workers)
     const now = await $.clock.now()
-    // A ticket's live worker: board runs key it <slug>--<NN> (implement-spec's fixer <slug>--fix),
-    // by name or by the description's first word.
+    const runTickets = run.tickets ?? []
+    const runStage = run.stage ?? ''
+    const runFindings = run.findings ?? []
+    const runOpen = run.open ?? []
+    // A ticket's live worker: board runs key it <slug>--<NN> (implement-spec's fixers <slug>--fix
+    // or <slug>--fix-<k>), by name or by the description's first word.
     const worker = (t: BoardTicket) =>
       [...list].reverse().find(w => workerKey(w) === `${run.slug}--${t.number}` && w.outcome === 'running')
-    const fixer = list.find(w => workerKey(w) === `${run.slug}--fix` && w.outcome === 'running')
+    const fixers = [...list].reverse().filter(w => {
+      if (w.outcome !== 'running') return false
+      const key = workerKey(w)
+
+      return key === `${run.slug}--fix` || key.startsWith(`${run.slug}--fix-`)
+    })
     const stack = safeStack(run)
+    const isAllLanded = stack.pending.length === 0 && stack.landed > 0 && stack.integration === null
     const chain = chainRows(chainTokens(run), Math.max(20, e.props.bodyColumns - 2))
 
     return (
@@ -401,9 +570,9 @@ export const register: Register = on => {
               Safe to merge <Text dimColor>{stackTally(run)}</Text>
             </Text>
             {chain.length === 0 && (
-              <Text color="warning" wrap="truncate-end">
+              <Text color={isAllLanded ? 'success' : 'warning'} wrap="truncate-end">
                 {'  '}
-                {stack.pending.length === 0 && stack.integration === null ? 'every PR landed' : 'nothing safe to merge yet'}
+                {isAllLanded ? 'every PR landed' : 'nothing safe to merge yet'}
               </Text>
             )}
             {chain.map((row, n) => (
@@ -420,7 +589,7 @@ export const register: Register = on => {
             ))}
           </Box>
         )}
-        {run.tickets.map(t => {
+        {runTickets.map(t => {
           const w = worker(t)
           const live = w === undefined ? '' : ` · ${w.tools} tools · ${duration(now - w.startedAt)}${w.lastTool === '' ? '' : ` · ${w.lastTool}`}`
 
@@ -437,15 +606,15 @@ export const register: Register = on => {
             </Text>
           )
         })}
-        {run.stage !== '' && (
+        {runStage !== '' && (
           <Box marginTop={1}>
             <Text bold wrap="truncate-end">
-              {run.stage}
-              {run.findings.length > 0 && <Text dimColor> {findingTally(run)}</Text>}
+              {runStage}
+              {runFindings.length > 0 && <Text dimColor> {findingTally(run)}</Text>}
             </Text>
           </Box>
         )}
-        {run.findings.map(f => (
+        {runFindings.map(f => (
           <Text key={f.id} wrap="truncate-end" dimColor={f.status === 'deferred'}>
             <Text color={findingColor(f.status)}>{findingMark(f.status)} </Text>
             {f.title}
@@ -456,17 +625,26 @@ export const register: Register = on => {
             </Text>
           </Text>
         ))}
-        {fixer !== undefined && (
-          <Text color="suggestion" wrap="truncate-end">
-            ◐ review fixes <Text dimColor>· {fixer.tools} tools · {duration(now - fixer.startedAt)}{fixer.lastTool === '' ? '' : ` · ${fixer.lastTool}`}</Text>
-          </Text>
-        )}
-        {run.open.length > 0 && (
+        {fixers.map(f => {
+          const key = workerKey(f)
+          const suffix = key.startsWith(`${run.slug}--fix-`) ? ` ${key.slice(`${run.slug}--fix-`.length)}` : ''
+
+          return (
+            <Text key={f.id} color="suggestion" wrap="truncate-end">
+              ◐ review fixes{suffix}{' '}
+              <Text dimColor>
+                · {f.tools} tools · {duration(now - f.startedAt)}
+                {f.lastTool === '' ? '' : ` · ${f.lastTool}`}
+              </Text>
+            </Text>
+          )
+        })}
+        {runOpen.length > 0 && (
           <Box marginTop={1}>
             <Text bold>Open after this run</Text>
           </Box>
         )}
-        {run.open.map(o => (
+        {runOpen.map(o => (
           <Text key={o.id} wrap="truncate-end" dimColor={o.done}>
             <Text color={openColor(o)}>{openMark(o)} </Text>
             {o.title}
@@ -488,16 +666,23 @@ export const register: Register = on => {
 // /ticket-board's reply where no pane draws.
 function boardText(run: TicketBoard): string {
   const note = (n: string) => (n === '' ? '' : ` (${n})`)
+  const runTickets = run.tickets ?? []
+  const runStage = run.stage ?? ''
+  const runFindings = run.findings ?? []
+  const runOpen = run.open ?? []
   const lines: string[] = []
   if (hasStack(run)) {
+    const stack = safeStack(run)
     const chain = chainTokens(run).join(' ')
-    lines.push(`Safe to merge (${stackTally(run)}): ${chain === '' ? 'nothing yet' : chain}`, ...stackWarnings(run), '')
+    const isAllLanded = stack.pending.length === 0 && stack.landed > 0 && stack.integration === null
+    const status = chain !== '' ? chain : isAllLanded ? 'every PR landed' : 'nothing safe to merge yet'
+    lines.push(`Safe to merge (${stackTally(run)}): ${status}`, ...stackWarnings(run), '')
   }
-  lines.push(...run.tickets.map(t => `${ticketMark(t.status)} ${t.number} ${t.title}: ${t.status}${note(t.note)}`))
-  if (run.stage !== '') lines.push('', `${run.stage}${run.findings.length > 0 ? `: ${findingTally(run)}` : ''}`)
-  lines.push(...run.findings.map(f => `${findingMark(f.status)} ${f.title}: ${f.status}${note(f.note)}`))
-  if (run.open.length > 0) lines.push('', 'Open after this run')
-  lines.push(...run.open.map(o => `${openMark(o)} ${o.title}: ${o.done ? 'done' : openLabel(o.kind)} (${o.where})`))
+  lines.push(...runTickets.map(t => `${ticketMark(t.status)} ${t.number} ${t.title}: ${t.status}${note(t.note)}`))
+  if (runStage !== '') lines.push('', `${runStage}${runFindings.length > 0 ? `: ${findingTally(run)}` : ''}`)
+  lines.push(...runFindings.map(f => `${findingMark(f.status)} ${f.title}: ${f.status}${note(f.note)}`))
+  if (runOpen.length > 0) lines.push('', 'Open after this run')
+  lines.push(...runOpen.map(o => `${openMark(o)} ${o.title}: ${o.done ? 'done' : openLabel(o.kind)} (${o.where})`))
 
   return lines.join('\n')
 }

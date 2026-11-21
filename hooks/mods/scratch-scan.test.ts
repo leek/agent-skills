@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { classify, normalizeSlug, openFiles, parseFile, scan, summary } from './scratch-scan'
+import { classify, isScratchWriteTool, normalizeSlug, openFiles, parseFile, scan, summary } from './scratch-scan'
 import type { Entry, Reader } from './scratch-scan'
 
 const DAY = 86_400_000
@@ -53,8 +53,28 @@ describe('parseFile', () => {
     expect(file.claimedBy).toBe('alice: session')
   })
 
-  test('falls back to a legacy Status line', async () => {
+  test('falls back to a legacy Status line without capturing across newlines', async () => {
     expect(parseFile('req.md', 'request', '# Bug\n\n**Status:** needs-triage\n').status).toBe('needs-triage')
+    expect(parseFile('req.md', 'request', '# Bug\n\n**Status:**\nNext line\n').status).toBe('')
+    expect(parseFile('tickets/02-x.md', 'ticket', '# T\n\n**Status:** open\n**Blocked by:**\nSee 01\n').blockedBy).toEqual([])
+  })
+
+  test('explicit frontmatter blocked-by: [] wins over legacy body Blocked by lines', async () => {
+    const file = parseFile(
+      'tickets/02-x.md',
+      'ticket',
+      '---\ntitle: T\nstatus: ready-for-agent\nblocked-by: []\n---\n\nBlocked by: 01\n',
+    )
+    expect(file.blockedBy).toEqual([])
+  })
+
+  test('reads block-list items when the key line has a trailing comment', async () => {
+    const file = parseFile(
+      'tickets/03-x.md',
+      'ticket',
+      '---\ntitle: T\nstatus: ready-for-agent\nblocked-by: # depends on auth\n  - 01\n  - 02\n---\n',
+    )
+    expect(file.blockedBy).toEqual(['01', '02'])
   })
 })
 
@@ -71,6 +91,8 @@ describe('classify', () => {
     expect(effort.state).toBe('open')
     expect(effort.frontier).toEqual(['tickets/02-b.md'])
     expect(effort.next).toBe('/implement .scratch/auth/tickets/02-b.md')
+    expect(effort.files.find(f => f.path === 'tickets/02-b.md')?.openBlockers).toEqual([])
+    expect(effort.files.find(f => f.path === 'tickets/03-c.md')?.openBlockers).toEqual(['02'])
   })
 
   test('a delivery ticket at ready-for-human waits for the deploy', async () => {
@@ -151,20 +173,23 @@ test('scan keeps the repo\'s own wontfix string as the status, and follows its h
     '/r/.scratch/remap/tickets/02-b.md': md('waiting'),
     '/r/.scratch/remap/tickets/03-ship.md': md('hitl', 'blocked-by: [01]\ndelivery: true\n'),
   }
-  const effort = (await scan(reader(files), '/r/.scratch', NOW)).efforts[0]
+  const board = await scan(reader(files), '/r/.scratch', NOW)
+  const effort = board.efforts[0]
+  expect(board.closedStatuses).toEqual(['not-planned'])
   expect(effort?.files.map(f => f.status)).toEqual(['not-planned', 'waiting', 'hitl'])
   expect(effort?.frontier).toEqual(['tickets/02-b.md', 'tickets/03-ship.md'])
   expect(effort?.next).toBe('after deploy: /implement .scratch/remap/tickets/03-ship.md')
   // What the pane counts as open: the wontfix ticket is closed under its own string.
-  expect(openFiles(effort?.files ?? []).map(f => f.path)).toEqual(['tickets/02-b.md', 'tickets/03-ship.md'])
+  expect(openFiles(effort?.files ?? [], board.closedStatuses).map(f => f.path)).toEqual(['tickets/02-b.md', 'tickets/03-ship.md'])
 
   const shipped = { ...files, '/r/.scratch/remap/tickets/03-ship.md': md('closed') }
   const after = (await scan(reader(shipped), '/r/.scratch', NOW)).efforts[0]
   expect(after?.next).toBe('waiting on a human: .scratch/remap/tickets/02-b.md (waiting)')
 
-  // A repo with no table: `not-planned` is an open status again.
-  const plain = (await scan(reader({ '/r/.scratch/p/tickets/01-a.md': md('not-planned') }), '/r/.scratch', NOW)).efforts[0]
-  expect(plain?.state).toBe('open')
+  // A repo with no table: `not-planned` is an open status again, and earlier board keeps its own closedStatuses.
+  const plainBoard = await scan(reader({ '/r/.scratch/p/tickets/01-a.md': md('not-planned') }), '/r/.scratch', NOW)
+  expect(plainBoard.efforts[0]?.state).toBe('open')
+  expect(openFiles(effort?.files ?? [], board.closedStatuses).map(f => f.path)).toEqual(['tickets/02-b.md', 'tickets/03-ship.md'])
 })
 
 // The cases where the board once disagreed with skills/scratch-status/scripts/scratch-state.sh.
@@ -355,4 +380,13 @@ test('normalizeSlug reads a path or a slash-wrapped slug as the slug', async () 
   expect(normalizeSlug('.scratch/auth/')).toBe('auth')
   expect(normalizeSlug('/auth/')).toBe('auth')
   expect(normalizeSlug('')).toBe('')
+})
+
+test('isScratchWriteTool matches .scratch with or without trailing slash and start-branch.sh, skipping Read', async () => {
+  expect(isScratchWriteTool('Bash', { command: 'rm -rf .scratch' })).toBe(true)
+  expect(isScratchWriteTool('Bash', { command: 'rm -r .scratch/' })).toBe(true)
+  expect(isScratchWriteTool('Write', { file_path: '/repo/.scratch/auth/spec.md' })).toBe(true)
+  expect(isScratchWriteTool('Bash', { command: 'bash /p/skills/implement/scripts/start-branch.sh auth' })).toBe(true)
+  expect(isScratchWriteTool('Read', { file_path: '/repo/.scratch/auth/spec.md' })).toBe(false)
+  expect(isScratchWriteTool('Bash', { command: 'cat foo.scratchpad' })).toBe(false)
 })

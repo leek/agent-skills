@@ -275,18 +275,20 @@ test('ticket_board counts not-built tickets as open and lists the work open afte
     tool_use_id: 's2',
   } as never)
   expect(String((listed as { result: unknown }).result)).toContain('2 open after this run (1 untracked)')
-  // The reply hands back each unfinished entry's id, which the pane never draws.
+  // The reply hands back each unfinished entry's id and kind, which the pane never draws.
   expect(String((listed as { result: unknown }).result)).toContain(
-    'Still open, by id (send done: true once one is resolved): a: Fix for the audit list is not pushed; b: Second sign-in method',
+    'Still open, by id (send done: true once one is resolved): a (not-shipped): Fix for the audit list is not pushed; b (your-decision): Second sign-in method',
   )
   const asked = await $.tool.call({ ...board, tool_use_id: 's2b' } as never)
-  expect(String((asked as { result: unknown }).result)).toContain('a: Fix for the audit list is not pushed; b: Second sign-in method')
+  expect(String((asked as { result: unknown }).result)).toContain(
+    'a (not-shipped): Fix for the audit list is not pushed; b (your-decision): Second sign-in method',
+  )
   expect(await pane.find({ type: 'Text', text: /1 of 2 done · 1 not built · 2 open after this run \(1 untracked\)/ })).toBeDefined()
   expect(await pane.find({ type: 'Text', text: /^Open after this run$/ })).toBeDefined()
   expect(await pane.find({ type: 'Text', text: /○ Fix for the audit list is not pushed {2}not shipped · #101/ })).toBeDefined()
   expect(await pane.find({ type: 'Text', text: /! Second sign-in method {2}your decision · untracked/ })).toBeDefined()
 
-  await $.tool.call({ ...board, open: [{ id: 'a', kind: 'not-shipped', done: true }], tool_use_id: 's3' } as never)
+  await $.tool.call({ ...board, open: [{ id: 'a', done: true }], tool_use_id: 's3' } as never)
   expect(await pane.find({ type: 'Text', text: /✓ Fix for the audit list is not pushed {2}done · #101/ })).toBeDefined()
   expect(await pane.find({ type: 'Text', text: /1 open after this run \(1 untracked\)/ })).toBeDefined()
 })
@@ -330,4 +332,245 @@ test('ticket_board keeps the safe-to-merge stack under the header, wrapped to th
   expect(await pane.find({ type: 'Text', text: /^ {2}#6487 → #6488$/ })).toBeDefined()
   expect(await pane.find({ type: 'Text', text: /✗ #6489 not safe · conflicts/ })).toBeDefined()
   expect(await pane.find({ type: 'Text', text: /waiting behind it: 3 more PRs and #6486/ })).toBeDefined()
+})
+
+test('followed-up subagent resumes running state and parallel fixers render on ticket board', async ($, on) => {
+  mock.clock(on, { now: 1_000 })
+  on('ui.render', async ($, e) => engineDraw($, e))
+  let spawnSeq = 0
+  on('agent.spawn', async () => ({ model: 'sonnet', agentId: `a${++spawnSeq}` }))
+  on('tool.call', async () => ({ result: 'ok' }) as never)
+  on('turn.complete', async () => ({ text: '' }))
+  on('ui.open', async () => ({ value: { isPlaced: true } }) as never)
+
+  const board = { tool: 'mcp__leek-skills__ticket_board', board: 'auth', kind: 'spec' }
+  await $.tool.call({
+    ...board,
+    tickets: [{ number: '01', title: 'Login form', status: 'running' }],
+    stage: 'fix pass 1',
+    tool_use_id: 's1',
+  } as never)
+
+  await $.agent.spawn({ prompt: 'build', description: 'auth--01 build login', subagentType: 'general-purpose' } as never)
+  await $.tool.call({ tool: 'Bash', command: 'test 1', tool_use_id: 't1', agentId: 'a1' } as never)
+  await $.turn.complete({ agentId: 'a1', reason: 'answer', answer: '', durationMs: 5, isAborted: false, turnId: 'x1' })
+
+  const band = await $.ui.mount({ plugin: 'leek-skills', surface: 'terminal', ...BAND } as never)
+  expect(await band.find({ type: 'Text', text: /Workers 1\/1 done/ })).toBeDefined()
+
+  // Follow-up via SendMessage reuses a1: tool.call resets outcome back to running.
+  await $.tool.call({ tool: 'Bash', command: 'test 2', tool_use_id: 't2', agentId: 'a1' } as never)
+  expect(await band.find({ type: 'Text', text: /Workers 0\/1 done/ })).toBeDefined()
+  expect(await band.find({ type: 'Text', text: /2 tools .*Bash: test 2/ })).toBeDefined()
+
+  // Parallel fixers (<slug>--fix-1, <slug>--fix-2) both show on the ticket pane.
+  await $.agent.spawn({ prompt: 'fix 1', description: 'auth--fix-1 fix race', subagentType: 'general-purpose' } as never)
+  await $.agent.spawn({ prompt: 'fix 2', description: 'auth--fix-2 fix copy', subagentType: 'general-purpose' } as never)
+  await $.tool.call({ tool: 'Edit', file_path: 'a.ts', tool_use_id: 't3', agentId: 'a2' } as never)
+  await $.tool.call({ tool: 'Edit', file_path: 'b.ts', tool_use_id: 't4', agentId: 'a3' } as never)
+
+  const pane = await $.ui.mount({
+    plugin: 'leek-skills',
+    surface: 'terminal',
+    component: 'Pane',
+    requestId: 'tickets',
+    props: { title: 'Spec: auth', isFocused: false, bodyColumns: 120, placement: 'dock' },
+  } as never)
+  expect(await pane.find({ type: 'Text', text: /01 Login form.*2 tools.*Bash: test 2/ })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: /review fixes 1.*1 tools.*Edit: a\.ts/ })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: /review fixes 2.*1 tools.*Edit: b\.ts/ })).toBeDefined()
+})
+
+test('ticket_board empty probe is read-only and never wipes a mismatched board or opens an empty pane', async ($, on) => {
+  mock.clock(on, { now: 0 })
+  on('ui.render', async ($, e) => engineDraw($, e))
+  let opens = 0
+  on('ui.open', async () => {
+    opens += 1
+    return { value: { isPlaced: true } } as never
+  })
+
+  const none = await $.tool.call({ tool: 'mcp__leek-skills__ticket_board', board: 'auth', kind: 'spec', tool_use_id: 'p1' } as never)
+  expect(String((none as { result: unknown }).result)).toBe('No active ticket board.')
+  expect(opens).toBe(0)
+
+  await $.tool.call({
+    tool: 'mcp__leek-skills__ticket_board',
+    board: 'auth',
+    kind: 'spec',
+    tickets: [{ number: '01', title: 'Login', status: 'merged' }],
+    tool_use_id: 'p2',
+  } as never)
+  expect(opens).toBe(1)
+
+  // Probing a different board must not wipe auth or reopen the pane.
+  const mismatch = await $.tool.call({ tool: 'mcp__leek-skills__ticket_board', board: 'billing', kind: 'spec', tool_use_id: 'p3' } as never)
+  expect(String((mismatch as { result: unknown }).result)).toContain('Board billing (spec) is not active; active board is auth (spec).')
+  expect(opens).toBe(1)
+
+  // auth is still intact.
+  const match = await $.tool.call({ tool: 'mcp__leek-skills__ticket_board', board: 'auth', kind: 'spec', tool_use_id: 'p4' } as never)
+  expect(String((match as { result: unknown }).result)).toContain('Current board (1 of 1 done).')
+  expect(opens).toBe(1)
+})
+
+test('ticket_board all-landed stack renders cleanly in pane and text fallback', async ($, on) => {
+  mock.clock(on, { now: 0 })
+  on('ui.render', async ($, e) => engineDraw($, e))
+  let isPlaced = true
+  on('ui.open', async () => ({ value: { isPlaced } }) as never)
+
+  await $.tool.call({
+    tool: 'mcp__leek-skills__ticket_board',
+    board: 'auth',
+    kind: 'spec',
+    tickets: [{ number: '01', title: 'Login', status: 'merged' }],
+    stack: [
+      { number: '101', position: 1, status: 'landed' },
+      { number: '102', position: 2, status: 'landed' },
+    ],
+    tool_use_id: 'l1',
+  } as never)
+
+  const pane = await $.ui.mount({
+    plugin: 'leek-skills',
+    surface: 'terminal',
+    component: 'Pane',
+    requestId: 'tickets',
+    props: { title: 'Spec: auth', isFocused: false, bodyColumns: 80, placement: 'dock' },
+  } as never)
+  expect(await pane.find({ type: 'Text', text: /Safe to merge all 2 landed/ })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: /every PR landed/ })).toBeDefined()
+
+  isPlaced = false
+  const textReply = await $.command.run({ command: 'ticket-board', args: '' } as never)
+  expect(textReply.text).toContain('Safe to merge (all 2 landed): every PR landed')
+})
+
+test('post-next observer failures do not re-run next(e) and ticket_board errors do not forward to next(e)', async ($, on) => {
+  const files: Record<string, string> = {
+    '/repo/.scratch/auth/tickets/01-login.md': '---\ntitle: Login\nstatus: ready-for-agent\n---\n',
+  }
+  let failCwd = false
+  let failOpen = false
+  let toolRuns = 0
+  mock.clock(on, { now: 0 })
+  on('ui.render', async ($, e) => engineDraw($, e))
+  on('session.cwd', async () => {
+    if (failCwd) throw new Error('cwd boom')
+    return { value: '/repo' } as never
+  })
+  on('fs.exists', async (_$, e) => ({ value: e.path === '/repo/.scratch' }) as never)
+  on('fs.read', async (_$, e) => ({ value: files[(e as { path: string }).path] ?? '' }) as never)
+  on('fs.list', async (_$, e) => {
+    const names = new Map<string, 'file' | 'dir'>()
+    for (const full of Object.keys(files)) {
+      if (!full.startsWith(`${e.path}/`)) continue
+      const parts = full.slice(e.path.length + 1).split('/')
+      names.set(parts[0] ?? '', parts.length > 1 ? 'dir' : 'file')
+    }
+    const value = [...names].map(([name, kind]) => ({ name, kind, size: 1, mtimeMs: 0, isLink: false }))
+    return { value } as never
+  })
+  on('ui.open', async () => {
+    if (failOpen) throw new Error('ui boom')
+    return { value: { isPlaced: true } } as never
+  })
+  on('tool.call', async () => {
+    toolRuns += 1
+    return { result: 'ran-once' } as never
+  })
+
+  // Open /scratch so background refresh runs on .scratch writes, then make refresh throw post-next.
+  await $.command.run({ command: 'scratch', args: '' } as never)
+  failCwd = true
+  const called = await $.tool.call({ tool: 'Bash', command: 'touch .scratch/auth/spec.md', tool_use_id: 't1' } as never)
+  expect((called as { result: unknown }).result).toBe('ran-once')
+  expect(toolRuns).toBe(1)
+
+  // An error inside ticket_board must return { deny } instead of forwarding to next(e).
+  failOpen = true
+  const denied = await $.tool.call({
+    tool: 'mcp__leek-skills__ticket_board',
+    board: 'auth',
+    kind: 'spec',
+    tickets: [{ number: '01', title: 'Login', status: 'running' }],
+    tool_use_id: 'tb1',
+  } as never)
+  expect(String((denied as { deny?: unknown }).deny)).toContain('ticket_board failed:')
+  expect(toolRuns).toBe(1)
+})
+
+test('/scratch resolves repo root from subdirectories, handles truncated git log, skips background rescans when unplaced, and renders open blockers numerically', async ($, on) => {
+  const DAY = 86_400_000
+  const now = 100 * DAY
+  const files: Record<string, string> = {
+    '/repo/.scratch/auth/tickets/01-done.md': '---\ntitle: Done\nstatus: closed\n---\n',
+    '/repo/.scratch/auth/tickets/9-wip.md': '---\ntitle: Unclaimed wip\nstatus: in-progress\nblocked-by: [01]\n---\n',
+    '/repo/.scratch/auth/tickets/10-wait.md': '---\ntitle: Waiting\nstatus: ready-for-agent\nblocked-by: [01, 9]\n---\n',
+  }
+  let scans = 0
+  on('ui.render', async ($, e) => engineDraw($, e))
+  mock.clock(on, { now })
+  on('session.cwd', async () => ({ value: '/repo/packages/web' }) as never)
+  on('fs.exists', async (_$, e) => ({ value: e.path === '/repo/.scratch' }) as never)
+  on('fs.read', async (_$, e) => ({ value: files[(e as { path: string }).path] ?? '' }) as never)
+  on('fs.list', async (_$, e) => {
+    if (e.path === '/repo/.scratch') scans += 1
+    const names = new Map<string, 'file' | 'dir'>()
+    for (const full of Object.keys(files)) {
+      if (!full.startsWith(`${e.path}/`)) continue
+      const parts = full.slice(e.path.length + 1).split('/')
+      names.set(parts[0] ?? '', parts.length > 1 ? 'dir' : 'file')
+    }
+    const value = [...names].map(([name, kind]) => ({ name, kind, size: 1, mtimeMs: now, isLink: false }))
+    return { value } as never
+  })
+  on('process.run', async (_$, e) => {
+    const argv = (e as { argv: readonly string[] }).argv
+    if (argv[1] === 'rev-parse') {
+      return { value: { exitCode: 0, stdout: '/repo\n', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } } as never
+    }
+    if (argv[1] === 'ls-files') {
+      return {
+        value: {
+          exitCode: 0,
+          stdout: '.scratch/auth/tickets/01-done.md\0.scratch/auth/tickets/9-wip.md\0.scratch/auth/tickets/10-wait.md\0',
+          stderr: '',
+          isStdoutTruncated: false,
+          isStderrTruncated: false,
+        },
+      } as never
+    }
+    if (argv.includes('-1')) {
+      return {
+        value: {
+          exitCode: 0,
+          stdout: `${(now - 40 * DAY) / 1000}\n`,
+          stderr: '',
+          isStdoutTruncated: false,
+          isStderrTruncated: false,
+        },
+      } as never
+    }
+    // Truncated bulk git log omits the old files: fallback git log -1 must recover their 40d age.
+    return { value: { exitCode: 0, stdout: '\0partial', stderr: '', isStdoutTruncated: true, isStderrTruncated: false } } as never
+  })
+  let isPlaced = false
+  on('ui.open', async () => ({ value: { isPlaced } }) as never)
+  on('tool.call', async () => ({ result: 'ok' }) as never)
+
+  // Unplaced surface: returns table with stale flag, and does NOT arm background rescans.
+  const unplaced = await $.command.run({ command: 'scratch', args: '' } as never)
+  expect(unplaced.text).toContain('open (stale)')
+  const scansAfterUnplaced = scans
+  await $.tool.call({ tool: 'Bash', command: 'rm -rf .scratch', tool_use_id: 'w1' } as never)
+  expect(scans).toBe(scansAfterUnplaced)
+
+  // Placed surface: renders openBlockers only (9, not closed 01) and does not tag unclaimed in-progress as blocked.
+  isPlaced = true
+  await $.command.run({ command: 'scratch', args: '' } as never)
+  const pane = await $.ui.mount({ plugin: 'leek-skills', surface: 'terminal', ...PANE } as never)
+  expect(await pane.find({ type: 'Text', text: /9 Unclaimed wip$/ })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: /10 Waiting {2}\[blocked by 09\]/ })).toBeDefined()
 })

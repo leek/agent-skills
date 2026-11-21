@@ -13,6 +13,8 @@ export type ScratchFile = {
   status: string
   claimedBy: string
   blockedBy: string[]
+  /** Blockers from `blockedBy` that are not closed; empty when closed, unreadable, or unblocked. */
+  openBlockers: string[]
   /** `delivery: true`: the spec's last ticket, which proves the spec shipped. */
   delivery: boolean
   /** Non-empty lines under a spec's `## Open Questions`; 0 for every other kind. */
@@ -33,6 +35,8 @@ export type ScratchEffort = {
 export type ScratchBoard = {
   root: string
   scannedAt: number
+  /** Repo-specific wontfix statuses from triage-labels.md; closed like the built-in words. */
+  closedStatuses: string[]
   efforts: ScratchEffort[]
 }
 

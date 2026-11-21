@@ -1,20 +1,26 @@
 import { describe, expect, test } from 'claude-code/testing'
 
+import type { TicketBoard } from '../../types'
 import {
   apply,
   chainRows,
   chainTokens,
+  findingTally,
   header,
+  isReadOnlyQuery,
   isUntracked,
   openMark,
+  openTally,
   parseUpdate,
   pending,
+  safeStack,
   stackTally,
   stackWarnings,
   summary,
   tally,
   ticketColor,
   ticketMark,
+  validateChange,
 } from './ticket-board'
 
 describe('apply', () => {
@@ -160,7 +166,7 @@ describe('apply', () => {
       ],
     }, 1)
     expect(pending(built)).toEqual([
-      'Still open, by id (send done: true once one is resolved): a: Fix for the audit list is not pushed; b: Second sign-in method',
+      'Still open, by id (send done: true once one is resolved): a (not-shipped): Fix for the audit list is not pushed; b (your-decision): Second sign-in method',
       'Findings not settled, by id: f1: Old runs vanish from the audit list',
     ])
 
@@ -168,16 +174,18 @@ describe('apply', () => {
     const same = apply(built, { board: 'auth', kind: 'spec', tickets: [] }, 2)
     expect(pending(same)).toEqual(pending(built))
 
+    // done: true on an existing id may omit kind and keeps the entry's original kind.
     const settled = apply(same, {
       board: 'auth',
       kind: 'spec',
       tickets: [],
       findings: [{ id: 'f1', status: 'fixed' }],
       open: [
-        { id: 'a', kind: 'not-shipped', done: true },
+        { id: 'a', done: true },
         { id: 'b', kind: 'your-decision', done: true },
       ],
     }, 3)
+    expect(settled.open[0]?.kind).toBe('not-shipped')
     expect(pending(settled)).toEqual([])
   })
 
@@ -187,12 +195,53 @@ describe('apply', () => {
     expect(header(board)).toBe('1 of 1 done')
     expect(summary(board)).toBe('1 of 1 done')
   })
+
+  test('defensive defaults handle pre-upgrade persisted TicketBoard without optional arrays', async () => {
+    const legacy = {
+      slug: 'auth',
+      kind: 'spec',
+      tickets: [{ number: '01', title: 'Login', status: 'merged', note: '' }],
+      updatedAt: 1,
+    } as unknown as TicketBoard
+    expect(findingTally(legacy)).toBe('0 of 0 fixed')
+    expect(openTally(legacy)).toBe('')
+    expect(header(legacy)).toBe('1 of 1 done')
+    expect(summary(legacy)).toBe('1 of 1 done')
+    expect(pending(legacy)).toEqual([])
+    expect(safeStack(legacy).pending).toEqual([])
+  })
 })
 
 describe('parseUpdate', () => {
   test('a stage-only update needs no tickets', async () => {
     const result = parseUpdate({ board: 'auth', kind: 'spec', stage: 'final checks' })
     expect(result).toEqual({ board: 'auth', kind: 'spec', tickets: [], stage: 'final checks', findings: [], open: [], stack: [], integration: undefined })
+  })
+
+  test('isReadOnlyQuery is true only when only board and kind are provided', async () => {
+    expect(isReadOnlyQuery({ board: 'auth', kind: 'spec' })).toBe(true)
+    expect(isReadOnlyQuery({ board: 'auth', kind: 'spec', stage: '' })).toBe(false)
+    expect(isReadOnlyQuery({ board: 'auth', kind: 'spec', tickets: [] })).toBe(false)
+    expect(isReadOnlyQuery({ board: 'auth', kind: 'spec', open: [] })).toBe(false)
+  })
+
+  test('allows omitting kind on open[] only when done is true on an existing id', async () => {
+    const doneNoKind = parseUpdate({ board: 'auth', kind: 'spec', open: [{ id: 'a', done: true }] })
+    expect(typeof doneNoKind).toBe('object')
+    expect(typeof parseUpdate({ board: 'auth', kind: 'spec', open: [{ id: 'a' }] })).toBe('string')
+    expect(typeof parseUpdate({ board: 'auth', kind: 'spec', open: [{ id: 'a', done: false }] })).toBe('string')
+
+    const existing = apply(null, {
+      board: 'auth',
+      kind: 'spec',
+      tickets: [],
+      open: [{ id: 'a', title: 'Pending', kind: 'later' }],
+    }, 1)
+    expect(validateChange(existing, doneNoKind as never)).toBeNull()
+    expect(typeof validateChange(null, doneNoKind as never)).toBe('string')
+    expect(
+      typeof validateChange(existing, parseUpdate({ board: 'auth', kind: 'spec', open: [{ id: 'missing', done: true }] }) as never),
+    ).toBe('string')
   })
 
   test('refuses an open entry with an unknown kind', async () => {
@@ -278,11 +327,45 @@ describe('stack', () => {
     expect(rows.join(' ')).toBe(tokens.join(' '))
   })
 
-  test('parseUpdate refuses a stack entry with no PR number or a bad status', async () => {
+  test('parseUpdate refuses a stack entry with no PR number, bad status, or invalid position', async () => {
     expect(typeof parseUpdate({ ...base, stack: [{ number: 'abc', status: 'safe' }] })).toBe('string')
     expect(typeof parseUpdate({ ...base, stack: [{ number: '1', status: 'green' }] })).toBe('string')
+    expect(typeof parseUpdate({ ...base, stack: [{ number: '1', position: 0, status: 'safe' }] })).toBe('string')
+    expect(typeof parseUpdate({ ...base, stack: [{ number: '1', position: -2, status: 'safe' }] })).toBe('string')
+    expect(typeof parseUpdate({ ...base, stack: [{ number: '1', position: 1.5, status: 'safe' }] })).toBe('string')
+    expect(typeof parseUpdate({ ...base, stack: [{ number: '1', position: '1', status: 'safe' }] })).toBe('string')
     expect(typeof parseUpdate({ ...base, integration: { number: '1' } })).toBe('string')
     const ok = parseUpdate({ ...base, stack: [{ number: 6487, position: 1, status: 'safe' }] })
     expect(typeof ok === 'string' ? ok : ok.stack).toEqual([{ number: '6487', position: 1, status: 'safe', note: undefined }])
+  })
+
+  test('safeStack reports duplicate positions instead of misreporting a missing position', async () => {
+    const board = apply(null, {
+      ...base,
+      stack: [
+        { number: '101', position: 1, status: 'safe' },
+        { number: '102', position: 1, status: 'safe' },
+        { number: '103', position: 2, status: 'safe' },
+      ],
+      integration: { number: '100', into: 'main', safe: true },
+    }, 1)
+    expect(chainTokens(board)).toEqual([])
+    expect(stackWarnings(board)).toEqual([
+      '✗ position 1 has multiple PRs (#101, #102)',
+      '  waiting behind it: 1 more PR and #100',
+    ])
+  })
+
+  test('all-landed stack reports clean landed tally instead of 0 of 0 safe', async () => {
+    const board = apply(null, {
+      ...base,
+      stack: [
+        { number: '101', position: 1, status: 'landed' },
+        { number: '102', position: 2, status: 'landed' },
+      ],
+    }, 1)
+    expect(stackTally(board)).toBe('all 2 landed')
+    expect(summary(board)).toContain('stack all 2 landed')
+    expect(stackWarnings(board)).toEqual([])
   })
 })
