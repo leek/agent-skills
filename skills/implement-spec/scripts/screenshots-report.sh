@@ -1,7 +1,7 @@
 #!/bin/bash
 # Which of an implement-spec run's screenshots reached a pull request, so the run cannot
 # close as delivered while one did not. No network: "uploaded" is what the run recorded
-# here after a successful upload-screenshots.sh call, not a lookup.
+# here after a successful `pr-assets.sh upload` call, not a lookup.
 #
 # Usage: screenshots-report.sh <notes dir> [--uploaded <image>... | --left-out <image>...]
 #   <notes dir> is the run's notes directory (spec-run-state.sh's "notes"); the images are

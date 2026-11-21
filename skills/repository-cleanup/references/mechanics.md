@@ -9,7 +9,7 @@ Worktrees and one-off test runs leave local databases behind: a per-worktree `DB
 ## Dropping pr-assets folders
 
 ```bash
-bash <this-skill-dir>/scripts/prune-pr-assets.sh --tip <plan tip> --drop <folder>...    # selected folders only
+bash <this-skill-dir>/../pr/scripts/pr-assets.sh prune --tip <plan tip> --drop <folder>...    # selected folders only
 ```
 
 A kept folder's `…/blob/pr-assets/…` links keep working; links pinned to a commit (`…/blob/<sha>/…`, from older uploads) point at unreachable commits that GitHub may stop serving once it garbage-collects them. A tip that moved since the plan refuses the run; list again.

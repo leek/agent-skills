@@ -80,7 +80,7 @@ When the `databases` list of `prune-merged-worktrees.sh` is not empty, read [Dat
 
 ## PR screenshots
 
-The `pr` skill uploads PR screenshots to the orphan `pr-assets` branch, one folder per PR branch, and nothing else ever removes them: every clone downloads the whole branch. One script lists the folders whose PR merged or closed more than 90 days ago (`--days N` to change it), or, with no PR found, whose last upload is that old. An open PR's folder is never a candidate. With no arguments it changes nothing: `bash <this-skill-dir>/scripts/prune-pr-assets.sh` prints the plan (tip, candidates, kept, with sizes).
+The `pr` skill uploads PR screenshots to the orphan `pr-assets` branch, one folder per PR branch, and nothing else ever removes them: every clone downloads the whole branch. The `pr` skill's script lists the folders whose PR merged or closed more than 90 days ago (`--days N` to change it), or, with no PR found, whose last upload is that old. An open PR's folder is never a candidate. Its `plan` changes nothing: `bash <this-skill-dir>/../pr/scripts/pr-assets.sh plan` prints the plan (tip, candidates, kept, with sizes).
 
 Offer the candidates as one `Remote` option, with their count, total size and folder names, and `cannot recover` in its description: dropping rewrites `pr-assets` as a fresh orphan commit with a force push, leased on the plan's tip, so those images leave every future clone. When the plan has a candidate, read [Dropping pr-assets folders](references/mechanics.md#dropping-pr-assets-folders) before you offer it: the drop command, for the selected folders only, which image links keep working, and a tip that moved since the plan.
 
