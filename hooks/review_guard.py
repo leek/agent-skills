@@ -1,20 +1,14 @@
-#!/usr/bin/env python3
-"""PreToolUse guard for the PR-review agents (finding-verifier, pr-reviewer).
+"""Read-only shell policy for the PR-review agents (finding-verifier, pr-reviewer).
 
 Both agents read untrusted text: review comments, bot findings, and the PR diff.
-Their bodies say read-only; this hook enforces it. hooks/shell_guard.py calls
-run_payload only for those agents' shell calls. Every segment of the command
-(split on &&, ||, ;, |) must be a read-only git, gh, rg, find, `sed -n '<range>p'`, or text command
-under both bash and zsh rules. Anything else returns 2, which blocks the call and
-shows stderr to the agent.
+Their bodies say read-only; hooks/pre_tool_guard.py enforces this policy on their
+shell calls. Every segment of the command (split on &&, ||, ;, |) must be a read-only
+git, gh, rg, find, `sed -n '<range>p'`, or text command under both bash and zsh rules.
 """
 
-from pathlib import Path
 import re
-import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from shell_guard import Blocked, check_filter, long_option_in, parse_command  # noqa: E402
+from shell_syntax import Blocked, check_filter, long_option_in, parse_command
 
 FILTERS = {"cat", "head", "tail", "wc", "sort", "uniq", "cut", "tr", "echo", "ls", "jq",
            "grep", "egrep", "cd", "pwd", "basename", "dirname", "true"}
@@ -31,7 +25,6 @@ GH_API_VALUE = {"--cache", "--header", "--jq", "--method", "--preview",
 GH_API_BOOL = {"--include", "--paginate", "--silent", "--slurp", "--verbose"}
 GH_API_SHORT = {"H": "--header", "q": "--jq", "X": "--method", "p": "--preview",
                 "f": "--raw-field", "F": "--field", "t": "--template", "i": "--include"}
-
 
 FETCH_FLAGS = {"-q", "--quiet", "-v", "--verbose", "--all", "--no-tags", "--dry-run",
                "--no-recurse-submodules"}
@@ -236,15 +229,3 @@ def check(command: str) -> None:
             check_sed(args)
         else:
             raise Blocked(f"`{name}` is not allowed — only read-only git, gh, rg, find, and text filters")
-
-
-def run_payload(payload: dict) -> int:
-    command = (payload.get("tool_input") or {}).get("command", "")
-    try:
-        check(command)
-    except Blocked as reason:
-        print(f"BLOCKED by review-agent guard: {reason}. You are read-only; do not look for "
-              "another way. Use the Read and Grep tools, or write UNSURE with what you checked.",
-              file=sys.stderr)
-        return 2
-    return 0

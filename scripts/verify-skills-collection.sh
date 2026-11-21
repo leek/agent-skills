@@ -551,10 +551,16 @@ check "claude plugin validate passes the directory profile" \
   claude plugin validate . --profile directory
 check "claude plugin test passes" \
   claude plugin test .
-run_python_tests() {
-  local t failed=""
-  for t in hooks/test_*.py skills/*/scripts/test_*.py; do
-    [[ -e "$t" ]] || continue
+# A subshell scopes nullglob; discovery must find hooks/'s three guard tests, so a moved or
+# renamed test cannot make this check pass with nothing run.
+run_python_tests() (
+  shopt -s nullglob
+  local t failed="" tests=(hooks/test_*.py skills/*/scripts/test_*.py)
+  if (( ${#tests[@]} < 3 )); then
+    echo "found ${#tests[@]} python test files, want at least 3" >&2
+    return 1
+  fi
+  for t in "${tests[@]}"; do
     if ! python3 -m unittest -q "$t"; then
       failed="$failed $t"
     fi
@@ -563,7 +569,7 @@ run_python_tests() {
     echo "failed python tests:$failed" >&2
     return 1
   fi
-}
+)
 check "every python guard/script test passes" run_python_tests
 check "bare-worktree notice speaks only in a bare Laravel worktree" \
   bash -c '

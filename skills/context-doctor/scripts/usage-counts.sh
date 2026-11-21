@@ -83,7 +83,9 @@ while IFS=$'\t' read -r log id ts inproj; do
           elif ($c.tool | startswith("mcp__")) then {type:"mcp_servers", name:($c.tool | split("__")[1])}
           else empty end
       elif .kind == "user" then
-        (.text | capture("<command-name>/?(?<n>[^<]+)</command-name>")? // empty | {type:"slash", name:.n})
+        # Only the shape Claude Code writes for a typed command: the name tag opens the message,
+        # optionally after its <command-message> tag. A tag pasted mid-text is not a command.
+        (.text | capture("^(<command-message>[^<]*</command-message>\\s*)?<command-name>/?(?<n>[^<]+)</command-name>")? // empty | {type:"slash", name:.n})
       else empty end
       | . + {id:$id, ts:$ts, in_project:$in}' >> "$events" || true
 done

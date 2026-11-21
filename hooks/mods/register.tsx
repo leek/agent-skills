@@ -341,8 +341,9 @@ export const register: Register = on => {
           {effort.state === 'open' &&
             work.slice(0, 8).map(f => {
               const isReady = effort.frontier.includes(f.path)
+              const blockers = effort.openBlockers?.[f.path] ?? []
               const tag =
-                f.claimedBy !== '' ? `  [${f.claimedBy}]` : !isReady && f.blockedBy.length > 0 ? `  [blocked by ${f.blockedBy.join(', ')}]` : ''
+                f.claimedBy !== '' ? `  [${f.claimedBy}]` : !isReady && blockers.length > 0 ? `  [blocked by ${blockers.join(', ')}]` : ''
 
               return (
                 <Text key={f.path} wrap="truncate-end" dimColor={!isReady}>
