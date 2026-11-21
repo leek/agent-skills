@@ -35,6 +35,11 @@ SAFE_BOOL_FLAGS = {"--clear", "--json", "--full", "-i", "--interactive", "-c", "
 SAFE_VALUE_FLAGS = {"--filter", "--type", "--status", "--method", "--load", "--url", "--text",
                     "--timeout", "-d", "--depth", "-s", "--selector"}
 SAFE_FLAGS = SAFE_BOOL_FLAGS | SAFE_VALUE_FLAGS
+# `agent-browser screenshot --help` (0.43): usage `screenshot [selector] [path]`, booleans
+# --full/-f, --if-changed, --annotate, and these four value flags. Legal on screenshot only.
+SCREENSHOT_VALUE_FLAGS = {"--threshold", "--screenshot-dir", "--screenshot-quality", "--screenshot-format"}
+SCREENSHOT_FLAGS = {"-f", "--full", "--if-changed", "--annotate"} | SCREENSHOT_VALUE_FLAGS
+IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg", ".webp")
 ELEMENT_STATES = {"visible", "hidden", "attached", "detached"}
 FILTERS = {"grep", "head", "tail", "wc", "sort", "uniq", "echo"}
 
@@ -47,6 +52,46 @@ def same_origin(url: str, origin: str) -> bool:
 def inside(path: str, run_dir: str, cwd: str) -> bool:
     real = os.path.realpath(os.path.join(cwd, os.path.expanduser(path)))
     return real.startswith(os.path.realpath(run_dir) + os.sep)
+
+
+def looks_like_path(word: str) -> bool:
+    return ("/" in word or "\\" in word or word.startswith("~")
+            or word.lower().endswith(IMAGE_SUFFIXES))
+
+
+def check_screenshot(rest: list[str], run_dir: str, cwd: str) -> None:
+    """Only screenshot's own value flags consume a word, so every other flag's would-be value
+    stays positional: `--timeout /tmp/x.png` saves to /tmp/x.png. The last positional (the
+    path, or a lone selector) and every path-like word must lie inside the run directory, and so
+    must --screenshot-dir."""
+    positional: list[str] = []
+    dirs: list[str] = []
+    i = 0
+    while i < len(rest):
+        a = rest[i]
+        i += 1
+        if a == "--":
+            positional.extend(rest[i:])
+            break
+        if not a.startswith("-"):
+            positional.append(a)
+            continue
+        name, eq, value = a.partition("=")
+        if name in SCREENSHOT_VALUE_FLAGS:
+            if not eq:
+                if i >= len(rest):
+                    raise Blocked(f"flag `{name}` needs a value")
+                value = rest[i]
+                i += 1
+            if name == "--screenshot-dir":
+                dirs.append(value)
+    blocked = [p for p in positional[:-1] if looks_like_path(p)] + positional[-1:]
+    real_run = os.path.realpath(run_dir)
+    for d in dirs:
+        if os.path.realpath(os.path.join(cwd, os.path.expanduser(d))) != real_run and not inside(d, run_dir, cwd):
+            raise Blocked(f"screenshots must be saved under {run_dir}/")
+    if any(not inside(p, run_dir, cwd) for p in blocked):
+        raise Blocked(f"screenshots must be saved under {run_dir}/")
 
 
 def strip_safe_flags(rest: list[str]) -> list[str]:
@@ -142,7 +187,8 @@ def check_browser(args: list[str], cwd: str) -> None:
             continue
         if a == "--state" and verb == "wait" and rest[i + 1:i + 2] and rest[i + 1] in ELEMENT_STATES:
             continue
-        if a.split("=", 1)[0] not in SAFE_FLAGS:
+        allowed = SAFE_FLAGS | SCREENSHOT_FLAGS if verb == "screenshot" else SAFE_FLAGS
+        if a.split("=", 1)[0] not in allowed:
             raise Blocked(f"flag `{a}` is not allowed")
     if verb in ("snapshot", "click", "hover", "focus", "scroll", "scrollintoview", "wait", "get",
                 "is", "back", "forward", "reload"):
@@ -162,9 +208,7 @@ def check_browser(args: list[str], cwd: str) -> None:
             raise Blocked(f"`{verb}` is only allowed on {scope['origin']} — navigate by clicking")
         return
     if verb == "screenshot":
-        paths = strip_safe_flags(rest)
-        if any(not inside(p, run_dir, cwd) for p in paths):
-            raise Blocked(f"screenshots must be saved under {run_dir}/")
+        check_screenshot(rest, run_dir, cwd)
         return
     if verb == "press":
         if len(rest) != 1 or rest[0] not in SAFE_KEYS:

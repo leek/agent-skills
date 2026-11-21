@@ -158,7 +158,35 @@ class GuardBrowserTest(unittest.TestCase):
         self.assertBlocked(f"{S} screenshot -s '#main' /tmp/evil.png", "must be saved under")
         self.assertBlocked(f"{S} screenshot -x {self.run_dir}/1.png", "flag `-x`")
         self.assertBlocked(f"{S} screenshot --bad {self.run_dir}/1.png", "flag `--bad`")
-        self.assertBlocked(f"{S} screenshot -s", "needs a value")
+        self.assertBlocked(f"{S} screenshot --threshold", "needs a value")
+
+    def test_screenshot_path_cannot_hide_behind_a_value_flag(self):
+        # `screenshot` takes only --threshold, --screenshot-dir, --screenshot-quality and
+        # --screenshot-format as value flags, so `--timeout /tmp/evil.png` leaves the path positional.
+        for cmd in [
+            f"{S} screenshot --timeout /tmp/evil.png",
+            f"{S} screenshot -s /tmp/evil.png",
+            f"{S} screenshot --timeout 5000 /tmp/evil.png {self.run_dir}/1.png",
+            f"{S} screenshot --screenshot-dir /tmp",
+            f"{S} screenshot --screenshot-dir=/tmp {self.run_dir}/1.png",
+            f"{S} screenshot --annotate '#main'",
+        ]:
+            with self.subTest(cmd=cmd):
+                self.assertBlocked(cmd, "must be saved under")
+        for cmd in [
+            f"{S} screenshot --timeout 5000 {self.run_dir}/1.png",
+            f"{S} screenshot -f --if-changed --threshold 0.01 {self.run_dir}/1.png",
+            f"{S} screenshot --annotate --json '#main' {self.run_dir}/1.png",
+            f"{S} screenshot --screenshot-format jpeg --screenshot-quality 80 {self.run_dir}/1.jpg",
+            f"{S} screenshot --screenshot-dir {self.run_dir}",
+            f"{S} screenshot --screenshot-dir={self.run_dir}/shots",
+            f"{S} screenshot",
+        ]:
+            with self.subTest(cmd=cmd):
+                self.assertAllowed(cmd)
+        # Screenshot's own flags are not legal on other verbs.
+        self.assertBlocked(f"{S} snapshot -f", "flag `-f`")
+        self.assertBlocked(f"{S} snapshot --screenshot-dir /tmp", "flag `--screenshot-dir`")
 
     def test_scope_is_validated_per_segment(self):
         run2 = "20260927-130000"
