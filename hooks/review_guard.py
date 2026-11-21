@@ -222,17 +222,49 @@ def check_sed(args: list[str]) -> None:
 JQ_ENV = re.compile(r'(?<![.\w$"])env\b|\$ENV\b')
 
 
+# `include` / `import` load a module from jq's search path (or -L), whose definitions the
+# filter check never sees: `def leak: env;` in m.jq, then `include "m"; leak`.
+JQ_MODULE = re.compile(r'(?<![.\w$"])(include|import)\b')
+JQ_BOOL = {"--null-input", "--raw-input", "--slurp", "--compact-output", "--raw-output",
+           "--raw-output0", "--join-output", "--ascii-output", "--sort-keys", "--color-output",
+           "--monochrome-output", "--tab", "--unbuffered", "--stream", "--stream-errors", "--seq",
+           "--exit-status", "--args", "--jsonargs"}
+JQ_SHORT_BOOL = set("nRscrjaSCMe")
+# Long options that take values, and how many words follow.
+JQ_VALUE = {"--indent": 1, "--arg": 2, "--argjson": 2, "--slurpfile": 2, "--rawfile": 2}
+
+
 def check_jq_filter(expr: str) -> None:
     if JQ_ENV.search(expr):
         raise Blocked("`jq` filters may not read environment variables (`env`, `$ENV`)")
+    if JQ_MODULE.search(expr):
+        raise Blocked("`jq` filters may not load modules (`include`, `import`)")
 
 
 def check_jq(args: list[str]) -> None:
-    for a in args:
-        if long_option_in(a, ("--from-file",)) or (
-                a.startswith("-") and not a.startswith("--") and "f" in a[1:]):
+    i = 0
+    while i < len(args):
+        a = args[i]
+        i += 1
+        if a == "--":
+            for rest in args[i:]:
+                check_jq_filter(rest)
+            return
+        if not a.startswith("-") or a == "-":
+            check_jq_filter(a)
+            continue
+        if long_option_in(a, ("--from-file",)) or (not a.startswith("--") and "f" in a[1:]):
             raise Blocked("`jq -f` / `--from-file` is not allowed")
-        check_jq_filter(a)
+        if long_option_in(a, ("--library-path",)) or (not a.startswith("--") and "L" in a[1:]):
+            raise Blocked("`jq -L` / `--library-path` is not allowed: it loads modules")
+        if a in JQ_BOOL:
+            continue
+        if a in JQ_VALUE:
+            i += JQ_VALUE[a]
+            continue
+        if not a.startswith("--") and set(a[1:]) <= JQ_SHORT_BOOL:
+            continue
+        raise Blocked(f"`jq {a}` is not an allowed jq option")
 
 
 def check(command: str) -> None:

@@ -186,6 +186,27 @@ class GuardReviewAgentsTest(unittest.TestCase):
         self.assertAllowed("gh pr list --json name --jq '.[].environment'")
         self.assertAllowed("gh pr view 1 --json title -q '.title'")
 
+    def test_jq_module_loading_is_blocked(self):
+        # A module on -L defining `def leak: env;` reads the environment past the filter check.
+        for cmd in ["jq -n -L /tmp/jqmod 'include \"m\"; leak'",
+                    "jq -n -L/tmp/jqmod 'leak'",
+                    "jq -nL /tmp/jqmod 'leak'",
+                    "jq --library-path /tmp/jqmod 'leak'",
+                    "jq --library-path=/tmp/jqmod 'leak'",
+                    "jq -n 'include \"m\"; leak'",
+                    "jq -n 'import \"m\" as m; m::leak'",
+                    "jq -n 'import \"m\" as $m; $m'",
+                    "gh api user --jq 'include \"m\"; leak'"]:
+            with self.subTest(cmd=cmd):
+                self.assertBlocked(cmd, "modules")
+        self.assertBlocked("jq --run-tests t.txt", "`jq --run-tests`")
+        self.assertBlocked("jq -nZ .", "`jq -nZ`")
+        self.assertAllowed("jq -r '.include' data.json")
+        self.assertAllowed("jq -r '.[] | select(.kind == \"import\")' data.json")
+        self.assertAllowed("jq -nr --arg x -L '$x'")
+        self.assertAllowed("jq --indent 2 -S . data.json")
+        self.assertAllowed("jq -s --slurpfile a a.json '.' b.json")
+
     def test_gh_writes_are_blocked(self):
         self.assertBlocked("gh pr merge 12 --squash", "not a read-only gh command")
         self.assertBlocked("gh pr view 12 --web", "opens a browser")
