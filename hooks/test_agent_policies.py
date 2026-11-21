@@ -116,6 +116,11 @@ class AgentPoliciesTest(unittest.TestCase):
         self.assertAllowed("agent-browser open http://127.0.0.1:8000/", a)
         self.assertAllowed("agent-browser open http://2130706433/", a)
         self.assertAllowed("agent-browser open https://app.test/1.2", a)
+        # Hosts the browser rewrites before it connects are refused outright.
+        for url in ("http://169%2E254%2E169%2E254/", "http://169\u3002254\u3002169\u3002254/",
+                    "http://\uff11\uff16\uff19.254.169.254/", "http://169.254.169.254\\@app.test/"):
+            self.assertBlocked(f"agent-browser open '{url}'", "plain ASCII URL", a)
+        self.assertAllowed("agent-browser open 'https://app.test/search?q=a%20b'", a)
         self.assertBlocked("rm -rf app", "`rm` is not allowed", a)
 
 

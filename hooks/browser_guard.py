@@ -277,7 +277,15 @@ def check_verb(verb: str, rest: list[str], cwd: str, save_dirs: list[str], origi
         if origin is None:
             if len(rest) != 1 or urlsplit(rest[0]).scheme not in ("http", "https"):
                 raise Blocked(f"`{verb}` takes one http(s) URL")
-            if metadata_host(urlsplit(rest[0]).hostname or ""):
+            # The browser rewrites what Python's urlsplit keeps: `\` becomes `/` (so the host
+            # after `\@` differs), tabs and newlines vanish, and a host is percent-decoded and
+            # IDNA-mapped (`169%2E254…`, fullwidth dots). Refuse those rather than copy that parser.
+            raw = rest[0]
+            netloc = urlsplit(raw).netloc
+            if (not raw.isascii() or "\\" in raw or any(c.isspace() or ord(c) < 32 or ord(c) == 127 for c in raw)
+                    or "%" in netloc):
+                raise Blocked(f"`{verb}` takes a plain ASCII URL with no backslash, whitespace, or % in its host")
+            if metadata_host(urlsplit(raw).hostname or ""):
                 raise Blocked(f"`{verb}` never opens a link-local or cloud metadata address")
             return
         if len(rest) != 1 or not same_origin(rest[0], origin):
