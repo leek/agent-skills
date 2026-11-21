@@ -208,13 +208,14 @@ class GuardReviewAgentsTest(unittest.TestCase):
         self.assertAllowed("jq -s --slurpfile a a.json '.' b.json")
 
     def test_jq_env_check_reads_only_the_filter_and_builtin_calls(self):
-        # File arguments are not filters, and an object key named env is not the builtin.
+        # Path-like file arguments are not filters, and a quoted object key is not the builtin.
         for cmd in ["jq '.name' config/env.json",
                     "jq . src/include/x.json",
-                    "jq -r . import.json env",
+                    "jq -r . import.json ./env",
                     "jq -- . env.json",
-                    "gh pr view 1 --json body --jq '{env: .environment}'",
-                    "jq '{a: 1, env: .e}' data.json",
+                    "jq . - data.json",
+                    "gh pr view 1 --json body --jq '{\"env\": .environment}'",
+                    "jq '{a: 1, \"env\": .e}' data.json",
                     "jq -n '$__loc__'"]:
             with self.subTest(cmd=cmd):
                 self.assertAllowed(cmd)
@@ -224,7 +225,15 @@ class GuardReviewAgentsTest(unittest.TestCase):
                     "jq '.[env:]' data.json",
                     "jq -n 'env::x'",
                     "jq -n -- env",
-                    "gh api user --jq '{env: env.HOME}'"]:
+                    "gh api user --jq '{env: env.HOME}'",
+                    # A bare `-` must not stand in for the filter and hide the real one.
+                    "jq -n - 'env'",
+                    "jq - 'env' file.json",
+                    "jq -n - 'env.x/1'",
+                    # No unquoted-key exemption: `.[0,env:]` is a slice that evaluates env.
+                    "jq -nc '[1,2,3] | .[0,env:]'",
+                    "jq '{env: .environment}' data.json",
+                    "jq . data.json env"]:
             with self.subTest(cmd=cmd):
                 self.assertBlocked(cmd, "environment variables")
 

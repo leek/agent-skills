@@ -218,17 +218,11 @@ def check_sed(args: list[str]) -> None:
 
 
 # `env` builtin and `$ENV` object read process environment variables (tokens, keys).
-# Field access (`.env`, `.foo.env`), string keys (`.["env"]`), longer words (`.environment`),
-# and an object key (`{env: .e}`, see env_is_key) stay allowed.
+# Field access (`.env`, `.foo.env`), string keys (`.["env"]`, `{"env": …}`), and longer words
+# (`.environment`) stay allowed. An unquoted key (`{env: …}`) is refused: telling it from a
+# slice (`.[0,env:]`, which runs env) needs a jq parser.
 # jq 1.6 lexes `$` and `ENV` as two tokens, so `$ ENV` reads it too.
 JQ_ENV = re.compile(r'(?<![.\w$"])env\b|\$\s*ENV\b')
-
-
-def env_is_key(expr: str, m: "re.Match[str]") -> bool:
-    """`env` written as an object key: `{env: …}` or `{…, env: …}`, never `.[env:]` or `env::f`."""
-    before, after = expr[:m.start()].rstrip(), expr[m.end():].lstrip()
-    return (m.group() == "env" and before.endswith(("{", ","))
-            and after.startswith(":") and not after.startswith("::"))
 
 
 # `include` / `import` load a module from jq's search path (or -L), whose definitions the
@@ -280,26 +274,38 @@ def jq_has_comment(expr: str) -> bool:
 def check_jq_filter(expr: str) -> None:
     if jq_has_comment(expr):
         raise Blocked("`jq` filters may not contain comments (`#`)")
-    if any(not env_is_key(expr, m) for m in JQ_ENV.finditer(expr)):
+    if JQ_ENV.search(expr):
         raise Blocked("`jq` filters may not read environment variables (`env`, `$ENV`)")
     if JQ_MODULE.search(expr):
         raise Blocked("`jq` filters may not load modules (`include`, `import`)")
 
 
+def jq_input_file(word: str) -> bool:
+    """An argument that is plainly an input file, never a program: stdin, a path, or *.json."""
+    return word == "-" or "/" in word or word.endswith(".json")
+
+
+def check_jq_positional(a: str, filter_seen: bool) -> bool:
+    """The first positional other than `-` is the filter. Every later one is checked too unless
+    it is plainly an input file, so `jq -n - 'env'` cannot hide the program behind a stand-in."""
+    if a == "-":
+        return filter_seen
+    if not filter_seen or not jq_input_file(a):
+        check_jq_filter(a)
+    return True
+
+
 def check_jq(args: list[str]) -> None:
-    """The first positional is the filter and is checked; later ones are input files."""
     i, filter_seen = 0, False
     while i < len(args):
         a = args[i]
         i += 1
         if a == "--":
-            if not filter_seen and i < len(args):
-                check_jq_filter(args[i])
+            for rest in args[i:]:
+                filter_seen = check_jq_positional(rest, filter_seen)
             return
         if not a.startswith("-") or a == "-":
-            if not filter_seen:
-                check_jq_filter(a)
-                filter_seen = True
+            filter_seen = check_jq_positional(a, filter_seen)
             continue
         if long_option_in(a, ("--from-file",)) or (not a.startswith("--") and "f" in a[1:]):
             raise Blocked("`jq -f` / `--from-file` is not allowed")
