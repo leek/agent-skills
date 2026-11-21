@@ -5,6 +5,7 @@
 #   1   not yet  -> wait <interval> seconds, check again
 #   2+  failed   -> print {"result":"failed", ...}, exit 2
 # Budget spent  -> print {"result":"timeout", ...}, exit 3
+# Usage error   -> exit 64, no verdict
 # "detail" is the last line the check printed, so the verdict carries its evidence.
 #
 # Usage: wait-until.sh [--interval <seconds>] [--timeout <seconds>] -- <check> [args ...]
@@ -12,7 +13,7 @@
 # Run it in the background; it changes nothing itself, it runs only the check you pass.
 set -e
 
-usage() { echo "usage: wait-until.sh [--interval <s>] [--timeout <s>] -- <check> [args ...]" >&2; exit 2; }
+usage() { echo "usage: wait-until.sh [--interval <s>] [--timeout <s>] -- <check> [args ...]" >&2; exit 64; }  # 64: not a verdict code
 
 interval=30
 timeout=3600
