@@ -461,26 +461,32 @@ if bad:
     print("no harness-tools pointer beside a Claude Code tool:", ", ".join(bad), file=sys.stderr)
     sys.exit(1)
 '
-check "harness-tools has every move, with one row per harness in each table" \
+check "harness-tools routes to one file per harness, each with every move" \
   python3 -c '
-import re, sys
-text = open("skills/harness-tools/SKILL.md", encoding="utf-8").read()
-want = ["Claude Code", "Codex", "Grok", "agy"]
+import os, re, sys
+base = "skills/harness-tools"
+text = open(base + "/SKILL.md", encoding="utf-8").read()
+want = {"Claude Code": "claude-code.md", "Codex": "codex.md", "Grok": "grok.md", "agy": "agy.md"}
 moves = ["Dispatch and wait", "Dispatch in the background", "Follow up", "Stop", "Structured question"]
-sections = {s.splitlines()[0].strip(): s for s in re.split(r"^## ", text, flags=re.M)[1:]}
 bad = []
 for move in moves:
-    sec = sections.get(move)
-    if sec is None:
-        bad.append(move + ": section missing")
+    if "**" + move + ".**" not in text:
+        bad.append("SKILL.md: move " + move + " not defined")
+routed = dict(re.findall(r"^\| ([^|]+?) \| \[references/([a-z-]+\.md)\]", text, flags=re.M))
+if routed != want:
+    bad.append("SKILL.md: router rows " + str(routed) + " (want " + str(want) + ")")
+on_disk = sorted(os.listdir(base + "/references"))
+if on_disk != sorted(want.values()):
+    bad.append("references/: " + ", ".join(on_disk) + " (want exactly " + ", ".join(sorted(want.values())) + ")")
+for harness, name in want.items():
+    p = base + "/references/" + name
+    if not os.path.isfile(p):
         continue
-    lines = [l for l in sec.splitlines() if l.startswith("|")]
-    if len(lines) < 3 or not lines[0].startswith("| Harness |"):
-        bad.append(move + ": no harness table")
-        continue
-    rows = [l.split("|")[1].strip() for l in lines[2:]]
-    if sorted(rows) != sorted(want):
-        bad.append(move + ": rows " + ", ".join(rows) + " (want exactly " + ", ".join(want) + ")")
+    ref = open(p, encoding="utf-8").read()
+    heads = [h.strip() for h in re.findall(r"^## (.+)$", ref, flags=re.M)]
+    for move in moves:
+        if move not in heads:
+            bad.append(p + ": section " + move + " missing")
 if bad:
     print("\n".join(bad), file=sys.stderr)
     sys.exit(1)
