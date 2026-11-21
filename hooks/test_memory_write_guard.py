@@ -95,6 +95,17 @@ class MemoryWriteGuardTest(unittest.TestCase):
             self.assertEqual(self.run_guard(f"~/.claude/agent-memory/{bare}/p.md",
                                             agent=agent, cwd="/repo"), 0)
 
+    def test_project_memory_when_cwd_is_home(self):
+        # Run from $HOME, a project agent's project memory is ~/.claude/agent-memory/<agent>/.
+        home = str(Path.home())
+        self.assertEqual(self.run_guard("~/.claude/agent-memory/standards-reviewer/MEMORY.md", cwd=home), 0)
+        self.assertEqual(self.run_guard(".claude/agent-memory/standards-reviewer/MEMORY.md", cwd=home), 0)
+        self.assertEqual(self.run_guard("~/.claude/agent-memory/finding-verifier/MEMORY.md", cwd=home), 2)
+        self.assertEqual(self.run_guard("~/.claude/settings.json", cwd=home), 2)
+        # Reached only as a parent of cwd, home is still not project memory.
+        self.assertEqual(self.run_guard("~/.claude/agent-memory/standards-reviewer/MEMORY.md",
+                                        cwd=os.path.join(home, "Code", "x")), 2)
+
     def test_path_keys_cover_all_write_tools(self):
         for key, tool in (("file_path", "Write"), ("path", "write"), ("target_file", "Delete"),
                           ("notebook_path", "EditNotebook"), ("target_notebook", "EditNotebook"),

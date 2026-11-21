@@ -32,10 +32,13 @@ def memory_roots(cwd: str, scope: str, subdirs: list[str]) -> list[str]:
     bases: list[str] = []
     home = os.path.realpath(os.path.expanduser("~"))
     if scope == "project":
-        here = os.path.abspath(cwd)
+        start = here = os.path.abspath(cwd)
         while True:
-            # Never treat `~/.claude/agent-memory/` as project memory even when cwd is under `~`.
+            # `~/.claude/agent-memory/` is project memory only when the session runs from `~`
+            # itself, never when `~` is reached as a parent of the working directory.
             if os.path.realpath(here) == home:
+                if here == start:
+                    bases.append(os.path.join(here, ".claude", "agent-memory"))
                 break
             bases.append(os.path.join(here, ".claude", "agent-memory"))
             parent = os.path.dirname(here)
