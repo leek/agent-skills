@@ -391,6 +391,29 @@ test('a worker a new prompt cleared comes back running when SendMessage resumes 
   expect(await band.find({ type: 'Text', text: /Workers 1\/1 done/ })).toBeDefined()
 })
 
+test('a SendMessage that is denied, errors, or throws leaves the finished worker finished', async ($, on) => {
+  mock.clock(on, { now: 1_000 })
+  on('ui.render', async ($, e) => engineDraw($, e))
+  on('agent.spawn', async () => ({ model: 'sonnet', agentId: 'a1' }))
+  let answer: 'deny' | 'error' | 'throw' = 'deny'
+  on('tool.call', async (_$, e) => {
+    if (e.tool !== 'SendMessage') return { result: 'ok' } as never
+    if (answer === 'throw') throw new Error('send boom')
+    return (answer === 'deny' ? { deny: 'refused' } : { isError: true, result: 'no such agent' }) as never
+  })
+  on('turn.complete', async () => ({ text: '' }))
+
+  await $.agent.spawn({ prompt: 'build', description: 'auth--01 build login', subagentType: 'general-purpose' } as never)
+  await $.turn.complete({ agentId: 'a1', reason: 'answer', answer: '', durationMs: 5, isAborted: false, turnId: 'x1' })
+  const band = await $.ui.mount({ plugin: 'leek-skills', surface: 'terminal', ...BAND } as never)
+
+  for (const kind of ['deny', 'error', 'throw'] as const) {
+    answer = kind
+    await $.tool.call({ tool: 'SendMessage', to: 'a1', message: 'more', tool_use_id: `m-${kind}` } as never).catch(() => undefined)
+    expect([kind, await band.find({ type: 'Text', text: /Workers 1\/1 done/ }) !== undefined]).toEqual([kind, true])
+  }
+})
+
 test('followed-up subagent resumes running state and parallel fixers render on ticket board', async ($, on) => {
   mock.clock(on, { now: 1_000 })
   on('ui.render', async ($, e) => engineDraw($, e))

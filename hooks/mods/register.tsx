@@ -439,16 +439,23 @@ export const register: Register = on => {
         // A finished worker making a tool call was resumed by a follow-up: running again.
         const line = describeTool(tool, input)
         await update($, workers, list => resume(list, id, w => ({ tools: w.tools + 1, lastTool: line })))
-      } else if (tool === 'SendMessage' && typeof input.to === 'string' && input.to !== '') {
-        // The parent's follow-up resumes a finished worker, even one a new prompt cleared away.
-        const to = input.to
-        await update($, workers, list => resume(list, to))
       }
     } catch {
       // Observer never blocks the tool call.
     }
 
     const result = await next(e)
+
+    try {
+      // The parent's follow-up resumes a finished worker, even one a new prompt cleared away, but
+      // only once the message went through: a denied or failed SendMessage wakes nobody.
+      const to = input.to
+      if (tool === 'SendMessage' && typeof to === 'string' && to !== '' && result.deny === undefined && result.isError !== true) {
+        await update($, workers, list => resume(list, to))
+      }
+    } catch {
+      // Observer never breaks or re-runs a tool call that already ran.
+    }
 
     try {
       if (isScratchWriteTool(tool, input) && isScratchPaneOpen && (await read($, board)) !== null) {
