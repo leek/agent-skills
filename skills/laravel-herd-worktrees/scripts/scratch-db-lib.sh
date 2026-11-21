@@ -57,7 +57,7 @@ db_protected_set() {
       [ -f "$f" ] && awk '
         { buf = buf " " $0 }
         END {
-          while (match(buf, /<env[[:space:]][^>]*>/)) {
+          while (match(buf, /<[A-Za-z]+[[:space:]][^>]*>/)) {   # <env>, and <server>/<var> (Laravel <= 7)
             tag = substr(buf, RSTART, RLENGTH)
             buf = substr(buf, RSTART + RLENGTH)
             if (tag ~ /[[:space:]]name[[:space:]]*=[[:space:]]*("DB_DATABASE"|\047DB_DATABASE\047)/) {

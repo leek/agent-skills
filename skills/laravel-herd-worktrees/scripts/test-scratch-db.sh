@@ -360,6 +360,16 @@ refused "phpunit.xml reversed double quotes" app_rev_double "used by the main ch
 printf '<phpunit><php>\n<env name="DB_DATABASE" value="app_phpunit"/>\n</php></phpunit>\n' > "$repo/phpunit.xml"
 ok "phpunit.xml protects DB_DATABASE regardless of attribute order or quote style"
 
+# --- regression: Laravel <= 7 phpunit.xml sets DB_DATABASE through <server> or <var> ---
+printf '<phpunit><php>\n<server name="DB_DATABASE" value="app_server"/>\n<var name="DB_DATABASE" value="app_var"/>\n</php></phpunit>\n' > "$repo/phpunit.xml"
+bash "$script" register pgsql app_server - 2>/dev/null
+bash "$script" register pgsql app_var - 2>/dev/null
+before=$(cat "$registry")
+refused "phpunit.xml <server>" app_server "used by the main checkout"
+refused "phpunit.xml <var>" app_var "used by the main checkout"
+printf '<phpunit><php>\n<env name="DB_DATABASE" value="app_phpunit"/>\n</php></phpunit>\n' > "$repo/phpunit.xml"
+ok "phpunit.xml protects DB_DATABASE set by <server> or <var>"
+
 # --- regression: dual-connection (pgsql + mysql) keeps failed connection's registry line ---
 : > "$registry"
 env_main 127.0.0.1 pgsql
