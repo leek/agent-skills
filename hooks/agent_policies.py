@@ -70,11 +70,14 @@ MAGICK_VALUE_OPS = {"-crop": re.compile(r"\d+x\d+[+-]\d+[+-]\d+"),
                     "-quality": re.compile(r"\d{1,3}")}
 MAGICK_BOOL_OPS = {"+repage", "-trim"}
 IMAGE = re.compile(r"[^:@|<>]+\.(?:png|jpe?g|webp)", re.IGNORECASE)
+# ImageMagick picks a coder from the file's content, so an MVG or SVG file named x.png runs as
+# one. The input must name its format (`png:/tmp/x.png`), which pins the coder to it.
+INPUT_IMAGE = re.compile(r"(png|jpe?g|webp):([^:@|<>]+\.(png|jpe?g|webp))", re.IGNORECASE)
 
 
 def check_magick(args: list[str], cwd: str) -> None:
-    """`magick <screenshot> [-crop G] [+repage] … <out>`: both images under the save dirs, plain
-    paths only (a `coder:` prefix or `@file` makes ImageMagick read or run something else)."""
+    """`magick png:<screenshot> [-crop G] [+repage] … <out>`: both images under the save dirs. The
+    input's format prefix is required; any other `coder:` prefix or `@file` is refused."""
     images: list[str] = []
     i = 0
     while i < len(args):
@@ -93,7 +96,10 @@ def check_magick(args: list[str], cwd: str) -> None:
     if len(images) != 2:
         raise Blocked("`magick` takes one input screenshot and one output image")
     dirs = save_dirs(cwd)
-    for image in images:
+    m = INPUT_IMAGE.fullmatch(images[0])
+    if not m or m.group(1).lower().replace("jpg", "jpeg") != m.group(3).lower().replace("jpg", "jpeg"):
+        raise Blocked("`magick` input names its format to match its extension: `magick png:/tmp/x.png …`")
+    for image in (m.group(2), images[1]):
         if not IMAGE.fullmatch(image) or not any(browser_guard.inside(image, d, cwd) for d in dirs):
             raise Blocked(f"`magick` reads and writes only .png/.jpg/.webp files under {' or '.join(dirs)}")
 
@@ -127,23 +133,50 @@ def session_miner(cwd: str) -> Callable[[str, list[str]], bool]:
 
 COMPOSER_READ = {"outdated", "audit", "show"}
 NPM_READ = {"outdated", "audit", "ls", "list", "view", "info"}
+# The subcommand comes first and every flag is a known boolean or carries its value after `=`.
+# A flag that takes a separate value (`composer -d outdated update`, `npm --cache outdated
+# install`) would hide the real subcommand behind a word this guard reads as the subcommand.
+COMPOSER_FLAGS = {"--direct", "--locked", "--no-interaction", "-n", "--no-plugins", "--no-scripts",
+                  "--no-dev", "--minor-only", "--patch-only", "--major-only", "--strict", "--all",
+                  "--latest", "--outdated", "--no-ansi", "--ansi", "--tree", "-D", "-a", "-l", "-o", "-m"}
+COMPOSER_VALUE_FLAGS = {"--format", "--abandoned", "--ignore-severity", "--ignore"}
+NPM_FLAGS = {"--json", "--long", "--all", "--parseable", "--omit-lockfile-only", "--production"}
+NPM_VALUE_FLAGS = {"--depth", "--omit", "--include", "--audit-level"}
+PACKAGE = re.compile(r"(@[a-z0-9._~-]+/)?[a-z0-9._~-]+(/[a-z0-9._~-]+)?(@[\w.^~<>=*|-]+)?", re.IGNORECASE)
+
+
+def check_package_args(tool: str, sub: str, args: list[str], bools: set, values: set) -> list[str]:
+    positional = []
+    for a in args:
+        name, eq, _ = a.partition("=")
+        if a.startswith("-"):
+            if (a in bools) or (eq and name in values):
+                continue
+            raise Blocked(f"`{tool} {sub} {a}` is not an allowed flag (value flags take `=`)")
+        if not PACKAGE.fullmatch(a):
+            raise Blocked(f"`{tool} {sub}` takes package names only, not `{a}`")
+        positional.append(a)
+    return positional
 
 
 def check_composer(args: list[str]) -> None:
-    sub = next((a for a in args if not a.startswith("-")), "")
+    sub = args[0] if args else ""
     if sub not in COMPOSER_READ:
-        raise Blocked(f"`composer {sub}` is not read-only; only {', '.join(sorted(COMPOSER_READ))}")
+        raise Blocked(f"`composer {sub}` is not read-only; only {', '.join(sorted(COMPOSER_READ))}, as the first word")
+    positional = check_package_args("composer", sub, args[1:], COMPOSER_FLAGS, COMPOSER_VALUE_FLAGS)
+    if sub == "audit" and positional:
+        raise Blocked("`composer audit` takes no package")
     # A project's plugins and scripts are its own code: without these flags they run.
     if "--no-plugins" not in args or "--no-scripts" not in args:
         raise Blocked("`composer` needs --no-plugins and --no-scripts: the project's plugins and scripts are untrusted")
 
 
 def check_npm(args: list[str]) -> None:
-    positional = [a for a in args if not a.startswith("-")]
-    sub = positional[0] if positional else ""
+    sub = args[0] if args else ""
     if sub not in NPM_READ:
-        raise Blocked(f"`npm {sub}` is not read-only; only {', '.join(sorted(NPM_READ))}")
-    if sub == "audit" and len(positional) > 1:
+        raise Blocked(f"`npm {sub}` is not read-only; only {', '.join(sorted(NPM_READ))}, as the first word")
+    positional = check_package_args("npm", sub, args[1:], NPM_FLAGS, NPM_VALUE_FLAGS)
+    if sub == "audit" and positional:
         raise Blocked("`npm audit` takes no subcommand (`npm audit fix` changes the lockfile)")
 
 

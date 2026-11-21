@@ -51,6 +51,21 @@ SEARCH_LABEL = re.compile(r"\s*search\b", re.IGNORECASE)
 GET_SUBCOMMANDS = {"text", "html", "value", "attr", "title", "url", "count", "box", "styles"}
 
 
+def metadata_host(host: str) -> bool:
+    """Link-local addresses (169.254.0.0/16, fe80::/10) and the cloud metadata names: a page
+    the reviewer reads must not steer it to instance credentials. Loopback and private ranges
+    stay open, since the app under review usually runs there."""
+    import ipaddress
+    host = host.strip("[]").lower().rstrip(".")
+    if host in ("metadata.google.internal", "metadata", "instance-data"):
+        return True
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return ip.is_link_local or str(ip) == "fd00:ec2::254"
+
+
 def same_origin(url: str, origin: str) -> bool:
     a, b = urlsplit(url), urlsplit(origin)
     return a.scheme in ("http", "https") and (a.scheme, a.netloc) == (b.scheme, b.netloc)
@@ -225,6 +240,8 @@ def check_verb(verb: str, rest: list[str], cwd: str, save_dirs: list[str], origi
         if origin is None:
             if len(rest) != 1 or urlsplit(rest[0]).scheme not in ("http", "https"):
                 raise Blocked(f"`{verb}` takes one http(s) URL")
+            if metadata_host(urlsplit(rest[0]).hostname or ""):
+                raise Blocked(f"`{verb}` never opens a link-local or cloud metadata address")
             return
         if len(rest) != 1 or not same_origin(rest[0], origin):
             raise Blocked(f"`{verb}` is only allowed on {origin} — navigate by clicking")

@@ -19,7 +19,8 @@ Rules that hold regardless of the brief:
 
 - Read-only. Use Bash only for the `git diff` / `git show` commands the brief names, for
   `agent-browser` to open, hover, focus, click, scroll, set the viewport or color scheme, and
-  screenshot, and for `magick` to crop a screenshot you took. Save screenshots and crops under
+  screenshot, and for `magick` to crop a screenshot you took (name the input's format:
+  `magick png:/tmp/shot.png -crop 400x300+0+0 +repage /tmp/crop.png`). Save screenshots and crops under
   the temp directory (`$TMPDIR` or `/tmp`) or `.scratch/`; a hook refuses any other path, and
   typing (except into a search box), `eval`, and every other shell command. In the browser you
   may hide a dev toolbar that covers the page; change nothing else. Never confirm an action
