@@ -91,8 +91,19 @@ describe('classify', () => {
     expect(effort.state).toBe('open')
     expect(effort.frontier).toEqual(['tickets/02-b.md'])
     expect(effort.next).toBe('/implement .scratch/auth/tickets/02-b.md')
-    expect(effort.files.find(f => f.path === 'tickets/02-b.md')?.openBlockers).toEqual([])
-    expect(effort.files.find(f => f.path === 'tickets/03-c.md')?.openBlockers).toEqual(['02'])
+  })
+
+  test('openBlockers keeps only the blockers still open, as scratch-state.sh open_blockers', async () => {
+    const files = [
+      parseFile('spec.md', 'spec', ticket('ready-for-agent')),
+      parseFile('tickets/01-a.md', 'ticket', ticket('closed')),
+      parseFile('tickets/02-b.md', 'ticket', ticket('ready-for-agent')),
+      parseFile('tickets/03-c.md', 'ticket', ticket('ready-for-agent', 'blocked-by: [01, 02]\n')),
+      parseFile('tickets/04-d.md', 'ticket', ticket('in-progress', 'blocked-by: [01]\n')),
+    ]
+    const effort = classify('auth', files, NOW, NOW)
+    expect(effort.openBlockers['tickets/03-c.md']).toEqual(['02'])
+    expect(effort.openBlockers['tickets/04-d.md'] ?? []).toEqual([])
   })
 
   test('a delivery ticket at ready-for-human waits for the deploy', async () => {

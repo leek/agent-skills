@@ -1,23 +1,17 @@
-#!/usr/bin/env python3
-"""PreToolUse guard: read-only agents with `memory:` may write only their memory files.
+"""File-write policy: read-only agents with `memory:` may write only their memory files.
 
 These agents read untrusted input (PR comments, transcripts, diffs), so they stay
-read-only, but `memory:` needs Write and Edit to keep its notes. Wired from
-hooks/hooks.json on the file-write tools. For an agent in MEMORY_ONLY, a write passes
-only when its real path lies under `.claude/agent-memory/` of the working directory or one
-of its parents (project memory) or `~/.claude/agent-memory/` (user memory; under a profile,
-`$CLAUDE_CONFIG_DIR/agent-memory/`); anything else,
-a symlink that leads out of those included, exits 2. Every other caller
-passes. Grok's `search_replace` sends the same `file_path` key, so it is covered too.
+read-only, but `memory:` needs Write and Edit to keep its notes. hooks/pre_tool_guard.py
+enforces this policy on file-write tool calls (including Grok's `search_replace`). A write
+passes only when its real path lies under `.claude/agent-memory/` of the working directory
+or one of its parents (project memory) or `~/.claude/agent-memory/` (user memory; under a
+profile, `$CLAUDE_CONFIG_DIR/agent-memory/`). Symlinks leading outside those roots are blocked.
 """
 
-import json
 import os
-import sys
 
-MEMORY_ONLY = {"deepening-scout", "dependency-auditor", "finding-verifier",
-               "release-notes-collector", "session-miner", "standards-reviewer",
-               "upgrade-impact-scout"}
+from shell_syntax import Blocked
+
 PATH_KEYS = ("file_path", "path", "target_file")
 
 
@@ -47,19 +41,13 @@ def memory_path(path: str, cwd: str) -> bool:
     return any(full.startswith(root + os.sep) for root in memory_roots(cwd))
 
 
-def run_payload(payload: dict) -> int:
-    agent = (payload.get("agent_type") or payload.get("subagentType") or "").rsplit(":", 1)[-1]
-    if agent not in MEMORY_ONLY:
-        return 0
-    tool_input = payload.get("tool_input") or payload.get("toolInput") or {}
+def check(tool_input: dict, cwd: str) -> None:
+    if not isinstance(tool_input, dict):
+        raise TypeError(f"tool_input must be a dict, got {type(tool_input).__name__}")
+    if cwd and not isinstance(cwd, str):
+        raise TypeError(f"cwd must be a str, got {type(cwd).__name__}")
     path = next((tool_input[k] for k in PATH_KEYS if isinstance(tool_input.get(k), str)), "")
-    if path and memory_path(path, payload.get("cwd", "")):
-        return 0
-    print(f"BLOCKED: {agent} is read-only; it may write only its memory files under "
-          ".claude/agent-memory/ (or $CLAUDE_CONFIG_DIR/agent-memory/). Report what you found instead of changing files.",
-          file=sys.stderr)
-    return 2
-
-
-if __name__ == "__main__":
-    sys.exit(run_payload(json.load(sys.stdin)))
+    if path and memory_path(path, cwd):
+        return
+    raise Blocked("it may write only its memory files under .claude/agent-memory/ "
+                  "(or $CLAUDE_CONFIG_DIR/agent-memory/)")

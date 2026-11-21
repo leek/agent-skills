@@ -148,7 +148,6 @@ export function parseFile(path: string, kind: ScratchKind, text: string): Scratc
     status: (status.trim().replace(/[`*]/g, '').trim().split(/\s+/)[0] ?? '').toLowerCase(),
     claimedBy,
     blockedBy,
-    openBlockers: [],
     delivery: field('delivery').toLowerCase() === 'true',
     openQuestions: questions.length,
   }
@@ -212,28 +211,30 @@ export function classify(
 
           return blocker === undefined || !closed(blocker) ? [id] : []
         })
-  const resolvedFiles = files.map(f => ({ ...f, openBlockers: openBlockers(f) }))
-  const byKind = (kind: ScratchKind) => resolvedFiles.filter(f => f.kind === kind)
+  const blockers = new Map(files.map(f => [f, openBlockers(f)]))
+  const byKind = (kind: ScratchKind) => files.filter(f => f.kind === kind)
   const derived = (file: ScratchFile): Derived => {
     if (file.status === '') return 'unreadable'
     if (closed(file)) return 'closed'
     if (file.claimedBy !== '' || file.status === 'in-progress') return 'in progress'
 
-    return file.openBlockers.length > 0 ? 'blocked' : 'ready'
+    return (blockers.get(file) ?? []).length > 0 ? 'blocked' : 'ready'
   }
   const isReady = (file: ScratchFile) => derived(file) === 'ready'
 
-  const frontier = resolvedFiles
+  const frontier = files
     .filter(f => isWork(f) && isReady(f))
     .sort((a, b) => byNumber(a.number, b.number))
     .map(f => f.path)
 
-  const base = { slug, files: resolvedFiles, lastChangeMs, frontier, isStale: false }
-  const mismatch = findMismatch(resolvedFiles, extraClosed)
+  // The pane shows these, not the raw `blockedBy`: a closed blocker no longer holds anything.
+  const stillOpen = [...blockers].filter(([, ids]) => ids.length > 0).map(([f, ids]) => [f.path, ids])
+  const base = { slug, files, lastChangeMs, frontier, openBlockers: Object.fromEntries(stillOpen), isStale: false }
+  const mismatch = findMismatch(files, extraClosed)
   if (mismatch !== '') {
     return { ...base, state: 'mismatched', next: mismatch }
   }
-  const open = openFiles(resolvedFiles, extraClosed)
+  const open = openFiles(files, extraClosed)
   if (open.length === 0) {
     return { ...base, state: 'done', next: '/scratch-cleanup' }
   }
