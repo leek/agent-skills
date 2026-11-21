@@ -17,15 +17,19 @@
 # failure while git deletes the directory (a permission, a file in use). Then the site is
 # already unserved, and "reason" is "git worktree remove refused".
 #
-# It never drops a database a calling skill created: it prints those still registered
-# for the worktree, so the caller runs `scratch-db.sh drop <database>` for each.
+# By default it drops no database a calling skill created: it prints those still registered
+# for the worktree. With --drop-databases, once git has removed the worktree, it runs
+# `scratch-db.sh drop <database>` (the one drop, with all its safety checks) for each of
+# them, and reports what went and what stayed; a kept worktree drops nothing.
 # A database Herd created (`--database=clone|empty`) Herd drops itself; this script
 # unregisters it.
 #
-# Usage: remove-worktree.sh <worktree path> [--branch <name>]
+# Usage: remove-worktree.sh <worktree path> [--branch <name>] [--drop-databases]
 # Output: JSON {"path","removed":true|false,"reason","branch","branch_deleted":true|false,
 #   "branch_reason","herd_unserve_failed":null|{"database_mode","database_name"},
 #   "databases":[{"connection","database","worktree"}]}  (databases is [] when kept)
+#   With --drop-databases it adds "dropped":[names] and "kept":[{"database","reason"}], and
+#   "databases" lists what is still registered for the path after the drops.
 # Exit 0 whether or not git removed it; "removed" and "reason" say which.
 
 set -e
@@ -34,13 +38,15 @@ command -v jq >/dev/null 2>&1 || { echo "jq is required" >&2; exit 1; }
 here=$(cd "$(dirname "$0")" && pwd)
 wt=${1:-}
 branch=""
-usage="Usage: remove-worktree.sh <worktree path> [--branch <name>]"
+drop_dbs=0
+usage="Usage: remove-worktree.sh <worktree path> [--branch <name>] [--drop-databases]"
 case "$wt" in -h|--help) echo "$usage" >&2; exit 0 ;; esac
 [ -n "$wt" ] || { echo "$usage" >&2; exit 2; }
 shift
 while [ $# -gt 0 ]; do
   case "$1" in
     --branch) [ -n "${2:-}" ] || { echo "--branch needs a name" >&2; exit 2; }; branch=$2; shift ;;
+    --drop-databases) drop_dbs=1 ;;
     *) echo "Unknown arg: $1" >&2; exit 2 ;;
   esac
   shift
@@ -146,8 +152,25 @@ if [ -n "$branch" ]; then
 fi
 
 if [ "$removed" = 1 ]; then dbs=$(bash "$here/scratch-db.sh" list "$wt"); else dbs="[]"; fi
+
+# --drop-databases: only after git removed the worktree (a kept one keeps its databases),
+# each registered name once, through scratch-db.sh drop, which exits 1 when it keeps one.
+drops='{"dropped":[],"kept":[]}'
+if [ "$drop_dbs" = 1 ] && [ "$removed" = 1 ]; then
+  while IFS= read -r d; do
+    [ -n "$d" ] || continue
+    res=$(bash "$here/scratch-db.sh" drop "$d") || true
+    printf '%s' "$res" | jq -e 'has("dropped") and has("kept")' >/dev/null 2>&1 \
+      || res=$(jq -n -c --arg d "$d" '{dropped: [], kept: [{database: $d, reason: "scratch-db.sh drop failed"}]}')
+    drops=$(jq -n -c --argjson a "$drops" --argjson b "$res" '{dropped: ($a.dropped + $b.dropped), kept: ($a.kept + $b.kept)}')
+  done < <(printf '%s' "$dbs" | jq -r '[.[].database] | unique[]')
+  dbs=$(bash "$here/scratch-db.sh" list "$wt")
+fi
+
 jq -n -c --arg path "$wt" --argjson removed "$(bool $removed)" --arg reason "$reason" --arg branch "$branch" \
   --argjson branch_deleted "$(bool $branch_deleted)" --arg branch_reason "$branch_reason" \
   --argjson herd_unserve_failed "$herd_failed" --argjson databases "$dbs" \
+  --argjson drops "$drops" --argjson with_drops "$(bool $drop_dbs)" \
   '{path: $path, removed: $removed, reason: $reason, branch: $branch, branch_deleted: $branch_deleted,
-    branch_reason: $branch_reason, herd_unserve_failed: $herd_unserve_failed, databases: $databases}'
+    branch_reason: $branch_reason, herd_unserve_failed: $herd_unserve_failed, databases: $databases}
+   + (if $with_drops then $drops else {} end)'

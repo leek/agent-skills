@@ -75,6 +75,6 @@ gh issue view N --json state
 
 At step 6, for each item it removes: from the main checkout, remove
 `.claude/worktrees/issues-<run>` by `laravel-herd-worktrees`' **Remove a served worktree**
-(`bash <this-skill-dir>/../laravel-herd-worktrees/scripts/remove-worktree.sh <worktree>`; it never forces, and a refusal means unsaved work, so report it).
-Then run `bash <this-skill-dir>/../laravel-herd-worktrees/scripts/scratch-db.sh drop <database>` for each database its `databases` lists, plus any this run registered with `-` (no worktree).
-It drops the database and its parallel-testing copies, unregisters them, and prints `{"dropped":[names],"kept":[{"database","reason"}]}`: report each `kept` entry.
+(`bash <this-skill-dir>/../laravel-herd-worktrees/scripts/remove-worktree.sh <worktree> --drop-databases`; it never forces, and a refusal means unsaved work, so report it).
+Once git has removed the worktree it drops each database registered for it and their parallel-testing copies, unregisters them, and adds `"dropped":[names]` and `"kept":[{"database","reason"}]` to its JSON: report each `kept` entry.
+For each database this run registered with `-` (no worktree), run `bash <this-skill-dir>/../laravel-herd-worktrees/scripts/scratch-db.sh drop <database>`, which prints the same `dropped` and `kept`.

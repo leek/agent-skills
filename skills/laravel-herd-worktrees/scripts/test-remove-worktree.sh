@@ -1,7 +1,8 @@
 #!/bin/bash
 # Offline test of remove-worktree.sh: the refusals (dirty tree, locked, main checkout,
 # submodules, a path that is not a worktree), each before Herd is touched, the removal, and valid JSON for a path and a branch argument holding a space, a double quote
-# and a tab. `herd` is a stub first on PATH that records its calls; HOME is a temp directory.
+# and a tab; and --drop-databases with the drop's refusals. `herd` and `psql` are stubs first
+# on PATH that record their calls; HOME is a temp directory.
 # Run: bash test-remove-worktree.sh
 
 set -e
@@ -27,9 +28,21 @@ case "$1" in
   workspace:delete) exit "${STUB_DELETE_RC:-0}" ;;
 esac
 STUB
-chmod +x "$t/bin/herd"
+# --- stub psql: records "host<TAB>port<TAB>statement" in $STUB_SQL, lists $STUB_DBS ---------
+cat > "$t/bin/psql" <<'STUB'
+#!/bin/bash
+host=""; port=""; stmt=""
+while [ $# -gt 0 ]; do
+  case "$1" in -h) host=$2; shift ;; -p) port=$2; shift ;; -Atqc) stmt=$2; shift ;; esac
+  shift
+done
+printf '%s\t%s\t%s\n' "$host" "$port" "$stmt" >> "$STUB_SQL"
+case "$stmt" in SELECT*) cat "$STUB_DBS" ;; esac
+STUB
+chmod +x "$t/bin/herd" "$t/bin/psql"
 export PATH="$t/bin:$PATH" HOME="$t/home"
-export STUB_LOG="$t/herd.log" STUB_SERVED="$t/served"
+export STUB_LOG="$t/herd.log" STUB_SERVED="$t/served" STUB_SQL="$t/sql.log" STUB_DBS="$t/server-dbs"
+: > "$STUB_SQL"; : > "$STUB_DBS"
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.com GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.com
 : > "$STUB_SERVED"; : > "$STUB_LOG"
@@ -197,3 +210,72 @@ jqt '.removed == false and .reason == "not a worktree of this repository"' "not 
 [ ! -s "$STUB_LOG" ] || fail "not a worktree: Herd was called: $(cat "$STUB_LOG")"
 [ -f "$t/wt-inner/dir/file" ] || fail "not a worktree: the directory is gone"
 ok "a path that is not a worktree is refused before Herd is touched"
+
+# --- --drop-databases: the one drop, after the removal, with its refusals ---------------------
+# The main checkout is on a local pgsql server with database app; .env files are ignored, so
+# a worktree's own .env leaves it clean.
+printf '.herd-workspace.json\n.env\n' > .gitignore
+git commit -q -am "ignore .env"
+env_main() { printf 'DB_CONNECTION=pgsql\nDB_HOST=%s\nDB_PORT=5432\nDB_DATABASE=app\n' "$1" > "$repo/.env"; }
+env_main 127.0.0.1
+printf 'postgres 7 MB\napp 9 MB\napp_rm 8 MB\napp_rm_test_1 8 MB\napp_rm_test_x 8 MB\n' > "$STUB_DBS"
+drops() { grep -c 'DROP DATABASE' "$STUB_SQL" 2>/dev/null || true; }
+
+# A kept worktree drops nothing, and the flag adds its two fields.
+git worktree add -q -b keepdb "$t/wt-keepdb"
+bash "$here/scratch-db.sh" register pgsql app_rm "$t/wt-keepdb" 2>/dev/null
+echo scratch > "$t/wt-keepdb/untracked.txt"
+: > "$STUB_SQL"
+run "$t/wt-keepdb" --drop-databases
+jqt '.removed == false and .databases == [] and .dropped == [] and .kept == []' "drop flag, kept worktree"
+[ ! -s "$STUB_SQL" ] || fail "drop flag, kept worktree: SQL ran: $(cat "$STUB_SQL")"
+grep -q "	app_rm	" "$registry" || fail "drop flag, kept worktree: its database was unregistered"
+rm "$t/wt-keepdb/untracked.txt"
+ok "--drop-databases on a refused removal sends no SQL and keeps the registry line"
+
+# Removed: the registered database and its _test_<N> copy go, and nothing else.
+run "$t/wt-keepdb" --drop-databases
+jqt '.removed == true and .dropped == ["app_rm","app_rm_test_1"] and .kept == [] and .databases == []' "drop flag, removed"
+[ "$(drops)" = 2 ] || fail "drop flag: ran $(drops) DROP statements, expected 2: $(cat "$STUB_SQL")"
+grep -q 'app_rm_test_x\|"app"' "$STUB_SQL" && fail "drop flag touched a database that is not a copy"
+grep -q "	app_rm	" "$registry" && fail "drop flag: app_rm is still registered"
+ok "--drop-databases drops the worktree's registered database and its _test_<N> copies after the removal"
+
+# A name the main checkout uses, registered for the worktree by mistake, stays.
+git worktree add -q -b usedb "$t/wt-usedb"
+bash "$here/scratch-db.sh" register pgsql app "$t/wt-usedb" 2>/dev/null
+: > "$STUB_SQL"
+run "$t/wt-usedb" --drop-databases
+jqt '.removed == true and .dropped == [] and (.kept | length == 1) and .kept[0].database == "app" and (.kept[0].reason | test("main checkout")) and (.databases | map(.database) == ["app"])' "drop flag, main checkout's name"
+[ "$(drops)" = 0 ] || fail "drop flag, main checkout's name: a DROP ran"
+bash "$here/scratch-db.sh" unregister app 2>/dev/null
+ok "--drop-databases keeps a name the main checkout uses, and it stays registered"
+
+# A database registered on a host that is not local stays, and no client is called.
+git worktree add -q -b farhost "$t/wt-farhost"
+env_main db.example.com
+bash "$here/scratch-db.sh" register pgsql app_far "$t/wt-farhost" 2>/dev/null
+env_main 127.0.0.1
+: > "$STUB_SQL"
+run "$t/wt-farhost" --drop-databases
+jqt '.removed == true and .dropped == [] and .kept[0].database == "app_far" and (.kept[0].reason | test("not local"))' "drop flag, remote host"
+[ ! -s "$STUB_SQL" ] || fail "drop flag, remote host: the client was called: $(cat "$STUB_SQL")"
+ok "--drop-databases keeps a database on a host that is not local, without calling the client"
+
+# Registered on port 5433 from the worktree's own .env: once the worktree is gone nothing
+# here reaches 5433, so it stays rather than being dropped on the main checkout's 5432.
+git worktree add -q -b port5433 "$t/wt-5433"
+printf 'DB_CONNECTION=pgsql\nDB_HOST=127.0.0.1\nDB_PORT=5433\nDB_DATABASE=app_p\n' > "$t/wt-5433/.env"
+bash "$here/scratch-db.sh" register pgsql app_p "$t/wt-5433" 2>/dev/null
+: > "$STUB_SQL"
+run "$t/wt-5433" --drop-databases
+jqt '.removed == true and .dropped == [] and .kept[0].database == "app_p" and (.kept[0].reason | test("registered on 127.0.0.1:5433"))' "drop flag, other server"
+[ ! -s "$STUB_SQL" ] || fail "drop flag, other server: SQL ran: $(cat "$STUB_SQL")"
+grep -q "	app_p	" "$registry" || fail "drop flag, other server: app_p was unregistered"
+ok "--drop-databases keeps a database registered on a server no remaining .env reaches"
+
+# Without the flag the output is the default shape: no dropped or kept fields.
+git worktree add -q -b noflag "$t/wt-noflag"
+run "$t/wt-noflag"
+jqt 'has("dropped") == false and has("kept") == false' "no flag"
+ok "without --drop-databases the JSON keeps its default fields"

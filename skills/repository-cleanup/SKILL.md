@@ -72,7 +72,7 @@ bash <this-skill-dir>/scripts/prune-merged-worktrees.sh    # list: merged clean 
 bash <this-skill-dir>/scripts/prune-merged-worktrees.sh --remove <worktree path> --drop pgsql:<database>   # selected items only; add --allow-prefix-only when a selected database's source is prefix-only
 ```
 
-A worktree's database can be dropped only in the same run that removes that worktree. Never pass a name the user did not select, and never build the arguments from the whole list.
+A worktree's database can be dropped only in the same run that removes that worktree. Never pass a name the user did not select, and never build the arguments from the whole list. Each removal runs `laravel-herd-worktrees`' `remove-worktree.sh` (Herd unserves the path, never `--force`, the local branch stays), and each drop its `scratch-db.sh drop-selected`, which drops exactly the selected name; a worktree or database either one refuses is in `kept` with the reason.
 
 ## Databases
 

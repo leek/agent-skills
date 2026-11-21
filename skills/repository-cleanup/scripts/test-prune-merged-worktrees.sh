@@ -32,10 +32,19 @@ done
 printf 'psql\t%s\t%s\n' "$host" "$stmt" >> "$STUB_LOG"
 case "$stmt" in SELECT*) cat "$STUB_DBS" ;; esac
 STUB
-printf '#!/bin/bash\nexit 0\n' > "$t/bin/herd"
+cat > "$t/bin/herd" <<'STUB'
+#!/bin/bash
+# Records every call in $STUB_HERD; serves each "path<TAB>site" line of $STUB_SERVED.
+printf 'herd' >> "$STUB_HERD"; printf ' %s' "$@" >> "$STUB_HERD"; printf '\n' >> "$STUB_HERD"
+case "$1 $*" in
+  workspaces*--json*) jq -R -s '[split("\n")[] | select(length > 0) | split("\t") | {path: .[0], site: .[1], served: true}]' "$STUB_SERVED" ;;
+esac
+exit 0
+STUB
 chmod +x "$t/bin/gh" "$t/bin/psql" "$t/bin/herd"
 export PATH="$t/bin:$PATH" HOME="$t/home"
-export STUB_LOG="$t/sql.log" STUB_DBS="$t/server-dbs" STUB_MERGED="$t/merged"
+export STUB_LOG="$t/sql.log" STUB_DBS="$t/server-dbs" STUB_MERGED="$t/merged" STUB_HERD="$t/herd.log" STUB_SERVED="$t/served"
+: > "$STUB_HERD"; : > "$STUB_SERVED"
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.com GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.com
 
@@ -199,3 +208,42 @@ printf '%s' "$out" | jq -e '[.databases[].database | select(startswith("app_pr43
   || fail "metacharacter registry name: a registered database and its copy are offered: $out"
 printf '%s\n' "$registry_before" > "$registry"
 ok "a registry name like foo(bar does not make the other registered databases orphans"
+
+# --- every removal goes through remove-worktree.sh ------------------------------------------
+# wt-served: merged, clean, served by Herd at served.app.test, with a Pest cache -> Herd is
+#   asked to unserve that exact site, the cache goes, the branch stays.
+# wt-sub: merged and clean, but it holds a checked-out submodule, which git worktree remove
+#   refuses -> kept, before Herd is touched, and its selected database stays.
+git worktree add -q -b feat/served "$t/wt-served"
+printf 'DB_CONNECTION=pgsql\nDB_HOST=127.0.0.1\nDB_DATABASE=app_served\n' > "$t/wt-served/.env"
+printf '%s\tserved.app.test\n' "$t/wt-served" > "$STUB_SERVED"
+tia="$HOME/.pest/tia/wt-served-$(printf '%s' "$t/wt-served" | shasum -a 256 | cut -c1-16)"
+mkdir -p "$tia"
+git init -q -b main "$t/sub"
+git -C "$t/sub" commit -q --allow-empty -m sub
+git worktree add -q -b feat/sub "$t/wt-sub"
+git -C "$t/wt-sub" -c protocol.file.allow=always submodule add -q "$t/sub" lib 2>/dev/null
+git -C "$t/wt-sub" commit -q -m "add a submodule"
+printf 'DB_CONNECTION=pgsql\nDB_HOST=127.0.0.1\nDB_DATABASE=app_sub\n' > "$t/wt-sub/.env"
+[ -z "$(git -C "$t/wt-sub" status --porcelain)" ] || fail "submodule fixture is not clean"
+printf 'feat/served\t%s\nfeat/sub\t%s\n' "$(git -C "$t/wt-served" rev-parse HEAD)" "$(git -C "$t/wt-sub" rev-parse HEAD)" > "$STUB_MERGED"
+printf 'app_served 8 MB\napp_sub 8 MB\n' >> "$STUB_DBS"
+run
+printf '%s' "$out" | jq -e --arg a "$t/wt-served" --arg b "$t/wt-sub" '.worktrees | map(.path) == [$a, $b]' >/dev/null \
+  || fail "through remove-worktree: expected wt-served and wt-sub as candidates: $out"
+: > "$STUB_LOG"; : > "$STUB_HERD"
+run --remove "$t/wt-served" --remove "$t/wt-sub" --drop pgsql:app_served --drop pgsql:app_sub
+[ "$rc" = 0 ] || fail "through remove-worktree: exit $rc ($(cat "$t/err"))"
+printf '%s' "$out" | jq -e --arg a "$t/wt-served" --arg b "$t/wt-sub" \
+  '.removed == [$a] and .dropped == ["app_served"]
+   and (.kept | map(select(.path == $b and (.reason | test("submodules")))) | length == 1)
+   and (.kept | map(select(.path == "app_sub" and .reason == "its worktree was not removed")) | length == 1)' >/dev/null \
+  || fail "through remove-worktree: $out"
+grep -q '^herd workspace:delete --force --keep-files -- served.app.test$' "$STUB_HERD" || fail "Herd was not asked to unserve served.app.test: $(cat "$STUB_HERD")"
+[ "$(grep -c 'workspace:delete' "$STUB_HERD")" = 1 ] || fail "Herd was asked to unserve more than the served worktree: $(cat "$STUB_HERD")"
+[ ! -e "$t/wt-served" ] || fail "wt-served is still there"
+[ ! -e "$tia" ] || fail "wt-served's Pest cache was kept"
+[ -d "$t/wt-sub" ] || fail "the submodule worktree was removed"
+git rev-parse -q --verify refs/heads/feat/served >/dev/null || fail "the served worktree's branch was deleted"
+grep -q '"app_sub"' "$STUB_LOG" && fail "the kept worktree's database was dropped"
+ok "a removal goes through remove-worktree.sh: Herd unserves the served path, the Pest cache goes, a submodule worktree and its database stay"

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Offline test of scratch-db.sh: the registry subcommands, and `drop` with its refusals.
+# Offline test of scratch-db.sh: the registry subcommands, and `drop` and `drop-selected` with their refusals.
 # psql and mysql are stubs first on PATH that record every statement they are asked to run;
 # no database server is touched. Run: bash test-scratch-db.sh
 
@@ -275,19 +275,26 @@ jqt '.dropped == ["app_w"] and .kept == []' "drop on the recorded port"
 printf 'DB_CONNECTION=pgsql\nDB_DATABASE=app_env_testing\n' > .env.testing
 ok "drop sends every statement to the recorded port 5433, with the credentials of the env file that names it"
 
-# --- env_get reads a value the way dotenv does ----------------------------------------------
-get() { ( . "$here/scratch-db-lib.sh"; env_get "$t/dotenv" "$1" ); }
-printf 'A=app # main\r\nB="quo # ted" # note\r\nC=\047single # q\047\nD=plain\r\nE= # only a comment\nF=a#b\n export G = spaced \nH=first\nH=last\nI=\n' > "$t/dotenv"
-[ "$(get A)" = "app" ] || fail "env_get: inline comment and CR not stripped: [$(get A)]"
-[ "$(get B)" = "quo # ted" ] || fail "env_get: a double-quoted value keeps its #: [$(get B)]"
-[ "$(get C)" = "single # q" ] || fail "env_get: a single-quoted value keeps its #: [$(get C)]"
-[ "$(get D)" = "plain" ] || fail "env_get: trailing CR: [$(get D)]"
-[ -z "$(get E)" ] || fail "env_get: a value that is only a comment is empty: [$(get E)]"
-[ "$(get F)" = "a#b" ] || fail "env_get: a # with no whitespace before it is part of the value: [$(get F)]"
-[ "$(get G)" = "spaced" ] || fail "env_get: export and spaces round =: [$(get G)]"
-[ "$(get H)" = "last" ] || fail "env_get: the last assignment wins: [$(get H)]"
-[ -z "$(get I)$(get MISSING)" ] || fail "env_get: an empty or missing key is empty"
-ok "env_get strips an inline comment, a carriage return and whitespace, and keeps # inside quotes"
+# --- the env reader takes a value the way dotenv does (seen through register's DB_HOST) ------
+get() {  # get <printf format of the DB_HOST lines>: the host register records from a .env holding them
+  mkdir -p "$t/envdir"
+  # shellcheck disable=SC2059  # the argument is a format on purpose: it carries \r and \047
+  printf "DB_CONNECTION=pgsql\r\n$1\nDB_PORT=5432\n" > "$t/envdir/.env"
+  bash "$script" register pgsql app_envcase "$t/envdir" 2>/dev/null
+  awk -F'\t' '$3 == "app_envcase" { h = $2; sub(/^pgsql@/, "", h); sub(/:5432$/, "", h); print h }' "$registry"
+  bash "$script" unregister app_envcase 2>/dev/null
+}
+[ "$(get 'DB_HOST=app # main\r')" = "app" ] || fail "env reader: inline comment and CR not stripped: [$(get 'DB_HOST=app # main\r')]"
+[ "$(get 'DB_HOST="quo # ted" # note\r')" = "quo # ted" ] || fail "env reader: a double-quoted value keeps its #: [$(get 'DB_HOST="quo # ted" # note\r')]"
+[ "$(get 'DB_HOST=\047single # q\047')" = "single # q" ] || fail "env reader: a single-quoted value keeps its #"
+[ "$(get 'DB_HOST=plain\r')" = "plain" ] || fail "env reader: trailing CR"
+[ "$(get 'DB_HOST= # only a comment')" = "127.0.0.1" ] || fail "env reader: a value that is only a comment is empty (so the default host)"
+[ "$(get 'DB_HOST=a#b')" = "a#b" ] || fail "env reader: a # with no whitespace before it is part of the value"
+[ "$(get ' export DB_HOST = spaced ')" = "spaced" ] || fail "env reader: export and spaces round ="
+[ "$(get 'DB_HOST=first\nDB_HOST=last')" = "last" ] || fail "env reader: the last assignment wins"
+[ "$(get 'DB_HOST=')" = "127.0.0.1" ] || fail "env reader: an empty value is empty (so the default host)"
+rm -rf "$t/envdir"
+ok "the env reader strips an inline comment, a carriage return and whitespace, and keeps # inside quotes"
 
 # The consequence: the main checkout's database stays protected when its line has a comment.
 printf 'DB_CONNECTION=pgsql\r\nDB_HOST=127.0.0.1\r\nDB_PORT=5432\r\nDB_DATABASE=app # main\r\nDB_USERNAME=root\r\n' > "$repo/.env"
@@ -385,3 +392,54 @@ grep -q "	pgsql@" "$registry" && fail "pgsql entry for app_dual should have been
 grep -q "	mysql@127.0.0.1:3306	app_dual	" "$registry" || fail "mysql entry for app_dual was wrongly removed when mysql drop failed: $(cat "$registry")"
 printf 'DB_CONNECTION=pgsql\nDB_DATABASE=app_env_testing\n' > "$repo/.env.testing"
 ok "dropping pgsql does not remove mysql registry entry when mysql drop fails"
+
+# --- drop-selected: exactly the selected name, on the named server, same refusals ------------
+: > "$registry"
+env_main 127.0.0.1
+reset_log
+run drop-selected pgsql@127.0.0.1:5432 app_y
+[ "$rc" = 0 ] || fail "drop-selected of an unregistered name exits 0, got $rc ($(cat "$t/err"))"
+[ "$out" = '{"dropped":["app_y"],"kept":[]}' ] || fail "drop-selected output: $out"
+[ "$(drops)" = 1 ] || fail "drop-selected ran $(drops) DROP statements, expected 1 (no _test_<N> copies)"
+grep -q 'DROP DATABASE IF EXISTS "app_y"$' "$STUB_LOG" || fail "drop-selected: no DROP for app_y"
+grep -q 'SELECT' "$STUB_LOG" && fail "drop-selected listed the server, which an exact name never needs"
+ok "drop-selected drops exactly the named database, not its _test_<N> copies, with no registry line needed"
+
+bash "$script" register pgsql app_sel - 2>/dev/null
+bash "$script" register mysql app_sel - 2>/dev/null
+reset_log
+run drop-selected pgsql@127.0.0.1:5432 app_sel
+[ "$rc" = 0 ] || fail "drop-selected of a registered name exits 0, got $rc"
+grep -q "	pgsql@127.0.0.1:5432	app_sel	" "$registry" && fail "drop-selected left the pgsql line"
+grep -q "	mysql@127.0.0.1:3306	app_sel	" "$registry" || fail "drop-selected removed the other connection's line"
+ok "drop-selected unregisters only the dropped connection's line"
+
+sel_refused() {  # sel_refused <case> <server> <database> <reason pattern>
+  before=$(cat "$registry")
+  reset_log
+  run drop-selected "$2" "$3"
+  [ "$rc" = 1 ] || fail "$1: exit $rc, expected 1 ($out)"
+  printf '%s' "$out" | jq -e --arg d "$3" --arg r "$4" '.dropped == [] and .kept[0].database == $d and (.kept[0].reason | test($r))' >/dev/null \
+    || fail "$1: expected $3 kept for /$4/, got $out"
+  [ "$(drops)" = 0 ] || fail "$1: a DROP ran"
+  [ "$(cat "$registry")" = "$before" ] || fail "$1: the registry changed"
+}
+sel_refused "drop-selected, main checkout's database" pgsql@127.0.0.1:5432 app "used by the main checkout"
+sel_refused "drop-selected, copy of it" pgsql@127.0.0.1:5432 app_test_1 "used by the main checkout"
+sel_refused "drop-selected, remaining worktree's" pgsql@127.0.0.1:5432 app_other "remaining worktree"
+sel_refused "drop-selected, bad name" pgsql@127.0.0.1:5432 'a-b' "not \\[A-Za-z0-9_\\]\\+"
+sel_refused "drop-selected, remote host" pgsql@db.example.com:5432 app_y "not local"
+[ ! -s "$STUB_LOG" ] || fail "drop-selected, remote host: the client was called"
+sel_refused "drop-selected, server no env reaches" pgsql@127.0.0.1:5433 app_y "registered on 127.0.0.1:5433"
+[ ! -s "$STUB_LOG" ] || fail "drop-selected, unreached server: the client was called"
+printf '1000000000\tpgsql@127.0.0.1:5433\tapp_elsewhere\t-\n' >> "$registry"
+sel_refused "drop-selected, registered on another server" pgsql@127.0.0.1:5432 app_elsewhere "registered on 127.0.0.1:5433, not on 127.0.0.1:5432"
+ok "drop-selected keeps a checkout's database, a bad name, a remote host, an unreached server, and a name registered on another server"
+
+run drop-selected pgsql app_y
+[ "$rc" = 2 ] || fail "drop-selected with no server exits 2, got $rc"
+run drop-selected sqlite@x:1 app_y
+[ "$rc" = 2 ] || fail "drop-selected on sqlite exits 2, got $rc"
+run drop-selected pgsql@127.0.0.1:5432
+[ "$rc" = 2 ] || fail "drop-selected with no name exits 2, got $rc"
+ok "drop-selected usage errors exit 2"
