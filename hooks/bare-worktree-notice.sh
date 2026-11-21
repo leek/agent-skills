@@ -9,7 +9,10 @@ set -e
 dir="${CLAUDE_PROJECT_DIR:-$PWD}"
 [[ -f "$dir/.git" ]] || exit 0  # a linked worktree has a .git file; the main checkout has a directory
 grep -qE '^gitdir:[[:space:]]+' "$dir/.git" 2>/dev/null || exit 0
-if grep -qE '^gitdir:[[:space:]]+(.*/)?modules(/|$)' "$dir/.git" 2>/dev/null; then
+# A submodule's gitdir is <...>/.git/modules/<name>; a linked worktree's is <...>/.git/worktrees/<name>,
+# even when its repo sits under a directory named modules/.
+gitdir=$(sed -n 's/^gitdir:[[:space:]]*//p' "$dir/.git" | head -n 1)
+if [[ "$gitdir" == *.git/modules/* && "$gitdir" != */worktrees/* ]]; then
   exit 0  # git submodule, not a linked worktree
 fi
 [[ -f "$dir/artisan" && -f "$dir/composer.json" && ! -e "$dir/vendor" ]] || exit 0
