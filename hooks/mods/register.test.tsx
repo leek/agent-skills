@@ -682,7 +682,7 @@ test('/scratch resolves repo root from subdirectories, handles truncated git log
   expect(await pane.find({ type: 'Text', text: /10 Waiting {2}\[blocked by 09\]/ })).toBeDefined()
 })
 
-test('a cut-short git log costs at most 8 per-file lookups a scan, cached, and the rest take the oldest time it showed', async ($, on) => {
+test('a cut-short git log costs at most 8 per-file lookups a scan, cached, and no file reads as freshly checked out', async ($, on) => {
   const DAY = 86_400_000
   const now = 100 * DAY
   const names = Array.from({ length: 20 }, (_, i) => `${String(i + 1).padStart(2, '0')}-t.md`)
@@ -727,4 +727,42 @@ test('a cut-short git log costs at most 8 per-file lookups a scan, cached, and t
   await $.command.run({ command: 'scratch', args: '' } as never)
   expect(looked.length).toBe(16)
   expect(new Set(looked).size).toBe(16)
+})
+
+test('files a cut-short git log left out never make an effort fresher than its known commit times', async ($, on) => {
+  const DAY = 86_400_000
+  const now = 100 * DAY
+  const names = Array.from({ length: 20 }, (_, i) => `${String(i + 1).padStart(2, '0')}-t.md`)
+  const files = Object.fromEntries(
+    names.map(n => [`/repo/.scratch/auth/tickets/${n}`, '---\ntitle: T\nstatus: ready-for-agent\n---\n']),
+  )
+  on('ui.render', async ($, e) => engineDraw($, e))
+  mock.clock(on, { now })
+  on('session.cwd', async () => ({ value: '/repo' }) as never)
+  on('fs.exists', async (_$, e) => ({ value: e.path === '/repo/.scratch' }) as never)
+  on('fs.read', async (_$, e) => ({ value: files[(e as { path: string }).path] ?? '' }) as never)
+  on('fs.list', async (_$, e) => {
+    const seen = new Map<string, 'file' | 'dir'>()
+    for (const full of Object.keys(files)) {
+      if (!full.startsWith(`${e.path}/`)) continue
+      const parts = full.slice(e.path.length + 1).split('/')
+      seen.set(parts[0] ?? '', parts.length > 1 ? 'dir' : 'file')
+    }
+    return { value: [...seen].map(([name, kind]) => ({ name, kind, size: 1, mtimeMs: now, isLink: false })) } as never
+  })
+  on('process.run', async (_$, e) => {
+    const argv = (e as { argv: readonly string[] }).argv
+    const ok = (stdout: string, isStdoutTruncated = false) =>
+      ({ value: { exitCode: 0, stdout, stderr: '', isStdoutTruncated, isStderrTruncated: false } }) as never
+    if (argv[1] === 'rev-parse') return ok(argv.includes('HEAD') ? 'abc123\n' : '/repo\n')
+    if (argv[1] === 'ls-files') return ok(names.map(n => `.scratch/auth/tickets/${n}\0`).join(''))
+    // Every ticket was last committed 50 days ago.
+    if (argv.includes('-1')) return ok(`${(now - 50 * DAY) / 1000}\n`)
+    // The cut log only reaches 10 days back, through commits to files outside the effort.
+    return ok(`\0${(now - 5 * DAY) / 1000}\n\n.scratch/other.md\n\0${(now - 10 * DAY) / 1000}\n\n.scratch/other.md\n\0${(now - 12 * DAY) / 1000}\n\n.scratch/au`, true)
+  })
+  on('ui.open', async () => ({ value: { isPlaced: true } }) as never)
+
+  const reply = await $.command.run({ command: 'scratch', args: '' } as never)
+  expect(reply.text).toContain('1 stale')
 })

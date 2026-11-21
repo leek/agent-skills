@@ -135,9 +135,11 @@ const fallbackTimes = new Map<string, number>()
 // `git log` over .scratch/ once per scan, run from the repository root (the plugin README lists
 // them). The log runs newest first, so a path's first appearance is its last commit. If git log
 // stdout is truncated, up to FALLBACK_LOOKUPS missing tracked paths per scan get their own
-// `git log -1`, cached for the session; any other missing tracked path is older than every
-// commit the cut log did show, so it takes that oldest time, never a fresh checkout mtime.
-// Any failure leaves the path to its mtime.
+// `git log -1`, cached for the session. Any other missing tracked path was committed before
+// the cut log's oldest commit, so that time is only an upper bound: it never makes an effort
+// look fresher than a time known for one of its own files (it takes the effort's oldest known
+// commit time, which leaves the effort's newest unchanged), and only an effort with no known
+// time takes the bound. Never a fresh checkout mtime. Any failure leaves the path to its mtime.
 function commitTimes($: EngineInterface, cwd: string) {
   type GitState = {
     times: Map<string, number>
@@ -195,6 +197,7 @@ function commitTimes($: EngineInterface, cwd: string) {
       oldestMs: 0,
     }))
     const { times, tracked, truncated, lsTruncated, oldestMs } = await lastCommits
+    const unresolved: string[] = []
     if (truncated) {
       for (const p of paths) {
         if (times.has(p) || (!lsTruncated && !tracked.has(p))) {
@@ -219,13 +222,20 @@ function commitTimes($: EngineInterface, cwd: string) {
             // Fall through to the bound or the mtime.
           }
         }
-        if (tracked.has(p) && oldestMs > 0) {
-          times.set(p, oldestMs)
+        if (tracked.has(p)) {
+          unresolved.push(p)
         }
       }
     }
+    const found = new Map(paths.flatMap(p => (times.has(p) ? [[p, times.get(p) ?? 0] as const] : [])))
+    const floor = found.size > 0 ? Math.min(...found.values()) : oldestMs
+    if (floor > 0) {
+      for (const p of unresolved) {
+        found.set(p, floor)
+      }
+    }
 
-    return new Map(paths.flatMap(p => (times.has(p) ? [[p, times.get(p) ?? 0] as const] : [])))
+    return found
   }
 }
 
