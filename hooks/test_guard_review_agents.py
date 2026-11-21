@@ -359,6 +359,9 @@ class GuardReviewAgentsTest(unittest.TestCase):
             self.assertAllowed("git show main~3", agent=agent)
         self.assertBlocked("git log --output=x~y", "unquoted glob")
         self.assertBlocked("find . -delete~x", "unquoted glob")
+        # A quoted or escaped dash still makes a flag once the shell dequotes the word.
+        self.assertBlocked("find . '-'delete~x", "unquoted glob")
+        self.assertBlocked("find . \\-exec~x rm {} +", "unquoted glob")
         self.assertAllowed("rg -n 'a{1,3}' app")
         self.assertAllowed("gh api 'repos/{owner}/{repo}/pulls?per_page=5'")
 

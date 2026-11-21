@@ -53,7 +53,8 @@ def check_expansion(word: "Word") -> None:
     live = word.unquoted
     if "{" in live and ("," in live or ".." in live):
         raise Blocked("brace expansion is not allowed; write the arguments out, or quote the word")
-    if any(c in live for c in "*?[^#") or ("~" in live[1:] and live.startswith("-")):
+    # The dash test reads the whole word: `'-'delete~x` and `\-delete~x` start with `-` once dequoted.
+    if any(c in live for c in "*?[^#") or ("~" in live and str(word).startswith("-")):
         raise Blocked("an unquoted glob character (* ? [ ^ # ~) is not allowed; quote the word, "
                       "as in 'HEAD^' or -g '*.php'")
 
