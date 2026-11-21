@@ -87,6 +87,14 @@ Give accent colour, weight, and size to the one thing per area that needs attent
 - **Check:** squint at the screen; what stands out must be the most important thing there. Accent marks one state (selected, changed from the default, needs action), never a whole kind of element.
 - **Example:** a settings list showed every current value as a blue chip. Better: only the value that needs attention is blue; the others are grey chips.
 
+#### No template filler
+
+Cut the decoration that generated screens add by reflex: a small uppercase eyebrow label over a heading, decorative numbering (01, 02, "01 //"), and an icon in a tinted tile above each card.
+
+- **Why:** each one repeats what the heading already says or decorates nothing, and users have learned to read them as template output. Each also adds a line above a heading, so the screen gets taller and the heading weaker.
+- **Check:** no small uppercase or letter-spaced text sits above a heading, as plain text or as a pill with a dot. Numbers appear only where the order is real and the user follows it (checkout steps, an install guide). A card's icon stays only when it carries meaning the title does not; a tinted tile around a generic icon goes with the icon. Uppercase table headers and keyboard keys are not eyebrows.
+- **Example:** a settings page had "ACCOUNT" above "Account", sections headed "01 // Profile", "02 // Security" and "03 // Billing", and a shield in a pale-blue rounded square above the Security card. Better: plain headings "Profile", "Security" and "Billing", and no tile.
+
 #### Run-in titles for short blurbs
 
 When a block is a short title plus one or two sentences (feature grids, benefit lists, setting descriptions), run the title into the paragraph as a bold first sentence ending in a full stop, with the rest in the muted body colour, instead of a heading on its own line.
@@ -190,6 +198,57 @@ Make every valid option of a select reachable: list them all, or, when the list 
 - **Check:** count the valid options in the data and compare with what the dropdown can reach. If the list is capped (first 50, a preloaded page), typing must search the whole set, server side when needed, not just the loaded slice. A long list (more than about 10) is searchable. A short list loads with the page and keeps its options: opening the select or moving focus away does not fetch them again. Nothing filters out valid options without saying so.
 - **Example:** a "Customer" select preloads the first 50 of 2,000 customers and offers no search, so customer #51 cannot be picked. Better: a searchable select that queries all 2,000 as the user types and shows matches by name and account number.
 
+#### Status shows real state
+
+Show a badge, a status dot, or a live-status word ("Live", "New", "Synced", "All systems operational") only when the app tracks that state and the element turns off when the state does.
+
+- **Why:** decoration that looks like status teaches users to ignore status. A "Live" dot that always pulses is false the first time something is down, and after that users stop reading the real badges too.
+- **Check:** in code, the element renders from a condition or a value (`isLive && …`, a status field, a query result); markup that always renders with fixed text is decoration and goes. On a screen, name the data that would turn it off; when there is none, it goes. A chain of three or more status facts ("12 items · Updated 2m ago · Synced · v2.1") keeps the one fact the user acts on, and the rest move to where they are needed or go. A pulsing loading skeleton is a loading state, not a status dot.
+- **Example:** a dashboard header had a pulsing green dot with "Live", a "New" badge on a feature that shipped a year ago, and "Synced · v2.4 · Updated just now" under the title. Better: the dot and "Live" removed because nothing feeds them, "New" shown only to users who have not opened the feature, and one line "Updated 2 min ago" read from the real last-sync time.
+
+### Charts
+
+#### Title names the data
+
+Title a chart by what it measures ("Monthly revenue"), never by its type, and make the title the finding only when the data is fixed.
+
+- **Why:** the reader can see it is a bar chart, so "Bar chart of…" spends the most-read line on nothing. A finding as the title tells the reader what to see, but on live data it goes stale and then says something false.
+- **Check:** no title contains "bar chart", "line graph", "pie chart" or "plot of". A report or static figure may state the finding ("Revenue doubled since March"); a dashboard tile fed by live data keeps the neutral name.
+- **Example:** a dashboard tile titled "Line chart showing weekly active users over time". Better: "Weekly active users". In a quarterly report, the same chart can be titled "Weekly active users up 40% since launch".
+
+#### No reading instructions
+
+Cut captions that explain how to read a chart ("Each bar represents one month", "Hover for details"), and fix the axis or label they were covering for.
+
+- **Why:** a chart that needs instructions has unclear axes or labels. The caption treats the symptom and costs reading time on every view, and a touch user cannot hover anyway.
+- **Check:** cover each caption and chart subtitle; when what it says is already in the title, axes or labels, it goes. When it says something they do not, move that into an axis label or the title.
+- **Example:** under a monthly sign-ups chart, "Each bar represents the number of new sign-ups in a month. Hover over a bar to see the exact value." Better: no caption, a y-axis labelled "Sign-ups", and month names on the x-axis.
+
+#### One encoding per value
+
+Show each value one way: let the axis and gridlines carry the shape, and print a number only where the reader needs the exact figure.
+
+- **Why:** a bar, a value printed on it, a gridline at its height and an axis tick all say the same thing, and the copies crowd out the data. Text does it too: a KPI with an arrow, a percentage, the word "up" and a sentence that restates them.
+- **Check:** printed values sit on the points that matter (the latest, the maximum, the one the page is about), not on every mark; when every bar does carry its value, the axis and gridlines go. A KPI shows its change once: one delta with one direction cue (an arrow or the delta's colour), not an arrow, a percentage, the word "up" and a sentence. Its baseline follows [Numbers carry their comparison](#numbers-carry-their-comparison).
+- **Example:** a revenue KPI read "$48,200 ▲ 12% up" with "Revenue grew 12% compared to last month" under it. Better: "$48,200" with a green "▲ 12%" chip, under a panel caption that names the comparison once for every tile. A bar chart printed values on all twelve bars and also had a full axis and gridlines. Better: the axis and light gridlines, with only the last month's value printed.
+
+#### Scaffolding stays faint
+
+Draw gridlines, axes and baselines as light hairlines, and drop frames, shadows, 3D and plot backgrounds.
+
+- **Why:** the data is what the reader came for. Heavy scaffolding competes with it; data darkest, labels next and scaffolding faintest lets the eye find the marks first.
+- **Check:** no box around the plot area, no shadow or glow on bars or lines, no 3D, no fill behind the plot. Gridlines are few, 1px and light grey, and minor ticks are gone. The chart type, the data and the series colours do not change.
+- **Example:** a line chart sat in a bordered panel with dark gridlines every 10 units, minor ticks and a glow on the line. Better: no border, four pale gridlines, one baseline, and the line in its plain series colour.
+
+#### Label series directly
+
+Put each series' name at the end of its line or beside its bar, with its latest value where useful, instead of in a legend.
+
+- **Why:** a legend makes the reader match colours to names, back and forth, for every series. A direct label puts the name where the eye already is, and it does not depend on telling colours apart.
+- **Check:** a chart with four or fewer series has no legend when its marks have room for labels. Each label sits next to its mark, in its series' colour ("This year 1,150").
+- **Example:** a two-line chart of this year against last year had a legend box at the top right. Better: "This year 1,150" at the end of one line and "Last year 870" at the end of the other, and no legend.
+- **Except:** more than four series, or marks too close together to label.
+
 ### Disclosure
 
 #### Progressive disclosure
@@ -205,7 +264,7 @@ Show what most users need at first glance, and put the rest one interaction away
 Put each fact on screen once, in the element that shows it best, and cut any label, subline, or intro that restates what a value, badge, or heading already says.
 
 - **Why:** every line of helper text costs reading time, and when most of it repeats what is already visible, users stop reading helper text at all, including the line that matters. Generated UI copy is especially prone to this: it explains each row as if the rest of the screen did not exist.
-- **Check:** for each subline, intro, or caption, cover it and ask what the user loses. When the answer is nothing because a badge, value, or heading already says it, delete it. A subline stays only when it adds something the row cannot show: a price or rate, a time window ("Since Nov 1"), a limit's source, a consequence. Section intros that summarise the rows below go.
+- **Check:** for each subline, intro, or caption, cover it and ask what the user loses. When the answer is nothing because a badge, value, or heading already says it, delete it. A subline stays only when it adds something the row cannot show: a price or rate, a time window ("Since Nov 1"), a limit's source, a consequence. Section intros that summarise the rows below go. A heading gets a subtitle only when it states a fact the heading does not ("Analytics" needs no "Understand your data better"). A menu or card list gets a blurb under each item only when the names alone cannot tell the items apart (plan tiers, settings), and then only on the items that need it.
 - **Example:** a "Plan & usage" panel showed a "Free plan" badge and "$0.00" estimated cost, yet also opened with "Free plan, courtesy of the provider: nothing is charged. Usage is still measured.", put "Courtesy of the provider" under Balance, and "Not charged: free plan" under Estimated cost. Better: drop all three. Keep "1 GB free, then $0.25 per GB-month" under Storage, "Since Nov 1" under This month, and "Custom, set by support" under Daily limit, because each adds a fact nothing else on the screen shows.
 
 #### Hover-reveal secondary actions
@@ -246,7 +305,7 @@ Place each affordance on a spectrum, from labelled button to icon only, to shown
 Design every state the default view does not show (menus, popovers, filter, sort and group builders, context menus, empty, loading and error states, onboarding, comments) with the same care as the default view.
 
 - **Why:** most of a UI is what you cannot see in its first screenshot. A skipped state ships as an unstyled default, and users spend real time there.
-- **Check:** list every state the page can reach, and look at each one. Hidden pieces use the same type scale, spacing, icon set, and radius as the default view, and menu items pair an icon with a label. Every change that loads new data (a filter, a tab, a sort, a list or board switch) shows the loading state, and every column takes part in it.
+- **Check:** list every state the page can reach, and look at each one. Hidden pieces use the same type scale, spacing, icon set, and radius as the default view. In a menu of actions (edit, copy, delete), every item pairs an icon with its label; in a menu of places (pages, records, destinations), an item has an icon only when the icon tells it apart from its neighbours (a logo, an avatar, a file type), never a generic pictograph that repeats the name. Every change that loads new data (a filter, a tab, a sort, a list or board switch) shows the loading state, and every column takes part in it.
 - **Example:** a database table page looks simple, but behind it sit a share popover, sort, filter, and group builders, row and column context menus, a comment thread, a getting-started checklist, and a what's-new card, all one consistent family.
 
 ### Guidance
@@ -292,6 +351,15 @@ Give every custom interactive element (an expandable card, a clickable row, a cu
 - **Why:** a clickable `div` looks fine with a mouse but is invisible or nameless to keyboard and screen-reader users, and a layout tuned for one font size breaks for users who enlarge text or turn on high contrast. These users meet the hidden defects first.
 - **Check:** Tab reaches the control and shows a clear focus ring (`:focus-visible`), and Enter or Space activates it. The accessibility inspector shows the right role (button, link, checkbox) and a name that reads well alone ("tobias commented 2 days ago", not "button"), plus state (`aria-expanded`, `aria-pressed`, `aria-checked`). Bump the text size to 200%: nothing clips, overlaps, or truncates what matters. In forced-colours or high-contrast mode, borders, focus, and selected state are still visible. Under a different theme or accent colour, every element follows it.
 - **Example:** an expandable comment card in an activity feed was a `div` with a click handler. Better: its header is a `<button aria-expanded>` whose name is the event text, with a focus ring, and the feed still reads cleanly at larger text, in high contrast, and with a purple accent theme.
+
+#### One cue per field
+
+Give every form field a visible label tied to its input, and cut any placeholder or helper text that only repeats it.
+
+- **Why:** a label, placeholder and helper text that all say "Email" make the user read one fact three times, and teach them to skip helper text, including the line that matters. A placeholder used as the label disappears when the user starts typing, so they lose track of what the field was for, and screen readers may not announce it.
+- **Check:** each input has a visible `<label>` tied to it (`for` and `id`, or a wrapping label). A placeholder stays only when it shows a format the label does not ("name@company.com", "DD/MM/YYYY"). Helper text stays only for a constraint the user cannot guess ("At least 12 characters") or a consequence ("Shown on your public profile"); text that says what the field is obviously for goes.
+- **Example:** a sign-up form had the label "Email", the placeholder "Enter your email", and "We'll use this email to contact you" under the field. Better: the label "Email" with the placeholder "name@company.com". The password field keeps "At least 12 characters".
+- **Except:** a search field with a magnifier icon may use a placeholder instead of a visible label, with an `aria-label` that matches it.
 
 ### Marketing pages
 
