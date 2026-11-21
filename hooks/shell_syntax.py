@@ -43,16 +43,19 @@ def check_expansion(word: "Word") -> None:
     a quoted one (`-g '*.php'`, `-name '*.php'`) reaches the command as written.
 
     Braces nest (`{-o,o{u}t}`), so no pattern is matched: any unquoted `{` with an unquoted
-    `,` or `..` in the same word is refused. `^`, `#` and a `~` after the first character are
-    zsh extended-glob operators (`^x` is every file but x), so they are refused too, which
-    means a revision such as `HEAD~3` or `HEAD^` must be quoted.
+    `,` or `..` in the same word is refused. `^` and `#` are zsh extended-glob operators
+    (`^x` is every file but x, `inA^x` can be several files and so add an argument), so they
+    are refused too, which means a revision such as `HEAD^` must be quoted. A `~` after the
+    first character is one as well, but `X~Y` (X free of other glob characters) can only become
+    the file X itself or stay as typed, never more words; so it is refused only in a word that
+    starts with `-`, where a file named X could become a flag (`-delete~x`). `HEAD~3` passes.
     """
     live = word.unquoted
     if "{" in live and ("," in live or ".." in live):
         raise Blocked("brace expansion is not allowed; write the arguments out, or quote the word")
-    if any(c in live for c in "*?[^#") or "~" in live[1:]:
+    if any(c in live for c in "*?[^#") or ("~" in live[1:] and live.startswith("-")):
         raise Blocked("an unquoted glob character (* ? [ ^ # ~) is not allowed; quote the word, "
-                      "as in 'HEAD~3' or -g '*.php'")
+                      "as in 'HEAD^' or -g '*.php'")
 
 
 def is_parameter(command: str, at: int) -> bool:

@@ -332,8 +332,16 @@ class GuardReviewAgentsTest(unittest.TestCase):
         self.assertBlocked("cat ^notes.txt", "unquoted glob")
         self.assertBlocked("find . -delete~x", "unquoted glob")
         self.assertBlocked("rg -n x app/Foo#Bar.php", "unquoted glob")
-        self.assertBlocked("git show HEAD~3", "unquoted glob")
         self.assertAllowed("git show 'HEAD~3' 'HEAD^' ~/notes.txt")
+        # code-review's review-scope.sh hands spec/standards reviewers unquoted revisions. Under
+        # zsh extended glob `X~Y` can only shrink to the file X, so `~` mid-word is refused only
+        # where X could be a flag (a word starting with `-`).
+        for agent in ("leek-skills:spec-reviewer", "leek-skills:standards-reviewer"):
+            self.assertAllowed("git diff HEAD~1...HEAD", agent=agent)
+            self.assertAllowed("git log HEAD~1..HEAD --oneline", agent=agent)
+            self.assertAllowed("git show main~3", agent=agent)
+        self.assertBlocked("git log --output=x~y", "unquoted glob")
+        self.assertBlocked("find . -delete~x", "unquoted glob")
         self.assertAllowed("rg -n 'a{1,3}' app")
         self.assertAllowed("gh api 'repos/{owner}/{repo}/pulls?per_page=5'")
 
