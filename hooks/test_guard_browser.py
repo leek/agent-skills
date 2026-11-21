@@ -166,7 +166,6 @@ class GuardBrowserTest(unittest.TestCase):
         for cmd in [
             f"{S} screenshot --timeout /tmp/evil.png",
             f"{S} screenshot -s /tmp/evil.png",
-            f"{S} screenshot --timeout 5000 /tmp/evil.png {self.run_dir}/1.png",
             f"{S} screenshot --screenshot-dir /tmp",
             f"{S} screenshot --screenshot-dir=/tmp {self.run_dir}/1.png",
             f"{S} screenshot --annotate '#main'",
@@ -184,6 +183,17 @@ class GuardBrowserTest(unittest.TestCase):
         ]:
             with self.subTest(cmd=cmd):
                 self.assertAllowed(cmd)
+        # Usage is `screenshot [selector] [path]`: the path slot is held to the run dir whatever
+        # it looks like, and a third positional is refused.
+        self.assertBlocked(f"{S} screenshot '#el' /tmp/x.png", "must be saved under")
+        self.assertBlocked(f"{S} screenshot '#el' /tmp/notes", "must be saved under")
+        self.assertAllowed(f"{S} screenshot '#el' {self.run_dir}/x.png")
+        self.assertAllowed(f"{S} screenshot {self.run_dir}/x.png")
+        for cmd in [f"{S} screenshot a b {self.run_dir}/x.png",
+                    f"{S} screenshot --timeout 5000 /tmp/evil.png {self.run_dir}/1.png",
+                    f"{S} screenshot '#el' {self.run_dir}/x.png extra"]:
+            with self.subTest(cmd=cmd):
+                self.assertBlocked(cmd, "at most a selector and a path")
         # Screenshot's own flags are not legal on other verbs.
         self.assertBlocked(f"{S} snapshot -f", "flag `-f`")
         self.assertBlocked(f"{S} snapshot --screenshot-dir /tmp", "flag `--screenshot-dir`")

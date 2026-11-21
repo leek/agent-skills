@@ -39,7 +39,6 @@ SAFE_FLAGS = SAFE_BOOL_FLAGS | SAFE_VALUE_FLAGS
 # --full/-f, --if-changed, --annotate, and these four value flags. Legal on screenshot only.
 SCREENSHOT_VALUE_FLAGS = {"--threshold", "--screenshot-dir", "--screenshot-quality", "--screenshot-format"}
 SCREENSHOT_FLAGS = {"-f", "--full", "--if-changed", "--annotate"} | SCREENSHOT_VALUE_FLAGS
-IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg", ".webp")
 ELEMENT_STATES = {"visible", "hidden", "attached", "detached"}
 FILTERS = {"grep", "head", "tail", "wc", "sort", "uniq", "echo"}
 
@@ -54,16 +53,11 @@ def inside(path: str, run_dir: str, cwd: str) -> bool:
     return real.startswith(os.path.realpath(run_dir) + os.sep)
 
 
-def looks_like_path(word: str) -> bool:
-    return ("/" in word or "\\" in word or word.startswith("~")
-            or word.lower().endswith(IMAGE_SUFFIXES))
-
-
 def check_screenshot(rest: list[str], run_dir: str, cwd: str) -> None:
     """Only screenshot's own value flags consume a word, so every other flag's would-be value
-    stays positional: `--timeout /tmp/x.png` saves to /tmp/x.png. The last positional (the
-    path, or a lone selector) and every path-like word must lie inside the run directory, and so
-    must --screenshot-dir."""
+    stays positional: `--timeout /tmp/x.png` saves to /tmp/x.png. Usage is `[selector] [path]`,
+    so a third positional is refused and the last one (the path, or a lone word that may be one)
+    must lie inside the run directory whatever it looks like, and so must --screenshot-dir."""
     positional: list[str] = []
     dirs: list[str] = []
     i = 0
@@ -85,12 +79,13 @@ def check_screenshot(rest: list[str], run_dir: str, cwd: str) -> None:
                 i += 1
             if name == "--screenshot-dir":
                 dirs.append(value)
-    blocked = [p for p in positional[:-1] if looks_like_path(p)] + positional[-1:]
+    if len(positional) > 2:
+        raise Blocked("`screenshot` takes at most a selector and a path")
     real_run = os.path.realpath(run_dir)
     for d in dirs:
         if os.path.realpath(os.path.join(cwd, os.path.expanduser(d))) != real_run and not inside(d, run_dir, cwd):
             raise Blocked(f"screenshots must be saved under {run_dir}/")
-    if any(not inside(p, run_dir, cwd) for p in blocked):
+    if positional and not inside(positional[-1], run_dir, cwd):
         raise Blocked(f"screenshots must be saved under {run_dir}/")
 
 
