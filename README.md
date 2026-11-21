@@ -115,14 +115,16 @@ Nothing below makes a network call or sends data anywhere. Everything the hooks 
 
 **What it sends, and where:** nothing leaves your machine. The mod makes no network calls. What it shows (the `.scratch/` board, the workers band, the ticket board) is held in Claude Code's plugin state for the session.
 
-**Programs it runs,** through `process.run`, in the session's working directory. Both use fixed arguments, and both run only when `/scratch` runs or its pane is open:
+**Programs it runs,** through `process.run`, only when `/scratch` runs or its pane is open. All are read-only `git` commands:
 
-- `git ls-files -z .scratch`: which `.scratch/` files are tracked.
-- `git -c core.quotePath=false log --relative --format=%x00%ct --name-only -- .scratch`: the last commit time of each tracked file, so the board can mark stale tickets. A file git does not track falls back to its modified time.
+- `git rev-parse --show-toplevel`, in the session's working directory: the repository root, so `/scratch` finds `.scratch/` from a subdirectory. Outside a repository the mod stays in the working directory.
+- `git ls-files -z .scratch`, from the repository root: which `.scratch/` files are tracked.
+- `git -c core.quotePath=false log --relative --format=%x00%ct --name-only -- .scratch`, from the repository root: the last commit time of each tracked file, so the board can mark stale tickets. A file git does not track falls back to its modified time.
+- `git log -1 --format=%ct -- <path>`, from the repository root, only when the previous command's output was cut short: the last commit time of one tracked `.scratch/` file it left out, at most 8 a scan, each answer kept for the session. Any other file it left out takes the oldest commit time the cut output did show.
 
 The mod parses their output into timestamps for the pane and sends it nowhere.
 
-**Files it reads:** `.scratch/` under the session's working directory (`fs.list`, `fs.read`), to draw the board.
+**Files it reads:** `<repository root>/.scratch/` (the session's working directory outside a repository) with `fs.list` and `fs.read`, to draw the board, and `.agents/triage-labels.md` or `docs/agents/triage-labels.md` beside it for the repository's status names.
 
 **Hooks, and what each one reads and changes:**
 
@@ -130,10 +132,10 @@ The mod parses their output into timestamps for the pane and sends it nowhere.
 - `command.run`: answers only the mod's own two commands, `/scratch` and `/ticket-board`. It opens the pane and replies with a one-line summary, or with the table where no pane draws. It never sees or changes another command.
 - `tool.call`:
   - It **stands in for one tool only,** `mcp__leek-skills__ticket_board`, which the mod itself registers. No other tool sits behind it. When `implement-spec`, `implement <spec> all`, or `wayfinder <map> all` reports ticket progress, the hook records the update, draws the pane, and returns a one-line reply that says whether the pane showed it.
-  - For every other tool, it observes only. It reads the tool name and input to count a subagent's tool calls and show its latest tool on the workers band. Then it calls `next` with the call unchanged and returns that result unchanged. After a write whose path or command names `.scratch/`, it rescans the open board.
+  - For every other tool, it observes only. It reads the tool name and input to count a subagent's tool calls and show its latest tool on the workers band, and reads a `SendMessage` call's `to` so a finished subagent it resumes shows as running again. Then it calls `next` with the call unchanged and returns that result unchanged. After a write whose path or command names `.scratch/`, it rescans the open board.
 - `agent.spawn`: reads the new subagent's name, type, and description, and the agent id from the result, to add a row to the workers band. It passes the spawn and returns its result unchanged.
 - `turn.complete`: records a subagent's outcome on the band.
-- `prompt.submit`: never reads the prompt's text. When no subagent is still running, it clears the workers band. The prompt passes unchanged.
+- `prompt.submit`: never reads the prompt's text. When no subagent is still running, it clears the workers band, keeping the cleared rows (at most 50) for the session in case a `SendMessage` resumes one. The prompt passes unchanged.
 - `ui.close`: remembers that you closed a pane, so later updates leave it closed.
 - `ui.render`: draws the band and the two panes.
 
