@@ -60,7 +60,7 @@ The rule goes in the `.agents/ui-design.md` you loaded. With none, create it wit
 Give a component one alignment edge, and group its parts by role: identity, details, stats, actions.
 
 - **Why:** the eye scans down one edge. Every extra alignment axis or mixed group is one more thing to decode. Proximity says what belongs together before anything is read.
-- **Check:** count the left edges. Primary actions sit together, apart from secondary links. Repeated label and value pairs line up as columns, label small and muted above a larger value.
+- **Check:** count the left edges. Primary actions sit together, apart from secondary links. Repeated label and value pairs line up as columns, label small and muted above a larger value. Related metrics share one panel split by dividers, not a row of separate cards. Filters sit above the content they filter, under the page title.
 - **Example:** a profile card had the photo beside the name, stats as a 2×2 grid of inline "Followers 31,261" pairs, and social-icon buttons centred under the main actions. Better: a cover strip with the photo overlapping it, social links at the top right, name → bio → location on one left edge, the four stats in one row, and the two primary actions as equal full-width buttons at the bottom.
 
 #### Spacing shows structure
@@ -117,8 +117,16 @@ Align icons, glyphs, and short text by where their visual mass sits, not by thei
 When one item in a list is boxed (a card, an expandable panel, a highlighted row), keep its icon and text on the same vertical lines as the plain rows around it, and inset its contents evenly from the box's corner.
 
 - **Why:** the eye follows the column of icons and the column of text down the list. A boxed row whose icon shifts a few pixels, or whose text starts at a different gap from its icon, breaks those lines and looks like a different component dropped in. Uneven insets (8px from the top, 12px from the side) make the icon look jammed into the corner instead of placed in it.
-- **Check:** draw a vertical line through the icons and another at the start of the text: the boxed row's icon and text sit on both lines, and a timeline connector passes straight through its icon. The icon's inset from the box's top and side are equal, and the icon-to-text gap matches the plain rows. A trailing control (chevron, menu) has the same inset from its corner as the leading icon has from its. Inner corner radius ≈ outer radius − inset, so nested curves stay concentric.
+- **Check:** draw a vertical line through the icons and another at the start of the text: the boxed row's icon and text sit on both lines, and a timeline connector passes straight through its icon. The icon's inset from the box's top and side are equal, and the icon-to-text gap matches the plain rows. A trailing control (chevron, menu) has the same inset from its corner as the leading icon has from its. The box's corners are concentric with anything rounded inside it ([Nested corners are concentric](#nested-corners-are-concentric)).
 - **Example:** a pull request timeline showed plain event rows and one boxed "commented" row. Inside the box, the icon sat 8px from the top and 12px from the left, and 6px from its label instead of the list's 11px, so the icon and text both missed the list's lines. Better: the box is offset so its icon lands on the timeline axis, with 11px inset top and side, an 11px gap to the label, and the chevron inset to match.
+
+#### Nested corners are concentric
+
+When a rounded element sits inside another rounded element, set the inner radius to the outer radius minus the inset between them, so both curves share one centre.
+
+- **Why:** with equal radii, the inner corner bulges toward the outer one, so the gap is thinner at the corners than along the sides. The eye reads that as pinched or misaligned without being able to say why. Concentric curves keep the gap even all round, and the two layers read as one built object.
+- **Check:** for each nested rounded pair (a card in a tray, an icon tile in a button, an avatar or logo in a pill, a button inside a search field), outer radius R, inset p, and inner radius r satisfy r ≈ R − p (a square inner corner when R ≤ p). Zoom into a corner: the gap band is as wide at the curve as along the straight edges. A circle in a pill's rounded end shares that end's centre, with the same gap on every side.
+- **Example:** a table card with a 10px radius sat 2px inside a tray that also had a 10px radius, so the corner gap pinched. Better: the card at 8px. A workspace switcher pill had its logo circle pushed off-centre in the left end. Better: the circle centred in the end cap with a 4px gap all round.
 
 #### Button placement follows the container
 
@@ -147,7 +155,7 @@ Build dark mode as its own palette, not an inverted light mode: a dark-grey base
 Show each value in the form its data type calls for, so the user sees the type before reading the text.
 
 - **Why:** colour, icon, position, and weight are taken in before any reading. In a plain-text table the user must read every cell to find the one inactive row.
-- **Check:** categories are tags with one consistent colour per value. Status is icon + colour + word, never colour alone. Numbers are right-aligned with tabular figures. Out-of-play rows (inactive, archived) are dimmed as a whole row. Long values truncate with an ellipsis and show in full on hover (where the ellipsis goes: [Truncate where values differ](#truncate-where-values-differ)).
+- **Check:** categories are tags with one consistent colour per value. Status is icon + colour + word, never colour alone. Numbers are right-aligned with tabular figures. Out-of-play rows (inactive, archived) are dimmed as a whole row. The first column is the one that identifies the row (merchant, customer, title), not the date. Long values truncate with an ellipsis and show in full on hover (where the ellipsis goes: [Truncate where values differ](#truncate-where-values-differ)).
 - **Example:** an employee table in plain text. Better: department as a tag with a coloured dot, employment as green "✓ Active" or red "✕ Inactive", years right-aligned, inactive rows greyed out, long emails truncated.
 
 #### Truncate where values differ
@@ -166,6 +174,14 @@ Pick each visual by what the user does with the data, not by what is easiest to 
 - **Check:** change over time is a chart (with the headline total) above the detail table. Severity or priority escalates in icon and colour, with red kept for the worst level only. People show as avatar + name.
 - **Example:** an incident tracker shows a bar chart of incidents per day under "214 Total", then the table: severity as bar-strength icons for Low/Medium/High and a red ⚠ for Critical, reporter as avatar + first name, category as coloured tags.
 
+#### Numbers carry their comparison
+
+Show every headline number with what it is measured against (the period, the baseline, or its spread), and colour a change by whether it is good, not by its sign.
+
+- **Why:** "1,297" or "+20%" alone makes the user guess: compared to what, over when, and is that good? A named baseline answers that in the same glance. Green for every rise and red for every fall gets it backwards for metrics where lower is better (response time, churn, cost).
+- **Check:** each stat or delta names its window and baseline ("November so far, against the same days in October"; "p95 across 2.1M requests this week"), once per group, not repeated on every tile. A delta is green when the change is good and red when it is bad: a drop in review time is green. Where the trend matters, a small sparkline or distribution sits beside the number, with the previous baseline drawn for comparison.
+- **Example:** three stat cards read "Orders 1,297 · +20.1% from last month", "Avg. response 4.2h · −8%" (in red), and "Refunds 12". Better: one panel captioned "This month so far vs the same days last month", each metric with a delta chip and a sparkline, and the −8% response time in green.
+
 #### Every option reachable
 
 Make every valid option of a select reachable: list them all, or, when the list is capped or loaded on demand, make it searchable across the full set.
@@ -181,7 +197,7 @@ Make every valid option of a select reachable: list them all, or, when the list 
 Show what most users need at first glance, and put the rest one interaction away, where it is used.
 
 - **Why:** each control on screen costs attention on every visit, even for users who never use it. Depth costs one click, and only for the users who want it.
-- **Check:** each level shows a summary plus the way into the next level. Nothing a user needs often is more than two levels deep.
+- **Check:** each level shows a summary plus the way into the next level. Nothing a user needs often is more than two levels deep. A record's detail pane is closed by default and opens when a row is selected, so the list gets the full width until then.
 - **Example:** the page header shows one "Share" button. It opens a popover with invite, general access, and the people list. Hovering a person there reveals the remove control.
 
 #### Say each fact once
@@ -240,8 +256,16 @@ Design every state the default view does not show (menus, popovers, filter, sort
 Assume the user does not know how to use the UI, and teach at the moment and place it matters.
 
 - **Why:** users skip manuals and tours. A hint attached to the control they are about to use gets read.
-- **Check:** a key action's first use gets a dismissible hint anchored to its control, with a small visual of the result. New users get a getting-started checklist with progress. Empty states say what to do next. Each hint shows once.
+- **Check:** a key action's first use gets a dismissible hint anchored to its control, with a small visual of the result. New users get a getting-started checklist with progress. Empty states say what to do next and let the user do it right there (an inline name field, starter templates), not only link away. Each hint shows once.
 - **Example:** on first visit, a dark popover points at "Add +", shows a mini row being typed, says "Add a row" with one line of description, and has a Dismiss button.
+
+#### Controls state their outcome
+
+Under a setting or action, say what the current choice will actually do for this user, in concrete terms, and update it as the choice changes, instead of generic help text that restates the label.
+
+- **Why:** "Receive emails about activity" makes the user imagine the result; "About 4 a week, only when someone needs you" tells them. Concrete consequences let them choose without trying each option, and copy that would fit any product reads as filler and gets skipped.
+- **Check:** each control's help text names a result (a count, a time, who is affected, what stops happening) and changes with the selected option. A setting with more than two meaningful states is a segmented control or select, not an on/off toggle. A warning names the specific thing and its deadline ("Card ending 4242 · 6 days left") and offers the fix plus a softer option ("Remind me Friday") with undo. Cover the help text and ask if it would read the same in any other app; if so, rewrite or cut it ([Say each fact once](#say-each-fact-once)).
+- **Example:** an "Email notifications" toggle read "Receive emails about mentions, comments and activity." Better: Email [Mentions · All · Off], with "About 4 a week, only when someone needs you" under Mentions, changing to "About 30 a week, bundled hourly" under All. A "Payment method expiring soon" banner became "Card ending 4242 · Team plan, $48 a month", a "6 days left" chip, and "Update card" beside "Remind me Friday".
 
 #### Tooltips on icon-only controls
 
