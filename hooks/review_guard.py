@@ -237,9 +237,11 @@ JQ_SHORT_BOOL = set("nRscrjaSCMe")
 JQ_VALUE = {"--indent": 1, "--arg": 2, "--argjson": 2, "--slurpfile": 2, "--rawfile": 2}
 
 
-def jq_has_comment(expr: str) -> bool:
-    """A `#` outside every string literal (string-aware, `\\(…)` interpolations are code).
-    A comment can split a token the env check matches: `$ #x<newline>ENV`."""
+def jq_code(expr: str) -> str:
+    """The filter with every string literal's text blanked to spaces, so a word inside one
+    (`contains("missing import")`) is data. A `\\(…)` interpolation is code and is kept, so
+    `"\\(env)"` still shows env. An unterminated string is refused."""
+    out: list[str] = []
     stack = ["code"]  # "code", "str", or an interpolation's paren depth (int)
     i = 0
     while i < len(expr):
@@ -247,16 +249,21 @@ def jq_has_comment(expr: str) -> bool:
         if top == "str":
             if c == "\\" and expr[i + 1:i + 2] == "(":
                 stack.append(0)
+                out.append(" (")
                 i += 2
                 continue
             if c == "\\":
+                out.append("  ")
                 i += 2
                 continue
             if c == '"':
                 stack.pop()
-        elif c == "#":
-            return True
-        elif c == '"':
+                out.append('"')
+            else:
+                out.append(" ")
+            i += 1
+            continue
+        if c == '"':
             stack.append("str")
         elif top != "code" and c == "(":
             stack[-1] = top + 1
@@ -265,18 +272,21 @@ def jq_has_comment(expr: str) -> bool:
                 stack.pop()
             else:
                 stack[-1] = top - 1
+        out.append(c)
         i += 1
     if stack != ["code"]:
         raise Blocked("`jq` filter has an unterminated string")
-    return False
+    return "".join(out)
 
 
 def check_jq_filter(expr: str) -> None:
-    if jq_has_comment(expr):
+    code = jq_code(expr)
+    # A comment can split a token the env check matches: `$ #x<newline>ENV`.
+    if "#" in code:
         raise Blocked("`jq` filters may not contain comments (`#`)")
-    if JQ_ENV.search(expr):
+    if JQ_ENV.search(code):
         raise Blocked("`jq` filters may not read environment variables (`env`, `$ENV`)")
-    if JQ_MODULE.search(expr):
+    if JQ_MODULE.search(code):
         raise Blocked("`jq` filters may not load modules (`include`, `import`)")
 
 

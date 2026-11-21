@@ -253,6 +253,23 @@ class GuardReviewAgentsTest(unittest.TestCase):
         self.assertAllowed("jq -r '\"a\\\"#b\"' data.json")
         self.assertAllowed("jq -r '\"\\(\"#\" + .x)\"' data.json")
 
+    def test_jq_words_inside_string_literals_pass(self):
+        # A string literal is data; only code (including `\(…)` interpolations) is checked.
+        for cmd in ["gh pr list --json body --jq '.[]|select(.body|contains(\"missing import\"))'",
+                    "jq '.[]|select(.title|test(\"set env\"))' x.json",
+                    "jq -r '\"include \\\"m\\\"; env\"' x.json",
+                    "jq -r '\"\\(.a) uses $ENV\"' x.json",
+                    "jq -r '\"\\(\"env\" + .b)\"' x.json"]:
+            with self.subTest(cmd=cmd):
+                self.assertAllowed(cmd)
+        for cmd in ["jq -n '\"\\(env)\"'",
+                    "jq -n '\"a \\(1 + (\"x\" | env.HOME))\"'",
+                    "jq -n '\"\\(\"x\") \\($ENV.PATH)\"'",
+                    "jq -n '\"\\\"\" + env.HOME'"]:
+            with self.subTest(cmd=cmd):
+                self.assertBlocked(cmd, "environment variables")
+        self.assertBlocked("jq -n '\"x\" | include \"m\"; .'", "modules")
+
     def test_gh_writes_are_blocked(self):
         self.assertBlocked("gh pr merge 12 --squash", "not a read-only gh command")
         self.assertBlocked("gh pr view 12 --web", "opens a browser")
