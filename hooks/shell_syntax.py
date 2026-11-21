@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-"""Shared shell parser and PreToolUse Bash dispatcher for read-only agent guards.
+"""Shared bash/zsh shell tokenizer and read-only filter checks for PreToolUse guards.
 
 Tokenizes commands under rules that hold in both bash and zsh, tracking quotes
 itself: blocks unquoted newlines and any \\r, command/process/arithmetic
@@ -7,21 +6,16 @@ substitutions (``, $(), =(), $[], and ${( in double quotes), unsafe redirects an
 background operators (<, >, <(, >(, |&, &), and unquoted subshells or zsh glob
 qualifiers ((, )). Quoted or escaped operators and newlines stay data, and a
 backslash-newline is a line continuation.
-
-Wired from hooks/hooks.json so every Bash tool call spawns one Python process
-instead of one per guard, exiting 0 at once unless agent_type is guarded.
-Grok loads the same hooks.json; normalize() maps its payload onto Claude's keys.
 """
 
-import importlib.util
-import json
-from pathlib import Path
-import re
-import sys
-
 SAFE_REDIRECTS = {("2", ">", "/dev/null"), ("2", ">&", "1")}
-REVIEW_GUARDED = {"finding-verifier", "pr-reviewer"}
-BROWSER_GUARDED = {"browser-tester", "browser-test-planner"}
+OPERATOR_CHARS = set("();<>|&")
+SEPARATORS = {"&&", "||", ";", "|"}
+UNIQ_VALUE_FLAGS = {"-f", "-s", "-w", "--skip-fields", "--skip-chars", "--check-chars"}
+
+# `${X:--o}` is `-o` when X is unset, and "$X" is whatever the environment holds: either way
+# the command gets an argument the checks never read.
+PARAMETER_REASON = "parameter expansion ($VAR, ${VAR}) is not allowed; write the value, or single-quote a literal $"
 
 
 class Blocked(Exception):
@@ -60,14 +54,6 @@ def check_expansion(word: "Word") -> None:
                       "as in 'HEAD~3' or -g '*.php'")
 
 
-OPERATOR_CHARS = set("();<>|&")
-
-
-# `${X:--o}` is `-o` when X is unset, and "$X" is whatever the environment holds: either way
-# the command gets an argument the checks never read.
-PARAMETER_REASON = "parameter expansion ($VAR, ${VAR}) is not allowed; write the value, or single-quote a literal $"
-
-
 def is_parameter(command: str, at: int) -> bool:
     """True for a `$` the shell may expand. Deny by default: zsh has more forms (`$=x`, `$~x`,
     `$^x`, `$+x`) than any list holds, so `$` is literal only at the end of a word or quote."""
@@ -98,7 +84,6 @@ def join_continuations(command: str) -> str:
         out.append(c)
         i += 1
     return "".join(out)
-SEPARATORS = {"&&", "||", ";", "|"}
 
 
 def tokenize(command: str) -> list[str]:
@@ -261,9 +246,6 @@ def long_option_in(arg: str, names: tuple[str, ...]) -> bool:
     return any(name.startswith(n) or n.startswith(name) for n in names)
 
 
-UNIQ_VALUE_FLAGS = {"-f", "-s", "-w", "--skip-fields", "--skip-chars", "--check-chars"}
-
-
 def check_filter(name: str, args: list[str]) -> None:
     """Refuse the text-filter forms that write a file or run a program."""
     if name == "sort":
@@ -286,60 +268,3 @@ def check_filter(name: str, args: list[str]) -> None:
                 positional += 1
         if positional > 1:
             raise Blocked("`uniq <in> <out>` writes a file")
-
-def _load_module(name: str, path: Path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"cannot load {path}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-SHELL_TOOLS = {"Bash", "run_terminal_command"}
-
-
-def normalize(payload: dict) -> dict:
-    """Map Grok's hook envelope onto Claude Code's keys.
-
-    Grok names the subagent `subagentType` (never `agent_type`), calls its shell
-    tool `run_terminal_command`, and sends `toolName`/`toolInput` in camelCase
-    beside the `tool_name`/`tool_input` aliases. The guards read Claude's shape.
-    """
-    tool = payload.get("tool_name") or payload.get("toolName") or "Bash"
-    return {
-        **payload,
-        "agent_type": payload.get("agent_type") or payload.get("subagentType") or "",
-        "tool_name": "Bash" if tool in SHELL_TOOLS else tool,
-        "tool_input": payload.get("tool_input") or payload.get("toolInput") or {},
-    }
-
-
-def dispatch(payload: dict) -> int:
-    """Route a guarded agent's shell call to its guard; every other call passes."""
-    payload = normalize(payload)
-    agent = payload["agent_type"].rsplit(":", 1)[-1]
-    if payload["tool_name"] != "Bash":
-        return 0
-    hooks_dir = Path(__file__).resolve().parent
-    if agent in REVIEW_GUARDED:
-        guard = hooks_dir / "guard-review-agents.py"
-    elif agent in BROWSER_GUARDED:
-        guard = hooks_dir.parent / "skills" / "browser-test" / "scripts" / "guard-browser.py"
-    else:
-        return 0
-    try:
-        return _load_module(guard.stem.replace("-", "_"), guard).run_payload(payload)
-    except Exception as error:  # noqa: BLE001
-        # Only exit 2 blocks a tool call, so a guard that crashes must not let the command run.
-        print(f"BLOCKED: the {agent} guard failed ({type(error).__name__}: {error}). "
-              "You are read-only; report what you could not do.", file=sys.stderr)
-        return 2
-
-
-def main() -> int:
-    return dispatch(json.load(sys.stdin))
-
-
-if __name__ == "__main__":
-    sys.exit(main())
