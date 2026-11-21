@@ -545,17 +545,22 @@ test('post-next observer failures do not re-run next(e) and ticket_board errors 
   expect((called as { result: unknown }).result).toBe('ran-once')
   expect(toolRuns).toBe(1)
 
-  // An error inside ticket_board must return { deny } instead of forwarding to next(e).
+  // A pane that fails to open after the board is saved still answers with the save, asks for the
+  // chat progress line, and never forwards to next(e).
   failOpen = true
-  const denied = await $.tool.call({
+  const saved = await $.tool.call({
     tool: 'mcp__leek-skills__ticket_board',
     board: 'auth',
     kind: 'spec',
     tickets: [{ number: '01', title: 'Login', status: 'running' }],
     tool_use_id: 'tb1',
   } as never)
-  expect(String((denied as { deny?: unknown }).deny)).toContain('ticket_board failed:')
+  expect((saved as { deny?: unknown }).deny).toBeUndefined()
+  expect(String((saved as { result?: unknown }).result)).toContain('post the progress line in chat')
   expect(toolRuns).toBe(1)
+  failOpen = false
+  const probe = await $.tool.call({ tool: 'mcp__leek-skills__ticket_board', board: 'auth', kind: 'spec', tool_use_id: 'tb2' } as never)
+  expect(String((probe as { result?: unknown }).result)).toContain('Current board')
 })
 
 test('/scratch resolves repo root from subdirectories, handles truncated git log, skips background rescans when unplaced, and renders open blockers numerically', async ($, on) => {

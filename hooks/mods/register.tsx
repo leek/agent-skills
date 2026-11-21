@@ -399,7 +399,15 @@ export const register: Register = on => {
         if (switched) {
           isTicketsDismissed = false
         }
-        const isPlaced = !isTicketsDismissed && (await $.ui.open({ id: TICKETS_PANE, title: title(run) })).isPlaced
+        // The board is saved by now: a pane that fails to open only means the chat lines carry it.
+        let isPlaced = false
+        if (!isTicketsDismissed) {
+          try {
+            isPlaced = (await $.ui.open({ id: TICKETS_PANE, title: title(run) })).isPlaced
+          } catch {
+            isPlaced = false
+          }
+        }
 
         const said = isPlaced
           ? `Shown in the ticket pane (${boardSummary(run)}). Skip the chat progress line.`
