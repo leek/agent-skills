@@ -111,3 +111,30 @@ land 01 abort
 eq "abort" "$(printf '%s' "$out" | jq -r '.released')" "true"
 [ ! -e "$notes/land.lock" ] || fail "the lock outlived abort"
 echo "ok abort frees only the caller's lock"
+
+# Non-conflict merge failure in begin (untracked file collides with integration branch):
+# must abort the merge, release the lock, and refuse instead of returning locked:true, conflicts:[].
+printf 'untracked blocker\n' >"$t/wt-01/collision.txt"
+printf 'tracked on integration\n' >"$r/collision.txt"
+git -C "$r" add -- collision.txt
+git -C "$r" commit -q -m "add collision.txt on integration"
+land 01 begin --integration "$r"
+eq "non-conflict merge exit" "$rc" 1
+eq "non-conflict merge unlocked" "$(printf '%s' "$out" | jq -c '[.locked, .merged, (has("conflicts"))]')" '[false,false,false]'
+[ ! -e "$notes/land.lock" ] || fail "non-conflict merge failure left lock behind"
+rm -f "$t/wt-01/collision.txt"
+echo "ok non-conflict merge failure releases lock and refuses cleanly"
+
+# Failed stack push must NOT append to $notes/stack.
+stack_before="$(cat "$notes/stack")"
+commit_file 01 four.txt four
+land 01 begin --integration "$r"
+eq "begin before failed push exit" "$rc" 0
+git -C "$r" remote set-url origin "$t/nonexistent-remote.git"
+land 01 finish --integration "$r" --ticket 04 --stack
+eq "failed push exit" "$rc" 1
+eq "failed push json" "$(printf '%s' "$out" | jq -c '[.landed, .pushed]')" '[true,false]'
+eq "failed push keeps stack unchanged" "$(cat "$notes/stack")" "$stack_before"
+[ ! -e "$notes/land.lock" ] || fail "failed push left lock behind"
+git -C "$r" remote set-url origin "$t/origin.git"
+echo "ok failed stack push leaves notes/stack untouched"

@@ -71,7 +71,7 @@ case "${1:-}" in
     db=${2:-}
     [ -n "$db" ] || { echo "unregister: database name required" >&2; exit 2; }
     [ -f "$registry" ] || exit 0
-    registry_remove "$db" || { echo "unregister: could not write $registry" >&2; exit 1; }
+    registry_remove "" "$db" || { echo "unregister: could not write $registry" >&2; exit 1; }
     echo ">> unregistered $db" >&2
     ;;
   list)

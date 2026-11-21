@@ -49,17 +49,23 @@ if [ -n "$tip_arg" ] && [ "$(git rev-parse "$tip_arg^{commit}" 2>/dev/null)" != 
   echo "pr-assets moved since the plan (now $tip): list again" >&2; exit 1
 fi
 
-prs="$(gh pr list --state all --limit 1000 --json number,headRefName,state,closedAt)"
 cutoff=$(( $(date +%s) - days * 86400 ))
 
 rows="$(mktemp)"
 index="$(mktemp)"
-trap 'rm -f "$rows" "$index"' EXIT
+open_prs_file="$(mktemp)"
+all_prs_file="$(mktemp)"
+prs_file="$(mktemp)"
+trap 'rm -f "$rows" "$index" "$open_prs_file" "$all_prs_file" "$prs_file"' EXIT
+
+gh pr list --state open --limit 1000 --json number,headRefName,state,closedAt > "$open_prs_file"
+gh pr list --state all --limit 1000 --json number,headRefName,state,closedAt > "$all_prs_file"
+jq -n --slurpfile o "$open_prs_file" --slurpfile a "$all_prs_file" '($o[0] + $a[0]) | unique_by(.number)' > "$prs_file"
 
 git ls-tree -d --name-only "$tip" | while IFS= read -r dir; do
   bytes="$(git ls-tree -r -l "$tip" -- "$dir" | awk '{ s += $4 } END { print s + 0 }')"
   last="$(git log -1 --format=%ct "$tip" -- "$dir")"
-  printf '%s' "$prs" | jq -c --arg d "$dir" --argjson bytes "$bytes" \
+  jq -c --arg d "$dir" --argjson bytes "$bytes" \
     --argjson last "${last:-0}" --argjson cutoff "$cutoff" '
     [.[] | select((.headRefName | gsub("[^A-Za-z0-9._-]"; "-")) == $d)] as $m
     | ($m | map(select(.state == "OPEN"))) as $open
@@ -67,12 +73,18 @@ git ls-tree -d --name-only "$tip" | while IFS= read -r dir; do
     | (if ($open | length) > 0 then
          {candidate: false, reason: "open PR #\($open[0].number)"}
        elif ($m | length) > 0 then
-         {candidate: ($closed < $cutoff),
-          reason: "PR #\($m | max_by(.closedAt // "") | .number) \($m | max_by(.closedAt // "") | .state | ascii_downcase) \($closed | todate | .[0:10])"}
+         ($m | max_by(.closedAt // "")) as $latest
+         | if $closed != null then
+             {candidate: ($closed < $cutoff),
+              reason: "PR #\($latest.number) \($latest.state | ascii_downcase) \($closed | todate | .[0:10])"}
+           else
+             {candidate: ($last < $cutoff),
+              reason: "PR #\($latest.number) \($latest.state | ascii_downcase) (no close date), last upload \($last | todate | .[0:10])"}
+           end
        else
          {candidate: ($last < $cutoff), reason: "no PR found, last upload \($last | todate | .[0:10])"}
        end) as $v
-    | {folder: $d, bytes: $bytes, candidate: $v.candidate, reason: $v.reason}' >> "$rows"
+    | {folder: $d, bytes: $bytes, candidate: $v.candidate, reason: $v.reason}' "$prs_file" >> "$rows"
 done
 
 if [ "${#drops[@]}" -eq 0 ]; then

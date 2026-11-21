@@ -158,4 +158,31 @@ eq "bad option" "$rc" 2
 mkdir -p "$t/empty"
 eq "no scratch" "$(bash "$state_sh" --root "$t/empty" | jq -c '[.exists, .efforts]')" '[false,[]]'
 echo "ok a bad --root or option exits 2; a root with no .scratch/ reports exists: false"
+
+# Regression: non-ASCII tracked paths under .scratch/ are recognized as tracked.
+u="$t/unicode"
+GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git init -q -b main "$u"
+md "$u/.scratch/café/tickets/01-naïve.md" ready-for-agent
+GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@e.st GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@e.st \
+  git -C "$u" add .scratch
+GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@e.st GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@e.st \
+  git -C "$u" commit -q -m "add unicode scratch"
+u_out="$(bash "$state_sh" --root "$u" --no-commits)"
+eq "unicode tracked" "$(effort "$u_out" "café" '[.tracked, .tickets[0].tracked]')" '[true,true]'
+echo "ok non-ASCII tracked paths under .scratch/ are recognized"
+
+# Regression: legacy Status:/Blocked by: match horizontal whitespace only, frontmatter
+# blocked-by: [] wins over body Blocked by:, and block-list key line allows trailing # comment.
+p="$t/parse"
+mkdir -p "$p/.scratch/edge/tickets"
+printf -- '# T1\n\n**Status:**\n\nready-for-agent\n' >"$p/.scratch/edge/tickets/01-emptystatus.md"
+printf -- '---\ntitle: T2\nstatus: ready-for-agent\n---\n\n**Blocked by:**\n\n01\n' >"$p/.scratch/edge/tickets/02-emptybl.md"
+printf -- '---\ntitle: T3\nstatus: ready-for-agent\nblocked-by: []\n---\n\n**Blocked by:** 01\n' >"$p/.scratch/edge/tickets/03-explicit-empty.md"
+printf -- '---\ntitle: T4\nstatus: ready-for-agent\nblocked-by: # wait\n  - 02\n---\n\nbody\n' >"$p/.scratch/edge/tickets/04-comment-block.md"
+p_out="$(bash "$state_sh" --root "$p" --no-commits edge)"
+eq "empty legacy status" "$(effort "$p_out" edge '.tickets[0].status')" '""'
+eq "empty legacy blocked-by" "$(effort "$p_out" edge '.tickets[1].blocked_by')" '[]'
+eq "explicit frontmatter empty blocked-by wins" "$(effort "$p_out" edge '.tickets[2].blocked_by')" '[]'
+eq "block-list key trailing comment" "$(effort "$p_out" edge '.tickets[3].blocked_by')" '["02"]'
+echo "ok horizontal-only legacy parsing, explicit blocked-by: [], and block-list key # comments"
 echo "test-scratch-state.sh: all cases passed"

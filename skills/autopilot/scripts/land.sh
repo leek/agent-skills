@@ -101,7 +101,15 @@ case "$action" in
       jq -cn --arg tip "$(git rev-parse "$ibranch")" '{locked: true, merged: true, tip: $tip}'
       exit 0
     fi
-    git diff --name-only --diff-filter=U | jq -Rsc '{locked: true, merged: false, conflicts: (split("\n") | map(select(. != "")))}'
+    conflicts="$(git diff --name-only --diff-filter=U)"
+    if [ -z "$conflicts" ]; then
+      git merge --abort 2>/dev/null || true
+      release_lock
+      echo "land.sh: merge of $ibranch failed without merge conflicts" >&2
+      jq -cn --arg reason "merge of $ibranch failed without merge conflicts" '{locked: false, merged: false, reason: $reason}'
+      exit 1
+    fi
+    printf '%s\n' "$conflicts" | jq -Rsc '{locked: true, merged: false, conflicts: (split("\n") | map(select(. != "")))}'
     exit 1
     ;;
 
@@ -134,9 +142,13 @@ case "$action" in
       cut="$ibranch-stack-$ticket"
       base="$ibranch"
       [ "$position" = 1 ] || base="$(tail -n 1 "$notes/stack" | cut -f3)"
-      printf '%s\t%s\t%s\t%s\n' "$position" "$ticket" "$cut" "$base" >>"$notes/stack"
       git branch -f "$cut" "$merge_sha" >&2
-      if git push -u origin "$cut" >&2; then pushed=true; else pushed=false; fi
+      if git push -u origin "$cut" >&2; then
+        pushed=true
+        printf '%s\t%s\t%s\t%s\n' "$position" "$ticket" "$cut" "$base" >>"$notes/stack"
+      else
+        pushed=false
+      fi
     fi
     release_lock
     jq -cn --arg ticket "$ticket" --arg merge_sha "$merge_sha" --argjson position "$position" \

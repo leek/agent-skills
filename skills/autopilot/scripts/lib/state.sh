@@ -79,13 +79,14 @@ resolve_state_paths() {
 }
 
 read_state_fields() {
-  local state_file="$1" query="$2" sentinel="__AUTOPILOT_STATE_END__" snapshot last_index
-  snapshot="$(jq -jr --arg sentinel "$sentinel" \
-    "(($query) + [\$sentinel]) | map(if . == null then \"\" else tostring end) | join(\"\\u001f\")" \
+  local state_file="$1" query="$2" snapshot field
+  snapshot="$(jq -jr \
+    "($query) | map(if . == null then \"\" else tostring end) | map(. + \"\\u001f\") | add // \"\"" \
     "$state_file")" || return 1
-  IFS=$'\x1f' read -r -a STATE_FIELDS <<<"$snapshot"
-  last_index=$((${#STATE_FIELDS[@]} - 1))
-  unset "STATE_FIELDS[$last_index]"
+  STATE_FIELDS=()
+  while IFS= read -r -d $'\x1f' field; do
+    STATE_FIELDS+=("$field")
+  done <<<"$snapshot"
 }
 
 persist_state() {

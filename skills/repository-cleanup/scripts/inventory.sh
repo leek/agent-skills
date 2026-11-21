@@ -51,7 +51,9 @@ base=$(git symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null || true)
 # status
 {
   ab=$(git rev-list --left-right --count 'HEAD...@{upstream}' 2>/dev/null || true)
-  jq -n --arg b "$(git branch --show-current)" --arg u "$(git rev-parse --abbrev-ref '@{upstream}' 2>/dev/null || true)" \
+  # On a gone upstream, git prints "@{u}" before failing, so keep the output only on success.
+  upstream=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null) || upstream=""
+  jq -n --arg b "$(git branch --show-current)" --arg u "$upstream" \
     --arg ab "$ab" --argjson c "$(git status --porcelain | lines)" \
     '($ab | split("\t")) as $n
      | {branch: ($b | select(. != "") // null), upstream: ($u | select(. != "") // null),
@@ -70,11 +72,13 @@ done
 # remotes and the stale remote-tracking refs a prune would delete
 git remote -v | awk '$3 == "(fetch)" { print $1 "\t" $2 }' | jq -R 'split("\t") | {name: .[0], url: .[1]}' | jq -s . > "$tmp/remotes.json"
 : > "$tmp/stale.jsonl"
-for r in $(git remote); do
-  git remote prune --dry-run "$r" 2>/dev/null | sed -n 's/^ \* \[would prune\] //p' | while read -r ref; do
-    jq -n --arg r "$r" --arg f "$ref" '{remote: $r, ref: $f}' >> "$tmp/stale.jsonl"
+if [ "$fetch" = 1 ]; then
+  for r in $(git remote); do
+    git remote prune --dry-run "$r" 2>/dev/null | sed -n 's/^ \* \[would prune\] //p' | while read -r ref; do
+      jq -n --arg r "$r" --arg f "$ref" '{remote: $r, ref: $f}' >> "$tmp/stale.jsonl"
+    done
   done
-done
+fi
 
 # worktrees
 git worktree list --porcelain | awk '

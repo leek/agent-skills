@@ -81,7 +81,10 @@ not_started() {  # not_started <branch>
 is_finished() {  # is_finished <branch>
   if git merge-base --is-ancestor "$1" "origin/$default" 2>/dev/null && ! not_started "$1"; then return 0; fi
   command -v gh >/dev/null 2>&1 || { echo ">> gh missing: PR state of $1 not checked" >&2; return 1; }
-  gh pr list --head "$1" --state all --json state --jq '.[].state' 2>/dev/null | grep -qE '^(MERGED|CLOSED)$'
+  local states
+  states=$(gh pr list --head "$1" --state all --json state --jq '.[].state' 2>/dev/null || true)
+  printf '%s\n' "$states" | grep -qE '^OPEN$' && return 1
+  printf '%s\n' "$states" | grep -qE '^(MERGED|CLOSED)$'
 }
 
 finished='[]'

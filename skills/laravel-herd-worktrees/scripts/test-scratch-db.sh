@@ -39,7 +39,10 @@ while [ $# -gt 0 ]; do
   shift
 done
 printf 'mysql\t%s\t%s\n' "$host" "$stmt" >> "$STUB_LOG"
-case "$stmt" in SELECT*) [ -z "${STUB_LIST_FAILS:-}" ] || { echo "ERROR 2002: cannot connect" >&2; exit 1; }; awk '{ print $1 "\t-" }' "$STUB_DBS" ;; esac
+case "$stmt" in
+  SELECT*) [ -z "${STUB_LIST_FAILS:-}" ] || { echo "ERROR 2002: cannot connect" >&2; exit 1; }; awk '{ print $1 "\t-" }' "$STUB_DBS" ;;
+  DROP*) case "$stmt" in *"\`${STUB_MYSQL_DROP_FAILS:-/}\`"*) echo "ERROR 1010: Error dropping database" >&2; exit 1 ;; esac ;;
+esac
 STUB
 chmod +x "$t/bin/psql" "$t/bin/mysql"
 export PATH="$t/bin:$PATH"
@@ -328,3 +331,47 @@ ok "a held lock stops the write with the lock's path, and the lock stays"
 [ "$(find "$repo/.git" -maxdepth 1 -name 'scratch-databases*' | wc -l | tr -d ' ')" = 1 ] \
   || fail "a temp file or lock was left beside the registry: $(find "$repo/.git" -maxdepth 1 -name 'scratch-databases*')"
 ok "no temp file or lock left behind"
+
+# --- regression: regex metacharacters in .env.testing never break is_protected ---
+printf 'DB_CONNECTION=pgsql\nDB_DATABASE=foo(bar\n' > "$repo/.env.testing"
+bash "$script" register pgsql app - 2>/dev/null
+before=$(cat "$registry")
+refused "regex metacharacter in .env.testing still protects main .env" app "used by the main checkout"
+printf 'DB_CONNECTION=pgsql\nDB_DATABASE=app_env_testing\n' > "$repo/.env.testing"
+ok "regex metacharacter foo(bar in .env.testing does not fail open is_protected"
+
+# --- regression: worktree path with & and | still protects its database ---
+wt_special="$t/wt&a|b"
+git worktree add -q -b special "$wt_special"
+printf 'DB_CONNECTION=pgsql\nDB_DATABASE=app_special\n' > "$wt_special/.env"
+bash "$script" register pgsql app_special - 2>/dev/null
+before=$(cat "$registry")
+refused "worktree path with & and |" app_special "remaining worktree"
+git worktree remove "$wt_special"
+ok "worktree path containing & and | protects its database"
+
+# --- regression: phpunit.xml with reversed attribute order and single quotes ---
+printf "<phpunit><php>\n<env value='app_rev_single' name='DB_DATABASE'/>\n<env value=\"app_rev_double\" force=\"true\" name=\"DB_DATABASE\"/>\n</php></phpunit>\n" > "$repo/phpunit.xml"
+bash "$script" register pgsql app_rev_single - 2>/dev/null
+bash "$script" register pgsql app_rev_double - 2>/dev/null
+before=$(cat "$registry")
+refused "phpunit.xml reversed single quotes" app_rev_single "used by the main checkout"
+refused "phpunit.xml reversed double quotes" app_rev_double "used by the main checkout"
+printf '<phpunit><php>\n<env name="DB_DATABASE" value="app_phpunit"/>\n</php></phpunit>\n' > "$repo/phpunit.xml"
+ok "phpunit.xml protects DB_DATABASE regardless of attribute order or quote style"
+
+# --- regression: dual-connection (pgsql + mysql) keeps failed connection's registry line ---
+: > "$registry"
+env_main 127.0.0.1 pgsql
+bash "$script" register pgsql app_dual - 2>/dev/null
+printf 'DB_CONNECTION=mysql\nDB_HOST=127.0.0.1\nDB_PORT=3306\nDB_DATABASE=app_env_testing\n' > "$repo/.env.testing"
+bash "$script" register mysql app_dual - 2>/dev/null
+reset_log
+export STUB_MYSQL_DROP_FAILS=app_dual
+run drop app_dual
+unset STUB_MYSQL_DROP_FAILS
+[ "$rc" = 0 ] || fail "dual drop exits 0 when one connection dropped, got $rc ($(cat "$t/err"))"
+grep -q "	pgsql@" "$registry" && fail "pgsql entry for app_dual should have been unregistered"
+grep -q "	mysql@127.0.0.1:3306	app_dual	" "$registry" || fail "mysql entry for app_dual was wrongly removed when mysql drop failed: $(cat "$registry")"
+printf 'DB_CONNECTION=pgsql\nDB_DATABASE=app_env_testing\n' > "$repo/.env.testing"
+ok "dropping pgsql does not remove mysql registry entry when mysql drop fails"
