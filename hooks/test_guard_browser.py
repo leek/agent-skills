@@ -219,6 +219,11 @@ class GuardBrowserTest(unittest.TestCase):
         self.assertBlocked(f"{S} find label 'Research budget' fill 1", "only allowed into a search box")
         self.assertBlocked(f"{S} find placeholder 'not a search' fill x", "only allowed into a search box")
 
+    def test_open_needs_the_origin_spelled_out(self):
+        for url in ("https:app.test/x", "https:/app.test/x", "https:///app.test/x"):
+            self.assertBlocked(f"{S} open '{url}'", "only allowed on", )
+        self.assertAllowed(f"{S} open https://app.test/x")
+
     def test_get_allows_only_read_subcommands(self):
         for sub in ("title", "url", "text @e1", "attr '#a' href", "count li"):
             self.assertAllowed(f"{S} get {sub}")

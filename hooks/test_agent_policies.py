@@ -121,6 +121,11 @@ class AgentPoliciesTest(unittest.TestCase):
                     "http://\uff11\uff16\uff19.254.169.254/", "http://169.254.169.254\\@app.test/"):
             self.assertBlocked(f"agent-browser open '{url}'", "plain ASCII URL", a)
         self.assertAllowed("agent-browser open 'https://app.test/search?q=a%20b'", a)
+        # The browser reads these as http://169.254.169.254/; urlsplit finds no host in them.
+        for url in ("http:169.254.169.254/", "http:/169.254.169.254/", "http:///169.254.169.254/",
+                    "HTTP:169.254.169.254"):
+            self.assertBlocked(f"agent-browser open '{url}'", "scheme://host", a)
+            self.assertBlocked(f"agent-browser read '{url}'", "scheme://host", a)
         self.assertBlocked("rm -rf app", "`rm` is not allowed", a)
 
 

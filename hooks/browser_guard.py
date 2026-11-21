@@ -103,7 +103,14 @@ def metadata_host(host: str) -> bool:
     return ip.is_link_local or str(ip) == "fd00:ec2::254"
 
 
+# `scheme://host`, spelled out. The browser reads `http:host` and `http:/host` as
+# `http://host/`, where urlsplit finds no host at all.
+AUTHORITY_URL = re.compile(r"https?://[^/\\?#]", re.IGNORECASE)
+
+
 def same_origin(url: str, origin: str) -> bool:
+    if not AUTHORITY_URL.match(url):
+        return False
     a, b = urlsplit(url), urlsplit(origin)
     return a.scheme in ("http", "https") and (a.scheme, a.netloc) == (b.scheme, b.netloc)
 
@@ -285,6 +292,8 @@ def check_verb(verb: str, rest: list[str], cwd: str, save_dirs: list[str], origi
             if (not raw.isascii() or "\\" in raw or any(c.isspace() or ord(c) < 32 or ord(c) == 127 for c in raw)
                     or "%" in netloc):
                 raise Blocked(f"`{verb}` takes a plain ASCII URL with no backslash, whitespace, or % in its host")
+            if not AUTHORITY_URL.match(raw) or not urlsplit(raw).hostname:
+                raise Blocked(f"`{verb}` takes a URL spelled scheme://host/…")
             if metadata_host(urlsplit(raw).hostname or ""):
                 raise Blocked(f"`{verb}` never opens a link-local or cloud metadata address")
             return
