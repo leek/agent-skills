@@ -106,6 +106,32 @@ class MemoryWriteGuardTest(unittest.TestCase):
         self.assertEqual(self.run_guard("~/.claude/agent-memory/standards-reviewer/MEMORY.md",
                                         cwd=os.path.join(home, "Code", "x")), 2)
 
+    def test_symlinked_memory_root_is_refused(self):
+        # A PR under triage can commit `.claude/agent-memory/<agent>` (or `agent-memory`) as a
+        # symlink; following it would make its target (the whole repo, $HOME) the memory root.
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = os.path.realpath(tmp)
+            os.makedirs(os.path.join(repo, ".claude", "agent-memory"))
+            os.symlink("../..", os.path.join(repo, ".claude", "agent-memory", "standards-reviewer"))
+            self.assertEqual(self.run_guard(os.path.join(
+                repo, ".claude", "agent-memory", "standards-reviewer", "app", "Foo.php"), cwd=repo), 2)
+            self.assertEqual(self.run_guard(os.path.join(repo, "app", "Foo.php"), cwd=repo), 2)
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = os.path.realpath(tmp)
+            os.makedirs(os.path.join(repo, ".claude"))
+            os.makedirs(os.path.join(repo, "app", "standards-reviewer"))
+            os.symlink("../app", os.path.join(repo, ".claude", "agent-memory"))
+            self.assertEqual(self.run_guard(os.path.join(
+                repo, ".claude", "agent-memory", "standards-reviewer", "Foo.php"), cwd=repo), 2)
+            self.assertEqual(self.run_guard(os.path.join(
+                repo, "app", "standards-reviewer", "Foo.php"), cwd=repo), 2)
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = os.path.realpath(tmp)
+            os.makedirs(os.path.join(repo, "elsewhere", "agent-memory", "standards-reviewer"))
+            os.symlink("elsewhere", os.path.join(repo, ".claude"))
+            self.assertEqual(self.run_guard(os.path.join(
+                repo, ".claude", "agent-memory", "standards-reviewer", "x.md"), cwd=repo), 2)
+
     def test_path_keys_cover_all_write_tools(self):
         for key, tool in (("file_path", "Write"), ("path", "write"), ("target_file", "Delete"),
                           ("notebook_path", "EditNotebook"), ("target_notebook", "EditNotebook"),

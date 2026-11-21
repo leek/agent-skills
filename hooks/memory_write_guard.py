@@ -28,8 +28,13 @@ def agent_subdirs(raw_agent: str, agent: str) -> list[str]:
 
 
 def memory_roots(cwd: str, scope: str, subdirs: list[str]) -> list[str]:
-    """The memory directories this agent owns under its declared scope (`project` or `user`)."""
-    bases: list[str] = []
+    """The memory directories this agent owns under its declared scope (`project` or `user`).
+
+    Each base is an anchor (a project directory, `~/.claude`, or `$CLAUDE_CONFIG_DIR`) plus
+    the parts below it. A root with a symlink anywhere below its anchor is dropped: a PR can
+    commit `.claude/agent-memory/<agent>` as a link to `../..`, and following it would make the
+    whole repo (or `$HOME`) the memory root."""
+    bases: list[tuple[str, list[str]]] = []
     home = os.path.realpath(os.path.expanduser("~"))
     if scope == "project":
         start = here = os.path.abspath(cwd)
@@ -38,20 +43,29 @@ def memory_roots(cwd: str, scope: str, subdirs: list[str]) -> list[str]:
             # itself, never when `~` is reached as a parent of the working directory.
             if os.path.realpath(here) == home:
                 if here == start:
-                    bases.append(os.path.join(here, ".claude", "agent-memory"))
+                    bases.append((here, [".claude", "agent-memory"]))
                 break
-            bases.append(os.path.join(here, ".claude", "agent-memory"))
+            bases.append((here, [".claude", "agent-memory"]))
             parent = os.path.dirname(here)
             if parent == here:
                 break
             here = parent
     elif scope == "user":
-        bases.append(os.path.join(home, ".claude", "agent-memory"))
+        bases.append((os.path.join(home, ".claude"), ["agent-memory"]))
         # A profile (CLAUDE_CONFIG_DIR) moves user memory to <config dir>/agent-memory/.
         config_dir = os.environ.get("CLAUDE_CONFIG_DIR")
         if config_dir:
-            bases.append(os.path.join(os.path.expanduser(config_dir), "agent-memory"))
-    return [os.path.realpath(os.path.join(base, sd)) for base in bases for sd in subdirs]
+            bases.append((os.path.expanduser(config_dir), ["agent-memory"]))
+    roots = []
+    for anchor, parts in bases:
+        for sd in subdirs:
+            p, linked = anchor, False
+            for part in parts + [sd]:
+                p = os.path.join(p, part)
+                linked = linked or os.path.islink(p)
+            if not linked:
+                roots.append(os.path.realpath(p))
+    return roots
 
 
 def memory_path(path: str, cwd: str, scope: str, raw_agent: str, agent: str) -> bool:
