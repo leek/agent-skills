@@ -39,7 +39,7 @@ own, name it `<app db>_pr<N>_fix<k>` and register it per
 in one message, in the background (Claude Code: `Agent`, `run_in_background: true`, no
 `name`, its `description` starting `pr-<N>--fix-<k>`, keeping the returned `agentId`; other
 harnesses: dispatch in the background per [harness-tools](../../harness-tools/SKILL.md),
-keeping each id; Codex: `spawn_agent` with `fork_turns: "none"` and the full brief). Its brief gives the worktree
+keeping each id, with the full brief). Its brief gives the worktree
 path, its findings' step 4 lines with links, its file list, the repo's `AGENTS.md` /
 `CLAUDE.md`, and these rules:
 

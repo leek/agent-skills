@@ -37,8 +37,7 @@ ref, the calling skill's line format, and the rules above. In Claude Code with t
 plugin installed, dispatch `subagent_type=leek-skills:finding-verifier` for each batch
 in parallel; it keeps the bots' recurring false premises in project memory, under the
 target repo's `.claude/`. In other harnesses, dispatch and wait per
-[harness-tools](../../harness-tools/SKILL.md) (Codex: `spawn_agent` with `fork_turns:
-"none"` and the full brief, then `wait_agent`), on a cheaper model where offered, or
+[harness-tools](../../harness-tools/SKILL.md) with the full brief, on a cheaper model where offered, or
 classify inline when the harness has no sub-agents. Re-verify yourself every line that
 comes back LEGIT or UNSURE.
 

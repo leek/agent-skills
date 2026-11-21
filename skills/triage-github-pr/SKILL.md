@@ -124,7 +124,7 @@ an installed `vendor/` or `node_modules/` tree.
 Run it in a fresh context so the bots cannot frame it. In Claude Code with this plugin
 installed, dispatch `subagent_type=leek-skills:pr-reviewer` with the brief, in the
 background (pass `run_in_background: true` where the Agent tool offers it), while
-gathering review state; its completion notification brings the findings. In other harnesses, dispatch it in the background per [harness-tools](../harness-tools/SKILL.md) (Codex: `spawn_agent` with `fork_turns: "none"` and the full brief), or use any read-only sub-agent on
+gathering review state; its completion notification brings the findings. In other harnesses, dispatch it in the background per [harness-tools](../harness-tools/SKILL.md) with the full brief, or use any read-only sub-agent on
 your strongest model, or review inline before you open the comment surfaces. Record the
 head sha it covered.
 
@@ -207,7 +207,7 @@ never a repeat: a human who raises it again disagrees with the answer, so verify
 Verify the rest (undirected) before you believe them, by
 [Verify findings](../fix-github-issues/references/verify-findings.md): its rules, its
 delegation of 3 or more findings to read-only verifier sub-agents (each batch from one
-PR, the PR head sha as the ref, the line format above; (Codex: `spawn_agent` with `fork_turns: "none"` and the full brief, then `wait_agent`)), and its second pass against the project's auto-dismiss
+PR, the PR head sha as the ref, the line format above), and its second pass against the project's auto-dismiss
 and never-dismiss lists before you write code. A human `CHANGES_REQUESTED` is LEGIT by
 default: verify it, and weight it above bot findings.
 
@@ -252,7 +252,7 @@ for presentation), run the tests green, then commit per the `commit` skill's
 [Staging](../commit/SKILL.md#staging) and [Subject](../commit/SKILL.md#subject).
 A batch whose fixes split into at least 2 groups of separate files is written by fixer
 sub-agents in parallel, per [Parallel fix batch](references/parallel-fixes.md), and a
-stack's integration PR batch always is (Codex: `spawn_agent` with `fork_turns: "none"` and the full brief, then `wait_agent`).
+stack's integration PR batch always is.
 You write the fixes yourself only when the batch is one group.
 A test failing outside your fix runs on the starting SHA first, by
 [A test failing outside your fix](references/gh-mechanics.md#a-test-failing-outside-your-fix).
