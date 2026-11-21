@@ -125,6 +125,23 @@ eq "non-conflict merge unlocked" "$(printf '%s' "$out" | jq -c '[.locked, .merge
 rm -f "$t/wt-01/collision.txt"
 echo "ok non-conflict merge failure releases lock and refuses cleanly"
 
+# A hook that rejects the merge commit leaves MERGE_HEAD with no conflicts: still refuse and free the lock.
+mkdir -p "$t/hooks"
+printf '#!/bin/sh\nexit 1\n' >"$t/hooks/pre-merge-commit"
+chmod +x "$t/hooks/pre-merge-commit"
+commit_file 01 hooked-ticket.txt ticket
+printf 'integration side\n' >"$r/hooked.txt"
+git -C "$r" add -- hooked.txt
+git -C "$r" commit -q -m "add hooked.txt on integration"
+git -C "$r" config core.hooksPath "$t/hooks"
+land 01 begin --integration "$r"
+git -C "$r" config --unset core.hooksPath
+eq "hook-rejected merge exit" "$rc" 1
+eq "hook-rejected merge unlocked" "$(printf '%s' "$out" | jq -c '[.locked, .merged, (has("reason"))]')" '[false,false,true]'
+[ ! -e "$notes/land.lock" ] || fail "hook-rejected merge left lock behind"
+! git -C "$t/wt-01" rev-parse -q --verify MERGE_HEAD >/dev/null || fail "hook-rejected merge was not aborted"
+echo "ok a hook-rejected merge commit refuses and releases the lock"
+
 # A failed stack push still records the cut: the worker pushes it itself and opens the PR, so
 # the next ticket's position and base must move past it.
 commit_file 01 four.txt four
@@ -136,6 +153,12 @@ eq "failed push exit" "$rc" 1
 eq "failed push json" "$(printf '%s' "$out" | jq -c '[.landed, .position, .cut, .base, .pushed]')" '[true,3,"foo-stack-04","foo-stack-03",false]'
 eq "failed push records the cut" "$(tail -n 1 "$notes/stack")" "$(printf '3\t04\tfoo-stack-04\tfoo-stack-03')"
 [ ! -e "$notes/land.lock" ] || fail "failed push left lock behind"
+# Retrying the same ticket reuses its recorded line instead of stacking the cut on itself.
+land 01 begin --integration "$r"
+eq "begin retry after failed push exit" "$rc" 0
+land 01 finish --integration "$r" --ticket 04 --stack
+eq "retry after failed push json" "$(printf '%s' "$out" | jq -c '[.position, .cut, .base]')" '[3,"foo-stack-04","foo-stack-03"]'
+eq "retry keeps one stack line for the ticket" "$(awk -F'\t' '$2 == "04"' "$notes/stack" | wc -l | tr -d ' ')" 1
 git -C "$r" remote set-url origin "$t/origin.git"
 commit_file 01 five.txt five
 land 01 begin --integration "$r"

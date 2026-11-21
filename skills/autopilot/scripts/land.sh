@@ -110,7 +110,7 @@ case "$action" in
       exit 0
     fi
     conflicts="$(git diff --name-only --diff-filter=U)"
-    if [ -z "$conflicts" ] && ! git rev-parse -q --verify MERGE_HEAD >/dev/null; then
+    if [ -z "$conflicts" ]; then
       git merge --abort 2>/dev/null || true
       release_lock
       echo "land.sh: merge of $ibranch failed without merge conflicts" >&2
@@ -146,10 +146,17 @@ case "$action" in
     pushed=null
     if [ "$stack" = 1 ]; then
       touch "$notes/stack"
-      position=$(( $(wc -l <"$notes/stack" | tr -d ' ') + 1 ))
       cut="$ibranch-stack-$ticket"
-      base="$ibranch"
-      [ "$position" = 1 ] || base="$(tail -n 1 "$notes/stack" | cut -f3)"
+      # A retry after pushed:false reuses the ticket's recorded line rather than stacking on itself.
+      recorded="$(awk -F'\t' -v t="$ticket" '$2 == t' "$notes/stack" | tail -n 1)"
+      if [ -n "$recorded" ]; then
+        position="$(printf '%s' "$recorded" | cut -f1)"
+        base="$(printf '%s' "$recorded" | cut -f4)"
+      else
+        position=$(( $(wc -l <"$notes/stack" | tr -d ' ') + 1 ))
+        base="$ibranch"
+        [ "$position" = 1 ] || base="$(tail -n 1 "$notes/stack" | cut -f3)"
+      fi
       git branch -f "$cut" "$merge_sha" >&2
       if git push -u origin "$cut" >&2; then
         pushed=true
@@ -158,7 +165,7 @@ case "$action" in
       fi
       # Recorded either way: on pushed:false the worker pushes the cut itself and opens its PR,
       # so the next ticket still stacks on it.
-      printf '%s\t%s\t%s\t%s\n' "$position" "$ticket" "$cut" "$base" >>"$notes/stack"
+      [ -n "$recorded" ] || printf '%s\t%s\t%s\t%s\n' "$position" "$ticket" "$cut" "$base" >>"$notes/stack"
     fi
     release_lock
     jq -cn --arg ticket "$ticket" --arg merge_sha "$merge_sha" --argjson position "$position" \
