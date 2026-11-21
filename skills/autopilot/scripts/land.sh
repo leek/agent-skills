@@ -132,13 +132,28 @@ case "$action" in
     [ -z "$(tracked_changes)" ] || refuse "the ticket worktree has uncommitted changes"
     git merge-base --is-ancestor "$ibranch" HEAD || refuse "$branch does not hold the integration tip; run begin again"
     [ -z "$(git -C "$integration" diff --cached --name-only)" ] || refuse "the integration checkout has staged changes"
-    if ! git -C "$integration" merge --no-ff --no-edit -m "Merge $branch into $ibranch" "$branch" >&2; then
-      git -C "$integration" merge --abort 2>/dev/null || true
-      refuse "the merge into $ibranch failed"
+    # A --stack retry after pushed:false, with every branch commit already on the integration
+    # branch, re-cuts the commit it landed the first time: the tip may hold later tickets' merges.
+    landed_sha=""
+    if [ "$stack" = 1 ] && [ -s "$notes/landed/$ticket" ] && [ -f "$notes/stack" ] &&
+      awk -F'\t' -v t="$ticket" '$2 == t { found = 1 } END { exit !found }' "$notes/stack"; then
+      landed_sha="$(sed -n '1p' "$notes/landed/$ticket")"
+      if ! git merge-base --is-ancestor "$landed_sha" "$ibranch" 2>/dev/null ||
+        ! git merge-base --is-ancestor "$branch" "$ibranch" 2>/dev/null; then
+        landed_sha=""
+      fi
     fi
-    merge_sha="$(git -C "$integration" rev-parse HEAD)"
-    mkdir -p -- "$notes/landed"
-    printf '%s\n' "$merge_sha" >"$notes/landed/$ticket"
+    if [ -n "$landed_sha" ]; then
+      merge_sha="$landed_sha"
+    else
+      if ! git -C "$integration" merge --no-ff --no-edit -m "Merge $branch into $ibranch" "$branch" >&2; then
+        git -C "$integration" merge --abort 2>/dev/null || true
+        refuse "the merge into $ibranch failed"
+      fi
+      merge_sha="$(git -C "$integration" rev-parse HEAD)"
+      mkdir -p -- "$notes/landed"
+      printf '%s\n' "$merge_sha" >"$notes/landed/$ticket"
+    fi
 
     position=null
     cut=""

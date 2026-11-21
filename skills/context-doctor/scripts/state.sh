@@ -96,15 +96,17 @@ case "$cmd" in
     mkdir -p "$state"
     ledger="$state/declined.jsonl"; touch "$ledger"
     before=$(wc -l < "$ledger" | tr -d ' ')
-    tmp=$(mktemp); trap 'rm -f "$tmp" "$ledger.new"' EXIT
+    # Each run's merge file is its own (beside the ledger, so the mv stays atomic): a fixed
+    # name would let one run's EXIT trap delete another's.
+    tmp=$(mktemp); new=$(mktemp "$ledger.tmp.XXXXXX"); trap 'rm -f "$tmp" "$new"' EXIT
     if [ $# -eq 0 ]; then
       jq -c --arg d "$(date -u +%Y-%m-%d)" 'select(.fingerprint) | . + {declined_on: (.declined_on // $d)}' > "$tmp"
     else
       [ -r "$1" ] || { echo "Unreadable: $1" >&2; exit 1; }
       jq -c --arg d "$(date -u +%Y-%m-%d)" 'select(.fingerprint) | . + {declined_on: (.declined_on // $d)}' "$1" > "$tmp"
     fi
-    { cat "$ledger"; cat "$tmp"; } | jq -sc 'unique_by(.fingerprint)[]' > "$ledger.new"
-    mv "$ledger.new" "$ledger"
+    { cat "$ledger"; cat "$tmp"; } | jq -sc 'unique_by(.fingerprint)[]' > "$new"
+    mv "$new" "$ledger"
     after=$(wc -l < "$ledger" | tr -d ' ')
     jq -nc --argjson a $((after - before)) --argjson t "$after" '{added:$a, total:$t}' ;;
   audited)

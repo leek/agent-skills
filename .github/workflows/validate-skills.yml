@@ -51,6 +51,12 @@ jobs:
 
       - name: Run shell and Python tests on stock macOS /bin/bash
         run: |
+          # The verifier and the tests it runs call bare `bash`, which PATH resolves to the
+          # runner's Homebrew Bash 5; put stock /bin/bash (3.2) first so every level runs 3.2.
+          mkdir -p "$RUNNER_TEMP/stock-bash"
+          ln -sf /bin/bash "$RUNNER_TEMP/stock-bash/bash"
+          export PATH="$RUNNER_TEMP/stock-bash:$PATH"
+          bash --version | head -n 1
           VERIFY_ONLY="bash -n" /bin/bash scripts/verify-skills-collection.sh
           VERIFY_ONLY="test-*.sh" /bin/bash scripts/verify-skills-collection.sh
           VERIFY_ONLY="python" /bin/bash scripts/verify-skills-collection.sh

@@ -159,6 +159,14 @@ eq "begin retry after failed push exit" "$rc" 0
 land 01 finish --integration "$r" --ticket 04 --stack
 eq "retry after failed push json" "$(printf '%s' "$out" | jq -c '[.position, .cut, .base]')" '[3,"foo-stack-04","foo-stack-03"]'
 eq "retry keeps one stack line for the ticket" "$(awk -F'\t' '$2 == "04"' "$notes/stack" | wc -l | tr -d ' ')" 1
+# A retry after another merge reached the integration branch still cuts the commit 04 landed.
+landed_04="$(cat "$notes/landed/04")"
+git -C "$r" commit -q --allow-empty -m "a later ticket's merge"
+land 01 begin --integration "$r"
+eq "begin retry after a later merge exit" "$rc" 0
+land 01 finish --integration "$r" --ticket 04 --stack
+eq "retry after a later merge json" "$(printf '%s' "$out" | jq -c '[.position, .merge_sha]')" "[3,\"$landed_04\"]"
+eq "retry cut stays on the landed commit" "$(git -C "$r" rev-parse foo-stack-04)" "$landed_04"
 git -C "$r" remote set-url origin "$t/origin.git"
 commit_file 01 five.txt five
 land 01 begin --integration "$r"

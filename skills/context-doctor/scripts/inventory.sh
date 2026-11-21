@@ -135,7 +135,7 @@ SECRET_KV = [
     (re.compile(r"(://)[^/\s:@]{16,}(@)"), r"\1[REDACTED]\2"),
 ]
 # Files whose text never goes into units, however they are reached (@.env, a symlinked key).
-SENSITIVE = re.compile(r"(?:^|/)\.env(?:\.[^/]*)?$|\.(?:pem|key|p12|pfx|keystore)$|(?:^|/)id_[a-z0-9]+$|(?:^|/)\.netrc$|(?:^|/)\.npmrc$")
+SENSITIVE = re.compile(r"(?:^|/)\.env(?:rc)?(?:\.[^/]*)?$|\.(?:pem|key|p12|pfx|keystore)$|(?:^|/)id_[a-z0-9]+$|(?:^|/)\.netrc$|(?:^|/)\.npmrc$")
 SKIP_DIRS = {".git", "node_modules", "vendor", "dist", "build", ".next", ".nuxt", "storage", ".venv", "venv", "__pycache__"}
 
 def redact(s):

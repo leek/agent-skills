@@ -135,7 +135,8 @@ class GuardReviewAgentsTest(unittest.TestCase):
         self.assertEqual(shell_call("git commit -m x", "leek-skills:pr-reviewer").returncode, 2)
         self.assertEqual(shell_call("rm -rf x", "leek-skills:browser-tester").returncode, 2)
 
-        # Read-only git-only agents are guarded; agents that run bash/composer/agent-browser are not.
+        # Read-only git-only agents get the review policy alone; ui-reviewer, session-miner, and
+        # dependency-auditor get it plus their own commands (test_agent_policies.py).
         for agent in ("leek-skills:standards-reviewer", "leek-skills:spec-reviewer",
                       "leek-skills:deepening-scout", "standards-reviewer",
                       "spec-reviewer", "deepening-scout"):
@@ -143,9 +144,9 @@ class GuardReviewAgentsTest(unittest.TestCase):
             self.assertAllowed("git log --oneline -10", agent=agent)
             self.assertBlocked("git commit -m x", "not a read-only git command", agent=agent)
             self.assertBlocked("rm -rf app", "`rm` is not allowed", agent=agent)
-        self.assertAllowed("bash extract-signal.sh log.jsonl", agent="leek-skills:session-miner")
-        self.assertAllowed("composer audit --format=json", agent="leek-skills:dependency-auditor")
-        self.assertAllowed("agent-browser snapshot -i", agent="leek-skills:ui-reviewer")
+        for agent in ("leek-skills:session-miner", "leek-skills:dependency-auditor", "leek-skills:ui-reviewer"):
+            self.assertAllowed("git diff main...HEAD", agent=agent)
+            self.assertBlocked("rm -rf app", "`rm` is not allowed", agent=agent)
 
     def test_empty_quote_io_number_desync_is_blocked(self):
         # Empty quotes disqualify IO_NUMBER in bash/zsh, so `""2>/dev/null` passes `2` as an
@@ -412,6 +413,11 @@ class GuardReviewAgentsTest(unittest.TestCase):
         self.assertAllowed("uniq -c notes.txt")
         # Programs run through git and rg.
         self.assertBlocked("git cat-file --filters HEAD:file", "runs a program")
+        self.assertBlocked("git cat-file --filter HEAD:file", "runs a program")
+        self.assertBlocked("git cat-file --filt HEAD:file", "runs a program")
+        # `--filter=<spec>` is log/rev-list's own option, not an abbreviation of --filters.
+        self.assertAllowed("git rev-list --objects --filter=blob:none HEAD")
+        self.assertAllowed("git log --filter=blob:none --oneline -5")
         self.assertBlocked("git diff --textconv 'HEAD~1'", "runs a program")
         self.assertBlocked("rg -z foo app", "decompression")
         self.assertBlocked("rg --search-zip foo app", "runs a program")

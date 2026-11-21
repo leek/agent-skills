@@ -255,9 +255,11 @@ cat > "$p4/CLAUDE.md" <<'MD'
 Install @types/node first.
 @.env
 @.env.copy
+@.envrc
 MD
 # A secrets file is never read: not for its size, its @ imports, or the identical-files hash.
 echo "PLAINENVVALUE=hello @leaky/ENVIMPORTVALUE_42.md" > "$p4/.env"; cp "$p4/.env" "$p4/.env.copy"
+echo "export DIRENVVALUE=hello" > "$p4/.envrc"
 cat > "$p4/.claude/rules/secrets.md" <<'MD'
 - Export GITHUB_TOKEN=ghxsecretvalue123456 before running.
 - Send Authorization: Bearer bearervalue12345678 to the API.
@@ -320,6 +322,7 @@ jq -e --arg p "$p4r/.claude/settings.json" '[.issues[] | select(.type=="skill-ov
   || fail "skill-override-dead blamed the wrong settings file"
 unit "COMMANDBODY"
 ! grep -rq 'PLAINENVVALUE' "$out" || fail "an imported .env reached the output"
+! grep -rq 'DIRENVVALUE' "$out" || fail "an imported .envrc reached the output"
 has_issue sensitive-file-skipped "secrets file"
 ! grep -rq 'ENVIMPORTVALUE' "$out" || fail "an imported .env was walked for @ imports"
 none identical-files ".env.copy"

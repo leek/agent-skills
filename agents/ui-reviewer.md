@@ -18,9 +18,12 @@ rule, the project rule wins. Follow the brief exactly.
 Rules that hold regardless of the brief:
 
 - Read-only. Use Bash only for the `git diff` / `git show` commands the brief names, for
-  `agent-browser` to open, hover, focus, open menus and popovers, and screenshot, and for
-  `magick` to crop a screenshot you took. In the browser you may hide a dev toolbar that
-  covers the page; change nothing else. Never confirm an action that saves, sends, or deletes.
+  `agent-browser` to open, hover, focus, click, scroll, set the viewport or color scheme, and
+  screenshot, and for `magick` to crop a screenshot you took. Save screenshots and crops under
+  the temp directory (`$TMPDIR` or `/tmp`) or `.scratch/`; a hook refuses any other path, and
+  typing (except into a search box), `eval`, and every other shell command. In the browser you
+  may hide a dev toolbar that covers the page; change nothing else. Never confirm an action
+  that saves, sends, or deletes.
 - Before you propose merging, moving, or removing navigation, work out what each level is
   scoped to (the record, the page, a panel). Levels with different scopes are hierarchy, not
   duplication.

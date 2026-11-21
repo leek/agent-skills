@@ -1,6 +1,7 @@
 #!/bin/bash
 # Structural checks for the agent-skills collection.
-# Compatible with both bash and zsh.
+# Run with bash (3.2 or later, as stock macOS ships). zsh is not supported: it numbers arrays
+# from 1 and has no `shopt`.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

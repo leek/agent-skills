@@ -45,6 +45,10 @@ FIND_VALUE_FLAGS = {"--name"}
 VERB_FLAGS = {"screenshot": SCREENSHOT_FLAGS, "find": FIND_BOOL_FLAGS | FIND_VALUE_FLAGS}
 ELEMENT_STATES = {"visible", "hidden", "attached", "detached"}
 FILTERS = {"grep", "head", "tail", "wc", "sort", "uniq", "echo"}
+SEARCH_LABEL = re.compile(r"\s*search\b", re.IGNORECASE)
+# `agent-browser get --help` (0.43) subcommands, less `cdp-url`: the browser's CDP WebSocket
+# URL, which drives the session outside this allowlist.
+GET_SUBCOMMANDS = {"text", "html", "value", "attr", "title", "url", "count", "box", "styles"}
 
 
 def same_origin(url: str, origin: str) -> bool:
@@ -57,20 +61,19 @@ def inside(path: str, run_dir: str, cwd: str) -> bool:
     return real.startswith(os.path.realpath(run_dir) + os.sep)
 
 
-def check_screenshot(rest: list[str], run_dir: str, cwd: str) -> None:
+def check_screenshot(rest: list[str], save_dirs: list[str], cwd: str) -> None:
     """Only screenshot's own value flags consume a word, so every other flag's would-be value
     stays positional: `--timeout /tmp/x.png` saves to /tmp/x.png. Usage is `[selector] [path]`,
     so a third positional is refused and the last one (the path, or a lone word that may be one)
-    must lie inside the run directory whatever it looks like, and so must --screenshot-dir."""
+    must lie inside a save directory whatever it looks like, and so must --screenshot-dir. With
+    neither a path nor --screenshot-dir, agent-browser saves to a temp directory, so that is refused.
+    `--` never reaches here: check_browser refuses it, since agent-browser may not honor it."""
     positional: list[str] = []
     dirs: list[str] = []
     i = 0
     while i < len(rest):
         a = rest[i]
         i += 1
-        if a == "--":
-            positional.extend(rest[i:])
-            break
         if not a.startswith("-"):
             positional.append(a)
             continue
@@ -85,23 +88,29 @@ def check_screenshot(rest: list[str], run_dir: str, cwd: str) -> None:
                 dirs.append(value)
     if len(positional) > 2:
         raise Blocked("`screenshot` takes at most a selector and a path")
-    real_run = os.path.realpath(run_dir)
+    where = " or ".join(f"{d}/" for d in save_dirs)
+
+    def saved_inside(p: str, may_be_dir: bool) -> bool:
+        real = os.path.realpath(os.path.join(cwd, os.path.expanduser(p)))
+        return any((may_be_dir and real == os.path.realpath(d)) or inside(p, d, cwd) for d in save_dirs)
+
     for d in dirs:
-        if os.path.realpath(os.path.join(cwd, os.path.expanduser(d))) != real_run and not inside(d, run_dir, cwd):
-            raise Blocked(f"screenshots must be saved under {run_dir}/")
-    if positional and not inside(positional[-1], run_dir, cwd):
-        raise Blocked(f"screenshots must be saved under {run_dir}/")
+        if not saved_inside(d, True):
+            raise Blocked(f"screenshots must be saved under {where}")
+    if positional and not saved_inside(positional[-1], False):
+        raise Blocked(f"screenshots must be saved under {where}")
+    if not positional and not dirs:
+        raise Blocked(f"screenshots must be saved under {where}: pass "
+                      f"`screenshot [selector] {save_dirs[0]}/<name>.png`")
 
 
 def strip_find_flags(rest: list[str]) -> list[str]:
-    """Strip find's own flags (and --name's value), returning positionals."""
+    """Strip find's own flags (and --name's value), returning positionals. check_browser has
+    already refused `--`, so every dash-prefixed word here is a flag."""
     positional: list[str] = []
     i = 0
     while i < len(rest):
         a = rest[i]
-        if a == "--":
-            positional.extend(rest[i + 1:])
-            break
         if a.startswith("-"):
             name, eq, _ = a.partition("=")
             if name in FIND_BOOL_FLAGS:
@@ -143,8 +152,10 @@ def check_find(rest: list[str]) -> None:
     if action in ("fill", "type"):
         if len(extra) != 1:
             raise Blocked(f"`find … {action}` needs exactly one text argument")
+        # The page writes its own labels, so the word must open the label: "Search users"
+        # passes, "Research budget" and "Not a search" do not.
         search = (locator == "role" and value == "searchbox") or (
-            locator in ("placeholder", "label") and "search" in value.lower())
+            locator in ("placeholder", "label") and SEARCH_LABEL.match(value) is not None)
         if search:
             return
         raise Blocked("typing is only allowed into a search box (`find role searchbox fill <text>`)")
@@ -179,8 +190,12 @@ def check_browser(args: list[str], cwd: str) -> None:
         args = args[2:]
     if not args:
         raise Blocked("missing agent-browser verb")
+    check_verb(args[0], args[1:], cwd, [run_dir], scope["origin"])
 
-    verb, rest = args[0], args[1:]
+
+def check_verb(verb: str, rest: list[str], cwd: str, save_dirs: list[str], origin: str | None) -> None:
+    """One read-only agent-browser verb. `origin` holds open/read to one site (a browser-test
+    run); None allows any http(s) URL and the rendering-only `set` forms (ui-reviewer)."""
     for i, a in enumerate(rest):
         if not a.startswith("-") or a == PROBE:
             continue
@@ -189,7 +204,11 @@ def check_browser(args: list[str], cwd: str) -> None:
         allowed = VERB_FLAGS.get(verb, SAFE_FLAGS)
         if a.split("=", 1)[0] not in allowed:
             raise Blocked(f"flag `{a}` is not allowed")
-    if verb in ("snapshot", "click", "hover", "focus", "scroll", "scrollintoview", "wait", "get",
+    if verb == "get":
+        if not rest or rest[0] not in GET_SUBCOMMANDS:
+            raise Blocked(f"`get` allows only {', '.join(sorted(GET_SUBCOMMANDS))}")
+        return
+    if verb in ("snapshot", "click", "hover", "focus", "scroll", "scrollintoview", "wait",
                 "is", "back", "forward", "reload"):
         return
     if verb in ("console", "errors"):
@@ -203,11 +222,22 @@ def check_browser(args: list[str], cwd: str) -> None:
     if verb in ("open", "read"):
         if verb == "read" and not rest:
             return
-        if len(rest) != 1 or not same_origin(rest[0], scope["origin"]):
-            raise Blocked(f"`{verb}` is only allowed on {scope['origin']} — navigate by clicking")
+        if origin is None:
+            if len(rest) != 1 or urlsplit(rest[0]).scheme not in ("http", "https"):
+                raise Blocked(f"`{verb}` takes one http(s) URL")
+            return
+        if len(rest) != 1 or not same_origin(rest[0], origin):
+            raise Blocked(f"`{verb}` is only allowed on {origin} — navigate by clicking")
         return
+    if verb == "set" and origin is None:
+        if (rest[:1] == ["viewport"] and len(rest) == 3 and rest[1].isdigit() and rest[2].isdigit()) or (
+                rest[:1] == ["device"] and len(rest) == 2) or (
+                rest[:1] == ["media"] and 1 <= len(rest) <= 3
+                and set(rest[1:]) <= {"dark", "light", "reduced-motion"}):
+            return
+        raise Blocked("`set` allows only viewport <w> <h>, device <name>, and media [dark|light] [reduced-motion]")
     if verb == "screenshot":
-        check_screenshot(rest, run_dir, cwd)
+        check_screenshot(rest, save_dirs, cwd)
         return
     if verb == "press":
         if len(rest) != 1 or rest[0] not in SAFE_KEYS:

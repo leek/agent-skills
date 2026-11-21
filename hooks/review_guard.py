@@ -8,6 +8,7 @@ git, gh, rg, find, `sed -n '<range>p'`, or text command under both bash and zsh 
 """
 
 import re
+from typing import Callable
 
 from shell_syntax import Blocked, check_filter, long_option_in, parse_command
 
@@ -44,6 +45,10 @@ def check_git(args: list[str]) -> None:
             for a in args[1:]):
         raise Blocked("`git grep -O` runs a program")
     for a in args[1:]:
+        # `--filter=<spec>` is its own option on log and rev-list, and an exact name wins over a
+        # prefix, so it abbreviates `--filters` (runs filter drivers) only on cat-file.
+        if args[0] != "cat-file" and a.split("=", 1)[0] == "--filter":
+            continue
         if long_option_in(a, ("--output", "--upload-pack", "--ext-diff", "--exec", "--textconv", "--filters")):
             raise Blocked(f"`git {args[0]} {a}` writes files or runs a program")
     if args[0] == "fetch":
@@ -331,24 +336,31 @@ def check_jq(args: list[str]) -> None:
         raise Blocked(f"`jq {a}` is not an allowed jq option")
 
 
-def check(command: str) -> None:
-    parts = parse_command(command)
-    for seg in parts:
+def check_segment(name: str, args: list[str]) -> None:
+    if name in FILTERS:
+        check_filter(name, args)
+    elif name == "git":
+        check_git(args)
+    elif name == "gh":
+        check_gh(args)
+    elif name == "rg":
+        check_rg(args)
+    elif name == "find":
+        check_find(args)
+    elif name == "sed":
+        check_sed(args)
+    elif name == "jq":
+        check_jq(args)
+    else:
+        raise Blocked(f"`{name}` is not allowed — only read-only git, gh, rg, find, and text filters")
+
+
+def check(command: str, extra: Callable[[str, list[str]], bool] | None = None) -> None:
+    """Every segment must pass. `extra` (an agent's own commands, from agent_policies) sees
+    each segment first: it returns True for a command it allows, raises Blocked for one it
+    refuses, and returns False to leave the segment to the read-only policy above."""
+    for seg in parse_command(command):
         name, args = seg[0], seg[1:]
-        if name in FILTERS:
-            check_filter(name, args)
+        if extra is not None and extra(name, args):
             continue
-        if name == "git":
-            check_git(args)
-        elif name == "gh":
-            check_gh(args)
-        elif name == "rg":
-            check_rg(args)
-        elif name == "find":
-            check_find(args)
-        elif name == "sed":
-            check_sed(args)
-        elif name == "jq":
-            check_jq(args)
-        else:
-            raise Blocked(f"`{name}` is not allowed — only read-only git, gh, rg, find, and text filters")
+        check_segment(name, args)

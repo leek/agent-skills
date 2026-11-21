@@ -190,10 +190,15 @@ class GuardBrowserTest(unittest.TestCase):
             f"{S} screenshot --screenshot-format jpeg --screenshot-quality 80 {self.run_dir}/1.jpg",
             f"{S} screenshot --screenshot-dir {self.run_dir}",
             f"{S} screenshot --screenshot-dir={self.run_dir}/shots",
-            f"{S} screenshot",
         ]:
             with self.subTest(cmd=cmd):
                 self.assertAllowed(cmd)
+        # With no path and no --screenshot-dir, agent-browser saves to a temp directory.
+        self.assertBlocked(f"{S} screenshot", "must be saved under")
+        self.assertBlocked(f"{S} screenshot --full", "must be saved under")
+        self.assertBlocked(f"{S} screenshot @e3", "must be saved under")
+        self.assertAllowed(f"{S} screenshot @e3 {self.run_dir}/x.png")
+        self.assertBlocked(f"{S} screenshot -- {self.run_dir}/x.png", "flag `--`")
         # Usage is `screenshot [selector] [path]`: the path slot is held to the run dir whatever
         # it looks like, and a third positional is refused.
         self.assertBlocked(f"{S} screenshot '#el' /tmp/x.png", "must be saved under")
@@ -207,6 +212,18 @@ class GuardBrowserTest(unittest.TestCase):
         # Screenshot's own flags are not legal on other verbs.
         self.assertBlocked(f"{S} snapshot -f", "flag `-f`")
         self.assertBlocked(f"{S} snapshot --screenshot-dir /tmp", "flag `--screenshot-dir`")
+
+    def test_search_label_must_open_with_the_word_search(self):
+        self.assertAllowed(f"{S} find label 'Search users' fill acme")
+        self.assertAllowed(f"{S} find placeholder 'search…' fill acme")
+        self.assertBlocked(f"{S} find label 'Research budget' fill 1", "only allowed into a search box")
+        self.assertBlocked(f"{S} find placeholder 'not a search' fill x", "only allowed into a search box")
+
+    def test_get_allows_only_read_subcommands(self):
+        for sub in ("title", "url", "text @e1", "attr '#a' href", "count li"):
+            self.assertAllowed(f"{S} get {sub}")
+        self.assertBlocked(f"{S} get cdp-url", "`get` allows only")
+        self.assertBlocked(f"{S} get", "`get` allows only")
 
     def test_scope_is_validated_per_segment(self):
         run2 = "20260927-130000"

@@ -24,6 +24,8 @@ WRITE_TOOLS = {"Write", "Edit", "MultiEdit", "search_replace", "write", "hashlin
 REVIEW_GUARDED = {"deepening-scout", "finding-verifier", "pr-reviewer",
                   "spec-reviewer", "standards-reviewer"}
 BROWSER_GUARDED = {"browser-tester", "browser-test-planner"}
+# Review-guarded too, plus each one's own commands (hooks/agent_policies.py).
+POLICY_GUARDED = {"dependency-auditor", "session-miner", "ui-reviewer"}
 # Each read-only agent with `memory:`, mapped to its declared memory scope.
 MEMORY_ONLY = {
     "deepening-scout": "project",
@@ -34,7 +36,11 @@ MEMORY_ONLY = {
     "standards-reviewer": "project",
     "upgrade-impact-scout": "project",
 }
-ALL_GUARDED = REVIEW_GUARDED | BROWSER_GUARDED | set(MEMORY_ONLY)
+# Read-only agents with no `memory:`: they write no file at all. Their `disallowedTools`
+# already drop Write and Edit on Claude Code; this holds on a harness that ignores it.
+NO_WRITES = {"browser-test-planner", "browser-tester", "pr-reviewer", "spec-reviewer",
+             "ui-reviewer"}
+ALL_GUARDED = REVIEW_GUARDED | BROWSER_GUARDED | POLICY_GUARDED | set(MEMORY_ONLY) | NO_WRITES
 
 
 def _agent_name(payload: dict) -> str:
@@ -56,18 +62,29 @@ def _tool_input(payload: dict) -> dict:
     return raw
 
 
+def _cwd(payload: dict) -> str:
+    cwd = payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
+    if not isinstance(cwd, str):
+        raise TypeError(f"cwd must be a string, got {type(cwd).__name__}")
+    return cwd
+
+
 def _run_shell_guard(agent: str, payload: dict) -> int:
-    if agent not in REVIEW_GUARDED and agent not in BROWSER_GUARDED:
+    if agent not in REVIEW_GUARDED and agent not in BROWSER_GUARDED and agent not in POLICY_GUARDED:
         return 0
     tool_input = _tool_input(payload)
     command = tool_input.get("command", "")
     if not isinstance(command, str):
         raise TypeError(f"command must be a string, got {type(command).__name__}")
     from shell_syntax import Blocked
-    if agent in REVIEW_GUARDED:
+    if agent in REVIEW_GUARDED or agent in POLICY_GUARDED:
         import review_guard
+        extra = None
+        if agent in POLICY_GUARDED:
+            import agent_policies
+            extra = agent_policies.POLICIES[agent](_cwd(payload))
         try:
-            review_guard.check(command)
+            review_guard.check(command, extra)
         except Blocked as reason:
             print(f"BLOCKED by review-agent guard: {reason}. You are read-only; do not look for "
                   "another way. Use the Read and Grep tools, or write UNSURE with what you checked.",
@@ -75,11 +92,8 @@ def _run_shell_guard(agent: str, payload: dict) -> int:
             return 2
         return 0
     import browser_guard
-    cwd = payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
-    if not isinstance(cwd, str):
-        raise TypeError(f"cwd must be a string, got {type(cwd).__name__}")
     try:
-        browser_guard.check(command, cwd)
+        browser_guard.check(command, _cwd(payload))
     except Blocked as reason:
         print(f"BLOCKED by browser-test guard: {reason}. This is a read-only test; do not look for "
               "another way. Record what you could not do and move on.", file=sys.stderr)
@@ -88,6 +102,10 @@ def _run_shell_guard(agent: str, payload: dict) -> int:
 
 
 def _run_write_guard(agent: str, payload: dict) -> int:
+    if agent in NO_WRITES:
+        print(f"BLOCKED: {agent} is read-only and writes no files. Report what you found instead.",
+              file=sys.stderr)
+        return 2
     if agent not in MEMORY_ONLY:
         return 0
     tool_input = _tool_input(payload)

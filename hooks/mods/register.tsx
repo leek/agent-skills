@@ -75,6 +75,9 @@ let isScratchPaneOpen = false
 let refreshSeq = 0
 // How many times the person closed the /scratch pane: a close during /scratch's scan wins.
 let scratchCloses = 0
+// Of those, the closes a person made. Only these count after ui.open returns: an engine close of
+// the pane's previous instance must not leave a placed pane with no board.
+let scratchPersonCloses = 0
 
 // The person closed the ticket pane; later updates for the same board leave it closed.
 let isTicketsDismissed = false
@@ -254,7 +257,7 @@ function commitTimes($: EngineInterface, cwd: string) {
   }
 }
 
-async function scanScratch($: EngineInterface): Promise<{ root: string; result: ScratchBoard | null }> {
+async function scanScratch($: EngineInterface, slug = only): Promise<{ root: string; result: ScratchBoard | null }> {
   const cwd = await $.session.cwd()
   const repoRoot = await resolveRepoRoot($, cwd)
   const root = `${repoRoot}/.scratch`
@@ -266,7 +269,7 @@ async function scanScratch($: EngineInterface): Promise<{ root: string; result: 
     read: (path: string) => $.fs.read(path),
     commitTimes: commitTimes($, repoRoot),
   }
-  const result = await scan(reader, root, await $.clock.now(), only)
+  const result = await scan(reader, root, await $.clock.now(), slug)
 
   return { root, result }
 }
@@ -301,6 +304,7 @@ export const register: Register = on => {
     isScratchPaneOpen = false
     refreshSeq = 0
     scratchCloses = 0
+    scratchPersonCloses = 0
     isTicketsDismissed = false
     retired.clear()
     fallbackTimes.clear()
@@ -345,10 +349,13 @@ export const register: Register = on => {
   }).catch(($, e, next) => next(e))
 
   on('command.run', { command: 'scratch' }, async ($, e) => {
-    only = normalizeSlug(e.args)
+    // This run's slug stays local: a second /scratch may change `only` while this one awaits.
+    const slug = normalizeSlug(e.args)
+    only = slug
     const seq = ++refreshSeq
     const closes = scratchCloses
-    const { root, result } = await scanScratch($)
+    const personCloses = scratchPersonCloses
+    const { root, result } = await scanScratch($, slug)
     if (result === null) {
       if (seq === refreshSeq && isScratchPaneOpen) {
         const now = await $.clock.now()
@@ -365,7 +372,11 @@ export const register: Register = on => {
       // The pane was closed while this scan ran: leave it closed and answer with the table.
       return { text: summary(result) }
     }
-    const opened = await $.ui.open({ id: PANE, title: only === '' ? 'Scratch' : `Scratch: ${only}` })
+    const opened = await $.ui.open({ id: PANE, title: slug === '' ? 'Scratch' : `Scratch: ${slug}` })
+    if (personCloses !== scratchPersonCloses) {
+      // The person closed it while it opened: keep it closed, never mark it open or draw into it.
+      return { text: summary(result) }
+    }
     if (opened.isPlaced) {
       isScratchPaneOpen = true
       // A newer scan (a background rescan) may have drawn already; never leave the pane empty.
@@ -384,6 +395,9 @@ export const register: Register = on => {
     isScratchPaneOpen = false
     refreshSeq += 1
     scratchCloses += 1
+    if (e.origin.kind === 'person') {
+      scratchPersonCloses += 1
+    }
     await update($, board, () => null)
 
     return next(e)

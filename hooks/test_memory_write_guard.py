@@ -225,6 +225,16 @@ class MemoryWriteGuardTest(unittest.TestCase):
         self.assertEqual(shell_blocked.returncode, 2)
         self.assertIn("not a read-only git command", shell_blocked.stderr)
 
+    def test_read_only_agents_without_memory_write_nothing(self):
+        # Their disallowedTools drop Write/Edit on Claude Code; the hook holds where that is ignored.
+        for agent in ("pr-reviewer", "spec-reviewer", "browser-tester", "browser-test-planner",
+                      "ui-reviewer"):
+            for tool in ("Write", "Edit", "search_replace"):
+                with self.subTest(agent=agent, tool=tool):
+                    self.assertEqual(self.run_guard("/repo/.claude/agent-memory/x/a.md",
+                                                    agent=f"leek-skills:{agent}", tool=tool), 2)
+        self.assertEqual(self.run_guard("/repo/app/Foo.php", agent="leek-skills:researcher"), 0)
+
     def test_every_memory_agent_is_guarded_or_a_named_writer(self):
         # `memory:` gives an agent Write and Edit even when its `tools:` line has neither.
         # `researcher` writes its findings file, so it is the one agent left unguarded.
