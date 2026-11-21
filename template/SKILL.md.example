@@ -1,11 +1,18 @@
 ---
 name: template-skill
 description: Replace with a one-line summary of what the skill does. For model-invoked skills, add distinct trigger branches; for user-invoked skills, keep a human one-liner with no trigger list.
-# Optional Claude Code fields (ignored by other harnesses; see docs/authoring.md):
+# User-invoked flows only (mirror with allow_implicit_invocation: false in agents/openai.yaml):
 # disable-model-invocation: true
+# Optional Claude Code fields (ignored by other harnesses; see docs/authoring.md):
 # argument-hint: "What the user passes (and the default when omitted)"
 # allowed-tools: "Bash(git status *)"
+# user-invocable: false
 # compatibility: "macOS with X installed"
+# model: sonnet
+# effort: medium
+# context: fork
+# agent: leek-skills:<name>
+# background: false
 ---
 
 # Insert instructions below

@@ -3,6 +3,8 @@ name: writing-for-agents
 description: Reference for writing documents an agent consumes. Use when creating or editing a skill, or when modifying AGENTS.md, CLAUDE.md, or a reference doc reached by a pointer.
 ---
 
+# Writing for Agents
+
 Reference for writing any document an agent consumes; a skill, an `AGENTS.md` / `CLAUDE.md`, a doc reached by a pointer. The packaging differs; the writing does not. The same levers make each one predictable: **predictability**: the agent taking the same _process_ every run, not producing the same output, is the root virtue, and every lever below serves it.
 
 **Bold terms** are defined in [`GLOSSARY.md`](GLOSSARY.md); look them up there for the full meaning.

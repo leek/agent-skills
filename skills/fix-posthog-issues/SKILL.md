@@ -90,8 +90,9 @@ Completion criterion: every issue has a line.
 - Vendor or browser noise: add a suppression rule, never a vendor patch.
 
 Make the minimal change and verify it. JS changes need the asset build. Commit one
-logical fix per commit, and list every PostHog issue id the commit covers in its body
-(`PostHog: <id>, <id>`). **Use plain refs only, never `fixes #NNN`.**
+logical fix per commit, per the `commit` skill's [Staging](../commit/SKILL.md#staging)
+and [Subject](../commit/SKILL.md#subject), and list every PostHog issue id the commit
+covers in its body (`PostHog: <id>, <id>`). **Use plain refs only, never `fixes #NNN`.**
 
 ## 5. Set status
 
@@ -107,7 +108,8 @@ active with a named blocker. Report `N active → M`, with one line per cluster,
 
 ## 6. Offer a deploy re-check
 
-If any issue is pending deploy verification, ask once whether to re-check it in 24–48
+If any issue is pending deploy verification, ask once (a structured question
+([harness-tools](../harness-tools/SKILL.md)), otherwise in chat) whether to re-check it in 24–48
 hours. On yes, schedule a one-time run where the harness can (in Claude Code, the
 `schedule` skill's cloud routine; failing that, `CronCreate` with `recurring: false`,
 which fires only while this session stays open, so say so). The prompt is plain text,

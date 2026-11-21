@@ -2,7 +2,7 @@
 name: resolve-review-comments
 description: Fix or rebut every review comment on a pull request, human or AI-review bot (Codex, Copilot, Gemini), then reply and resolve each thread. Use when the user wants a PR's review comments addressed, answered, or cleared.
 argument-hint: "A PR number or URL (defaults to the PR for the current branch)"
-allowed-tools: "Bash(gh pr view *) Bash(gh pr diff *) Bash(gh pr checks *) Bash(gh api *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/triage-github-pr/scripts/pr-comments.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/triage-github-pr/scripts/pr-reply.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/fix-ci-failures/scripts/failed-jobs.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/closeout/scripts/pr-state.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/run-after/scripts/wait-until.sh * -- bash ${CLAUDE_PLUGIN_ROOT}/skills/closeout/scripts/pr-state.sh * --in-flight*)"
+allowed-tools: "Bash(gh repo view *) Bash(gh pr view *) Bash(gh pr diff *) Bash(gh pr checks *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/triage-github-pr/scripts/pr-comments.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/triage-github-pr/scripts/pr-reply.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/fix-ci-failures/scripts/failed-jobs.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/closeout/scripts/pr-state.sh *) Bash(bash ${CLAUDE_PLUGIN_ROOT}/skills/run-after/scripts/wait-until.sh * -- bash ${CLAUDE_PLUGIN_ROOT}/skills/closeout/scripts/pr-state.sh * --in-flight*)"
 ---
 
 # Resolve Review Comments
@@ -28,7 +28,7 @@ after you. At the watch's cap, or when only requested humans are left in its `co
 in the report. Then pull all three comment
 surfaces (reviews, inline review threads, general issue comments) and the PR's
 commit range. See [`references/gh-mechanics.md`](references/gh-mechanics.md) for the exact
-`gh api` and GraphQL calls; you need it whenever you touch the GitHub side.
+scripts and `gh` calls; you need it whenever you touch the GitHub side.
 
 Build each thread whole and mark the directed ones by
 [Build whole threads](references/threads.md#build-whole-threads).
@@ -68,7 +68,9 @@ at any count, to read-only workers by
 [Verify findings](../fix-github-issues/references/verify-findings.md#delegate-a-large-set),
 with `HEAD` as the ref, the line format
 `Cluster N: [LEGIT | NOT A BUG | UNSURE] — <one-line evidence>`, and the checks in this
-step added to its rules. Directed clusters never go to the workers.
+step added to its rules. Directed clusters never go to the workers. (In Claude Code, the
+verifier writes recurring false premises to `.claude/agent-memory/`, which step 5's
+`commit` staging carries.)
 
 ## 4. Fix the legit and directed ones
 
