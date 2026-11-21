@@ -145,10 +145,12 @@ case "$action" in
       git branch -f "$cut" "$merge_sha" >&2
       if git push -u origin "$cut" >&2; then
         pushed=true
-        printf '%s\t%s\t%s\t%s\n' "$position" "$ticket" "$cut" "$base" >>"$notes/stack"
       else
         pushed=false
       fi
+      # Recorded either way: on pushed:false the worker pushes the cut itself and opens its PR,
+      # so the next ticket still stacks on it.
+      printf '%s\t%s\t%s\t%s\n' "$position" "$ticket" "$cut" "$base" >>"$notes/stack"
     fi
     release_lock
     jq -cn --arg ticket "$ticket" --arg merge_sha "$merge_sha" --argjson position "$position" \

@@ -125,16 +125,21 @@ eq "non-conflict merge unlocked" "$(printf '%s' "$out" | jq -c '[.locked, .merge
 rm -f "$t/wt-01/collision.txt"
 echo "ok non-conflict merge failure releases lock and refuses cleanly"
 
-# Failed stack push must NOT append to $notes/stack.
-stack_before="$(cat "$notes/stack")"
+# A failed stack push still records the cut: the worker pushes it itself and opens the PR, so
+# the next ticket's position and base must move past it.
 commit_file 01 four.txt four
 land 01 begin --integration "$r"
 eq "begin before failed push exit" "$rc" 0
 git -C "$r" remote set-url origin "$t/nonexistent-remote.git"
 land 01 finish --integration "$r" --ticket 04 --stack
 eq "failed push exit" "$rc" 1
-eq "failed push json" "$(printf '%s' "$out" | jq -c '[.landed, .pushed]')" '[true,false]'
-eq "failed push keeps stack unchanged" "$(cat "$notes/stack")" "$stack_before"
+eq "failed push json" "$(printf '%s' "$out" | jq -c '[.landed, .position, .cut, .base, .pushed]')" '[true,3,"foo-stack-04","foo-stack-03",false]'
+eq "failed push records the cut" "$(tail -n 1 "$notes/stack")" "$(printf '3\t04\tfoo-stack-04\tfoo-stack-03')"
 [ ! -e "$notes/land.lock" ] || fail "failed push left lock behind"
 git -C "$r" remote set-url origin "$t/origin.git"
-echo "ok failed stack push leaves notes/stack untouched"
+commit_file 01 five.txt five
+land 01 begin --integration "$r"
+eq "begin after failed push exit" "$rc" 0
+land 01 finish --integration "$r" --ticket 05 --stack
+eq "next cut after failed push" "$(printf '%s' "$out" | jq -c '[.position, .cut, .base, .pushed]')" '[4,"foo-stack-05","foo-stack-04",true]'
+echo "ok a failed stack push still records the cut, so the next ticket stacks on it"
