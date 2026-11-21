@@ -23,7 +23,8 @@ steps need all three.
    upward. A PR merges only after every PR before it on an edge shows `MERGED`; a
    stopped or queued one holds its dependents. Independent PRs keep the user's order.
 3. **Step 1 for all PRs at once.** Dispatch one `pr-reviewer` per PR in the
-   background, in one message (other harnesses: dispatch in the background per [harness-tools](../../harness-tools/SKILL.md); Codex: `spawn_agent` with `fork_turns: "none"` and the full brief). A stack's integration
+   background, in one message (other harnesses: dispatch in the background per
+   [harness-tools](../../harness-tools/SKILL.md) with a fresh context and the full brief). A stack's integration
    PR waits for its own turn after the landings, and steps 2–4 skip it until then.
 4. **Steps 2 and 3 for all PRs.** Gather reviews and review state for every PR.
    Watch every PR's reviewers with one wait for the queue (several numbers in one
@@ -38,8 +39,9 @@ steps need all three.
    **Fixers per PR:** every PR whose merge does not wait on another open PR (no stack
    base, no merge-after edge) and has current-batch findings gets its fixes written by
    fixer sub-agents per [Parallel fix batch](parallel-fixes.md), one per PR (or one per
-   file group when that PR's batch splits), all started in one message (Codex:
-   `spawn_agent` with `fork_turns: "none"` and the full brief). While they run, keep
+   file group when that PR's batch splits), all started in one message (other harnesses:
+   dispatch in the background per [harness-tools](../../harness-tools/SKILL.md) with a
+   fresh context and the full brief). While they run, keep
    verifying and replying on the other PRs; as each returns, merge its work, then take
    that PR through its tests, pre-push review and push. A stack is never split this
    way: it fixes once, on its integration or top PR, below.

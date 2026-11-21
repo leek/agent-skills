@@ -34,7 +34,7 @@ Parse these before any discovery. On invalid input, stop and report it.
    ```bash
    bash <this-skill-dir>/../sweep/scripts/known-work.sh --prefix prune-tests > <scratch>/known-work.json
    ```
-   Query it the way `sweep`'s step 1 shows.
+   Query it the way [`sweep`'s step 1](../sweep/SKILL.md#1-load-context-and-known-work) shows.
 
 ## 2. Pick one area
 
@@ -42,7 +42,7 @@ Rank the in-scope test files by smell density: mock-heavy setups, assertion-free
 
 ## 3. Baseline
 
-Work in a worktree from the fetched base, per `sweep`'s step 3.1, with the branch `prune-tests/<area>` (not in `taken_branches`).
+Work in a worktree from the fetched base, per [`sweep`'s step 3.1](../sweep/SKILL.md#3-isolate-fix-verify), with the branch `prune-tests/<area>` (not in `taken_branches`).
 
 1. Run the area's tests. **A failing test is never deleted.** Write it to `.scratch/prune-tests/findings/<YYYY-MM-DD>-<topic>.md` in the main checkout as a possible product bug, and leave it alone.
 2. Measure coverage of the area's **production owners** (the code its tests exercise). Run the full suite, or, when that is too slow, the area plus every test file that names an owner. Use the same test set again in step 5. Record the number and the command. Without a coverage driver, say so and record covered lines from the runner's own output, or the owners' line list, instead.
