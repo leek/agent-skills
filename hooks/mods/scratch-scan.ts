@@ -114,8 +114,10 @@ export function parseFile(path: string, kind: ScratchKind, text: string): Scratc
 
   let status = field('status')
   if (status === '') {
+    // `[^\n]+`, not `\S.*`: as in scratch-state.sh, the first `**Status:**` line holding anything
+    // (even only spaces) decides, and a later line is not read in its place.
     const head = text.split(/\r?\n/).slice(0, 30).join('\n')
-    status = (head.match(/^\*\*Status:\*\*[ \t]*(\S.*)$/m)?.[1] ?? head.match(/^Status:[ \t]*(\S.*)$/m)?.[1] ?? '').trim()
+    status = (head.match(/^\*\*Status:\*\*[ \t]*([^\n]+)$/m)?.[1] ?? head.match(/^Status:[ \t]*([^\n]+)$/m)?.[1] ?? '').trim()
   }
 
   // Older files carry the claim and the blockers as body lines, not frontmatter.
@@ -128,7 +130,7 @@ export function parseFile(path: string, kind: ScratchKind, text: string): Scratc
   const hasBlockedByFrontmatter = /^blocked-by:[ \t]*/m.test(front)
   let blockedBy = parseList(front, 'blocked-by').map(blockerId)
   if (!hasBlockedByFrontmatter) {
-    const legacy = body.match(/^(?:\*\*Blocked by:\*\*|Blocked by:)[ \t]*(\S.*)$/im)?.[1]?.trim() ?? ''
+    const legacy = body.match(/^(?:\*\*Blocked by:\*\*|Blocked by:)[ \t]*([^\n]+)$/im)?.[1]?.trim() ?? ''
     blockedBy = NO_VALUE.includes(legacy.toLowerCase()) ? [] : (legacy.match(/\b\d+\b/g) ?? [])
   }
 

@@ -76,6 +76,31 @@ describe('parseFile', () => {
     )
     expect(file.blockedBy).toEqual(['01', '02'])
   })
+
+  // The fixtures of test-scratch-state.sh's legacy-parsing regression, plus a legacy line that
+  // holds only spaces: scratch-state.sh reads that line as empty and never looks further down.
+  test('legacy and frontmatter edge cases parse as scratch-state.sh parses them', async () => {
+    const files: Record<string, string> = {
+      '/r/.scratch/edge/tickets/01-emptystatus.md': '# T1\n\n**Status:**\n\nready-for-agent\n',
+      '/r/.scratch/edge/tickets/02-emptybl.md': '---\ntitle: T2\nstatus: ready-for-agent\n---\n\n**Blocked by:**\n\n01\n',
+      '/r/.scratch/edge/tickets/03-explicit-empty.md':
+        '---\ntitle: T3\nstatus: ready-for-agent\nblocked-by: []\n---\n\n**Blocked by:** 01\n',
+      '/r/.scratch/edge/tickets/04-comment-block.md':
+        '---\ntitle: T4\nstatus: ready-for-agent\nblocked-by: # wait\n  - 02\n---\n\nbody\n',
+      '/r/.scratch/edge/tickets/05-spacestatus.md': '# T5\n\n**Status:**   \nStatus: ready-for-agent\n',
+      '/r/.scratch/edge/tickets/06-spacebl.md': '# T6\n\n**Status:** ready-for-agent\n**Blocked by:**  \nBlocked by: 01\n',
+    }
+    const board = await scan(reader(files), '/r/.scratch', NOW)
+    const parsed = board.efforts[0]?.files.map(f => [f.status, f.blockedBy])
+    expect(parsed).toEqual([
+      ['', []],
+      ['ready-for-agent', []],
+      ['ready-for-agent', []],
+      ['ready-for-agent', ['02']],
+      ['', []],
+      ['ready-for-agent', []],
+    ])
+  })
 })
 
 describe('classify', () => {
