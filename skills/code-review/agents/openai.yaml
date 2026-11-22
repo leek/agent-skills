@@ -1,5 +1,5 @@
 interface:
   display_name: "Code Review"
-  short_description: "Three-axis review of the diff since a fixed point: Correctness (bugs, failure modes), Standards (repo conventions) and Spec (ticket/PRD fidelity), plus UI for diffs that change what a user sees"
+  short_description: "Multi-axis review of the diff since a fixed point: Correctness, Standards, Spec and Design (would a better design have been chosen), plus UI for diffs that change what a user sees"
 policy:
   allow_implicit_invocation: true

@@ -21,7 +21,7 @@ SHELL_TOOLS = {"Bash", "run_terminal_command", "Shell"}
 WRITE_TOOLS = {"Write", "Edit", "MultiEdit", "search_replace", "write", "hashline_edit",
                "StrReplace", "EditNotebook", "Delete"}
 
-REVIEW_GUARDED = {"deepening-scout", "finding-verifier", "pr-reviewer",
+REVIEW_GUARDED = {"deepening-scout", "design-reviewer", "finding-verifier", "pr-reviewer",
                   "spec-reviewer", "standards-reviewer"}
 BROWSER_GUARDED = {"browser-tester", "browser-test-planner"}
 # Review-guarded too, plus each one's own commands (hooks/agent_policies.py).
@@ -38,7 +38,7 @@ MEMORY_ONLY = {
 }
 # Read-only agents with no `memory:`: they write no file at all. Their `disallowedTools`
 # already drop Write and Edit on Claude Code; this holds on a harness that ignores it.
-NO_WRITES = {"browser-test-planner", "browser-tester", "pr-reviewer", "spec-reviewer",
+NO_WRITES = {"browser-test-planner", "browser-tester", "design-reviewer", "pr-reviewer", "spec-reviewer",
              "ui-reviewer"}
 ALL_GUARDED = REVIEW_GUARDED | BROWSER_GUARDED | POLICY_GUARDED | set(MEMORY_ONLY) | NO_WRITES
 

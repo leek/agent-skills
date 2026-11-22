@@ -138,8 +138,8 @@ class GuardReviewAgentsTest(unittest.TestCase):
         # Read-only git-only agents get the review policy alone; ui-reviewer, session-miner, and
         # dependency-auditor get it plus their own commands (test_agent_policies.py).
         for agent in ("leek-skills:standards-reviewer", "leek-skills:spec-reviewer",
-                      "leek-skills:deepening-scout", "standards-reviewer",
-                      "spec-reviewer", "deepening-scout"):
+                      "leek-skills:deepening-scout", "leek-skills:design-reviewer",
+                      "standards-reviewer", "spec-reviewer", "deepening-scout"):
             self.assertAllowed("git diff main...HEAD", agent=agent)
             self.assertAllowed("git log --oneline -10", agent=agent)
             self.assertBlocked("git commit -m x", "not a read-only git command", agent=agent)
