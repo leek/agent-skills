@@ -14,7 +14,7 @@ Multi-axis review of the diff between `HEAD` and a fixed point the user supplies
 - **Spec**: does the code faithfully implement the originating ticket / PRD / spec?
 - **Design**: knowing what we know now, would a senior engineer building this from scratch choose this design? It designs before it reads the diff, then compares, and reports only alternatives worth changing.
 
-When the diff changes what a user sees, a fourth axis runs too:
+When the diff changes what a user sees, a fifth axis runs too:
 
 - **UI**: does the changed page meet the `ui-design` rules (the house rules plus this repo's `.agents/ui-design.md`)?
 
@@ -32,7 +32,7 @@ Pin it once, from inside the repo: `bash <this-skill-dir>/scripts/review-scope.s
 
 With `--wip`, `diff_cmd` is `git diff <merge-base>`: the working tree against the merge-base, so it also prints staged and unstaged changes. It prints no untracked file. `untracked` lists those, and every brief carries that list beside the diff command, each file to be read whole as new code.
 
-Exit 1 is a fixed point that does not resolve, or an empty diff (`"empty": true`): stop here, not inside three parallel reviews.
+Exit 1 is a fixed point that does not resolve, or an empty diff (`"empty": true`): stop here, not inside parallel reviews.
 
 ### 2. Identify the spec source
 
@@ -63,13 +63,13 @@ On top of whatever the repo documents, the Standards axis always carries the **s
 
 **If sub-agents are unavailable:** run the reviews inline in this session, Correctness first, then Standards, then Spec (or skip Spec when no source was found), then Design and UI when they run. Inline, write your Design sketch down before you open the diff. Same briefs, same output shape, only the execution host changes.
 
-**Small diffs run inline too.** When step 1's `size` is `inline` (at most 3 files and 150 changed lines), three fresh contexts each re-reading it cost more than they find: take the inline path above, and skip the Design axis (report it as `not run (small diff)`): a diff that small makes no design decision the spec's blind design did not already weigh.
+**Small diffs run inline too.** When step 1's `size` is `inline` (at most 3 files and 150 changed lines), fresh contexts each re-reading it cost more than they find: take the inline path above, and skip the Design axis (report it as `not run (small diff)`) unless a caller names it: a diff that small rarely makes a design decision worth a second design. A caller that names Design gets it inline, with the sketch written before the diff is opened.
 
 **Large diffs split Correctness.** When `size` is `split` (more than 25 files), one Correctness reviewer runs out of turns before it reports. Dispatch two, each given half of `files` (a file and its tests stay together) and the full commit list, and present both reports under the one `## Correctness` heading.
 
 **A caller may name the axes.** Run only those, and report the rest as `not run`. A caller may also ask for one Correctness reviewer whatever the size: then skip the split above.
 
-**A re-review narrows.** When the caller passes the previous round's findings and its head, review only `<previous head>..HEAD` (the fix commits) and run only the axes that had actionable findings, plus Correctness when a fix added a mechanism (job, lock, claim, retry). Design never re-runs: the user approved each Design fix. Report the axes that did not run as `not re-run`.
+**A re-review narrows.** When the caller passes the previous round's findings and its head, review only `<previous head>..HEAD` (the fix commits) and run only the axes that had actionable findings, plus Correctness when a fix added a mechanism (job, lock, claim, retry) or applied a Design finding (a Design fix is new surface: a migration, a new class, moved callers). Design itself never re-runs: the user approved each Design fix. Report the axes that did not run as `not re-run`.
 
 **Correctness brief**: hand over the brief in [`references/independent-review.md`](references/independent-review.md) in full, failure-mode probes included, with the diff command and commit list as its range, the commit messages as intent, and the repo's `AGENTS.md` / `CLAUDE.md`. Do not pass any PR review comments: this axis is the view they did not shape. Its output is the brief's `Self N: [BLOCKING | MAJOR | MINOR]` lines, each with a concrete failing case.
 
@@ -89,7 +89,7 @@ If the spec is missing, skip the Spec axis and note this in the final report.
 
 **Design brief**: hand over the absolute path of [`references/design-lens.md`](references/design-lens.md) (this skill's directory) and tell the reviewer to follow its **Design review brief**, with the diff command and commit list, the spec path from step 2 (with none, the commit messages are the intent), the repo's `AGENTS.md` / `CLAUDE.md`, the ADRs and decision records in the area (`docs/adr/`, the spec's `decisions/`), and the caller's stack reference when it names one. Tag each Design finding `DESIGN`, never BLOCKING or MAJOR: callers that budget rounds on those must not fix a Design finding on their own, since the lens's **Deciding a Design finding** section hands every one to the user.
 
-**UI brief**: run this axis only when step 1's `files` change what a user sees: views, templates, components, stylesheets, or UI-defining classes (for example `*.blade.php`, `*.tsx`, `*.jsx`, `*.vue`, `*.svelte`, `*.css`, `resources/views/`, Filament resources, pages, and widgets, Livewire components). Its reviewer is the fourth sub-agent from the top of this step: `leek-skills:ui-reviewer` where the harness loads this plugin's agents (it arrives with the `ui-design` rules preloaded, so it dispatches nothing itself); elsewhere a general sub-agent told to read the `ui-design` skill's `SKILL.md` by absolute path first; inline, read it yourself and follow its **Review** section. Brief it with the diff command, the page's purpose and its main user (from the commit messages, the spec, or the changed views), the absolute path of this repo's `.agents/ui-design.md` when that file exists, and a URL or screenshot paths when the caller has them. When it does not run, report it as `not run (no UI files)`. Tag each UI finding MINOR, or MAJOR when a user cannot see or reach something the page is for, so callers that budget rounds on BLOCKING and MAJOR can count it.
+**UI brief**: run this axis only when step 1's `files` change what a user sees: views, templates, components, stylesheets, or UI-defining classes (for example `*.blade.php`, `*.tsx`, `*.jsx`, `*.vue`, `*.svelte`, `*.css`, `resources/views/`, Filament resources, pages, and widgets, Livewire components). Its reviewer is the UI sub-agent from the top of this step: `leek-skills:ui-reviewer` where the harness loads this plugin's agents (it arrives with the `ui-design` rules preloaded, so it dispatches nothing itself); elsewhere a general sub-agent told to read the `ui-design` skill's `SKILL.md` by absolute path first; inline, read it yourself and follow its **Review** section. Brief it with the diff command, the page's purpose and its main user (from the commit messages, the spec, or the changed views), the absolute path of this repo's `.agents/ui-design.md` when that file exists, and a URL or screenshot paths when the caller has them. When it does not run, report it as `not run (no UI files)`. Tag each UI finding MINOR, or MAJOR when a user cannot see or reach something the page is for, so callers that budget rounds on BLOCKING and MAJOR can count it.
 
 ### 5. Aggregate
 

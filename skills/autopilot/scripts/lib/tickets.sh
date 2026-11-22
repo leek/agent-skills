@@ -135,8 +135,18 @@ ticket_waits_on_gate() {
 
 # The paths a ticket's `## Files` section names, one per line, sorted.
 ticket_files() {
-  awk '
-    /^## Files[[:space:]]*$/ { inside = 1; next }
+  ticket_section_paths "$1" "Files"
+}
+
+# The paths a ticket's `## Shared registrations` section names, one per line, sorted.
+ticket_shared() {
+  ticket_section_paths "$1" "Shared registrations"
+}
+
+# The backticked paths under one `## <heading>` section, one per line, sorted.
+ticket_section_paths() {
+  awk -v heading="## $2" '
+    $0 ~ "^" heading "[[:space:]]*$" { inside = 1; next }
     inside && /^##[[:space:]]/ { exit }
     inside {
       line = $0

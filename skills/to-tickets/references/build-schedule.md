@@ -28,7 +28,9 @@ graph; a larger worker count cannot shorten a chain.
    that could be shortened without changing semantics gets revised before publish.
 
 Finish when every shared path has an owner/dependency or an explicit serialization
-note, and the first wave can run together without overlapping files.
+note, and the first wave can run together: no `## Files` path of one ticket appears
+in another's `## Files` or `## Shared registrations` (two Shared registrations of one
+path may overlap).
 
 ## At dispatch
 
@@ -38,8 +40,8 @@ delivery ticket; an older ticket without Work uses 2. Count actual blockers, not
 ticket-number order. A cycle is a tracker error to fix before dispatch.
 
 Among ready, unclaimed tickets, dispatch the largest remaining path weight first;
-break ties by ticket number. Skip a candidate sharing a `## Files` path with a
-running ticket and try the next (overlap only under `## Shared registrations`
-runs in parallel). Recompute after merges, releases, or graph changes.
+break ties by ticket number. Skip a candidate when a `## Files` path of either
+ticket appears in the other's `## Files` or `## Shared registrations`, and try the
+next; overlap only under `## Shared registrations` runs in parallel. Recompute after merges, releases, or graph changes.
 Dependencies, deploy gates, claims, and the concurrency limit remain hard
 constraints.

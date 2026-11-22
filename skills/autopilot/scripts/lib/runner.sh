@@ -546,13 +546,20 @@ ensure_worktree() {
   fi
 }
 
+# A ticket overlaps a running one when either one's `## Files` path appears in the
+# other's `## Files` or `## Shared registrations`. Two Shared registrations of one path
+# do not overlap: those are append-only and land.sh resolves them.
 ticket_overlaps_running() {
-  local number="$1" mine="$TEMP_DIR/files-$1" label
-  ticket_files "$TRACKER_ROOT/$(ticket_ref "$number")" >"$mine"
-  [[ -s "$mine" ]] || return 1
+  local number="$1" ref mine="$TEMP_DIR/files-$1" mine_all="$TEMP_DIR/all-$1" label theirs theirs_all
+  ref="$TRACKER_ROOT/$(ticket_ref "$number")"
+  ticket_files "$ref" >"$mine"
+  { ticket_files "$ref"; ticket_shared "$ref"; } | sort -u >"$mine_all"
+  [[ -s "$mine_all" ]] || return 1
   while IFS= read -r label; do
-    [[ -n "$label" && -s "$TEMP_DIR/w/$label/files" ]] || continue
-    if [[ -n "$(comm -12 "$mine" "$TEMP_DIR/w/$label/files")" ]]; then
+    theirs="$TEMP_DIR/w/$label/files"
+    theirs_all="$TEMP_DIR/w/$label/all"
+    [[ -n "$label" && -f "$theirs" && -f "$theirs_all" ]] || continue
+    if [[ -n "$(comm -12 "$mine" "$theirs_all")" || -n "$(comm -12 "$mine_all" "$theirs")" ]]; then
       return 0
     fi
   done < <(running_labels)
@@ -631,6 +638,7 @@ start_build_worker() {
   announce_activity "selected $ref ($selection, worktree $worktree)"
   launch_worker "$number" build "$worktree" "$(build_prompt "$worktree" "$manifest")" "$ref"
   ticket_files "$TRACKER_ROOT/$ref" >"$TEMP_DIR/w/$number/files"
+  { ticket_files "$TRACKER_ROOT/$ref"; ticket_shared "$TRACKER_ROOT/$ref"; } | sort -u >"$TEMP_DIR/w/$number/all"
 }
 
 unit_is_skipped() {

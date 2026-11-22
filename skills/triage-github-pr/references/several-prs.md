@@ -22,8 +22,9 @@ steps need all three.
    builds its stack and owns its merge method, retargets, and fixes that must flow
    upward. A PR merges only after every PR before it on an edge shows `MERGED`; a
    stopped or queued one holds its dependents. Independent PRs keep the user's order.
-3. **Step 1 for all PRs at once.** Check each PR's `code_review` field from step 2's
-   `pr.sh state` snapshot per step 1's skip/narrow rule, then dispatch one `pr-reviewer`
+3. **Step 1 for all PRs at once.** Run `pr.sh state` once with every PR number (not
+   `--in-flight`, whose object has no `code_review`), check each PR's `code_review` per
+   step 1's skip/narrow rule, then dispatch one `pr-reviewer`
    for each PR that still needs one, in the background, in one message (other harnesses:
    dispatch in the background per [harness-tools](../../harness-tools/SKILL.md) with a
    fresh context and the full brief). A stack's integration PR waits for its own turn
