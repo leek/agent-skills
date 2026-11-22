@@ -35,6 +35,8 @@ Maps, tickets, and specs are markdown files under `.scratch/`. Read the layout o
 
 Map body template, ticket body, claim/block/resolve mechanics: [references/map-and-tickets.md](references/map-and-tickets.md). Ticket types (research / prototype / grilling / task): [references/ticket-types.md](references/ticket-types.md). Fog of war and out-of-scope rules: [references/fog-and-scope.md](references/fog-and-scope.md). Load each when charting or resolving.
 
+When exploring the codebase while charting or resolving, read and maintain [Shared exploration](references/exploration.md); carry earlier session findings into the record when creating the effort directory.
+
 ## Structured questions
 
 Decision points that arise outside a full grilling: confirming the destination phrasing, choosing between scope rulings, picking which frontier ticket to work, use the question shape from `grilling` (as a structured question ([harness-tools](../harness-tools/SKILL.md)), otherwise a plain question in chat): recommended option first, real trade-offs per option, wait for the answer. Don't reinvent the protocol here, including its **Settle it yourself first** ladder and **What still earns a question** bar, which gate every question this skill asks and every ticket it charts. When this skill invokes `grilling` or `domain-modeling`, the inner skill does **not** print an end-of-session block, only the outermost skill does.

@@ -12,6 +12,8 @@ Walk the decision tree one branch at a time. Resolve dependencies between decisi
 
 Finding facts is never the user's job. If a question can be answered by exploring the environment (codebase, files, docs, tools, or current implementation) inspect that context instead of asking. When a fact needs real reading, resolve it through the `research` skill's dispatch rules (its sub-agent must complete inside this session), mark the branch deferred, and keep interviewing the rest of the frontier.
 
+For codebase exploration, read and maintain the effort's evidence record per [Shared exploration](../wayfinder/references/exploration.md). Reuse verified findings across the planning handoff; decisions still belong in the ledger.
+
 ## Core Loop
 
 1. Identify the next unresolved decision that matters.

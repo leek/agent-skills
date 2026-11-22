@@ -18,6 +18,8 @@ Work from whatever is already in the conversation. If the user passes a referenc
 
 ### 2. Explore the codebase when applicable
 
+Read and refresh [Shared exploration](../wayfinder/references/exploration.md) first; put the evidence headings each ticket needs in its Parent context. Explore changed areas and gaps rather than rediscovering verified facts.
+
 When the work targets an existing codebase and you haven't already explored it, inspect the current state. Ticket titles and descriptions use the project's domain vocabulary (`GLOSSARY.md`, or the older `CONTEXT.md`, if present) and respect ADRs in the area. For greenfield or non-code work, continue from the gathered context.
 
 Look for opportunities to **prefactor**: restructure first so the feature lands cleanly. "Make the change easy, then make the easy change." Prefactors become the first tickets.
@@ -39,6 +41,8 @@ List the **files** each ticket expects to create or edit, from step 2's explorat
 **Wide refactors are the exception to vertical slicing.** A wide refactor is one mechanical change (rename a column, retype a shared value object) whose blast radius fans across the codebase so no vertical slice can land green. When the work holds one, read [`references/wide-refactor.md`](references/wide-refactor.md) and sequence it as **expand–contract** (expand, migrate in batches, contract) the way that file says.
 
 **Close every breakdown with a delivery ticket.** The last ticket, blocked by all the others, traces each spec requirement to a ticket and lists the before-merge checks and the after-deploy steps (commands, backfills, flags, smoke checks). A requirement it cannot trace is a gap: add a ticket for it. Draft it per [DELIVERY-TICKET.md](DELIVERY-TICKET.md). On a wide refactor, the integrate-and-verify ticket is this ticket.
+
+Before the decision sweep, apply [Build schedule](references/build-schedule.md): reduce incidental shared-file bottlenecks where justified, estimate each ticket's Work, and record the critical path and first wave in the delivery ticket. Keep semantic dependencies and complete vertical slices.
 
 ### 4. Settle the build's open decisions
 
@@ -64,47 +68,7 @@ First run `ticket.sh lint <slug> --fix`, which quotes the titles itself, and fix
 
 ## Ticket template
 
-This template is canonical.
-
-```markdown
----
-title: "<Ticket title>"
-status: ready-for-agent
-claimed-by:
-blocked-by: []
-deploy-gate: false
----
-
-# <NN>: <Ticket title>
-
-## Parent
-
-Relative path to the spec (`../spec.md`), or omit on the spec-less path.
-
-## Parent context
-
-Only when a spec exists, omit this whole section otherwise:
-
-- [Build Contract](../spec.md#build-contract)
-- [<only another spec heading this ticket needs>](../spec.md#<heading-anchor>)
-
-## What to build
-
-The end-to-end behaviour this ticket makes work, from the user's perspective, 
-not a layer-by-layer implementation list.
-
-## Acceptance criteria
-
-- [ ] Behavior statements: what a user/caller can now do, what data is
-      persisted, what is forbidden (authorization), never presentation
-      ("page shows heading X") or implementation ("uses a repository")
-
-## Files
-
-- `<path this ticket expects to create or edit>`
-```
-
-Keep comments out of the frontmatter: an empty `claimed-by` means unclaimed. Blockers live in the `blocked-by` frontmatter (ticket numbers, `[]` to start at once), not a body section. The delivery ticket has its own template in [DELIVERY-TICKET.md](DELIVERY-TICKET.md).
+When writing a build ticket, read and use the canonical [Build ticket template](references/build-ticket.md), including Files, Scheduling, and progressive context links. The delivery ticket uses [DELIVERY-TICKET.md](DELIVERY-TICKET.md).
 
 When the spec sequences deploys (expand/migrate/contract, "ship A, deploy, then B", a command that must exist in production before the enforcement that calls it), set `deploy-gate: true` on every ticket that must be live before its dependents are built. Blockers alone do not express this: a worker can close ticket A and start ticket B on the same branch, collapsing three deploys into one PR. `autopilot` builds up to a deploy-gate ticket, delivers that, and stops with `needs_input` before its dependents; a human session should likewise commit, deploy, and only then pick up the dependents.
 

@@ -44,6 +44,11 @@ Nothing new. Prove the spec shipped whole, before merge and after deploy.
 - [ ] Full test suite green
 - [ ] End to end: <flow that crosses tickets>
 
+## Build schedule
+
+<Longest dependency chain, remaining shared-file bottlenecks, and first wave,
+from the Build schedule reference in to-tickets. Planning notes, not a merge gate.>
+
 ## After deploy
 
 - [ ] `<command>` (changes data): <what to expect>
