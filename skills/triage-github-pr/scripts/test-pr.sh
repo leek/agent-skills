@@ -438,8 +438,9 @@ pending='.statusCheckRollup = [
 fixtures; run state 7
 eq "snapshot exit" "$rc" 0
 p=$(echo "$out" | jq -c '.[0]')
-eq "snapshot keys" "$(echo "$p" | jq -c 'keys')" '["base","bot_reactions","checks_failed","checks_pending","cross_repo","draft","head","head_pushed_at","head_sha","maintainer_can_modify","merge_danger","merge_state","mergeable","number","repo","requested_reviewers","review","reviews_owed","rounds","stacked_above","state","threads_open","title","unchecked","url"]'
+eq "snapshot keys" "$(echo "$p" | jq -c 'keys')" '["base","bot_reactions","checks_failed","checks_pending","code_review","cross_repo","draft","head","head_pushed_at","head_sha","maintainer_can_modify","merge_danger","merge_state","mergeable","number","repo","requested_reviewers","review","reviews_owed","rounds","stacked_above","state","threads_open","title","unchecked","url"]'
 eq "snapshot facts" "$(echo "$p" | jq -c '[.number,.state,.draft,.head,.head_sha,.base,.mergeable,.merge_state,.review,.cross_repo,.maintainer_can_modify]')" '[7,"OPEN",false,"feat/export","aaa111","main","MERGEABLE","BLOCKED","REVIEW_REQUIRED",false,false]'
+eq "snapshot code_review absent" "$(echo "$p" | jq -c '.code_review')" null
 eq "snapshot checks_failed" "$(echo "$p" | jq -c '.checks_failed')" '[{"name":"tests","link":"https://github.com/o/r/actions/runs/1/job/11"},{"name":"ci/external","link":"https://ci.example/9"}]'
 eq "snapshot checks_pending" "$(echo "$p" | jq -c '.checks_pending')" '[]'
 eq "snapshot threads_open" "$(echo "$p" | jq -c '.threads_open')" 1
@@ -452,6 +453,19 @@ eq "snapshot calls" "$(calls)" 6
 grep -q '^api --paginate repos/o/r/activity?ref=refs/heads/feat/export&activity_type=push&per_page=100' "$GH_LOG" || fail "snapshot: activity call"
 grep -q 'head=feat/export' "$GH_LOG" || fail "snapshot: head passed to the query"
 ok "state: snapshot fields"
+
+fixtures; pr7 '.author = {"login":"me"} | .body += "\n\n<!-- code-review: head=1111111 model=old-model -->\n<!-- code-review: head=abcdef1234567 model=claude-opus-4-6 -->"'
+run state 7; p=$(echo "$out" | jq -c '.[0]')
+eq "own code_review takes last marker" "$(echo "$p" | jq -c '.code_review')" '{"head":"abcdef1234567","model":"claude-opus-4-6"}'
+fixtures; pr7 '.author = {"login":"mallory"} | .body += "\n\n<!-- code-review: head=abcdef1234567 model=claude-opus-4-6 -->"'
+run state 7; eq "other author marker ignored" "$(echo "$out" | jq -c '.[0].code_review')" null
+fixtures; pr7 '.author = {"login":"me"} | .isCrossRepository = true | .body += "\n\n<!-- code-review: head=abcdef1234567 model=claude-opus-4-6 -->"'
+run state 7; eq "fork PR marker ignored" "$(echo "$out" | jq -c '.[0].code_review')" null
+fixtures; pr7 '.author = {"login":"me"} | .body += "\n\n<!-- code-review: head=notasha model=claude-opus-4-6 -->"'
+run state 7; eq "malformed marker ignored" "$(echo "$out" | jq -c '.[0].code_review')" null
+fixtures; pr7 '.author = {"login":"me"} | .body += "\n\n<!-- code-review: head=abcdef1234567 model=claude-opus-4-6 -->"'
+GH_FAIL='^api user' run state 7; eq "failed api user keeps marker untrusted" "$(echo "$out" | jq -c '.[0].code_review')" null
+ok "state: trusted code_review marker on own same-repo PR only"
 
 fixtures; pr7 "$pending | .reviewRequests = [{\"__typename\":\"User\",\"login\":\"alice\"},{\"__typename\":\"Team\",\"name\":\"Core\",\"slug\":\"core\"}] | .reviewDecision = \"\""
 echo '[{"content":"eyes","user":{"login":"chatgpt-codex-connector[bot]","type":"Bot"}},{"content":"heart","user":{"login":"bob","type":"User"}}]' > "$GH_FIX/reactions.json"

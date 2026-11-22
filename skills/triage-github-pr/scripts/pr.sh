@@ -40,6 +40,8 @@
 #   stacked_above        [number]                 open PRs whose base is this PR's head; [] for a fork PR
 #   repo                 {name, default_branch, delete_branch_on_merge, merge_methods: ["merge","squash","rebase"]}
 #   merge_danger         the body's "## Merge Danger" section (the pr skill's format), or null
+#   code_review          {head, model} from a trusted <!-- code-review: head=<sha> model=<model> -->
+#                        marker on your own same-repo PR, or null (never trusted on forks or other authors)
 #   unchecked            the reads that failed: "threads", "repo", "rounds", "reactions", "timeline".
 #                        Each leaves its fields null (threads_open; repo, stacked_above and every
 #                        `required`; rounds and head_pushed_at; bot_reactions; reviews_owed).
@@ -214,7 +216,7 @@ resolve_repo() { # <repo or "">: prints OWNER/REPO
 
 # ---------------------------------------------------------------------------------------
 cmd_state() {
-  local in_flight=0 no_required=0 settle errors=0 i=0 n out repo head feed
+  local in_flight=0 no_required=0 settle errors=0 i=0 n out repo head feed me="" me_checked=0
   local prs=()
   settle=${PR_STATE_SETTLE:-120}
   : > "$tmp/check-names"
@@ -239,10 +241,15 @@ cmd_state() {
     i=$((i + 1))
     out="$tmp/rows/$(printf %03d "$i").json"
     echo "Checking PR #$n..." >&2
-    if ! gh pr view "$n" --json number,url,title,state,isDraft,reviewDecision,statusCheckRollup,body,headRefName,headRefOid,baseRefName,mergeable,mergeStateStatus,isCrossRepository,maintainerCanModify,reviewRequests,createdAt,headRepository,headRepositoryOwner > "$tmp/pr.json"; then
+    if ! gh pr view "$n" --json number,url,title,state,isDraft,author,reviewDecision,statusCheckRollup,body,headRefName,headRefOid,baseRefName,mergeable,mergeStateStatus,isCrossRepository,maintainerCanModify,reviewRequests,createdAt,headRepository,headRepositoryOwner > "$tmp/pr.json"; then
       errors=$((errors + 1))
       jq -n --arg number "$n" '{number: ($number | tonumber? // $number), error: "gh pr view failed"}' > "$out"
       continue
+    fi
+    if [ "$in_flight" = 0 ] && [ "$me_checked" = 0 ] \
+       && jq -e '(.isCrossRepository | not) and ((.body // "") | contains("<!-- code-review: "))' "$tmp/pr.json" >/dev/null 2>&1; then
+      me=$(gh api user --jq .login 2>/dev/null || true)
+      me_checked=1
     fi
     repo=$(jq -r '.url | split("/") | .[3] + "/" + .[4]' "$tmp/pr.json")
     head=$(jq -r '.headRefName' "$tmp/pr.json")
@@ -319,7 +326,7 @@ query($owner: String!, $repo: String!, $pr: Int!, $head: String!, $endCursor: St
        --slurpfile threads "$tmp/threads.json" --slurpfile rounds "$tmp/rounds.json" \
        --slurpfile timeline "$tmp/timeline.json" --slurpfile pushed "$tmp/pushed.json" \
        --argjson settle "$settle" --rawfile unchecked "$tmp/unchecked" --rawfile names "$tmp/check-names" \
-       --argjson in_flight "$in_flight" --argjson no_required "$no_required" '
+       --argjson in_flight "$in_flight" --argjson no_required "$no_required" --arg me "$me" '
       def outcome:
         if (.status // "COMPLETED" | ascii_upcase) != "COMPLETED" then "PENDING"
         else (.conclusion // .state // "") | ascii_upcase end;
@@ -407,6 +414,8 @@ query($owner: String!, $repo: String!, $pr: Int!, $head: String!, $endCursor: St
                                (if $r.squashMergeAllowed then "squash" else empty end),
                                (if $r.rebaseMergeAllowed then "rebase" else empty end)])} end),
            merge_danger: ((.body // "") | (capture("## Merge Danger\\s*(?<s>[\\s\\S]*?)(\\n## |\\z)").s)? // null),
+           code_review: (if .isCrossRepository or ($me == "") or ((.author.login // "") != $me) then null
+                         else ([(.body // "") | scan("<!-- code-review: head=([0-9a-f]{7,40}) model=([A-Za-z0-9._:/-]+) -->") | {head: .[0], model: .[1]}] | last // null) end),
            unchecked: ($unchecked | lines)}
         end' "$tmp/pr.json" > "$out"
     [ ! -s "$tmp/unchecked" ] || errors=$((errors + 1))

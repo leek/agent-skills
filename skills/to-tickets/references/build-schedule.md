@@ -6,16 +6,19 @@ graph; a larger worker count cannot shorten a chain.
 
 ## Before publishing
 
-1. Compare every ticket's Files list, including registrations, against the others.
-   List shared paths and distinguish a semantic dependency from incidental file
-   contention. Verify callers and the repository's extension points before choosing
-   a change.
-2. For incidental contention, consider an existing module/registration boundary or
-   a small behavior-preserving prefactor that gives each feature its own file. Add
-   the prefactor only when its cost is justified by the parallel work it unlocks;
-   its tests preserve existing behavior, and dependent feature tickets block on it.
-   Keep each feature independently demoable. A shared-file edit that remains stays
-   serialized; incomplete features waiting for a final wiring ticket are not a fix.
+1. Compare every ticket's `## Files` list against the others. List shared paths
+   and distinguish a semantic dependency from incidental file contention. Move
+   append-only shared registrations (an independent route, translation key,
+   provider binding, or config/menu entry) to `## Shared registrations` so they
+   do not serialize unrelated slices. Verify callers and the repository's
+   extension points before choosing a change.
+2. For remaining incidental contention under `## Files`, consider an existing
+   module/registration boundary or a small behavior-preserving prefactor that
+   gives each feature its own file. Add the prefactor only when its cost is
+   justified by the parallel work it unlocks; its tests preserve existing
+   behavior, and dependent feature tickets block on it. Keep each feature
+   independently demoable. A `## Files` edit that remains stays serialized;
+   incomplete features waiting for a final wiring ticket are not a fix.
 3. Give each build ticket a `## Scheduling` section with `Work: 1`, `Work: 2`, or
    `Work: 3` (small, medium, large relative to this effort), and one sentence naming
    the likely cost: implementation, setup, or tests. These are scheduling estimates,
@@ -35,6 +38,8 @@ delivery ticket; an older ticket without Work uses 2. Count actual blockers, not
 ticket-number order. A cycle is a tracker error to fix before dispatch.
 
 Among ready, unclaimed tickets, dispatch the largest remaining path weight first;
-break ties by ticket number. Skip a candidate sharing a file with a running ticket
-and try the next. Recompute after merges, releases, or graph changes. Dependencies,
-deploy gates, claims, and the concurrency limit remain hard constraints.
+break ties by ticket number. Skip a candidate sharing a `## Files` path with a
+running ticket and try the next (overlap only under `## Shared registrations`
+runs in parallel). Recompute after merges, releases, or graph changes.
+Dependencies, deploy gates, claims, and the concurrency limit remain hard
+constraints.

@@ -19,7 +19,8 @@ gh pr diff N
 
 The gate snapshot holds, per PR, the metadata and merge gates, the finished failures on
 the head (`checks_failed`), the in-flight signals, `threads_open`, `rounds`,
-`stacked_above`, and the `repo` settings; the sections below name the fields they use.
+`stacked_above`, `code_review` (the trusted `<!-- code-review: head=<sha> model=<model> -->`
+marker from your own same-repo PR body, or null), and the `repo` settings; the sections below name the fields they use.
 A field listed in `unchecked` is null because its read failed: not checked, never zero
 or empty. Run it again wherever a step re-reads a gate.
 

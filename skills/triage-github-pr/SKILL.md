@@ -112,11 +112,26 @@ Then follow the repo's `AGENTS.md` / `CLAUDE.md` rules for tests, lint, and cach
 Before you read anyone else's review, review the diff yourself for what would break:
 correctness, security, data, broken contracts, and missing tests. The brief, inputs,
 and output format are in
-[`references/independent-review.md`](references/independent-review.md). Do this on
-every PR, even one with no reviews, and even when `implement` already reviewed it: this
-is the model-independent look, and a PR body's `Left open:` lines are findings to verify
-in step 4, never a substitute for it. Include the brief's workflow-coverage pass so a
-changed invariant is checked across its live sibling paths before the fix batch.
+[`references/independent-review.md`](references/independent-review.md). Read
+`pr.sh state N` first (it returns gate metadata and never reads review comments):
+
+- **Verified same-model `code-review` on unchanged code.** When `exhaustive` is off,
+  the snapshot carries a trusted `code_review: {head, model}` (`pr.sh state` populates it
+  only for your own same-repo PR, never forks or other authors), and `code_review.model`
+  matches your current model: fetch the head (`git fetch origin <head>`) and verify
+  `git merge-base --is-ancestor <code_review.head> <head_sha>` holds.
+  - When `git diff --name-only <code_review.head>..<head_sha> -- ':!.scratch/'` is empty
+    (zero non-`.scratch/` code changes since `code-review`), skip dispatching
+    `pr-reviewer` and record `Self: skipped (code-review covered <code_review.head> on
+    <model>)` against `<head_sha>`. Codex and Copilot provide the model-independent pass.
+  - When that diff is non-empty, narrow `pr-reviewer` to `<code_review.head>..<head_sha>`
+    with its workflow-coverage pass over the newly changed invariants.
+- **Otherwise** (no trusted `code_review`, a different model or harness, non-ancestor or
+  unverifiable commit, or `exhaustive` mode): review the full `<base-sha>...<head-sha>`
+  diff, even when the PR has no other reviews. A PR body's `Left open:` lines are
+  findings to verify in step 4, never a substitute for review. Include the brief's
+  workflow-coverage pass so a changed invariant is checked across its live sibling paths
+  before the fix batch.
 A dependency bump (the diff touches only manifests and lockfiles) is reviewed from the
 lockfile diff and each package's release notes for that version span; never `diff -r`
 an installed `vendor/` or `node_modules/` tree.
@@ -135,9 +150,10 @@ returns `Self: no findings` for the cost of a full rules reload. Check that the
 assertions still forbid what they were written to catch, and that no test was skipped,
 deleted, or weakened to go green.
 
-Completion criterion: a `Self N:` line per finding, or `Self: no findings`, against a
-recorded head sha, plus coverage of the changed invariants' live paths. An explicit
-`NOT REVIEWED` path still needs review before claiming the head is covered.
+Completion criterion: a `Self N:` line per finding, `Self: no findings`, or `Self: skipped
+(code-review covered <sha> on <model>)` against a recorded head sha, plus coverage of the
+changed invariants' live paths (when not skipped). An explicit `NOT REVIEWED` path still
+needs review before claiming the head is covered.
 
 ## 2. Read review state
 

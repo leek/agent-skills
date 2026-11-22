@@ -210,6 +210,18 @@ eq "overlap exit" "$status" 0
 eq "overlap workers at once" "$(sort -n "$t/c-stub/concurrency" | tail -n 1)" "1"
 echo "ok tickets whose Files overlap build one after the other"
 
+# ---- tickets overlapping only under Shared registrations run in parallel ----------------
+r="$t/c2"
+new_repo "$r"
+ticket "$r" 01-a $'blocked-by: []\n' $'## Files\n\n- `app/One.php`\n\n## Shared registrations\n\n- `routes/web.php`'
+ticket "$r" 02-b $'blocked-by: []\n' $'## Files\n\n- `app/Two.php`\n\n## Shared registrations\n\n- `routes/web.php`'
+commit_repo "$r"
+status=0
+ap "$r" "$t/c2-stub" --provider claude --root .scratch/foo >/dev/null || status=$?
+eq "shared registrations exit" "$status" 0
+eq "shared registrations workers at once" "$(sort -n "$t/c2-stub/concurrency" | tail -n 1)" "2"
+echo "ok tickets overlapping only on Shared registrations run in parallel"
+
 # ---- a crashed worker keeps its claim and fails the run after the others land -----------
 r="$t/d"
 new_repo "$r"

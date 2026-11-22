@@ -37,7 +37,13 @@ not a layer-by-layer implementation list.
 
 ## Files
 
-- `<verified path this ticket expects to create or edit, registrations included>`
+- `<verified path this ticket expects to create or edit (exclusive across parallel workers)>`
+
+## Shared registrations
+
+Optional. Omit when none. Append-only registration files (`routes/`, `lang/`, provider bindings, config or menu entries) where this ticket only adds an independent entry; parallel workers may share these and merge at landing.
+
+- `<verified registration path>`
 
 ## Scheduling
 
