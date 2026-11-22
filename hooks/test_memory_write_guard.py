@@ -228,7 +228,7 @@ class MemoryWriteGuardTest(unittest.TestCase):
     def test_read_only_agents_without_memory_write_nothing(self):
         # Their disallowedTools drop Write/Edit on Claude Code; the hook holds where that is ignored.
         for agent in ("pr-reviewer", "spec-reviewer", "browser-tester", "browser-test-planner",
-                      "ui-reviewer"):
+                      "ui-reviewer", "design-reviewer"):
             for tool in ("Write", "Edit", "search_replace"):
                 with self.subTest(agent=agent, tool=tool):
                     self.assertEqual(self.run_guard("/repo/.claude/agent-memory/x/a.md",

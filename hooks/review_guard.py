@@ -1,5 +1,6 @@
 """Read-only shell policy for the review agents in pre_tool_guard.REVIEW_GUARDED
-(deepening-scout, finding-verifier, pr-reviewer, spec-reviewer, standards-reviewer).
+(deepening-scout, design-reviewer, finding-verifier, pr-reviewer, spec-reviewer,
+standards-reviewer).
 
 Each reads untrusted text: review comments, bot findings, the PR diff, or the codebase.
 Their bodies say read-only; hooks/pre_tool_guard.py enforces this policy on their

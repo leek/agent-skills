@@ -30,7 +30,7 @@ Return `continue` with `completed_ref` set to `ticket_ref` only after `finish` p
 
 Every buildable ticket is landed on `branch` in `integration`, your working directory. You are `implement-spec`'s orchestrator from step 5 on: read that skill completely, then run its steps 5, 6, 7, and 8 with the manifest's values (`base_sha`, `notes`, `delivery`, `merged`, `delivery_ticket`). `delivery` is `pr` (One PR), `stack` (Stacked PRs), or `branch` (push, no PR). The differences:
 
-- **Nobody answers.** Step 6's full-suite question: follow the repo's rule or the user's saved preference when one settles it, otherwise skip the full run and say so. A finding that needs the user's decision is left open: name it in the PR as a `Left open:` line and in `reason`.
+- **Nobody answers.** Step 6's full-suite question: follow the repo's rule or the user's saved preference when one settles it, otherwise skip the full run and say so. A finding that needs the user's decision is left open: name it in the PR as a `Left open:` line and in `reason`. Every Design finding (tagged `DESIGN`) is one of these: never fix it.
 - **Step 7 resolves exactly the `merged` tickets**, each from `<notes>/<NN>.md`, with `ticket.sh --root <tracker_root> resolve`. Work `delivery_ticket` only when it is not null. Tickets named in `left_open` were not built: say so in the PR body, and leave them open.
 - **A deploy gate** in `deploy_gates` ends this delivery: say in the PR body that it must be deployed before its dependents are built.
 - **Step 8's leftovers** follow `cleanup`: `auto` removes them without asking; `list` leaves them and names each one in `reason`, for the launching session to ask about.
