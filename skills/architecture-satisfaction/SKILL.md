@@ -23,7 +23,7 @@ Stop when the architecture is satisfactory and checks pass.
 
 Use this for a deliberate architectural refactor where the desired destination can be stated in concrete terms and the current system can be tested after each meaningful change.
 
-This is not a general cleanup pass. Use `housekeeper` for low-risk code hygiene, and `repository-cleanup` for Git branch/PR/worktree/stash cleanup.
+This is not a general cleanup pass. Use `/sweep here cleanup` for low-risk code hygiene, and `repository-cleanup` for Git branch/PR/worktree/stash cleanup.
 
 ## Define Satisfactory First
 
@@ -69,7 +69,7 @@ The progress file is scratch state for long refactors and handoffs. Do not use i
 3. Make one significant, reviewable change at a time.
 4. Live-test the affected behavior after each significant change. Prefer the project's real app/runtime checks when available, not only static checks.
 5. Run the relevant automated checks: tests, type checks, linters, formatters, build, migrations, or focused smoke scripts.
-6. Run an independent review after each significant change. Run the `code-review` skill against the checkpoint's starting commit (its Correctness axis runs as the `leek-skills:pr-reviewer` subagent where the harness has subagents, and inline otherwise), and brief it with the Independent Review Focus below. Where that skill is not installed, use an existing autoreview command or a separate review pass that looks for behavior regressions, missed callers, leaky abstractions, and test gaps.
+6. Run an independent review after each significant change. Run the `code-review` skill against the checkpoint's starting commit, naming the Correctness and Design axes and passing the progress file's architectural target as the spec (Correctness runs as the `leek-skills:pr-reviewer` subagent and Design as `leek-skills:design-reviewer` where the harness has subagents, and inline otherwise), and brief Correctness with the Independent Review Focus below. The Design axis checks each checkpoint against the target, so the refactor does not drift toward a different design than the one approved. Where that skill is not installed, use an existing autoreview command or a separate review pass that looks for behavior regressions, missed callers, leaky abstractions, and test gaps.
 7. Fix issues found by live testing, checks, or review before moving to the next architectural step.
 8. Commit each verified checkpoint when the user has asked for commits or the repository workflow expects checkpoint commits. Keep commits small and named after the architectural move, staged per the `commit` skill's [Staging](../commit/SKILL.md#staging) with a subject per its [Subject](../commit/SKILL.md#subject).
 9. Update the progress file with the checkpoint, evidence, decisions, and next action.

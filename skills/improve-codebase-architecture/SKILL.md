@@ -59,6 +59,8 @@ See [HTML-REPORT.md](HTML-REPORT.md) for the full HTML scaffold, diagram pattern
 
 Do NOT propose interfaces yet. Once the report is up, ask the user which candidate to explore (a structured question ([harness-tools](../harness-tools/SKILL.md)): the top recommendation first and marked recommended, then the next strongest up to 4 options, each option's `preview` an ASCII before/after sketch of that candidate's shape, and "Other" reaching the rest; otherwise ask in chat: "Which of these would you like to explore?").
 
+**Leave the rest as leads.** The HTML report lives in a temporary folder, so a candidate the user does not pick is lost with it. Once the user picks, write each other `Strong` or `Worth exploring` candidate to `sweep`'s audit inbox, in the format its [Findings outside this issue](../sweep/SKILL.md#3-isolate-fix-verify) paragraph gives, with the candidate's files, problem, and solution as the finding. Skip `Speculative` ones, and name each file you wrote in chat.
+
 ### 3. Grilling loop
 
 Once the user picks a candidate, run the `/grilling` skill to walk the decision tree with them: constraints, dependencies, the shape of the deepened module, what sits behind the seam, what tests survive.
@@ -69,3 +71,12 @@ Side effects happen inline as decisions crystallize: run the `/domain-modeling` 
 - **Sharpening a fuzzy term during the conversation?** Update `GLOSSARY.md` right there.
 - **User rejects the candidate with a load-bearing reason?** Offer an ADR, framed as: _"Want me to record this as an ADR so future architecture reviews don't re-suggest it?"_ Only offer when the reason would actually be needed by a future explorer to avoid re-suggesting the same thing, skip ephemeral reasons ("not worth it right now") and self-evident ones.
 - **Want to explore alternative interfaces for the deepened module?** Run the `/codebase-design` skill and use its design-it-twice parallel sub-agent pattern.
+
+### 4. Hand off
+
+When the grill settles the deepened module, the target is concrete enough to build. Route it:
+
+- **A refactor that fits one branch** → `/architecture-satisfaction <the settled target>`: it refactors toward that target in reviewed checkpoints.
+- **A refactor that spans several tickets** → `/to-spec`, which records the grill's decisions as a spec.
+
+Every candidate the user did not pick goes to the audit inbox (step 2's **Leave the rest as leads**), so a later `/sweep` can take it.
