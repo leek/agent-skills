@@ -66,7 +66,7 @@ On top of whatever the repo documents, the Standards axis always carries the **s
 
 **Large diffs split Correctness.** When `size` is `split` (more than 25 files), one Correctness reviewer runs out of turns before it reports. Dispatch two, each given half of `files` (a file and its tests stay together) and the full commit list, and present both reports under the one `## Correctness` heading.
 
-**A caller may name the axes.** Run only those, and report the rest as `not run`.
+**A caller may name the axes.** Run only those, and report the rest as `not run`. A caller may also ask for one Correctness reviewer whatever the size: then skip the split above.
 
 **A re-review narrows.** When the caller passes the previous round's findings and its head, review only `<previous head>..HEAD` (the fix commits) and run only the axes that had actionable findings, plus Correctness when a fix added a mechanism (job, lock, claim, retry). Report the axes that did not run as `not re-run`.
 
