@@ -1,21 +1,21 @@
 # Smell baseline
 
-A fixed set of Fowler code smells (_Refactoring_, ch.3) that the Standards axis of `code-review` applies even when a repo documents nothing. Two rules bind it:
+A fixed set of twelve Fowler code smells (_Refactoring_, ch.3) that the Standards axis of `code-review` applies even when a repo documents nothing. Two rules bind it:
 
 - **The repo overrides.** A documented repo standard always wins; where it endorses something the baseline would flag, suppress the smell.
 - **Always a judgement call.** Each smell is a labelled heuristic ("possible Feature Envy"), never a hard violation.
 
-Each smell reads *what it is* → *how to fix*; match it against the diff:
+The smells are defined once, in the `code-smells-audit` catalog. Each line below links its card; the one-line description of each is in that catalog's [index](../../code-smells-audit/references/index.md). Match the diff against those one-liners, and open a card (its detection heuristics, PHP/Laravel and TS/React sections, and refactorings) only for a candidate match, to confirm it and name the fix.
 
-- **Mysterious Name**: a function, variable, or type whose name doesn't reveal what it does or holds. → rename it; if no honest name comes, the design's murky.
-- **Duplicated Code**: the same logic shape appears in more than one hunk or file in the change. → extract the shared shape, call it from both.
-- **Feature Envy**: a method that reaches into another object's data more than its own. → move the method onto the data it envies.
-- **Data Clumps**: the same few fields or params keep travelling together (a type wanting to be born). → bundle them into one type, pass that.
-- **Primitive Obsession**: a primitive or string standing in for a domain concept that deserves its own type. → give the concept its own small type.
-- **Repeated Switches**: the same `switch`/`if`-cascade on the same type recurs across the change. → replace with polymorphism, or one map both sites share.
-- **Shotgun Surgery**: one logical change forces scattered edits across many files in the diff. → gather what changes together into one module.
-- **Divergent Change**: one file or module is edited for several unrelated reasons. → split so each module changes for one reason.
-- **Speculative Generality**: abstraction, parameters, or hooks added for needs the spec doesn't have. → delete it; inline back until a real need shows.
-- **Message Chains**: long `a.b().c().d()` navigation the caller shouldn't depend on. → hide the walk behind one method on the first object.
-- **Middle Man**: a class or function that mostly just delegates onward. → cut it, call the real target direct.
-- **Refused Bequest**: a subclass or implementer that ignores or overrides most of what it inherits. → drop the inheritance, use composition.
+- [Uncommunicative Name](../../code-smells-audit/references/smells/uncommunicative-name.md)
+- [Duplicated Code](../../code-smells-audit/references/smells/duplicated-code.md): within the change, the same logic shape in more than one hunk or file
+- [Feature Envy](../../code-smells-audit/references/smells/feature-envy.md)
+- [Data Clump](../../code-smells-audit/references/smells/data-clump.md)
+- [Primitive Obsession](../../code-smells-audit/references/smells/primitive-obsession.md)
+- [Conditional Complexity](../../code-smells-audit/references/smells/conditional-complexity.md): including the same `switch` or `if` cascade on one type repeated across the change (Fowler's Repeated Switches)
+- [Shotgun Surgery](../../code-smells-audit/references/smells/shotgun-surgery.md): one logical change forcing scattered edits across the diff
+- [Divergent Change](../../code-smells-audit/references/smells/divergent-change.md)
+- [Speculative Generality](../../code-smells-audit/references/smells/speculative-generality.md): abstraction the spec has no need for
+- [Message Chain](../../code-smells-audit/references/smells/message-chain.md)
+- [Middle Man](../../code-smells-audit/references/smells/middle-man.md)
+- [Refused Bequest](../../code-smells-audit/references/smells/refused-bequest.md)

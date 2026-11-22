@@ -87,7 +87,7 @@ and merge without another bot wait or fix round. Carry new findings; a review th
 still running lands in the [late-review sweep](references/gh-mechanics.md#follow-up-pr). A request not to
 merge remains review-only; it also uses the bounded fix budget unless asked otherwise.
 
-Grade findings with the [independent-review severities](references/independent-review.md#output).
+Grade findings with the [independent-review severities](../code-review/references/independent-review.md#output).
 A carried finding keeps its grade, is replied to with `<severity>, carried to a
 follow-up PR`, resolved, and listed in the disposition comment. A required human
 review or unresolved owner decision cannot be disposed of by carrying it.
@@ -112,7 +112,7 @@ Then follow the repo's `AGENTS.md` / `CLAUDE.md` rules for tests, lint, and cach
 Before you read anyone else's review, review the diff yourself for what would break:
 correctness, security, data, broken contracts, and missing tests. The brief, inputs,
 and output format are in
-[`references/independent-review.md`](references/independent-review.md). Read
+[`code-review/references/independent-review.md`](../code-review/references/independent-review.md). Read
 `pr.sh state N` first (it returns gate metadata and never reads review comments):
 
 - **Verified same-model `code-review` on unchanged code.** When `exhaustive` is off,

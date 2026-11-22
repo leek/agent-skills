@@ -71,7 +71,7 @@ On top of whatever the repo documents, the Standards axis always carries the **s
 
 **A re-review narrows.** When the caller passes the previous round's findings and its head, review only `<previous head>..HEAD` (the fix commits) and run only the axes that had actionable findings, plus Correctness when a fix added a mechanism (job, lock, claim, retry). Design never re-runs: the user approved each Design fix. Report the axes that did not run as `not re-run`.
 
-**Correctness brief**: hand over the brief in [`triage-github-pr/references/independent-review.md`](../triage-github-pr/references/independent-review.md) in full, failure-mode probes included, with the diff command and commit list as its range, the commit messages as intent, and the repo's `AGENTS.md` / `CLAUDE.md`. Do not pass any PR review comments: this axis is the view they did not shape. Its output is the brief's `Self N: [BLOCKING | MAJOR | MINOR]` lines, each with a concrete failing case.
+**Correctness brief**: hand over the brief in [`references/independent-review.md`](references/independent-review.md) in full, failure-mode probes included, with the diff command and commit list as its range, the commit messages as intent, and the repo's `AGENTS.md` / `CLAUDE.md`. Do not pass any PR review comments: this axis is the view they did not shape. Its output is the brief's `Self N: [BLOCKING | MAJOR | MINOR]` lines, each with a concrete failing case.
 
 **Standards brief**: include:
 
