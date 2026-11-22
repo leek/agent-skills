@@ -116,7 +116,9 @@ per finding with its severity/leverage line and its card path.
 
 After writing the file, summarize the top findings in the session and point at
 the artifact. Slicing findings into tickets is out of scope, hand the report
-to the user (or `/to-tickets`) instead.
+to the user (or `/to-tickets`) instead. The file is also a lead source for
+`/sweep`: its ledger lists `docs/audits/` reports, so a later sweep can prove
+and fix one finding per PR (`/sweep here cleanup` for small ones).
 
 ## Reference material
 

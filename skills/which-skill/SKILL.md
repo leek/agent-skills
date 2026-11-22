@@ -66,7 +66,7 @@ Most work runs one straight line (**decide → spec → tickets → build**) ove
 
 ## Repo upkeep
 
-`housekeeper` (low-risk cleanup), `repository-cleanup` (branches, PRs, stashes, worktrees), `scratch-status` (what is still open in `.scratch/`, read-only), `scratch-cleanup` (file research into docs/, remove finished efforts), `dependency-audit` (Composer or npm audit), `upgrade-plan` (plan one library or framework upgrade), `prune-tests` (delete low-signal tests, one PR per area), `retro` (look back over this session or recent logs for environment improvements), `context-doctor` (audit CLAUDE.md, rules, memory, skills, and plugins for stale, duplicate, or wasted context), `domain-modeling` (terms and ADRs), `laravel-herd-worktrees` (worktree plus `.test` URL).
+`sweep here cleanup` (low-risk code cleanup, one commit each, no PR), `repository-cleanup` (branches, PRs, stashes, worktrees), `scratch-status` (what is still open in `.scratch/`, read-only), `scratch-cleanup` (file research into docs/, remove finished efforts), `dependency-audit` (Composer or npm audit), `upgrade-plan` (plan one library or framework upgrade), `prune-tests` (delete low-signal tests, one PR per area), `retro` (look back over this session or recent logs for environment improvements), `context-doctor` (audit CLAUDE.md, rules, memory, skills, and plugins for stale, duplicate, or wasted context), `domain-modeling` (terms and ADRs), `laravel-herd-worktrees` (worktree plus `.test` URL).
 
 ## Running out of context
 

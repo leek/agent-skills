@@ -7,6 +7,8 @@
 #                    when the branch starts sweep/ or sweep-)
 #   taken_branches   local and remote branch names starting with the prefix
 #   findings         .scratch/<prefix>/findings/*.md files in the main checkout
+#   audits           docs/audits/*.md reports in the main checkout (code-smells-audit
+#                    writes them); their open findings are leads too
 #
 # Usage: known-work.sh [--days N] [--prefix NAME]
 # --prefix names the skill's branches and findings (default sweep; prune-tests
@@ -65,6 +67,7 @@ done
 } | sort -u | jq -R . | jq -s . > "$tmp/branches.json"
 
 find "$main/.scratch/$prefix/findings" -name '*.md' 2>/dev/null | sort | jq -R . | jq -s . > "$tmp/findings.json"
+find "$main/docs/audits" -maxdepth 1 -name '*.md' 2>/dev/null | sort | jq -R . | jq -s . > "$tmp/audits.json"
 
 jq -n \
   --arg default "$default" \
@@ -72,7 +75,8 @@ jq -n \
   --slurpfile open "$tmp/open.json" \
   --slurpfile closed "$tmp/closed.json" \
   --slurpfile branches "$tmp/branches.json" \
-  --slurpfile findings "$tmp/findings.json" '
+  --slurpfile findings "$tmp/findings.json" \
+  --slurpfile audits "$tmp/audits.json" '
   {
     default_branch: $default,
     prs: ($open[0] + $closed[0] | unique_by(.number) | sort_by(-.number) | map({
@@ -81,5 +85,6 @@ jq -n \
       sweep: (.headRefName | test("^" + $prefix + "[-/]"))
     })),
     taken_branches: $branches[0],
-    findings: $findings[0]
+    findings: $findings[0],
+    audits: $audits[0]
   }'

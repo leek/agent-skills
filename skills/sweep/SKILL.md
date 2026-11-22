@@ -2,7 +2,7 @@
 name: sweep
 description: Find, prove, and fix one unnoticed problem per cycle, one PR each.
 disable-model-invocation: true
-argument-hint: "[count 1-10] [focus areas, e.g. 3 refactor performance]; defaults to one cycle over every category"
+argument-hint: "[count 1-10] [here] [focus areas, e.g. 3 refactor performance, or here cleanup]; defaults to one cycle over every category, one PR each"
 ---
 
 # Sweep
@@ -24,6 +24,7 @@ The skill runs again and again on the same repo. Its PRs from earlier runs stay 
 Parse these before any discovery. On invalid input, stop and report it.
 
 - **Count:** one whole number from 1 to 10. Without a count, run 1 cycle. A second number, `0`, a negative number, or a decimal is invalid. Treat a count above 10 as 10, and say so.
+- **`here`:** work in the current checkout instead of a worktree and PR. Each cycle ends as one commit on the current branch, never pushed. Refuse `here` on the default or a deploy branch, and when a path the fix would touch has uncommitted changes. It suits `cleanup` runs, where a PR per small removal costs more than it is worth.
 - **Focus areas:** every other token. A quoted phrase is one area: `/sweep "session notes" perf`. With no areas, every category qualifies.
 
 | Focus area | Category |
@@ -36,6 +37,7 @@ Parse these before any discovery. On invalid input, stop and report it.
 | `observability`, `errors` | error-handling and observability gaps |
 | `refactor`, `architecture`, `dry`, `tech-debt` | maintainability, layering, duplicated logic |
 | `polish` | best-practice violations, code smells, minor polish |
+| `cleanup`, `hygiene`, `dead-code` | unused or unreachable code, stale files or comments, unused dependencies, broken links, inconsistent names, confusing project structure |
 
 Any other area is a **product area** (`billing`, `scheduling`). Confirm by search that it names real code (a directory, model, or domain term), otherwise stop and report it. Categories combine as a union, product areas as a union, and a category plus a product area as an intersection (`perf billing` means a performance problem in billing). Focus restricts what qualifies. It never relaxes the evidence bar.
 
@@ -47,7 +49,7 @@ Any other area is a **product area** (`billing`, `scheduling`). Confirm by searc
    ```bash
    bash <this-skill-dir>/scripts/known-work.sh > <scratch>/known-work.json
    ```
-   It holds every open PR, every PR merged in the last 30 days (`--days N` to widen), every PR closed unmerged in the last year, the taken `sweep*` branch names, and earlier sweep findings files. It is large, so query it. Do not read it whole:
+   It holds every open PR, every PR merged in the last 30 days (`--days N` to widen), every PR closed unmerged in the last year, the taken `sweep*` branch names, the findings files in the audit inbox, and the `docs/audits/` reports. It is large, so query it. Do not read it whole:
    ```bash
    jq -r --arg p <path> '.prs[] | select(.files | index($p)) | "#\(.number) \(.state) \(.title)"' <scratch>/known-work.json
    ```
@@ -57,7 +59,7 @@ Keep discovery cheap: inventories first, then drill into strong evidence. Do not
 
 ## 2. Prove one issue
 
-Priority among in-focus candidates: (1) broken production behavior, (2) CI or static-analysis failures, (3) wrong logic or data, (4) significant UX, (5) security or reliability, (6) measured performance, (7) error handling or observability, (8) high-value refactors, (9) code smells, (10) polish. Weigh impact, evidence strength, and fix scope.
+Priority among in-focus candidates: (1) broken production behavior, (2) CI or static-analysis failures, (3) wrong logic or data, (4) significant UX, (5) security or reliability, (6) measured performance, (7) error handling or observability, (8) high-value refactors, (9) code smells and cleanup, (10) polish. Weigh impact, evidence strength, and fix scope.
 
 **Check every candidate against the ledger** before you spend effort on it. Query each file the fix would touch, then read the title and body (`gh pr view <n>`) of each hit. A candidate is **covered** when a ledger PR addresses the same root cause or makes the same fix:
 
@@ -65,7 +67,7 @@ Priority among in-focus candidates: (1) broken production behavior, (2) CI or st
 - Merged: covered if current `main` already has the fix. If the problem still reproduces on `main`, the earlier fix was incomplete. Say so in the PR.
 - Closed unmerged: covered. Someone declined it. Do not propose it again.
 
-A ledger PR that touches the same file for a different reason does not cover it. A findings file from an earlier sweep is an open lead. You may take it if it still reproduces, and name its path in the PR.
+A ledger PR that touches the same file for a different reason does not cover it. A findings file in the audit inbox (written by an earlier sweep or by another skill) is an open lead, and so is an open finding in a `docs/audits/` report. You may take one if it still reproduces, and name its path in the PR. A lead never lowers the evidence bar below.
 
 Before you edit, establish all of these, or drop the candidate:
 
@@ -73,6 +75,8 @@ Before you edit, establish all of these, or drop the candidate:
 - Evidence that it exists on current `origin/<default>`: a reproducer, a failing test, a log line, or a measured baseline. Reading code and imagining a failure is not evidence.
 - The root cause, including the framework, vendor, config, and schema facts behind it.
 - A bounded fix and a check that will show it worked.
+
+**Cleanup evidence** is proof that nothing uses it: no reference in code, config, routes, views, tests, or docs, and no dynamic lookup (a string class name, a container binding, a config-driven call) that could reach it. Generated files, files whose purpose is unclear, and another session's active work stay protected. Removing a dependency, a broad set of files, or a public interface needs the user's approval first: ask (a structured question ([harness-tools](../harness-tools/SKILL.md)), `multiSelect: true` when several wait; otherwise in chat), and write each declined or unanswered one as a lead.
 
 Drop a candidate that is disproven, covered, speculative, or out of scope, then take the next one. For hard bugs and regressions, use the `diagnosing-bugs` loop.
 
@@ -85,15 +89,21 @@ Drop a candidate that is disproven, covered, speculative, or out of scope, then 
    From here on, start every command for this cycle with `cd <worktree path> &&` (or use `git -C <worktree path>`). Some harness shells do not keep the working directory between calls, and a bare `composer install` or `artisan make:*` then lands in the main checkout.
    In a Laravel repo, make it runnable with `laravel-herd-worktrees`' **Bootstrap a bare worktree** section before you run anything in it. A scratch database gets a name no checkout config uses, `<app db>_sweep_<topic>`, and you register it when you create it: `bash <this-skill-dir>/../laravel-herd-worktrees/scripts/scratch-db.sh register <pgsql|mysql|sqlite> <database> <worktree path>` (see its [Scratch database registry](../laravel-herd-worktrees/SKILL.md#scratch-database-registry)).
    Record each resource the cycle creates (worktree, database, browser session, background process) for [Finish the run](#5-finish-the-run).
+
+   With **`here`**, skip this step: no branch, no worktree, no database. Work in the current checkout and touch only the paths of this one issue.
 2. **Fix.** Look for an existing abstraction first, and reuse or extend it. Make the smallest change that fully fixes the root cause. Keep every edit tied to the one issue.
 3. **Prove it.** For a bug, write the regression test first, through the real entry point (HTTP, Livewire, Filament, job, command, observer). It must fail before the fix and pass after; follow the `tdd` loop. For performance, compare measured query counts or timings. For UX and presentation, show it on the worktree's running site with `verify`, never a test (the `tdd` skill's [What needs a test](../tdd/SKILL.md#what-needs-a-test-and-what-proves-the-rest) section). For refactors and coverage, protect the behavior with tests. Never change production to reproduce.
 4. **Checks.** Run the checks the repo requires, in its order, on the changed paths only. Report failures that existed before this change apart from regressions it caused.
 
-**Findings outside this issue** (including severe ones out of focus): write each to the **main checkout** as `.scratch/sweep/findings/<YYYY-MM-DD>-<topic>.md`, in the triage request format: a `# <title>` heading, then a `**Status:** needs-triage` line (the string `.agents/triage-labels.md` maps that role to, when the file exists), then the finding. Do not fix them, commit them, or open issues for them. `/triage` takes them from there.
+**Findings outside this issue** (including severe ones out of focus): write each to the **audit inbox**, the **main checkout**'s `.scratch/sweep/findings/<YYYY-MM-DD>-<topic>.md`, in the triage request format: a `# <title>` heading, then a `**Status:** needs-triage` line (the string `.agents/triage-labels.md` maps that role to, when the file exists), then the finding. Do not fix them, commit them, or open issues for them. `/triage` takes them from there.
+
+This section owns the audit inbox and its file format. Other skills that find more than they fix write their leftovers here in the same format (`improve-codebase-architecture`'s candidates the user did not pick), and `code-smells-audit`'s `docs/audits/` reports count as leads where they are.
 
 ## 4. Submit
 
 Follow [references/submit.md](references/submit.md): review the diff, rerun the ledger for PRs opened during the cycle, commit, push, open the PR, label it, and wait for checks.
+
+With **`here`**, run only its steps 1 and 2, then commit the cycle's paths per the `commit` skill's [Staging](../commit/SKILL.md#staging) and [Subject](../commit/SKILL.md#subject). Never push, and skip its Clean up: the cycle made nothing to remove. Report each commit SHA where a PR link would go.
 
 ## 5. Finish the run
 

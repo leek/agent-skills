@@ -22,7 +22,7 @@ Stop when valuable work is recovered and remaining repository state is intention
 
 Use this when abandoned branches, old worktrees, unclear pull requests, unmerged commits, or forgotten stashes make it difficult to know which repository state still matters.
 
-This loop cleans Git repository state. It is not a source-code housekeeping pass; use `housekeeper` for dead code, stale files, duplicated logic, broken links, unused dependencies, and project-structure cleanup.
+This loop cleans Git repository state. It is not a source-code housekeeping pass; use `/sweep here cleanup` for dead code, stale files, duplicated logic, broken links, unused dependencies, and project-structure cleanup.
 
 ## Workflow
 
