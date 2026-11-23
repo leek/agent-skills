@@ -20,8 +20,47 @@ import {
   tally,
   ticketColor,
   ticketMark,
+  ticketTime,
   validateChange,
 } from './ticket-board'
+
+describe('ticket time', () => {
+  const MIN = 60_000
+  const spec = (tickets: { number: string; title?: string; status: 'blocked' | 'running' | 'fixing' | 'merged' | 'closed' }[]) => ({
+    board: 'auth',
+    kind: 'spec' as const,
+    tickets,
+  })
+
+  test('runs from dispatch to the first done status and stays fixed after', async () => {
+    const blocked = apply(null, spec([{ number: '01', title: 'Login', status: 'blocked' }]), 0)
+    expect(ticketTime(blocked.tickets[0]!, 5 * MIN)).toBe('')
+    const running = apply(blocked, spec([{ number: '01', status: 'running' }]), 10 * MIN)
+    expect(ticketTime(running.tickets[0]!, 27 * MIN)).toBe('17m')
+    const merged = apply(running, spec([{ number: '01', status: 'merged' }]), 95 * MIN)
+    const closed = apply(merged, spec([{ number: '01', status: 'closed' }]), 300 * MIN)
+    expect(ticketTime(closed.tickets[0]!, 999 * MIN)).toBe('1h25m')
+  })
+
+  test('a post-merge fix reopens the clock from the original dispatch', async () => {
+    const merged = apply(
+      apply(null, spec([{ number: '15', title: 'Status', status: 'running' }]), 0),
+      spec([{ number: '15', status: 'merged' }]),
+      30 * MIN,
+    )
+    const fixing = apply(merged, spec([{ number: '15', status: 'fixing' }]), 40 * MIN)
+    expect(fixing.tickets[0]?.doneAt).toBeUndefined()
+    expect(ticketTime(fixing.tickets[0]!, 50 * MIN)).toBe('50m')
+    const again = apply(fixing, spec([{ number: '15', status: 'merged' }]), 60 * MIN)
+    expect(ticketTime(again.tickets[0]!, 999 * MIN)).toBe('1h00m')
+  })
+
+  test('a ticket first seen already merged shows no time', async () => {
+    const board = apply(null, spec([{ number: '24', title: 'Import', status: 'merged' }]), 5 * MIN)
+    expect(board.tickets[0]).toEqual({ number: '24', title: 'Import', status: 'merged', note: '' })
+    expect(ticketTime(board.tickets[0]!, 9 * MIN)).toBe('')
+  })
+})
 
 describe('apply', () => {
   test('first update lists the tickets; later ones change status by number and keep titles', async () => {
@@ -40,7 +79,7 @@ describe('apply', () => {
       kind: 'spec',
       tickets: [{ number: '01', status: 'merged', note: 'abc123' }, { number: '02', status: 'ready' }],
     }, 2)
-    expect(second.tickets[0]).toEqual({ number: '01', title: 'Login', status: 'merged', note: 'abc123' })
+    expect(second.tickets[0]).toEqual({ number: '01', title: 'Login', status: 'merged', note: 'abc123', startedAt: 1, doneAt: 2 })
     // A status change drops the note that explained the old status.
     expect(second.tickets[1]?.note).toBe('')
     expect(tally(second)).toBe('1 of 2 done · 1 ready')

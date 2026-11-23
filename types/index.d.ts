@@ -64,6 +64,10 @@ export type BoardTicket = {
   title: string
   status: TicketStatus
   note: string
+  /** When it first went `running` or `fixing` (ms); absent on a ticket the board never saw start. */
+  startedAt?: number
+  /** When it reached a done status (ms); cleared when it reopens. */
+  doneAt?: number
 }
 
 export type FindingStatus = 'open' | 'fixing' | 'fixed' | 'asking' | 'deferred'

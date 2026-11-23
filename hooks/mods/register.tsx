@@ -45,6 +45,7 @@ import {
   stackWarnings,
   ticketColor,
   ticketMark,
+  ticketTime,
   title,
   summary as boardSummary,
   validateChange,
@@ -337,7 +338,7 @@ export const register: Register = on => {
     isTicketsDismissed = false
     const opened = await $.ui.open({ id: TICKETS_PANE, title: title(run) })
 
-    return { text: opened.isPlaced ? boardSummary(run) : boardText(run) }
+    return { text: opened.isPlaced ? boardSummary(run) : boardText(run, await $.clock.now()) }
   })
 
   on('ui.close', { id: TICKETS_PANE }, async ($, e, next) => {
@@ -724,7 +725,10 @@ export const register: Register = on => {
         )}
         {runTickets.map(t => {
           const w = worker(t)
-          const live = w === undefined ? '' : ` · ${w.tools} tools · ${duration(now - w.startedAt)}${w.lastTool === '' ? '' : ` · ${w.lastTool}`}`
+          // The ticket's own clock (dispatch to merge) beats the worker's, which restarts per dispatch.
+          const time = ticketTime(t, now) || (w === undefined ? '' : duration(now - w.startedAt))
+          const live = w === undefined ? '' : ` · ${w.tools} tools`
+          const last = w === undefined || w.lastTool === '' ? '' : ` · ${w.lastTool}`
 
           return (
             <Text key={t.number} wrap="truncate-end" dimColor={t.status === 'skipped' || t.status === 'blocked'}>
@@ -735,6 +739,8 @@ export const register: Register = on => {
                 {t.status}
                 {t.note === '' ? '' : ` · ${t.note}`}
                 {live}
+                {time === '' ? '' : ` · ${time}`}
+                {last}
               </Text>
             </Text>
           )
@@ -797,7 +803,7 @@ export const register: Register = on => {
 }
 
 // /ticket-board's reply where no pane draws.
-function boardText(run: TicketBoard): string {
+function boardText(run: TicketBoard, now: number): string {
   const note = (n: string) => (n === '' ? '' : ` (${n})`)
   const runTickets = run.tickets ?? []
   const runStage = run.stage ?? ''
@@ -811,7 +817,13 @@ function boardText(run: TicketBoard): string {
     const status = chain !== '' ? chain : isAllLanded ? 'every PR landed' : 'nothing safe to merge yet'
     lines.push(`Safe to merge (${stackTally(run)}): ${status}`, ...stackWarnings(run), '')
   }
-  lines.push(...runTickets.map(t => `${ticketMark(t.status)} ${t.number} ${t.title}: ${t.status}${note(t.note)}`))
+  lines.push(
+    ...runTickets.map(t => {
+      const time = ticketTime(t, now)
+
+      return `${ticketMark(t.status)} ${t.number} ${t.title}: ${t.status}${note(t.note)}${time === '' ? '' : ` · ${time}`}`
+    }),
+  )
   if (runStage !== '') lines.push('', `${runStage}${runFindings.length > 0 ? `: ${findingTally(run)}` : ''}`)
   lines.push(...runFindings.map(f => `${findingMark(f.status)} ${f.title}: ${f.status}${note(f.note)}`))
   if (runOpen.length > 0) lines.push('', 'Open after this run')

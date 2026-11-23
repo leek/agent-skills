@@ -292,12 +292,18 @@ export function apply(previous: TicketBoard | null, change: BoardUpdate, now: nu
   for (const t of change.tickets) {
     const at = tickets.findIndex(one => one.number === t.number)
     const old = at === -1 ? undefined : tickets[at]
+    // The clock starts at the first dispatch and stops at the first done status; a ticket
+    // that reopens (a post-merge fix) keeps its start and stops again when it is done again.
+    const startedAt = old?.startedAt ?? (ACTIVE.has(t.status) ? now : undefined)
+    const doneAt = DONE.has(t.status) ? (old !== undefined && DONE.has(old.status) ? old.doneAt : now) : undefined
     const next: BoardTicket = {
       number: t.number,
       title: t.title ?? old?.title ?? '',
       status: t.status,
       // A status change without a note clears the old one; it described the old status.
       note: t.note ?? (old?.status === t.status ? old.note : ''),
+      ...(startedAt === undefined ? {} : { startedAt }),
+      ...(startedAt === undefined || doneAt === undefined ? {} : { doneAt }),
     }
     if (old === undefined) {
       tickets.push(next)
@@ -519,6 +525,28 @@ export function stackWarnings(board: TicketBoard): string[] {
 }
 
 const DONE = new Set<TicketStatus>(['built', 'merged', 'resolved', 'closed'])
+
+const ACTIVE = new Set<TicketStatus>(['running', 'fixing'])
+
+/** Coarse wall time for a ticket row: `42s`, `17m`, `2h05m`. */
+export function elapsed(ms: number): string {
+  const minutes = Math.floor(Math.max(0, ms) / 60000)
+  if (minutes < 1) return `${Math.round(Math.max(0, ms) / 1000)}s`
+  if (minutes < 60) return `${minutes}m`
+
+  return `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')}m`
+}
+
+/**
+ * How long a ticket took (dispatch to first done status), or how long it has run so far while
+ * it is still open; empty when the board never saw it start.
+ */
+export function ticketTime(t: BoardTicket, now: number): string {
+  if (t.startedAt === undefined) return ''
+  if (t.doneAt !== undefined) return elapsed(t.doneAt - t.startedAt)
+
+  return ACTIVE.has(t.status) ? elapsed(now - t.startedAt) : ''
+}
 
 export const title = (board: TicketBoard) => `${board.kind === 'map' ? 'Map' : 'Spec'}: ${board.slug}`
 
