@@ -7,8 +7,8 @@ it never reads the other reviews first, so their framing cannot narrow what it s
 ## Inputs to hand the reviewer
 
 - The PR title, body, and commit messages (intent, not evidence).
-- The range to review. First pass: `<base-sha>...<head-sha>`. Re-review (step 6),
-  after `git fetch origin`: when `git merge-base --is-ancestor <last-reviewed-sha> <head-sha>`
+- The range to review. First pass: `<base-sha>...<head-sha>`. Re-review (`triage-github-pr`'s step 6, or a `code-review`
+  re-review), after `git fetch origin`: when `git merge-base --is-ancestor <last-reviewed-sha> <head-sha>`
   holds, only the PR's own new commits,
   `git log -p --no-merges <last-reviewed-sha>..<head-sha> ^origin/<base>`, which leaves
   out what `gh pr update-branch` merged in from the base. When it does not hold (a

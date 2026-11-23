@@ -103,7 +103,7 @@ This section owns the audit inbox and its file format. Other skills that find mo
 
 Follow [references/submit.md](references/submit.md): review the diff, rerun the ledger for PRs opened during the cycle, commit, push, open the PR, label it, and wait for checks.
 
-With **`here`**, run only its steps 1 and 2, then commit the cycle's paths per the `commit` skill's [Staging](../commit/SKILL.md#staging) and [Subject](../commit/SKILL.md#subject). Never push, and skip its Clean up: the cycle made nothing to remove. Report each commit SHA where a PR link would go.
+With **`here`**, skip that file: its diff base (`origin/<default>`), worktree commands, and rebase all assume a branch of its own, and on the current branch they would pull in its earlier commits. Instead, review this cycle's uncommitted change only (`git diff HEAD -- <the cycle's paths>`) with submit's step 1 checklist, rerun `known-work.sh` as its step 2 does but never rebase, then commit the cycle's paths per the `commit` skill's [Staging](../commit/SKILL.md#staging) and [Subject](../commit/SKILL.md#subject). Never push. The cycle made nothing to clean up. Report each commit SHA where a PR link would go.
 
 ## 5. Finish the run
 

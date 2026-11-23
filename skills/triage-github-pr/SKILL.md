@@ -120,12 +120,14 @@ and output format are in
   only for your own same-repo PR, never forks or other authors), and `code_review.model`
   matches your current model: fetch the head (`git fetch origin <head>`) and verify
   `git merge-base --is-ancestor <code_review.head> <head_sha>` holds.
-  - When `git diff --name-only <code_review.head>..<head_sha> -- ':!.scratch/'` is empty
-    (zero non-`.scratch/` code changes since `code-review`), skip dispatching
+  - When `git log --no-merges --format=%H <code_review.head>..<head_sha> ^origin/<base> -- ':!.scratch/'`
+    prints nothing (no new non-`.scratch/` commits of the PR's own since `code-review`;
+    a base merge from `gh pr update-branch` is left out), skip dispatching
     `pr-reviewer` and record `Self: skipped (code-review covered <code_review.head> on
     <model>)` against `<head_sha>`. Codex and Copilot provide the model-independent pass.
-  - When that diff is non-empty, narrow `pr-reviewer` to `<code_review.head>..<head_sha>`
-    with its workflow-coverage pass over the newly changed invariants.
+  - When it prints commits, narrow `pr-reviewer` to them, in the brief's re-review form
+    (`git log -p --no-merges <code_review.head>..<head_sha> ^origin/<base>`), with its
+    workflow-coverage pass over the newly changed invariants.
 - **Otherwise** (no trusted `code_review`, a different model or harness, non-ancestor or
   unverifiable commit, or `exhaustive` mode): review the full `<base-sha>...<head-sha>`
   diff, even when the PR has no other reviews. A PR body's `Left open:` lines are

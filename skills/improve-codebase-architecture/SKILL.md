@@ -79,4 +79,4 @@ When the grill settles the deepened module, the target is concrete enough to bui
 - **A refactor that fits one branch** → `/architecture-satisfaction <the settled target>`: it refactors toward that target in reviewed checkpoints.
 - **A refactor that spans several tickets** → `/to-spec`, which records the grill's decisions as a spec.
 
-Every candidate the user did not pick goes to the audit inbox (step 2's **Leave the rest as leads**), so a later `/sweep` can take it.
+The `Strong` and `Worth exploring` candidates the user did not pick are already in the audit inbox (step 2's **Leave the rest as leads**), so a later `/sweep` can take them.

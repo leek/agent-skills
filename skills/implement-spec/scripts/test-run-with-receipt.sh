@@ -39,7 +39,7 @@ expect() { [ "$1" = "$2" ] || fail "expected $2, got $1"; }
 out=$(run)
 expect "$(status "$out")" passed
 expect "$(printf '%s' "$out" | jq -r .cached)" true
-rg -q 'test output' "$T/stderr" || fail 'command output not forwarded'
+grep -q 'test output' "$T/stderr" || fail 'command output not forwarded'
 out=$(run)
 expect "$(status "$out")" reused
 expect "$(calls)" 1

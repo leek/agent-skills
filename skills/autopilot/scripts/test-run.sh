@@ -222,6 +222,18 @@ eq "shared registrations exit" "$status" 0
 eq "shared registrations workers at once" "$(sort -n "$t/c2-stub/concurrency" | tail -n 1)" "2"
 echo "ok tickets overlapping only on Shared registrations run in parallel"
 
+# ---- a Shared registration never runs beside an exclusive edit of the same path ----------
+r="$t/c3"
+new_repo "$r"
+ticket "$r" 01-a $'blocked-by: []\n' $'## Files\n\n- `app/One.php`\n\n## Shared registrations\n\n- `routes/web.php`'
+ticket "$r" 02-b $'blocked-by: []\n' $'## Files\n\n- `routes/web.php`'
+commit_repo "$r"
+status=0
+ap "$r" "$t/c3-stub" --provider claude --root .scratch/foo >/dev/null || status=$?
+eq "shared vs exclusive exit" "$status" 0
+eq "shared vs exclusive workers at once" "$(sort -n "$t/c3-stub/concurrency" | tail -n 1)" "1"
+echo "ok a Shared registration waits for an exclusive edit of the same path"
+
 # ---- a crashed worker keeps its claim and fails the run after the others land -----------
 r="$t/d"
 new_repo "$r"
