@@ -6,7 +6,7 @@ You are one fresh top-level session in an Autopilot run that builds one spec. Th
 
 1. Follow the repository instructions the harness loaded; read them from disk only when they are absent. Once you know the work paths, read every deeper `AGENTS.md`, `AGENTS.local.md`, `CLAUDE.md`, `CLAUDE.md.local`, and path-matched project rule that applies.
 2. The run ID, the workflow path, and the manifest in the launch prompt are authoritative. The workflow is the `implement-spec` skill: the runner plays its orchestrator for steps 1–4, and the finish worker plays it from step 5 on. Skills it names sit beside it, and `ticket.sh` is `bash <workflow dir>/../setup/scripts/ticket.sh`.
-3. The manifest's `mode` picks your section below: `build` or `finish`.
+3. The manifest's `mode` picks your section below: `build`, `verify`, or `finish`.
 
 ## Build mode: one ticket, in its worktree
 
@@ -26,10 +26,22 @@ The runner has claimed `ticket_file` for this run and created `worktree` on `tic
 
 Return `continue` with `completed_ref` set to `ticket_ref` only after `finish` printed `landed: true` and the report is written. The runner checks both and fails the ticket otherwise.
 
+## Verify mode: check landed tickets, in the verify worktree
+
+The runner hands you `tickets`, each landed on `branch`, and `worktree`, a detached worktree that the verify workers of this run share. You are `implement-spec`'s step 4 verifier for those tickets: read that skill's **Guardrails**, **Stack references**, and the **Verify each ticket as it merges** paragraph of step 4, and follow its brief, with these differences.
+
+- **Setup carries over.** When `worktree` is already runnable (an earlier verify worker set it up: dependencies, env config, its database `<app db>_spec_<slug>_verify`), keep it and do only the setup the new commits need. Otherwise make it runnable by step 3.2's recipe and register its database.
+- **Check the integration tip once:** `git checkout --detach <branch>`, then each ticket's acceptance criteria, in the order given. Read each ticket file (`<tracker_root>/.scratch/<slug>/tickets/<NN>-*.md`), the spec's Build Contract, and `decisions_dir`.
+- **Write one record per ticket**, `<notes>/verify-<NN>.md`, and screenshots in `screenshots`, as that paragraph says. A failure is only recorded: nobody fixes it now, and the finish worker's fix batch takes it.
+- **Never write code, commit, or write `.scratch/`.**
+
+Return `continue` with `completed_ref` set to `verify` once every ticket has a record, failures included; `summary` names each ticket's result. Return `blocked` when the app cannot be served or set up, naming why: the finish worker then verifies those tickets.
+
 ## Finish mode: review, verify, resolve, deliver
 
 Every buildable ticket is landed on `branch` in `integration`, your working directory. You are `implement-spec`'s orchestrator from step 5 on: read that skill completely, then run its steps 5, 6, 7, and 8 with the manifest's values (`base_sha`, `notes`, `delivery`, `merged`, `delivery_ticket`). `delivery` is `pr` (One PR), `stack` (Stacked PRs), or `branch` (push, no PR). The differences:
 
+- **Step 5's verify pass** follows that step's narrow rule, with one difference: no step 4 verifier is alive, so dispatch a fresh verifier subagent for it, pointed at the verify worktree `<main checkout>/.claude/worktrees/<branch>--verify` when it exists (its setup is done) and at the `<notes>/verify-<NN>.md` records. Step 8 removes that worktree like a fixer worktree.
 - **Nobody answers.** Step 6's full-suite question: follow the repo's rule or the user's saved preference when one settles it, otherwise skip the full run and say so. A finding that needs the user's decision is left open: name it in the PR as a `Left open:` line and in `reason`. Every Design finding (tagged `DESIGN`) is one of these: never fix it.
 - **Step 7 resolves exactly the `merged` tickets**, each from `<notes>/<NN>.md`, with `ticket.sh --root <tracker_root> resolve`. Work `delivery_ticket` only when it is not null. Tickets named in `left_open` were not built: say so in the PR body, and leave them open.
 - **A deploy gate** in `deploy_gates` ends this delivery: say in the PR body that it must be deployed before its dependents are built.

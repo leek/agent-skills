@@ -2,8 +2,8 @@
 # Offline end-to-end test for the Autopilot run loop (lib/runner.sh, lib/tickets.sh, land.sh).
 # Runs autopilot.sh in throwaway repositories under mktemp -d with a stub provider binary
 # (AUTOPILOT_CLAUDE_BIN) that plays a worker: a build worker commits one file in its
-# worktree and lands it with land.sh; the finish worker resolves the landed tickets with
-# ticket.sh. No agent CLI, no tmux, no network.
+# worktree and lands it with land.sh; the verify worker writes a pass record per landed
+# ticket; the finish worker resolves the landed tickets with ticket.sh. No agent CLI, no tmux, no network.
 # Prints one `ok <case>` line per case; exits non-zero on the first failed assertion.
 set -e
 set -o pipefail
@@ -72,7 +72,17 @@ if [ "$mode" = "build" ]; then
   bash "$(m .land)" finish --notes "$(m .notes)" --integration "$(m .integration)" --ticket "$ticket" >/dev/null 2>&1
   printf 'Built %s.\nAssumed: colour -> blue\n' "$ticket" >"$(m .report_file)"
   result continue "$(m .ticket_ref)" "landed"
+elif [ "$mode" = "verify" ]; then
+  printf 'verify %s %s\n' "$(m '.tickets | join(",")')" "$(pwd -P)" >>"$STUB_DIR/verify-log"
+  if grep -q 'BADVERIFY' "$(m .tracker_root)/.scratch/$(m .slug)/tickets/"*.md; then
+    exit 7
+  fi
+  for n in $(m '.tickets[]'); do
+    printf 'pass\n' >"$(m .notes)/verify-$n.md"
+  done
+  result continue "verify" "verified"
 else
+  ls "$(m .notes)" | grep -c '^verify-' >"$STUB_DIR/verified" || true
   printf 'finish %s %s\n' "$(m '.merged | join(",")')" "$(pwd -P)" >>"$STUB_DIR/log"
   m '[.retro_sessions[] | .ticket + ":" + .outcome + ":" + (.events | test("events[.]jsonl$") | tostring)] | join(",")' >"$STUB_DIR/retro"
   printf 'resolved\n' >"$STUB_DIR/body"
@@ -139,7 +149,7 @@ ticket "$r" 04-ship $'blocked-by: ["01", "02", "03"]\ndelivery: true\n'
 commit_repo "$r"
 
 status=0
-out="$(ap "$r" "$t/a-stub" --provider claude --root .scratch/foo/spec.md)" || status=$?
+out="$(ap "$r" "$t/a-stub" --provider claude --root .scratch/foo/spec.md --max-iterations 4)" || status=$?
 eq "run exit" "$status" 0
 eq "run status" "$(printf '%s' "$out" | jq -r '.status')" "complete"
 eq "workers at once" "$(sort -n "$t/a-stub/concurrency" | tail -n 1)" "2"
@@ -159,7 +169,10 @@ grep -q 'ticket 01 assumed: colour -> blue' "$t/err" || fail "an assumption was 
 grep -q 'ticket 03 merged (3 of 3' "$t/err" || fail "the last merge was not announced"
 grep -q 'Autopilot: board {"stage":"review and verify round 1"}' "$t/err" || fail "the finish worker's board line was not relayed"
 eq "no retro candidates on a clean run" "$(cat "$t/a-stub/retro")" ""
-echo "ok every ticket lands on the integration branch and the finish worker closes them"
+eq "tickets landed beside a build are verified" "$(cut -d' ' -f2 "$t/a-stub/verify-log" | tr ',' '\n' | sort | paste -sd, -)" "01,02"
+eq "verify worktree" "$(cut -d' ' -f3 "$t/a-stub/verify-log" | sort -u)" "$r/.claude/worktrees/foo--verify"
+eq "verify records before finish" "$(cat "$t/a-stub/verified")" "2"
+echo "ok tickets are verified as they land beside a build, outside the session budget, and the finish worker closes them"
 
 state="$(ap "$r" "$t/a-stub" --status --root .scratch/foo)"
 eq "status by directory root" "$(printf '%s' "$state" | jq -r '[.status, .branch, .delivery, (.concurrency | tostring), (.workers | length | tostring)] | join(" ")')" "complete foo pr 5 0"
@@ -284,6 +297,22 @@ eq "worktree ticket" "$(derived "$i" 01)" "closed"
 eq "main checkout branch" "$(git -C "$r" branch --show-current)" "$main_branch"
 eq "worktree status" "$(ap "$r" "$t/w-stub" --status --root .scratch/foo/spec.md | jq -r '[.status, .delivery, .cleanup, .integration] | join(" ")')" "complete branch auto $i"
 echo "ok an integration worktree is the tracker and the landing place; the main checkout stays put"
+
+# ---- a crashed verify worker never fails the run: the finish worker verifies instead ------
+r="$t/v"
+new_repo "$r"
+ticket "$r" 01-a $'blocked-by: []\n' "BADVERIFY"
+ticket "$r" 02-b $'blocked-by: ["01"]\n'
+commit_repo "$r"
+status=0
+out="$(ap "$r" "$t/v-stub" --provider claude --root .scratch/foo)" || status=$?
+eq "verify crash exit" "$status" 0
+eq "verify crash status" "$(printf '%s' "$out" | jq -r '.status')" "complete"
+eq "no verify record" "$(cat "$t/v-stub/verified")" "0"
+grep -q 'verify worker ended without a result for tickets 01' "$t/err" || fail "the verify crash was not announced"
+eq "crashed verify ticket still closes" "$(derived "$r" 01)" "closed"
+eq "last ticket goes to the finish worker" "$(grep -c '' "$t/v-stub/verify-log")" "1"
+echo "ok a crashed verify worker is announced and the finish worker verifies its tickets"
 
 # ---- refusals before any worker ----------------------------------------------------------
 r="$t/e"

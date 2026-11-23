@@ -1,6 +1,7 @@
 #!/bin/bash
 # Stateful Autopilot run loop: a parallel frontier of fresh top-level worker processes, each
-# build worker in its own worktree, landing on one integration branch; then one finish worker.
+# build worker in its own worktree, landing on one integration branch; one verify worker at a
+# time checks the landed tickets while the build goes on; then one finish worker.
 
 set -e
 
@@ -26,6 +27,9 @@ TERMINAL_REASON=""
 TERMINAL_EXIT=0
 NEXT_HEARTBEAT=0
 BOARD_LINES_SEEN=0
+VERIFY_LABEL="verify"
+VERIFY_QUEUE=""
+VERIFY_LAUNCHES=0
 
 find_skill() {
   local name="$1"
@@ -243,8 +247,8 @@ validate_result() {
 }
 
 # ---- worker slots ----------------------------------------------------------------------
-# One directory per worker under $TEMP_DIR/w/<label>: <label> is the ticket number, or
-# "finish". Bash 3.2 has no associative arrays, so the files are the table.
+# One directory per worker under $TEMP_DIR/w/<label>: <label> is the ticket number,
+# "verify", or "finish". Bash 3.2 has no associative arrays, so the files are the table.
 
 running_labels() {
   local slot
@@ -258,6 +262,11 @@ running_labels() {
 
 running_count() {
   running_labels | wc -l | tr -d ' '
+}
+
+# Build workers only: the verify worker never takes a build slot.
+build_running_count() {
+  running_labels | awk -v v="$VERIFY_LABEL" '$0 != v' | wc -l | tr -d ' '
 }
 
 worker_is_running() {
@@ -310,11 +319,17 @@ launch_worker() {
   local label="$1" mode="$2" cwd="$3" prompt="$4" ref="$5"
   local slot="$TEMP_DIR/w/$label" attempt_id event_file worker_pid worker_pgid runner_pgid
 
-  LAUNCHES=$((LAUNCHES + 1))
-  ITERATION="$LAUNCHES"
+  # Verify sessions are advisory and never spend the --max-iterations budget.
+  if [[ "$mode" == "verify" ]]; then
+    VERIFY_LAUNCHES=$((VERIFY_LAUNCHES + 1))
+    attempt_id="$(date -u '+%Y%m%dT%H%M%SZ')-$$-v$VERIFY_LAUNCHES"
+  else
+    LAUNCHES=$((LAUNCHES + 1))
+    ITERATION="$LAUNCHES"
+    attempt_id="$(date -u '+%Y%m%dT%H%M%SZ')-$$-$LAUNCHES"
+  fi
   rm -rf -- "$slot"
   mkdir -p -- "$slot"
-  attempt_id="$(date -u '+%Y%m%dT%H%M%SZ')-$$-$LAUNCHES"
   event_file="$RUN_DIR/$attempt_id.$label.$PROVIDER.events.jsonl"
   touch "$event_file" "$slot/activity"
   : >"$slot/model"
@@ -453,6 +468,10 @@ handle_worker_result() {
   ref="$(sed -n '1p' "$slot/ref")"
   [[ "$mode" != "build" ]] || clear_land_lock "$BRANCH--$label"
 
+  if [[ "$mode" == "verify" ]]; then
+    handle_verify_result "$slot" "$worker_exit"
+    return 0
+  fi
   if [[ "$worker_exit" != "0" ]]; then
     fail_unit "$label" "the $PROVIDER worker process exited $worker_exit"
     return 0
@@ -487,6 +506,7 @@ handle_worker_result() {
         return 0
       fi
       LAST_COMPLETED_REF="$ref"
+      VERIFY_QUEUE="$VERIFY_QUEUE $label"
       frontier_refresh
       announce_activity "ticket $label merged ($(landed_numbers | wc -l | tr -d ' ') of $(frontier_query '[.tickets[] | select(.delivery | not)] | length') landed on $BRANCH)"
       announce_assumptions "$label"
@@ -659,7 +679,7 @@ dispatch_frontier() {
   # This run's own interrupted claims first, then the ready frontier, lowest number first.
   if [[ ${own[0]+present} ]]; then
     for number in "${own[@]}"; do
-      [[ "$DRAINING" == "false" && "$(running_count)" -lt "$CONCURRENCY" ]] || return 0
+      [[ "$DRAINING" == "false" && "$(build_running_count)" -lt "$CONCURRENCY" ]] || return 0
       if unit_is_skipped "$number" || worker_is_running "$number" || ticket_is_landed "$number"; then
         continue
       fi
@@ -673,7 +693,7 @@ dispatch_frontier() {
   fi
   if [[ ${ready[0]+present} ]]; then
     for number in "${ready[@]}"; do
-      [[ "$DRAINING" == "false" && "$(running_count)" -lt "$CONCURRENCY" ]] || return 0
+      [[ "$DRAINING" == "false" && "$(build_running_count)" -lt "$CONCURRENCY" ]] || return 0
       if unit_is_skipped "$number" || worker_is_running "$number" || ticket_is_landed "$number"; then
         continue
       fi
@@ -685,6 +705,76 @@ dispatch_frontier() {
       start_build_worker "$number" frontier
     done
   fi
+}
+
+# A verify session is advisory: whatever it returns, the run goes on, and the finish worker
+# verifies every landed ticket that has no `pass` in <notes>/verify-<NN>.md.
+handle_verify_result() {
+  local slot="$1" worker_exit="$2" tickets status summary
+  tickets="$(sed -n '1p' "$slot/ref")"
+  if [[ "$worker_exit" != "0" ]] || ! validate_result "$slot/result.json"; then
+    announce_activity "verify worker ended without a result for tickets $tickets: the finish worker verifies them"
+    return 0
+  fi
+  cp -- "$slot/result.json" "$RUN_DIR/result-$VERIFY_LABEL-$VERIFY_LAUNCHES.json" || true
+  status="$(jq -r '.status' "$slot/result.json")"
+  summary="$(jq -r '.summary' "$slot/result.json")"
+  announce_activity "verify $tickets $status: $summary"
+}
+
+ensure_verify_worktree() {
+  local worktree="$1"
+  [[ ! -d "$worktree" ]] || return 0
+  mkdir -p -- "$(dirname "$worktree")" || return 1
+  git -C "$MAIN_CHECKOUT" worktree add --detach "$worktree" "$BRANCH" >/dev/null 2>&1
+}
+
+# One verify worker at a time takes every ticket landed since the last one started, in its
+# own detached worktree, so its environment setup carries over between sessions. It runs only
+# beside build workers: once none is building, the queue is the finish worker's, so the
+# finish never waits on a new verify session.
+dispatch_verify() {
+  local tickets worktree="$MAIN_CHECKOUT/.claude/worktrees/$BRANCH--verify" manifest
+  [[ -n "${VERIFY_QUEUE// /}" ]] || return 0
+  ! worker_is_running "$VERIFY_LABEL" || return 0
+  tickets="$(printf '%s\n' $VERIFY_QUEUE | paste -sd' ' -)"
+  if [[ "$(build_running_count)" -eq 0 ]]; then
+    VERIFY_QUEUE=""
+    record_activity "tickets $tickets landed with no build running: the finish worker verifies them"
+    return 0
+  fi
+  VERIFY_QUEUE=""
+  if ! ensure_verify_worktree "$worktree"; then
+    announce_activity "could not create the verify worktree $worktree: the finish worker verifies tickets $tickets"
+    return 0
+  fi
+  manifest="$(jq -cn \
+    --arg spec_file "$TRACKER_ROOT/.scratch/$SPEC_SLUG/spec.md" \
+    --arg tracker_root "$TRACKER_ROOT" \
+    --arg decisions_dir "$TRACKER_ROOT/.scratch/$SPEC_SLUG/decisions" \
+    --arg slug "$SPEC_SLUG" \
+    --arg branch "$BRANCH" \
+    --arg worktree "$worktree" \
+    --arg integration "$INTEGRATION_DIR" \
+    --arg notes "$NOTES_DIR" \
+    --arg board_file "$NOTES_DIR/board.jsonl" \
+    --arg tickets "$tickets" \
+    '{
+      mode: "verify",
+      tickets: ($tickets | split(" ") | map(select(. != ""))),
+      spec_file: $spec_file,
+      tracker_root: $tracker_root,
+      decisions_dir: $decisions_dir,
+      slug: $slug,
+      branch: $branch,
+      worktree: $worktree,
+      integration: $integration,
+      notes: $notes,
+      screenshots: ($notes + "/screenshots"),
+      board_file: $board_file
+    }')"
+  announce_activity "verifying tickets $tickets in $worktree"
+  launch_worker "$VERIFY_LABEL" verify "$worktree" "$(build_prompt "$worktree" "$manifest")" "$tickets"
 }
 
 start_finish_worker() {
@@ -883,6 +973,7 @@ run_autopilot_loop() {
         DISPATCH_NEEDED="false"
         dispatch_frontier
       fi
+      dispatch_verify
       if [[ "$(running_count)" -eq 0 ]]; then
         decide_when_idle
       fi

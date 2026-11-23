@@ -1,7 +1,8 @@
 #!/bin/bash
 # Build one spec with fresh top-level Claude Code, Codex, or Grok processes: a parallel
 # frontier of build workers, each in its own worktree, landing on one integration branch,
-# then one finish worker that reviews, verifies, resolves, and delivers.
+# one verify worker at a time checking landed tickets meanwhile, then one finish worker that
+# reviews, verifies what is left, resolves, and delivers.
 # Human-readable progress goes to stderr; terminal results and status use JSON on stdout.
 
 set -euo pipefail
@@ -186,8 +187,12 @@ Run options:
 
 Each ready ticket gets a build worker in <main checkout>/.claude/worktrees/<branch>--<NN>
 on the branch <branch>--<NN>; a ticket whose Files overlap a running ticket's waits. A
-worker lands its branch with land.sh, one at a time. When nothing more can be built, one
-finish worker runs in the integration checkout. Run notes (reports, landed/, the landing
+worker lands its branch with land.sh, one at a time. After each landing, one verify worker
+at a time (outside the concurrency limit) checks the tickets landed since the last one, in
+<main checkout>/.claude/worktrees/<branch>--verify; tickets that land with no build
+running are left to the finish worker. Verify sessions do not count toward
+--max-iterations. When nothing more can be built and no verify worker runs, one finish
+worker runs in the integration checkout. Run notes (reports, landed/, the landing
 lock, screenshots) are in <git-common-dir>/implement-spec/<branch>.
 
 Autopilot writes raw provider events and a human-readable log under the target
