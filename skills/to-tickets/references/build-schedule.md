@@ -26,6 +26,9 @@ graph; a larger worker count cannot shorten a chain.
 4. In the delivery ticket's `## Build schedule`, record the longest dependency
    chain, remaining shared-file bottlenecks, and the proposed first wave. A chain
    that could be shortened without changing semantics gets revised before publish.
+   Mechanical batches (test fixtures, call-site migrations) never block on each
+   other: the shared factories, helpers or states they need go in their own small
+   ticket, and every batch blocks only on that one.
 
 Finish when every shared path has an owner/dependency or an explicit serialization
 note, and the first wave can run together without overlapping files.

@@ -15,6 +15,8 @@ Turn sessions into a ranked list of concrete improvements to the agent's **envir
 
 Claude Code (`~/.claude/projects`, `$CLAUDE_CONFIG_DIR/projects`, and each `~/.claude-profiles/*/projects`), Codex (`~/.codex/sessions`, plain and `.jsonl.zst`), Grok (`~/.grok/sessions`), and agy (`~/.gemini/antigravity-cli`: `history.jsonl` plus one SQLite `.db` per conversation). Two scripts in `<this-skill-dir>/scripts/` read them, read-only: they stream archives without decompressing in place and open SQLite read-only. Store their output in the session scratchpad, never beside the logs.
 
+**Did a change make a workflow faster?** Compare runs of the same workflow before and after it, not a fresh sample: `bash <this-skill-dir>/scripts/run-metrics.sh <session .jsonl> [--repo DIR --stack PREFIX]` gives one Claude Code run's waits, subagent rows, and tokens as JSON, plus per-ticket lines changed for an `implement-spec` stack. Compare phase milestones (first dispatch to whole-branch review, review to last fix) normalized by lines changed, never raw wall time, and say which changes no run exercised yet.
+
 ## 1. Pick the N most recent sessions
 
 Default N = 50 **parent sessions** unless the user gives a number. Run once:
