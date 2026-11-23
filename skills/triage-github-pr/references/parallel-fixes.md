@@ -47,7 +47,9 @@ path, its findings' step 4 lines with links, its file list, the repo's `AGENTS.m
   `skills/tdd/SKILL.md`) and prove each fix per its **What needs a test** section: a
   behaviour fix gets a regression test that fails without it, a presentation fix gets
   none, and the report says so. Make the minimal change.
-- Run focused tests in the foreground and wait for the result. End with them green.
+- Work one finding at a time: its test, its fix, its focused test in the foreground
+  (wait for the result), its commit, then the next finding. End with every focused
+  test green.
 - Never end your turn while a command you started is still running. If the shell tool
   moves a command to the background (it does at its timeout), wait for it in the
   foreground: `bash <harness-tools dir>/scripts/wait-task-output.sh <the output file it
@@ -56,10 +58,15 @@ path, its findings' step 4 lines with links, its file list, the repo's `AGENTS.m
 - Touch a file outside the list only when the fix cannot land without it, and name it in
   the report.
 - Format the touched paths with the repo's formatter, and commit each finding on its
-  own, per the **Staging** and **Subject** sections of the `commit` skill's `SKILL.md`,
-  the subject naming the finding. (Write its absolute path into the brief:
+  own as soon as its test is green, never batched at the end, per the **Staging** and
+  **Subject** sections of the `commit` skill's `SKILL.md`, the subject naming the
+  finding. (Write its absolute path into the brief:
   `<this-skill-dir>/../commit/SKILL.md`.)
 - Never push, never write to GitHub, never touch `.scratch/`.
+- Before reporting, re-read your whole diff from the commit you started at, as a
+  reviewer who did not write it, and fix what it turns up: a fix that breaks a sibling
+  path or undoes another finding's fix comes back from the pre-push review as a new
+  finding.
 - Report in at most ten lines: each finding's commit SHA, the touched paths, the focused
   test command and result, and anything that blocks a finding.
 

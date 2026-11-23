@@ -19,19 +19,26 @@ graph; a larger worker count cannot shorten a chain.
    behavior, and dependent feature tickets block on it. Keep each feature
    independently demoable. A `## Files` edit that remains stays serialized;
    incomplete features waiting for a final wiring ticket are not a fix.
-3. Give each build ticket a `## Scheduling` section with `Work: 1`, `Work: 2`, or
+3. Land each **shared seam** first, as its own small ticket: a helper or trait
+   that several tickets will add to, a test-factory state or translation layer
+   they all lean on. Every ticket that needs it blocks on that ticket alone,
+   never on a sibling that happens to build it, so parallel tickets reuse one
+   seam instead of each inventing their own. A large mechanical rewrite (call
+   sites, or the existing tests a new shape breaks, across a hundred-plus files)
+   is cut into batches per [Wide refactors](wide-refactor.md) step 2, enough of
+   them to fill the build's concurrency, each blocked only by the seam it needs:
+   batches never block on each other, and one agent working through the whole
+   rewrite is a chain of one.
+4. Give each build ticket a `## Scheduling` section with `Work: 1`, `Work: 2`, or
    `Work: 3` (small, medium, large relative to this effort), and one sentence naming
    the likely cost: implementation, setup, or tests. These are scheduling estimates,
    not promises or questions for the user. Split a ticket too large for one session.
-4. In the delivery ticket's `## Build schedule`, record the longest dependency
+5. In the delivery ticket's `## Build schedule`, record the longest dependency
    chain, remaining shared-file bottlenecks, and the proposed first wave. A chain
    that could be shortened without changing semantics gets revised before publish.
-   Mechanical batches (test fixtures, call-site migrations) never block on each
-   other: the shared factories, helpers or states they need go in their own small
-   ticket, and every batch blocks only on that one.
 
 Finish when every shared path has an owner/dependency or an explicit serialization
-note, and the first wave can run together: no `## Files` path of one ticket appears
+note, every shared seam has its own ticket, and the first wave can run together: no `## Files` path of one ticket appears
 in another's `## Files` or `## Shared registrations` (two Shared registrations of one
 path may overlap).
 

@@ -57,7 +57,7 @@ nonignored untracked files in scope exist, and inputs remain unchanged across
 the run. Thus it also works during `git merge --no-commit`, when the index holds the
 prospective merge. Dirty or uncertain state executes tests without caching them.
 
-At integration, regenerate context and invoke the same command through the helper. The integration checkout has its own path and database, so a context that records a worktree path or database name literally never matches. Record them as the setup the runner normalizes (a fresh per-run test database, paths relative to the repo root) when you can prove it does; otherwise expect a run, not a reuse.
+At integration, regenerate context and invoke the same command through the helper. The integration checkout has its own path and database, so a context that records a worktree path or database name literally never matches. Record them as the setup the runner normalizes (a fresh per-run test database, paths relative to the repo root) when you can prove it does; otherwise expect a run, not a reuse. Where that proof holds, write each ticket's context that way from the start: once implementers merge the tip at report time, the merged tree usually equals the tree they tested, and a matching context turns the merge check into a reuse.
 An identical tree, command, repository and context reuses the result. A changed
 integration tip, conflict resolution, or environment causes a run. Separate receipt
 files have one writer each; wait for the implementer's report before using its file.
