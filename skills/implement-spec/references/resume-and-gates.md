@@ -14,7 +14,11 @@ Read this when [`scripts/spec-run-state.sh`](../scripts/spec-run-state.sh) repor
 
 A `deploy-gate: true` ticket bounds the run: build up to and including it, then stop at step 7 with a PR; its dependents start after that PR is deployed.
 
-When dependents would wait behind a gate, ask once, in step 1's question call, before the first dispatch (not after the gate PR opens): stop at the gate, or build the dependents in this run on a second integration branch `<slug>-2` cut from the gate branch's tip.
+When dependents would wait behind a gate, ask once, in step 1's question call, before the first dispatch (not after the gate PR opens): stop at the gate, or build the dependents in this run on a second integration branch `<slug>-2` cut from the gate branch's tip. When several gate tickets are ready together, the same question covers which of them this run builds.
+
+**Each option states what it costs.** Every stop at a gate ends the run, and the next run pays for its own review, verification, merge and deploy. So each option's text gives the tickets it builds now and the deploys the spec still needs after it, from `ticket.sh frontier`'s `gates` (`deploys_left` is the fewest possible; `chain` names them): `Stop at the gate: 5 tickets now, 4 more deploys` beside `Second branch: 9 tickets now, 3 more deploys`.
+
+**Recommend by what the dependents need, never the narrowest scope by default.** Recommend the wider option (the second branch, or every ready gate the spec's deploy order allows together) when the dependents need the gate live only for ordering. Recommend stopping when a dependent is built from what the gate's deploy finds in production (a measurement, a parity report that may not read zero), or the spec's Build Contract says these gates deploy apart.
 
 - Before dispatching the first contract/drop ticket on `<slug>-2`, confirm the gate branch `<slug>` has no remaining writes or reads to the columns or tables `<slug>-2` drops.
 - `<slug>-2` takes changes only by merging `<slug>` (the gate ticket and its review fixes), never by merging or cherry-picking any other branch.

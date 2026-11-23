@@ -58,7 +58,8 @@ common() { (cd "$repo" && cd "$(git rev-parse --git-common-dir)" && pwd -P); }
 new_repo
 run feat
 eq fresh-exit "$code" 0
-eq fresh-keys "$(field 'keys_unsorted | join(",")')" "slug,branch,mode,finished,integration_worktree,notes,base_sha,decision_sweep_done,build_decisions,local_default_scratch_only,default"
+eq fresh-keys "$(field 'keys_unsorted | join(",")')" "slug,branch,mode,finished,integration_worktree,notes,base_sha,decision_sweep_done,build_decisions,local_default_scratch_only,default,setup,setup_saved"
+eq fresh-setup "$(field '[.setup, .setup_saved] | @csv')" "\"$(common)/implement-spec/feat/setup.md\",false"
 eq fresh-values "$(field '[.slug, .branch, .mode, (.finished | length), .integration_worktree, .base_sha, .decision_sweep_done, .build_decisions, .local_default_scratch_only, .default] | @csv')" \
   '"feat","feat","fresh",0,"","",false,"",false,"main"'
 eq fresh-notes "$(field .notes)" "$(common)/implement-spec/feat"
@@ -102,10 +103,14 @@ git -C "$repo" switch -q main
 git -C "$repo" merge -q --ff-only feat
 git -C "$repo" push -q origin main
 GH_STATE=""
+mkdir -p "$(common)/implement-spec/feat"
+echo "worktree: worktree" > "$(common)/implement-spec/feat/setup.md"
 run feat
 eq landed-exit "$code" 0
 eq landed-values "$(field '[.branch, .mode, (.finished | join(" ")), .base_sha] | @csv')" '"feat-2","fresh","feat",""'
 eq landed-notes "$(field .notes)" "$(common)/implement-spec/feat-2"
+# The saved setup answers belong to the spec, so the second run reads the first run's file.
+eq landed-setup "$(field '[.setup, .setup_saved] | @csv')" "\"$(common)/implement-spec/feat/setup.md\",true"
 echo "ok <slug>-2 when the first landed"
 
 # <slug>-3: the first landed, the second's PR merged (gh), and finished stays a JSON array

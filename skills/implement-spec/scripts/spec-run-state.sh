@@ -11,7 +11,8 @@
 #   {"slug", "branch", "mode": "fresh"|"resume", "finished": [branches already landed],
 #    "integration_worktree": path or "", "notes": dir, "base_sha": sha or "",
 #    "decision_sweep_done": true|false, "build_decisions": path or "",
-#    "local_default_scratch_only": true|false, "default"}
+#    "local_default_scratch_only": true|false, "default",
+#    "setup": file, "setup_saved": true|false}
 #   With --default-only (what implement's start-branch.sh reads, so the rule lives here
 #   once): only {"default", "local_default_scratch_only"}, with no branch or gh lookup.
 #
@@ -24,6 +25,8 @@
 #   and no later commit touching the spec or its tickets.
 # - local_default_scratch_only: local <default> is ahead of origin/<default> only by
 #   commits touching .scratch/<slug>.
+# - setup: where the spec's worktree, delivery and cleanup answers are kept, one file for
+#   every run of the spec (under <slug>, never <slug>-<n>). setup_saved: it is non-empty.
 
 set -e
 
@@ -126,9 +129,15 @@ for f in .scratch/"$slug"/decisions/*.md; do
   break
 done
 
+setup="$common/implement-spec/$slug/setup.md"
+setup_saved=0
+[ -s "$setup" ] && setup_saved=1
+
 jq -cn --arg slug "$slug" --arg branch "$branch" --arg mode "$mode" --argjson finished "$finished" \
   --arg wt "$wt" --arg notes "$notes" --arg base "$base" --argjson sweep "$(bool $sweep)" \
   --arg bd "$bd" --argjson scratch_only "$(bool $scratch_only)" --arg default "$default" \
+  --arg setup "$setup" --argjson setup_saved "$(bool $setup_saved)" \
   '{slug: $slug, branch: $branch, mode: $mode, finished: $finished, integration_worktree: $wt,
     notes: $notes, base_sha: $base, decision_sweep_done: $sweep, build_decisions: $bd,
-    local_default_scratch_only: $scratch_only, default: $default}'
+    local_default_scratch_only: $scratch_only, default: $default,
+    setup: $setup, setup_saved: $setup_saved}'

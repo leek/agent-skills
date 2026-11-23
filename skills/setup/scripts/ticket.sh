@@ -14,8 +14,12 @@
 #   frontier <slug> [--kind tickets|decisions]                              read-only
 #     {"slug","kind","tickets":[{"number","path","title","status","derived","claimed_by",
 #      "claim_age_seconds","blocked_by":[..],"open_blockers":[..],"type","deploy_gate",
-#      "delivery"}],"frontier":[..],"next","counts":{"open","closed","ready","blocked",
-#      "claimed","in_progress","human"}}
+#      "delivery"}],"frontier":[..],"next","gates":{"total","open","chain":[..],
+#      "deploys_left"},"counts":{"open","closed","ready","blocked","claimed",
+#      "in_progress","human"}}
+#     "gates" counts the deploy-gate tickets ("open": not closed). "chain" is the longest
+#     run of open gate tickets along the blocking edges, and "deploys_left" its length:
+#     the fewest deploys the open tickets still need, each one ending a build run.
 #     "number" is the file's number as written ("01"); "path" is relative to the root.
 #     "derived" is closed | ready | blocked | claimed (claimed-by set) | in-progress
 #     (status in-progress, no claimant) | human (a build ticket, unblocked and unclaimed,
@@ -494,6 +498,45 @@ def still_open(blockers: list, built: set) -> list:
     return [b for b in blockers if not (b.isdigit() and int(b) in built)]
 
 
+def gate_summary(rows: list[dict]) -> dict:
+    """Deploy gates still to ship, and the longest chain of them along the blocking edges.
+
+    Each gate on one chain needs its own deploy before the next is built, so the chain's
+    length is the fewest deploys the open tickets still need.
+    """
+    by_number = {r["number"]: r for r in rows}
+    is_open = lambda r: r["derived"] != "closed"
+    best: dict[str, list[str]] = {}
+
+    def chain(number: str, seen: frozenset) -> list[str]:
+        if number in best:
+            return best[number]
+        row = by_number.get(number)
+        if row is None or number in seen:
+            return []
+        longest: list[str] = []
+        for blocker in row["blocked_by"]:
+            found = chain(blocker, seen | {number})
+            if len(found) > len(longest):
+                longest = found
+        own = [number] if row["deploy_gate"] and is_open(row) else []
+        best[number] = longest + own
+        return best[number]
+
+    longest: list[str] = []
+    for row in rows:
+        found = chain(row["number"], frozenset())
+        if len(found) > len(longest):
+            longest = found
+    gates = [r for r in rows if r["deploy_gate"]]
+    return {
+        "total": len(gates),
+        "open": sum(1 for r in gates if is_open(r)),
+        "chain": longest,
+        "deploys_left": len(longest),
+    }
+
+
 def cmd_frontier(root: str, args: list[str]) -> None:
     rest, opts = take_options(args, ("--kind", "--built"))
     if len(rest) != 1:
@@ -553,6 +596,7 @@ def cmd_frontier(root: str, args: list[str]) -> None:
         "tickets": rows,
         "frontier": frontier,
         "next": frontier[0] if frontier else None,
+        "gates": gate_summary(rows),
         "counts": {
             "open": sum(1 for r in rows if r["derived"] != "closed"),
             "closed": count("closed"),

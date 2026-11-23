@@ -86,6 +86,18 @@ eq "frontier kind" "$(q "$f" '.kind')" '"tickets"'
 eq "frontier numbers" "$(q "$f" '[.tickets[].number]')" '["01","02","03","04","05","06","07","08"]'
 echo "ok frontier lists tickets and the ready numbers lowest first"
 
+eq "one gate" "$(q "$f" '.gates')" '{"total":1,"open":1,"chain":["03"],"deploys_left":1}'
+g="$r/.scratch/gates/tickets"
+ticket "$g/01-a.md" closed $'blocked-by: []\ndeploy-gate: true\n'
+ticket "$g/02-b.md" ready-for-agent $'blocked-by: [01]\ndeploy-gate: true\n'
+ticket "$g/03-c.md" ready-for-agent $'blocked-by: [02]\n'
+ticket "$g/04-d.md" ready-for-agent $'blocked-by: [03]\ndeploy-gate: true\n'
+ticket "$g/05-e.md" ready-for-agent $'blocked-by: []\ndeploy-gate: true\n'
+run "$r" frontier gates
+eq "gate chain" "$(q "$out" '.gates')" '{"total":4,"open":3,"chain":["02","04"],"deploys_left":2}'
+rm -rf "$r/.scratch/gates"
+echo "ok frontier counts deploy gates and the longest chain of open ones"
+
 eq "derived states" "$(q "$f" '[.tickets[].derived]')" \
   '["closed","closed","ready","blocked","claimed","in-progress","ready","human"]'
 eq "wontfix closed" "$(q "$f" '.tickets[1] | [.status, .derived]')" '["wontfix","closed"]'

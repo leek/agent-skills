@@ -72,6 +72,8 @@ When writing a build ticket, read and use the canonical [Build ticket template](
 
 When the spec sequences deploys (expand/migrate/contract, "ship A, deploy, then B", a command that must exist in production before the enforcement that calls it), set `deploy-gate: true` on every ticket that must be live before its dependents are built. Blockers alone do not express this: a worker can close ticket A and start ticket B on the same branch, collapsing three deploys into one PR. `autopilot` builds up to a deploy-gate ticket, delivers that, and stops with `needs_input` before its dependents; a human session should likewise commit, deploy, and only then pick up the dependents.
 
+Every gate ends a build run, so tell the user what the gates cost before a build claims anything. After `ticket.sh lint` passes, read `ticket.sh frontier <slug>`'s `gates`, and when `open` is above 0 report one line: `<open> deploy gates, at least <deploys_left> deploys (<chain>)`. When `deploys_left` is above 3, name beside it which gates wait on production data (a backfill, a one-time operation, a parity check) and which only keep areas apart, so the user can ask to merge the second kind.
+
 Files are numbered from `01` in topological order: every blocker has a lower number than the ticket it blocks. Numbers order dependencies; they do not serialize independent tickets.
 
 ## After publishing

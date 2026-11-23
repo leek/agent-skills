@@ -29,6 +29,26 @@ echo '{"agentType":"leek-skills:implementer","description":"ticket 01","model":"
   echo '{"type":"assistant","timestamp":"2026-01-01T10:30:00Z","message":{"id":"s1","usage":{"output_tokens":7,"cache_read_input_tokens":50},"content":[]}}'
 } > "$T/sess/subagents/agent-a.jsonl"
 
+# A second subagent, described as a stack ticket, whose ref is gone: sized from its PR.
+echo '{"agentType":"general-purpose","description":"feat--03 participants","model":"m"}' > "$T/sess/subagents/agent-b.meta.json"
+{
+  echo '{"type":"user","timestamp":"2026-01-01T10:10:00Z","message":{"role":"user","content":"brief"}}'
+  echo '{"type":"assistant","timestamp":"2026-01-01T10:20:00Z","message":{"id":"t1","usage":{"output_tokens":3},"content":[]}}'
+} > "$T/sess/subagents/agent-b.jsonl"
+
+# gh stub: one pull request for feat-stack-03, none for any other head.
+mkdir -p "$T/bin"
+cat > "$T/bin/gh" <<'GH'
+#!/bin/bash
+case "$*" in
+  *"--head feat-stack-03 "*) echo '[{"number":7,"additions":150,"deletions":50,"changedFiles":4,"createdAt":"2026-01-01T10:25:00Z"}]' ;;
+  *) echo '[]' ;;
+esac
+GH
+chmod +x "$T/bin/gh"
+PATH="$T/bin:$PATH"
+export PATH
+
 out=$(bash "$script" "$s" 2>"$T/err") || fail "session: exit $?"
 eq "wall" "$(jq -r .wall_min <<<"$out")" 60.0
 eq "questions" "$(jq -r .questions_answered <<<"$out")" 1
@@ -38,6 +58,10 @@ eq "humans" "$(jq -r .human_messages <<<"$out")" 2
 eq "errors" "$(jq -r .tool_errors <<<"$out")" 1
 eq "parent out" "$(jq -r .parent_tokens.output <<<"$out")" 15
 echo "ok session timing, waits, errors and tokens"
+
+# 61 minutes: agents 10:10-10:30 (21), the question 10:01-10:06 with nothing running (6)
+eq "phases" "$(jq -c .phases <<<"$out")" '{"agents_running_min":21,"question_idle_min":6,"question_busy_min":0,"quiet_min":34}'
+echo "ok phases split the session by agents running and questions open"
 
 eq "sub minutes" "$(jq -r '.subagents_by_type["leek-skills:implementer"].agent_minutes' <<<"$out")" 20.0
 eq "sub out" "$(jq -r '.subagents[0].tokens.output' <<<"$out")" 7
@@ -58,7 +82,10 @@ git -C "$r" -c user.email=t@t -c user.name=t commit -q -m two
 git -C "$r" update-ref refs/remotes/origin/feat-stack-02 HEAD
 
 out=$(bash "$script" "$s" --repo "$r" --stack feat 2>"$T/err") || fail "stack: exit $?"
-eq "ticket count" "$(jq -r '.tickets|length' <<<"$out")" 2
+eq "ticket count" "$(jq -r '.tickets|length' <<<"$out")" 3
+eq "03 from its PR" "$(jq -c '.tickets[]|select(.ticket=="03")|[.source,.pr,.lines,.files,.build_minutes,.minutes_per_100_lines]' <<<"$out")" '["pr",7,200,4,10.0,5.0]'
+eq "first pr" "$(jq -r '.first_pr_min' <<<"$out")" 15.0
+eq "01 source" "$(jq -c '.tickets[]|select(.ticket=="01")|[.source,.build_minutes]' <<<"$out")" '["ref",null]'
 eq "01 parent" "$(jq -r '.tickets[]|select(.ticket=="01").parent' <<<"$out")" origin/feat
 eq "01 lines" "$(jq -r '.tickets[]|select(.ticket=="01").lines' <<<"$out")" 2
 eq "02 parent" "$(jq -r '.tickets[]|select(.ticket=="02").parent' <<<"$out")" origin/feat-stack-01
