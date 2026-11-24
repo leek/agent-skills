@@ -99,7 +99,7 @@ Where the harness has a structured question tool ([harness-tools](../harness-too
 
 Without one of these tools, ask the same shape in chat (numbered options, recommendation first, trade-off per line, and under each option the fenced block its `preview` would hold) and wait for the answer. Never print fake tool JSON.
 
-A rejected question did not land. Ask the same decision again once, rewritten: the situation first, fewer terms, and each option stated as what will happen. If the user rejects that too, take the recommended option, record it as `implied`, and move on.
+A rejected or dismissed question remains unanswered. If delivery failed, use the waiting or chat fallback in [harness-tools](../harness-tools/SKILL.md). If the user says the question is unclear, ask it again with the situation first, fewer terms, and each option stated as what will happen. Keep the decision open until the user answers or explicitly delegates the choice.
 
 ## Stop Conditions
 

@@ -38,6 +38,8 @@ Use your harness's tool with the skill's own content (the brief, the agent type,
 
 **Structured question.** A click-to-answer question: the recommended option first and marked as recommended, real options only, and a free-text Other that the harness adds. When the skill asks for more questions or options than your tool takes, split them over further calls; when it asks for multi-select and your tool has none, ask that question in chat. Fallback: the same shape in chat: the question, the numbered options with the recommendation first, then wait for the answer.
 
+Completion: the user supplied an answer. A question must never disappear before the user can answer it. A tool acknowledging delivery leaves the question pending. Follow the harness's waiting or chat fallback so the question stays visible and answerable; a status summary cannot replace an unanswered question.
+
 ## While background sub-agents run
 
 Each wake either changes the run's state or does not. A repeat of a report you already used gets no reply: end the turn without text. An idle notice or completion from an agent that has not delivered its report is a **stall**, even when it explains itself: it says it is waiting on a background run, a test, or a notice, or it carries no report and no new commit. Follow up with it at once: "Nothing will wake you. Wait for that run in the foreground with `wait-task-output.sh`, then finish and report." A wake that changes state gets one status line with the count and the names still running (`4 of 7 done; waiting on billing-export, fax-cover`), so the user never has to ask for status.

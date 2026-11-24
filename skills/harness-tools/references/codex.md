@@ -31,3 +31,7 @@ Start it with `exec_command`, then poll with an empty `write_stdin` at `yield_ti
 ## Structured question
 
 `request_user_input`, only when it is in your tool list for this turn (Plan mode): 1–3 questions, each with a `header` (12 characters at most), an `id`, and 2–3 single-select options of `label` and `description`. No `preview` and no multi-select: put a short snippet in the option description, or show side-by-side artifacts in chat first.
+
+Prefer `request_user_input` whenever it is in your tool list: it blocks until the user answers, so the question stays open. Use `request_user_input_async` only when the blocking tool is absent. It returns as soon as the question is displayed, before the user answers: an `accepted` result means delivery, not an answer, and ending the turn can dismiss its controls. No tool is known to wait for the answer (the top-level `wait` is not documented as one), so after an async question, do only work that does not depend on the answer, then end the turn with the chat fallback: the complete question and its numbered choices in the final reply, so it stays answerable after the controls disappear. Never end on a status summary while a question is pending.
+
+Keep the decision open until the user answers; elapsed time, dismissal, or a new unrelated message is not a choice.
